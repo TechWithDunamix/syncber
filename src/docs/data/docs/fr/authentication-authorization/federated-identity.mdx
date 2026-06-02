@@ -138,11 +138,11 @@ Le SCIM (System for Cross-domain Identity Management) est le protocole standard 
 | Opération SCIM | Événement IdP | Action SP |
 |---------------|--------------|-----------|
 | **POST /Users** | Nouvel utilisateur ajouté | Créer un compte dans l'application |
-| **PUT /Users/{id}** | Attributs utilisateur modifiés | Mettre à jour les attributs du compte |
-| **PATCH /Users/{id}** | Changement partiel d'attributs | Mise à jour partielle |
-| **DELETE /Users/{id}** | Utilisateur supprimé/désactivé | Désactiver/supprimer le compte |
+| **PUT /Users/`{id}`** | Attributs utilisateur modifiés | Mettre à jour les attributs du compte |
+| **PATCH /Users/`{id}`** | Changement partiel d'attributs | Mise à jour partielle |
+| **DELETE /Users/`{id}`** | Utilisateur supprimé/désactivé | Désactiver/supprimer le compte |
 | **POST /Groups** | Nouveau groupe créé | Créer un groupe correspondant |
-| **PATCH /Groups/{id}** | Appartenance au groupe modifiée | Ajouter/retirer l'utilisateur du groupe |
+| **PATCH /Groups/`{id}`** | Appartenance au groupe modifiée | Ajouter/retirer l'utilisateur du groupe |
 
 ### Déploiement SCIM typique
 

@@ -189,7 +189,7 @@ Week 13-16: Cutover complete
 ## Key Takeaways
 
 - IAM/PAM migrations are among the highest-risk infrastructure projects — a failed IdP migration can lock users out of all applications, and a failed PAM migration can block all administrative access
-- Four migration strategies exist: big bang (all-at-once, highest risk, for <500 users), phased (by group, app, geography, or business unit), coexistence (old and new systems operate simultaneously with attribute synchronisation), and hybrid (phased migration with coexistence period)
+- Four migration strategies exist: big bang (all-at-once, highest risk, for fewer than 500 users), phased (by group, app, geography, or business unit), coexistence (old and new systems operate simultaneously with attribute synchronisation), and hybrid (phased migration with coexistence period)
 - IdP migration follows five phases: assessment (4-8 weeks), planning (4-8 weeks), build and test (4-8 weeks), phased execution (8-16 weeks with pilot → early adopters → phased rollout → long tail), and post-migration stabilisation and optimisation
 - PAM migration presents unique challenges including credential portability (passwords cannot be exported in plaintext — use API import with staged rotation), session recording continuity (archive old recordings, maintain search), and connector reconfiguration for all managed systems
 - Coexistence requires attribute synchronisation between old and new IdPs — password hash sync (PHS) for seamless user authentication during transition, directory sync for attribute consistency, and credential import for PAM

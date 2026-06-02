@@ -157,7 +157,7 @@ User Browser ──> IdP Auth ──> IdP Session Created ──> SP Token Issue
 | **Self-hosted (Keycloak)** | 99.9% (with HA) | 8.76 hours | Same as above + no federated access |
 | **Self-hosted (single node)** | 99% | 87.6 hours | Complete authentication failure |
 
-<Aside variant="warning">
+<Aside variant="caution">
 IdP downtime means ALL applications that rely on SSO authentication become unavailable. Users cannot access any federated application, including email, CRM, cloud infrastructure, and collaboration tools. IdP HA is not optional — it is a business-critical requirement that should be designed with multi-region active-active deployment, automatic failover, and regular DR testing.
 </Aside>
 

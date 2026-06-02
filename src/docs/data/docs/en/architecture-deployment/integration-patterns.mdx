@@ -52,11 +52,11 @@ SCIM (System for Cross-domain Identity Management) is the standard protocol for 
 | SCIM Operation | HRIS Event | IAM Action |
 |----------------|------------|------------|
 | **POST /Users** | New employee record created | Create user account in IdP, PAM, target systems |
-| **PUT /Users/{id}** | Employee attribute change | Update user attributes, trigger role recalculation |
-| **PATCH /Users/{id}** | Partial attribute update | Update specific attributes without full replacement |
-| **DELETE /Users/{id}** | Employee record deleted (retired) | Disable user account, trigger deprovisioning workflow |
+| **PUT /Users/`{id}`** | Employee attribute change | Update user attributes, trigger role recalculation |
+| **PATCH /Users/`{id}`** | Partial attribute update | Update specific attributes without full replacement |
+| **DELETE /Users/`{id}`** | Employee record deleted (retired) | Disable user account, trigger deprovisioning workflow |
 | **POST /Groups** | New department/team created | Create corresponding group in IAM |
-| **PATCH /Groups/{id}** | Group membership change | Add/remove user from group, recalculate entitlements |
+| **PATCH /Groups/`{id}`** | Group membership change | Add/remove user from group, recalculate entitlements |
 
 ### HRIS Integration Patterns
 

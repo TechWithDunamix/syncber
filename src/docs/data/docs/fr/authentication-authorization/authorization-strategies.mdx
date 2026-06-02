@@ -84,7 +84,7 @@ L'approche la plus pragmatique pour la plupart des organisations : utiliser RBAC
 | Modèle | Sécurité | Cas d'Usage | Mise en Œuvre |
 |--------|----------|-------------|---------------|
 | **Clé API** | Faible | Accès machine, faible sensibilité | En-tête X-API-Key |
-| **JWT (Bearer Token)** | Moyenne | API REST, utilisateur connecté | En-tête Authorization: Bearer <token> |
+| **JWT (Bearer Token)** | Moyenne | API REST, utilisateur connecté | `Authorization: Bearer &lt;token&gt;` |
 | **OAuth 2.0 Client Credentials** | Élevée | M2M, service à service | OAuth 2.0 flow |
 | **mTLS (Mutual TLS)** | Très élevée | Service mesh, API financières | Certificat client + serveur |
 | **HMAC / Signature de requête** | Très élevée | API sensibles (paiement, signature) | Signature HMAC de la requête |

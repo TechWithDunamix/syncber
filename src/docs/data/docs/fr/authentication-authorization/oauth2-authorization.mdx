@@ -77,7 +77,7 @@ Application Mobile                    Authorization Server
 | **Contenu** | sub, aud, iss, exp, iat, scopes |
 | **Durée de vie** | 15-60 minutes |
 | **Validation** | Signature (RS256/ES256), audience, expiration |
-| **Transport** | En-tête HTTP Authorization: Bearer <token> |
+| **Transport** | `Authorization: Bearer &lt;token&gt;` |
 
 Exemple de JWT Access Token décodé :
 
