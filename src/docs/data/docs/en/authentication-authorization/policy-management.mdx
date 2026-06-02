@@ -1,0 +1,247 @@
+---
+title: "Policy Management"
+description: "Enterprise policy management — PDP/PEP/PIP architecture, policy lifecycle, policy-as-code workflows, policy languages (XACML, Rego, Cedar), and enterprise policy platforms."
+sidebar:
+  order: 10
+  label: "Policy Management"
+---
+
+Policy management is the discipline of defining, storing, evaluating, and governing the rules that control access to resources. In modern IAM architectures, policies are the central mechanism for translating business requirements into enforceable access controls, and they must be managed with the same rigour as application code.
+
+Well-managed policies provide consistent enforcement across heterogeneous systems, clear audit trails for compliance, and the agility to respond to changing business and security requirements.
+
+## The Policy Architecture
+
+The XACML standard defines the canonical policy architecture, which has been widely adopted beyond XACML itself:
+
+| Component | Function | Responsible For |
+|-----------|----------|-----------------|
+| **PAP** (Policy Administration Point) | Creating, editing, and managing policies | Policy administrators, CI/CD pipeline |
+| **PDP** (Policy Decision Point) | Evaluating access requests against policies and returning decisions | Policy engine (OPA, AuthZForce, Axiomatics) |
+| **PEP** (Policy Enforcement Point) | Intercepting access requests and enforcing PDP decisions | Application middleware, API gateway, agent |
+| **PIP** (Policy Information Point) | Providing attribute values required for policy evaluation | Identity directory, HR system, CMDB |
+| **PAP** | Storing policies in a repository | Policy database, Git repository |
+
+### Policy Decision Flow — Full Context
+
+```
+┌─────────┐     ┌─────────┐     ┌─────────┐     ┌─────────┐
+│  User   │────→│   PEP   │────→│   PDP   │────→│   PIP   │
+│(Subject)│     │(Enforce)│     │(Decide) │     │  (Attr) │
+└─────────┘     └─────────┘     └─────────┘     └─────────┘
+                     │               │               │
+                     │          ┌────┴────┐     ┌────┴────┐
+                     │          │  PAP    │     │  HR DB  │
+                     │          │(Policies)│     │  AD/LDAP│
+                     │          └─────────┘     └─────────┘
+                     ▼
+               ┌──────────┐
+               │  Access  │
+               │  Grant/  │
+               │  Deny    │
+               └──────────┘
+```
+
+### Policy Decision Responses
+
+| Decision | Meaning | Example |
+|----------|---------|---------|
+| **Permit** | Access is allowed | "User can view document" |
+| **Deny** | Access is explicitly denied | "User is blocked from admin console" |
+| **NotApplicable** | No policy matches this request | "No policy covers this action on this resource" |
+| **Indeterminate** | Policy evaluation failed | "Attribute source unavailable, rule evaluation error" |
+
+Policy combining algorithms determine the final decision when multiple rules apply:
+
+| Algorithm | Behaviour | Use Case |
+|-----------|-----------|----------|
+| **Deny-overrides** | If any rule evaluates to Deny, the final decision is Deny | Security-first — default deny with exceptions |
+| **Permit-overrides** | If any rule evaluates to Permit, the final decision is Permit | Open-by-default — used when maximising access |
+| **First-applicable** | The first rule that matches determines the decision | Ordered policy evaluation, precedence-based |
+| **Only-one-applicable** | Exactly one rule must apply; otherwise Indeterminate | Strict policy environments, no ambiguity |
+
+## Policy Lifecycle
+
+Policies should be managed through a defined lifecycle, analogous to software development:
+
+```
+Design → Develop → Test → Deploy → Monitor → Retire
+   ↑                                        │
+   └────────────────────────────────────────┘
+                   Review
+```
+
+### Phase 1: Design
+
+- Identify the business requirement driving the policy change
+- Define the policy objective in plain language
+- Identify required attributes and their data sources
+- Assess impact: which users, resources, and actions will be affected?
+- Document the policy intent and expected behaviour
+
+### Phase 2: Develop
+
+- Write the policy in the chosen policy language (XACML, Rego, Cedar)
+- Structure policies for clarity and maintainability
+- Define test cases covering Permit, Deny, and edge cases
+- Store the policy in version control (Git)
+
+### Phase 3: Test
+
+| Test Type | What It Validates | Tooling |
+|-----------|-------------------|---------|
+| **Unit tests** | Individual rule evaluation for specific inputs | `opa test`, custom test harnesses |
+| **Integration tests** | Policy interaction with attribute sources and PEP | Postman, integration test suite |
+| **Regression tests** | Existing policies unchanged by new policy | CI/CD pipeline with automated test suite |
+| **Performance tests** | Policy evaluation latency under load | Load testing (k6, Gatling) |
+| **Impact analysis** | Which users/resources are affected by policy change | Policy simulation (describe-affected, what-if analysis) |
+
+### Phase 4: Deploy
+
+- Deploy to staging environment for validation
+- Run canary deployment (apply to 5% of traffic, monitor for issues)
+- Full rollout with rollback capability
+- Update policy version in the policy repository
+
+### Phase 5: Monitor
+
+| Metric | What It Tracks | Alert Threshold |
+|--------|----------------|-----------------|
+| **Decision count** | Volume of policy evaluations | Significant change from baseline |
+| **Decision distribution** | Ratio of Permit/Deny/NotApplicable | >10% increase in Deny rate |
+| **Evaluation latency** | Time to evaluate policy | p99 > 100ms |
+| **Error rate** | Indeterminate decisions | > 0.1% error rate |
+| **Cache hit ratio** | PDP cache effectiveness | < 80% cache hit rate |
+
+### Phase 6: Review and Retire
+
+- Periodic policy certification (annual or quarterly)
+- Review policy effectiveness — is it achieving the intended outcome?
+- Identify orphaned policies — no longer referenced by any application
+- Rationalise overlapping policies — merge or replace
+- Archive retired policies for audit reference
+
+## Policy Languages Comparison
+
+| Language | Standard | Paradigm | Expressiveness | Tooling Ecosystem | Learning Curve |
+|----------|----------|----------|---------------|-------------------|----------------|
+| **XACML** | OASIS | Declarative XML | High | Mature (enterprise) | Steep |
+| **ALFA** | OASIS | Abbreviated XACML | High | Moderate | Moderate |
+| **Rego (OPA)** | Open Source | Declarative / Logic | Very High | Excellent (k8s, cloud) | Moderate |
+| **Cedar** | AWS | Declarative | High | Good (AWS Verified Permissions) | Low |
+| **Odin** | Open Source | Declarative | High | Emerging | Low |
+| **Casbin** | Open Source | Configuration | Moderate | Good (multi-language) | Low |
+
+### Rego (OPA) — The Cloud-Native Standard
+
+Rego is the policy language for Open Policy Agent. It uses a rule-based, declarative approach:
+
+```rego
+package api.authz
+
+# Default deny
+default allow = false
+
+# Admin override — full access for admin users
+allow {
+    input.user.roles[_] == "admin"
+}
+
+# Self-service — users can read their own data
+allow {
+    input.method == "GET"
+    input.path == sprintf("/users/%s", [input.user.id])
+}
+
+# Project-based access — users can read project resources for projects they belong to
+allow {
+    input.method == "GET"
+    input.path == sprintf("/projects/%s", [input.project.id])
+    data.projects[input.project.id].members[_] == input.user.email
+}
+```
+
+### Cedar (AWS) — The AWS-Native Option
+
+Cedar is a purpose-built policy language developed by AWS for use in AWS Verified Permissions and Amazon Verified Permissions:
+
+```cedar
+// Permit policy: allow user to read their own documents
+permit (
+    principal in [user::"alice"],
+    action in [Action::"read"],
+    resource in [Document::"report.docx"]
+) when {
+    resource.owner == principal
+};
+
+// Forbid policy: deny access to classified documents
+forbid (
+    principal,
+    action,
+    resource
+) when {
+    resource.classification == "confidential" &&
+    principal.clearance_level < 5
+};
+```
+
+<Aside variant="tip">
+For greenfield deployments in cloud-native environments, choose **Rego/OPA** — it has the richest ecosystem, broadest platform support (Kubernetes, microservices, APIs), and is vendor-independent. For AWS-native architectures, consider **Cedar** for integration with AWS Verified Permissions and Cognito.
+</Aside>
+
+## Policy Repository and Versioning
+
+Policies should be stored in a centralised, version-controlled repository:
+
+| Feature | Local Files | Git Repository | Policy DB (Enterprise) |
+|---------|-------------|----------------|----------------------|
+| **Versioning** | Manual | Git (full history) | Built-in |
+| **Review workflow** | None | PR/MR workflow | Custom workflow |
+| **Access control** | Filesystem permissions | Git permissions | Role-based |
+| **Audit trail** | None | Git log | Built-in audit |
+| **Rollback** | Manual restore | Git revert | Built-in rollback |
+| **Branching** | None | Full branching | Limited |
+| **Scalability** | Limited | Enterprise-scale | Enterprise-scale |
+
+**Recommended approach**: Store policies in Git with the following structure:
+
+```
+policies/
+├── production/
+│   ├── api-authz/
+│   │   ├── admin.rego
+│   │   ├── self-service.rego
+│   │   └── project-access.rego
+│   ├── data-access/
+│   │   ├── pii-protection.rego
+│   │   └── row-level-security.rego
+│   └── network/
+│       └── network-policies.rego
+├── staging/
+│   └── (mirrors production structure)
+├── test/
+│   ├── api-authz_test.rego
+│   └── data-access_test.rego
+└── policy-metadata.yaml
+```
+
+## Enterprise Policy Management Platforms
+
+| Platform | Policy Engine | Key Features | Best For |
+|----------|--------------|--------------|----------|
+| **Axiomatics** | Proprietary XACML | Attribute-based, SOD, simulation, impact analysis | Large enterprises, regulated |
+| **SailPoint IIQ** | Proprietary | IGA + policy management, certification | Identity governance |
+| **Saviynt** | Proprietary | IGA + cloud security, policy management | Cloud-first organisations |
+| **OPA + Styra DAS** | OPA/Rego | Policy-as-code, declarative, k8s-native | Cloud-native, microservices |
+| **AWS Verified Permissions** | Cedar | Serverless, integrated with AWS services | AWS-native applications |
+| **Google Zanzibar** | ReBAC (proprietary) | Relationship-based, massive scale | Content platforms, collaboration |
+
+## Key Takeaways
+
+- The XACML architecture (PAP, PDP, PEP, PIP, PRP) is the canonical framework for policy-based access control — adopted beyond XACML itself by OPA, Cedar, and other modern systems
+- Policies return four possible decisions: Permit, Deny, NotApplicable, or Indeterminate — with combining algorithms (deny-overrides, permit-overrides, first-applicable) resolving conflicts
+- The policy lifecycle mirrors software development: design → develop → test → deploy → monitor → review → retire, with each phase requiring specific tooling and practices
+- Rego (OPA) is the leading policy language for cloud-native environments; Cedar (AWS) is the leading option for AWS-native architectures
+- Policies should be stored in Git with a structured repository, enabling versioning, review workflows, CI/CD testing, and rollback
+- Enterprise policy platforms range from XACML-based (Axiomatics) for regulated industries to OPA/Styra for cloud-native and Zanzibar for relationship-based models

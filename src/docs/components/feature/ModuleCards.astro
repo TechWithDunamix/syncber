@@ -1,0 +1,168 @@
+---
+import { docsRoute } from "@/docs/js/docsUtils";
+import { getLocaleFromUrl } from "@/docs/js/localeUtils";
+import { getLocalizedRoute } from "@/docs/js/translationUtils";
+
+const currLocale = getLocaleFromUrl(Astro.url);
+
+interface ModuleItem {
+  title: string;
+  description: string;
+  href: string;
+}
+
+const moduleData: ModuleItem[] = [
+  {
+    title: "Fundamentals of IAM",
+    description:
+      "Learn the core concepts of Identity and Access Management — identity lifecycles, directories, user provisioning, and foundational IAM models.",
+    href: `/${docsRoute}/iam-fundamentals/`,
+  },
+  {
+    title: "Authentication & Authorization",
+    description:
+      "Deep dive into MFA, SSO, federated identity, OAuth 2.0, OIDC, SAML, and authorization models including RBAC and ABAC.",
+    href: `/${docsRoute}/authentication-authorization/`,
+  },
+  {
+    title: "Privileged Access Management",
+    description:
+      "Master credential vaulting, session management, just-in-time access, least privilege enforcement, and privileged account discovery.",
+    href: `/${docsRoute}/privileged-access-management/`,
+  },
+  {
+    title: "Identity Governance",
+    description:
+      "Explore role management, access certifications, Segregation of Duties, entitlement reviews, and policy-driven access controls.",
+    href: `/${docsRoute}/identity-governance/`,
+  },
+  {
+    title: "Compliance, Auditing & Reporting",
+    description:
+      "Understand how IAM and PAM map to SOX, GDPR, PCI DSS, HIPAA, and how to build audit-ready access controls and reporting.",
+    href: `/${docsRoute}/compliance-security/`,
+  },
+  {
+    title: "Architecture & Deployment",
+    description:
+      "Design and deploy production-ready IAM/PAM architectures — HA/DR, integration patterns, and operational best practices.",
+    href: `/${docsRoute}/architecture-deployment/`,
+  },
+];
+---
+
+<section id="module-cards" class="relative my-12 overflow-hidden py-6 md:py-12">
+  <div class="docs-home-container">
+    <div class="mb-14 text-center" data-mos="fade-down">
+      <h2 class="docs-h1">Course Modules</h2>
+      <p class="text-muted-foreground mx-auto mt-4 max-w-2xl text-pretty">
+        Six comprehensive modules take you from IAM fundamentals to production-ready PAM deployment.
+      </p>
+    </div>
+
+    <!-- Timeline -->
+    <div class="relative mx-auto max-w-5xl">
+      <!-- Center line (desktop) / Left line (mobile) -->
+      <div
+        class="bg-border/60 absolute left-4 top-0 h-full w-0.5 md:left-1/2 md:-translate-x-px"
+        aria-hidden="true"
+      ></div>
+
+      {
+        moduleData.map((mod, idx) => {
+          const isLeft = idx % 2 === 0;
+          const stepNum = idx + 1;
+          return (
+            <div
+              class="relative mb-10 pl-12 md:mb-14 md:pl-0"
+              data-mos="fade-down"
+              data-mos-anchor="#module-cards"
+              data-mos-delay={idx * 100}
+            >
+              <div class="md:grid md:grid-cols-2 md:gap-8 lg:gap-12">
+                <!-- Card -->
+                <div
+                  class={`${isLeft ? "md:col-start-1 md:pr-8" : "md:col-start-2 md:pl-8"} ${!isLeft ? "md:col-start-2" : ""}`}
+                >
+                  <a
+                    href={getLocalizedRoute(currLocale, mod.href)}
+                    class="group relative block rounded-xl border bg-card p-6 transition-all duration-200 hover:border-accent hover:shadow-lg hover:-translate-y-1"
+                  >
+                    <div class="flex items-start gap-3">
+                      <span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-accent/10 text-sm font-bold text-accent md:hidden">
+                        {stepNum}
+                      </span>
+                      <div class="min-w-0">
+                        <h3 class="text-foreground mb-2 text-lg font-semibold group-hover:text-accent">
+                          {mod.title}
+                        </h3>
+                        <p class="text-muted-foreground text-sm leading-relaxed">
+                          {mod.description}
+                        </p>
+                        <div class="mt-4 flex items-center text-sm font-medium text-accent">
+                          View Module
+                          <svg
+                            class="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  </a>
+                </div>
+              </div>
+
+              <!-- Step circle on the timeline -->
+              <div
+                class="absolute left-2.5 top-2 z-10 hidden size-7 -translate-x-1/2 items-center justify-center rounded-full border-2 border-accent bg-card text-xs font-bold text-accent md:flex md:left-1/2"
+                aria-hidden="true"
+              >
+                {stepNum}
+              </div>
+            </div>
+          );
+        })
+      }
+    </div>
+
+    <!-- Pricing -->
+    <div
+      class="mx-auto mt-14 max-w-lg text-center"
+      data-mos="fade-down"
+      data-mos-anchor="#module-cards"
+      data-mos-delay="700"
+    >
+      <div class="relative rounded-2xl border border-accent/20 bg-gradient-to-b from-accent/[0.04] to-transparent p-8 shadow-lg ring-1 ring-accent/10 md:p-10">
+        <!-- decorative glow -->
+        <div
+          aria-hidden="true"
+          class="pointer-events-none absolute -inset-4 rounded-3xl opacity-30 blur-2xl"
+          style="background: radial-gradient(ellipse at center, var(--color-accent) 0%, transparent 70%)"
+        ></div>
+        <div class="relative">
+          <span class="mb-4 inline-block rounded-full border border-accent/20 bg-accent/10 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-accent">
+            Full Course Access
+          </span>
+          <div class="mb-1 flex items-baseline justify-center gap-1">
+            <span class="text-lg text-muted-foreground">$</span>
+            <span class="text-6xl font-bold tracking-tight text-foreground">249.99</span>
+          </div>
+          <p class="text-muted-foreground mb-6 text-base">for six months of access</p>
+          <a
+            href={getLocalizedRoute(currLocale, `/${docsRoute}/iam-pam-professional`)}
+            class="inline-flex items-center gap-2 rounded-xl bg-accent px-8 py-3 text-base font-semibold text-accent-foreground shadow-lg shadow-accent/25 transition-all duration-200 hover:brightness-110 hover:shadow-xl hover:shadow-accent/30 active:scale-[0.97]"
+          >
+            Get Started
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" />
+            </svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

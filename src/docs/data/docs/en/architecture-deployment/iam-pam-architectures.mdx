@@ -1,0 +1,213 @@
+---
+title: "IAM/PAM Architectures"
+description: "IAM and PAM architecture patterns — hub-and-spoke, cloud-hybrid, microservices, zero trust — including topology selection criteria, deployment models, and architecture decision frameworks."
+sidebar:
+  order: 2
+  label: "IAM/PAM Architectures"
+---
+
+Choosing the right IAM/PAM architecture is one of the most consequential decisions in an identity program. The architecture determines scalability, resilience, operational complexity, and the organisation's ability to adapt to changing requirements.
+
+## Architecture Patterns Overview
+
+| Pattern | Best For | Complexity | Scalability | Security |
+|---------|----------|------------|-------------|----------|
+| **Hub-and-Spoke** | Centralised control, regulated industries | Medium | Good | Strong |
+| **Cloud-Hybrid** | Cloud migration, multi-cloud | High | Excellent | Strong |
+| **Microservices/API-First** | Cloud-native, SaaS providers | High | Excellent | Very Strong |
+| **Zero Trust** | High-security, remote-first | High | Good | Strongest |
+
+## Hub-and-Spoke Architecture
+
+### Structure
+
+A central IAM/PAM platform (hub) connects to multiple target systems (spokes). The hub centralises policy management, identity provisioning, credential vaulting, and session management while enforcement occurs at the spoke level.
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                         HUB (Central)                         │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
+│  │  IGA Engine │  │ PAM Vault   │  │  IdP/SSO   │         │
+│  │  Policy Mgt │  │ Session Mgt │  │  MFA        │         │
+│  │  Certificat.│  │ Cred Vault  │  │  Token Svc  │         │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘         │
+│         │                │                │                  │
+└─────────┼────────────────┼────────────────┼──────────────────┘
+          │                │                │
+     ┌────┴────┐     ┌────┴────┐     ┌────┴────┐
+     │ Spoke 1 │     │ Spoke 2 │     │ Spoke 3 │
+     │ (Prod)  │     │ (Dev)   │     │ (DR)    │
+     └─────────┘     └─────────┘     └─────────┘
+```
+
+### When to Use
+
+| Criteria | Recommendation |
+|----------|---------------|
+| **Number of target systems** | 50+ (the hub reduces per-system management complexity) |
+| **Geographic distribution** | Multiple regions (hub in each region with central management) |
+| **Regulatory requirements** | Data residency, audit trail centralisation |
+| **Existing directory infrastructure** | Centralised AD or LDAP deployment |
+| **Operational model** | Centralised IAM team with local IT support |
+
+### Advantages and Challenges
+
+| Aspect | Advantage | Challenge |
+|--------|-----------|-----------|
+| **Policy management** | Single point for policy definition and distribution | Spoke-specific policy exceptions add complexity |
+| **Audit and reporting** | Centralised audit trail across all spoke systems | High-volume log centralisation requires bandwidth |
+| **User experience** | Consistent authentication across spokes | Hub becomes a single point of failure |
+| **Operational cost** | Lower per-system management cost | Hub infrastructure cost is concentrated |
+
+## Cloud-Hybrid Architecture
+
+### Structure
+
+Bridges on-premises and cloud resources with a cloud IdP as the authoritative identity source and on-premises directories synchronised to the cloud.
+
+```
+┌──────────────────────┐     ┌─────────────────────────┐
+│    ON-PREMISES       │     │      CLOUD              │
+│                       │     │                         │
+│  ┌─────────────────┐ │     │  ┌───────────────────┐  │
+│  │ Active Directory│─┼─────┼─>│ Cloud IdP         │  │
+│  │ (Authoritative) │ │ Sync│  │ (Okta/Azure/One)  │  │
+│  └─────────────────┘ │     │  └────────┬──────────┘  │
+│                       │     │           │              │
+│  ┌─────────────────┐ │     │  ┌────────┴──────────┐  │
+│  │ On-prem PAM     │ │     │  │ Cloud PAM         │  │
+│  │ (Servers/Apps)  │─┼─────┼─>│ (Cloud Consoles)  │  │
+│  └─────────────────┘ │     │  └───────────────────┘  │
+│                       │     │                         │
+│  ┌─────────────────┐ │     │  ┌───────────────────┐  │
+│  │ On-prem Apps    │─┼─────┼─>│ SaaS Apps         │  │
+│  │ (SAML/OIDC)     │ │     │  │ (via IdP Proxy)   │  │
+│  └─────────────────┘ │     │  └───────────────────┘  │
+└──────────────────────┘     └─────────────────────────┘
+```
+
+### Directory Synchronisation Strategy
+
+| Approach | Latency | Complexity | Use Case |
+|----------|---------|------------|----------|
+| **Real-time sync (SCIM)** | Seconds | Medium | Cloud IdP as primary directory |
+| **Near-real-time (Delta sync)** | Minutes | Low | AD Connect, Okera LDAP Agent |
+| **Batch sync (Daily)** | Hours | Very Low | Non-critical identity data |
+| **Event-driven (HRIS trigger)** | Minutes | Medium | HRIS attribute changes |
+
+### When to Use
+
+| Criteria | Recommendation |
+|----------|---------------|
+| **SaaS adoption** | 30%+ SaaS applications (cloud IdP for SSO) |
+| **Cloud infrastructure** | Multi-cloud or significant cloud native workload |
+| **On-premises investment** | Significant AD/LDAP infrastructure already deployed |
+| **Hybrid workforce** | Mix of on-prem and remote users |
+| **Merger/Acquisition** | Bridge between different identity domains |
+
+## Microservices / API-First Architecture
+
+### Structure
+
+For cloud-native environments, IAM/PAM capabilities are delivered as APIs and services rather than monolithic platforms:
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                    API GATEWAY                                 │
+│  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐    │
+│  │Auth N  │ │Token   │ │Policy  │ │User    │ │Audit   │    │
+│  │Service │ │Service │ │Engine  │ │Service │ │Service │    │
+│  └────────┘ └────────┘ └────────┘ └────────┘ └────────┘    │
+│        │          │          │          │          │         │
+└────────┼──────────┼──────────┼──────────┼──────────┼─────────┘
+         │          │          │          │          │
+    ┌────┴────┐ ┌───┴───┐ ┌───┴───┐ ┌───┴───┐ ┌───┴───┐
+    │Microsvc │ │ Micro │ │ Micro │ │ Micro │ │ Micro │
+    │   A     │ │  svc B│ │  svc C│ │  svc D│ │  svc E│
+    └─────────┘ └───────┘ └───────┘ └───────┘ └───────┘
+```
+
+### Key Design Principles
+
+| Principle | Implementation |
+|-----------|----------------|
+| **API-first** | All IAM capabilities exposed as REST/HTTP APIs |
+| **Stateless** | Authentication state in tokens (JWTs), not server sessions |
+| **Policy-as-code** | Authorisation policies in OPA/Cedar, version-controlled |
+| **Decentralised enforcement** | Each service enforces its own authorisation decisions |
+| **Centralised management** | Policy management, auditing, and reporting are centralised |
+| **Workload identity** | Service-to-service authentication via SPIFFE/SPIRE or OAuth client credentials |
+| **Zero standing privileges** | JIT credential delivery for service accounts |
+
+## Zero Trust Architecture
+
+### Core Principles Applied to IAM
+
+| Zero Trust Principle | IAM Implementation |
+|---------------------|-------------------|
+| **Verify explicitly** | Authenticate and authorise every access request regardless of source |
+| **Least privilege** | JIT access, just-enough-admin, granular RBAC/ABAC |
+| **Assume breach** | Continuous verification, session monitoring, credential rotation |
+| **Micro-segmentation** | Network segmentation enforced through identity-aware policies |
+| **Continuous validation** | Real-time risk scoring, session timeout enforcement, device posture check |
+
+### Zero Trust IAM Architecture
+
+```
+User Request ──> Identity Verification ──> Device Posture Check ──> Context Evaluation
+     │                  │                         │                      │
+     │         ┌────────┴────────┐        ┌────────┴────────┐    ┌──────┴──────┐
+     │         │ IdP: MFA        │        │ MDM: OS version │    │ Location    │
+     │         │ Risk scoring    │        │ Patch level     │    │ Time        │
+     │         │ Device identity │        │ Disk encryption │    │ Sensitivity │
+     │         └─────────────────┘        └─────────────────┘    │ Risk level  │
+     │                                                           └──────┬──────┘
+     │                                                                  │
+     └─────────────────────────────┬────────────────────────────────────┘
+                                   │
+                                   v
+                        ┌─────────────────────┐
+                        │  Policy Decision     │
+                        │  (Allow/Deny/Step-up)│
+                        └─────────────────────┘
+                                   │
+                         Allow ────┴──── Deny
+                            │             │
+                            v             v
+                     Access Granted   Access Denied
+                     (JIT ticket)     (Audit logged)
+```
+
+## Architecture Decision Framework
+
+### Decision Criteria
+
+| Factor | Weight | Hub-Spoke | Cloud-Hybrid | Microservices | Zero Trust |
+|--------|--------|-----------|--------------|---------------|------------|
+| **Number of systems** | High | 50+ systems | 100+ systems | 100+ microservices | Any scale |
+| **Cloud adoption** | High | Low-Medium | Medium-High | High | Medium-High |
+| **Security requirements** | High | Strong | Strong | Very Strong | Strongest |
+| **Operational maturity** | Medium | Medium | Medium-High | High | High |
+| **Regulatory requirements** | High | Strong fit | Good fit | Challenging | Strong fit |
+| **Existing investment** | High | On-prem AD/IGA | Hybrid infra | Cloud-native | New deployment |
+
+### Architecture Selection Matrix
+
+| Your Situation | Recommended Architecture |
+|---------------|-------------------------|
+| On-premises, regulated industry, 50+ apps | Hub-and-Spoke |
+| Mixed on-prem/cloud, 30%+ SaaS | Cloud-Hybrid |
+| Cloud-native, microservices, high scale | Microservices/API-First |
+| High security, remote workforce, zero trust mandate | Zero Trust |
+| Post-merger, multiple identity domains | Cloud-Hybrid with IdP Bridging |
+| Small organisation (< 500 users) | Cloud-Hybrid (SaaS IGA/PAM) |
+
+## Key Takeaways
+
+- Four primary IAM/PAM architecture patterns exist: hub-and-spoke (centralised control), cloud-hybrid (bridging on-prem and cloud), microservices/API-first (cloud-native), and zero trust (no implicit trust)
+- Hub-and-spoke centralises policy management and audit in a single platform but creates a potential single point of failure — best for regulated industries with 50+ on-premises systems
+- Cloud-hybrid architecture uses directory synchronisation (SCIM, delta sync, batch) to bridge on-prem AD/LDAP with cloud IdP — ideal for hybrid infrastructure with significant SaaS adoption
+- Microservices/API-first architecture applies API-first, stateless, policy-as-code, and decentralised enforcement principles — designed for cloud-native environments at scale
+- Zero trust architecture applies five principles (verify explicitly, least privilege, assume breach, micro-segmentation, continuous validation) — every access request is fully authenticated, authorised, and risk-evaluated regardless of network location
+- The architecture decision framework considers number of systems, cloud adoption, security requirements, operational maturity, regulatory requirements, and existing investment to select the optimal pattern
+- Architecture maturity is not binary — most organisations evolve through stages: ad hoc → centralised → standardised → automated → adaptive, and the architecture pattern may change at each stage

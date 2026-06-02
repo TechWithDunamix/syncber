@@ -1,0 +1,147 @@
+---
+title: "Self-Service IAM"
+description: "Self-service identity management — access request portals, approval workflows, self-service password management, user experience design, and building a frictionless IAM user journey."
+sidebar:
+  order: 7
+  label: "Self-Service IAM"
+---
+
+Self-Service IAM empowers users to manage their own identity and access needs without requiring IT helpdesk intervention. Well-designed self-service capabilities reduce operational costs, improve user satisfaction, and accelerate access provisioning.
+
+Password reset remains the #1 IT helpdesk ticket category — self-service password management alone can reduce helpdesk volume by 30-50%.
+
+## Self-Service Capabilities
+
+### Self-Service Password Reset (SSPR)
+
+| Feature | Description | Impact |
+|---------|-------------|--------|
+| **Multi-factor verification** | Verify identity before allowing password reset (email, SMS, phone call, security questions) | Prevents unauthorised password changes |
+| **Self-service unlock** | User unlocks their own account without IT intervention | Reduces lockout resolution from hours to minutes |
+| **Password writeback** | Password change synchronised back to on-premises AD | Single reset covers cloud and on-premises |
+| **Registration campaign** | Proactive user enrollment in SSPR before they need it | Ensures users have verification methods configured |
+| **Passwordless SSPR** | Reset using biometric or FIDO2 (no password remembered or required) | Eliminates the need to know the old password |
+
+### Access Request Portal
+
+A centralised portal where users request access to applications, roles, and entitlements.
+
+| Portal Feature | Description | Benefit |
+|----------------|-------------|---------|
+| **Application catalogue** | Browse available applications and their roles | Users discover what access is available |
+| **Shop-style request** | Search, select, and request access like an online store | Intuitive user experience |
+| **Justification required** | Business reason must be provided for each request | Reduces frivolous requests |
+| **Approval routing** | Requests automatically routed to correct approver | Eliminates manual forwarding |
+| **Request status tracking** | Users can see where their request is in the approval chain | Transparency, reduces status inquiries |
+| **Entitlement recommendations** | AI-driven suggestions based on role and peer access | Guides users to appropriate access |
+
+### Approval Workflows
+
+| Workflow Type | Use Case | Typical Approvers |
+|--------------|----------|-------------------|
+| **Manager approval** | Standard access requests | User's direct manager |
+| **Application owner approval** | Sensitive application access | App owner or delegated admin |
+| **Security team approval** | Privileged access, exceptions | Security operations |
+| **Multi-stage approval** | High-risk access (manager + app owner + security) | Escalation chain |
+| **Self-approval (policy-based)** | Low-risk access automatically granted | No approval needed (policy evaluator) |
+
+### Self-Service Group Management
+
+Users can manage their own group memberships for collaboration:
+
+- **Group creation** — Create new distribution groups or Teams
+- **Membership management** — Add/remove members from owned groups
+- **Group expiry** — Groups auto-expire if not renewed
+- **Group discovery** — Search and join open groups
+
+## SSPR Architecture
+
+```
+User initiates password reset
+    │
+    ▼
+Identity verification (MFA challenge)
+    │
+    ├── Email OTP sent to registered email
+    ├── SMS OTP sent to registered phone
+    ├── Phone call — automated voice verification
+    ├── Security questions (deprecated — use MFA)
+    └── Mobile app notification (Microsoft Authenticator, Okta Verify)
+    │
+    ▼
+Password selection
+    │
+    ├── User enters new password
+    ├── Password checked against breach database (haveibeenpwned)
+    ├── Password validated against policy (length, complexity)
+    └── Strong password generator available
+    │
+    ▼
+Password writeback
+    │
+    ├── Password written to cloud IdP (Azure AD, Okta)
+    ├── Password synced to on-premises AD (via Azure AD Connect / LDAP)
+    └── Password propagation to connected SaaS applications (where supported)
+    │
+    ▼
+Confirmation
+    │
+    ├── Success notification sent (email, SMS)
+    ├── Login with new password enabled
+    └── Reset all existing sessions (invalidate old password)
+```
+
+<Aside variant="tip">
+Self-service password reset must be enrolled before it can be used. Run proactive SSPR enrollment campaigns that guide users to register their verification methods during onboarding and at regular intervals. A registered user base of < 50% means the SSPR investment is not delivering its full value.
+</Aside>
+
+## User Experience Design for Self-Service IAM
+
+### Design Principles
+
+| Principle | Description | Example |
+|-----------|-------------|---------|
+| **Progressive disclosure** | Show only what the user needs at each step | Wizard-style request flow, not a single complex form |
+| **Consistent terminology** | Use the same terms users see in their daily work | "Salesforce" not "Application ID: SFDC-001" |
+| **Feedback and confirmation** | Users always know what happened | "Your request for Salesforce access has been submitted and is pending manager approval" |
+| **Error prevention and recovery** | Prevent errors before they happen, make recovery easy | Real-time password strength meter, clear error messages |
+| **Mobile-first** | Design for mobile device usage | Responsive portal, mobile app for approvals |
+
+### Request Flow Optimisation
+
+| Optimisation | Before | After |
+|-------------|--------|-------|
+| **Search** | User scrolls through a long list of applications | Type-ahead search with recent and popular suggestions |
+| **Approvals** | All requests require manager approval | Low-risk requests auto-approved; high-risk routed to manager |
+| **Status** | User emails helpdesk for status | Real-time request status visible in portal |
+| **Notifications** | No proactive notifications | Email/SMS on request submission, approval, provisioning |
+
+## Self-Service Metrics
+
+| Metric | Target | What It Measures |
+|--------|--------|-----------------|
+| **SSPR adoption rate** | > 70% of eligible users | % of users registered for self-service password reset |
+| **SSPR success rate** | > 95% | % of self-service resets completed without helpdesk escalation |
+| **Helpdesk password reset volume reduction** | 30-50% reduction | Decrease in password-related helpdesk tickets |
+| **Access request fulfilment time** | < 24 hours for standard requests | Time from request submission to access granted |
+| **First-time approval rate** | > 80% | % of access requests approved on first submission |
+| **User satisfaction (CSAT)** | > 4.0 / 5.0 | User satisfaction with self-service portal |
+
+## Self-Service Adoption Challenges
+
+| Challenge | Mitigation |
+|-----------|------------|
+| **User awareness** | Launch campaign, email reminders, manager communication |
+| **Registration friction** | Simplify registration (pre-enroll from HR data, single-click consent) |
+| **Password writeback failures** | Monitor sync health, alert on failures, fallback to cloud-only reset |
+| **Approval bottlenecks** | Escalation rules, auto-approval for low-risk, delegation of approval authority |
+| **Shadow IT bypass** | Make self-service so good that users prefer it over emailing IT directly |
+
+## Key Takeaways
+
+- Self-Service IAM empowers users to manage identity and access needs without IT helpdesk — password reset alone reduces helpdesk volume by 30-50%
+- Core self-service capabilities include password reset, access request portal, approval workflows, and group management
+- SSPR architecture follows a defined flow: identity verification (MFA) → password selection (with breach check and policy validation) → password writeback (cloud + on-premises) → confirmation
+- UX design principles for self-service include progressive disclosure, consistent terminology, feedback, error prevention, and mobile-first design
+- Key metrics include SSPR adoption rate (> 70%), SSPR success rate (> 95%), helpdesk volume reduction (30-50%), and request fulfilment time (< 24 hours)
+- Adoption challenges require proactive mitigation: launch campaigns, simplify registration, monitor writeback health, and ensure the self-service experience is better than the manual alternative

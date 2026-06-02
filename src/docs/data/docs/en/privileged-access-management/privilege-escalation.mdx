@@ -1,0 +1,208 @@
+---
+title: "Privilege Escalation Paths"
+description: "Understanding how attackers escalate privileges — Windows and Linux privilege escalation techniques, Active Directory attack paths, cloud privilege escalation, and defensive mitigations."
+sidebar:
+  order: 7
+  label: "Privilege Escalation Paths"
+---
+
+Privilege escalation is the process by which an attacker who has gained a foothold in a system (with limited privileges) obtains higher-level privileges — typically administrator or root access. Understanding how privilege escalation works is essential for IAM professionals because PAM controls are specifically designed to prevent and detect these techniques.
+
+The MITRE ATT&CK framework categorises privilege escalation as a distinct tactic (TA0004), with 40+ documented techniques.
+
+## The Privilege Escalation Mindset
+
+Attackers follow a predictable pattern once they gain initial access:
+
+```
+Initial Foothold ──→ Reconnaissance ──→ Escalation Technique ──→ Higher Privileges ──→ Lateral Movement ──→ Repeat
+(Low privilege)    (Find escalation     (Exploit weakness)     (Admin/root)         (Find new targets)   (Escalate again)
+                     opportunities)
+```
+
+Every escalation technique exploits one of three fundamental weaknesses:
+1. **Misconfiguration** — A system is configured with excessive privileges or insecure defaults
+2. **Vulnerability** — A software bug allows privilege elevation
+3. **Credential exposure** — Higher-privilege credentials are accessible from a lower-privilege context
+
+## Windows Privilege Escalation
+
+### Token Manipulation
+
+Windows access tokens determine the privileges of a process or thread. Attackers manipulate tokens to gain elevated privileges.
+
+| Technique | How It Works | Detection |
+|-----------|-------------|-----------|
+| **Token impersonation** | Use `DuplicateTokenEx` to create a copy of an elevated token | Monitor API calls to DuplicateTokenEx, SeImpersonatePrivilege usage |
+| **Token theft** | Steal token from a higher-privilege process | Monitor OpenProcess with PROCESS_ALL_ACCESS |
+| **Token creation** | Create a token with arbitrary privileges | Monitor SeCreateTokenPrivilege usage |
+| **Named pipe impersonation** | Create a named pipe that a higher-privilege process connects to | Monitor named pipe creation in privileged contexts |
+
+### Unquoted Service Paths
+
+When a Windows service path contains spaces and is not enclosed in quotes, Windows may execute a differently-named executable:
+
+```
+Service: C:\Program Files\My App\service.exe (unquoted)
+Attacker plants: C:\Program.exe
+Result: Windows executes C:\Program.exe instead of C:\Program Files\My App\service.exe
+```
+
+**Mitigation**: Ensure all service paths are quoted in registry; audit for unquoted paths with `wmic service get name,pathname`.
+
+### Weak Service Permissions
+
+A service where the lower-privilege user has `WRITE_DAC` or `SERVICE_CHANGE_CONFIG` permission can be escalated:
+
+```
+Current user: Limited user with SERVICE_CHANGE_CONFIG on "VulnerableSvc"
+Attack: Change service binary to attacker's executable
+       → Attacker starts service
+       → Service runs as LOCAL_SYSTEM
+       → Privilege escalation complete
+```
+
+**Mitigation**: Audit service permissions with tools like Process Explorer or AccessChk. Apply least-privilege to service ACLs.
+
+### DLL Hijacking
+
+Applications that load DLLs without specifying a full path can be forced to load a malicious DLL placed in a directory the attacker controls.
+
+**Mitigation**: Application allowlisting, safe DLL search mode, DLL redirects.
+
+### Windows Privilege Escalation Tools
+
+Popular tools used for Windows privilege escalation:
+
+| Tool | Purpose | Detection Method |
+|------|---------|-----------------|
+| **WinPEAS** | Automated privilege escalation enumeration | Signature-based AV, EDR behavioural detection |
+| **PowerUp** | PowerShell-based privilege escalation checks | PowerShell logging, AMSI, Constrained Language Mode |
+| **BeRoot** | Windows privilege escalation scanner | EDR process monitoring |
+| **BloodHound** | AD attack path mapping | Graph analysis of AD data, LDAP query monitoring |
+| **Mimikatz** | Credential extraction from LSASS | LSASS access monitoring, Credential Guard |
+
+## Linux Privilege Escalation
+
+### SUID/SGID Binaries
+
+Executables with the SUID (Set User ID) bit set run with the privileges of the file owner, not the executing user:
+
+```bash
+# Find all SUID binaries
+find / -perm -4000 -type f 2>/dev/null
+
+# If a binary owned by root has SUID set:
+# CVE-2021-3156 (sudo) — buffer overflow in sudo allows privilege escalation
+# CVE-2023-2640 (OverlayFS) — Ubuntu privilege escalation via OverlayFS
+```
+
+**Mitigation**: Minimise SUID binaries, audit regularly, use capabilities instead of SUID where possible.
+
+### Sudo Misconfiguration
+
+The `/etc/sudoers` file defines which users can run which commands as which users. Misconfigurations are common:
+
+```bash
+# Risky sudoers entries
+user ALL=(ALL) ALL           # User has full sudo access
+user ALL=(ALL) NOPASSWD: ALL # User has passwordless sudo (extreme risk)
+user ALL=(ALL) /bin/vi       # User can run vi as root → :!bash to get root shell
+```
+
+**Mitigation**: Follow the principle of least privilege for sudo — specify exact commands and arguments, require password, log all sudo usage.
+
+### Kernel Exploits
+
+| CVE | Vulnerability | Affected Kernels | Mitigation |
+|-----|---------------|-----------------|------------|
+| **CVE-2023-2640** | OverlayFS privilege escalation | Ubuntu 6.2 kernel | Update kernel, apply vendor patch |
+| **CVE-2022-0847** | Dirty Pipe — arbitrary file overwrite | Linux 5.8 – 5.16 | Update to 5.16.11+ |
+| **CVE-2021-4034** | PwnKit — pkexec local privilege escalation | All Linux (discovered in 2021, present since 2009) | Update polkit to 0.120+ |
+| **CVE-2017-1000112** | Dirty COW — race condition in memory subsystem | Linux 2.6.22 – 4.8 | Long-patched |
+
+### Linux Capabilities
+
+Linux capabilities break root privileges into granular units. Misconfigured capabilities can lead to escalation:
+
+| Dangerous Capability | Risk | What an Attacker Can Do |
+|---------------------|------|------------------------|
+| `CAP_SYS_ADMIN` | Extreme | Essentially root — mount filesystems, access namespaces |
+| `CAP_DAC_OVERRIDE` | Very High | Bypass file permission checks — read/write any file |
+| `CAP_NET_RAW` | High | Raw socket access — packet crafting, ARP spoofing |
+| `CAP_SETUID` | High | Set arbitrary UID — escalate to root |
+| `CAP_SYS_PTRACE` | High | Debug any process — memory inspection, code injection |
+
+**Mitigation**: Audit running processes and binaries for dangerous capabilities. Remove capabilities from processes that do not need them.
+
+## Active Directory Privilege Escalation
+
+### Kerberoasting
+
+An attacker requests Ticket-Granting Service (TGS) tickets for any AD service account using SPN lookup. These tickets are encrypted with the service account's NTLM hash, which can be cracked offline.
+
+```bash
+# Request TGS for all SPNs (PowerView)
+Get-DomainUser * -SPN | Get-DomainSPNTicket -Format Hashcat
+
+# Crack the hash offline
+hashcat -m 13100 kerberos_hashes.txt rockyou.txt
+```
+
+**Mitigation**: Use strong (30+ character) random passwords for service accounts, use Group Managed Service Accounts (gMSAs) where possible, monitor for kerberoasting tool usage.
+
+### AS-REP Roasting
+
+Users without Kerberos pre-authentication enabled allow attackers to request an AS-REP response that can be cracked offline.
+
+**Mitigation**: Enable Kerberos pre-authentication for all user accounts, audit for accounts with `DONT_REQ_PREAUTH` flag set.
+
+### ACL Abuse
+
+Active Directory ACLs allow fine-grained permissions. Misconfigured ACLs create escalation paths:
+
+| AD ACL Permission | Escalation Risk |
+|-------------------|-----------------|
+| **GenericAll** on a user object | Can change user's password without knowing current password |
+| **WriteOwner** | Can take ownership of an object |
+| **WriteDACL** | Can modify object's ACL to grant full control |
+| **Self-Membership** | Can add self to a privileged group |
+| **ForceChangePassword** | Can reset another user's password |
+
+**Mitigation**: Use tools like BloodHound to map AD attack paths, audit AD ACLs, remove excessive permissions.
+
+## Cloud Privilege Escalation
+
+| Cloud | Escalation Technique | Description | Mitigation |
+|-------|---------------------|-------------|------------|
+| **AWS** | IAM privilege escalation via permissions | User with `iam:CreatePolicy` or `iam:PassRole` can escalate to admin | Restrict IAM permissions, use permission boundaries |
+| **AWS** | Assume role chaining | User who can `sts:AssumeRole` can chain through roles | Limit trust policies, require MFA for role assumption |
+| **Azure** | Global Admin from Application Admin | Application Admin can create service principal with Global Admin privileges | Monitor application creation, separate admin roles |
+| **Azure** | Privileged Identity Management (PIM) abuse | User with PIM administrator rights can activate themselves permanently | Monitor PIM activations, require approval for activation |
+| **GCP** | Service account impersonation | User with `iam.serviceAccounts.actAs` can impersonate any service account | Limit actAs, use IAM Conditions |
+
+## Defensive Mitigations Summary
+
+| Defence | Windows | Linux | AD | Cloud |
+|---------|---------|-------|-----|-------|
+| **Patch management** | 🔴 Critical | 🔴 Critical | 🔴 Critical | N/A |
+| **Least privilege** | Remove local admin | Remove root via SSH | Remove DA standing rights | Limit IAM roles |
+| **Application allowlisting** | AppLocker | SELinux/AppArmor | N/A | N/A |
+| **Credential Guard** | Enable | N/A | N/A | N/A |
+| **PAM / JIT** | JIT admin elevation | JIT sudo elevation | JIT DA elevation | JIT role assumption |
+| **Monitoring** | EDR, Sysmon | auditd, osquery | AD audit, BloodHound | CloudTrail, GuardDuty |
+| **Configuration scanning** | CIS benchmarks | CIS benchmarks | PingCastle | Security Hub |
+| **Network segmentation** | 🔴 Critical | 🔴 Critical | 🔴 Critical | VPC/network ACLs |
+
+<Aside variant="caution">
+Most privilege escalation can be prevented by two controls: **patch management** (preventing exploitation of vulnerabilities) and **least privilege** (minimising the standing privileges available for abuse). Before investing in complex detection tooling, ensure these fundamentals are in place.
+</Aside>
+
+## Key Takeaways
+
+- Privilege escalation exploits three fundamental weaknesses: misconfiguration, vulnerability, and credential exposure — all three must be addressed
+- Windows escalation includes token manipulation, unquoted service paths, weak service permissions, DLL hijacking, and credential extraction from LSASS
+- Linux escalation includes SUID binaries, sudo misconfiguration, kernel exploits, and dangerous Linux capabilities
+- Active Directory escalation includes Kerberoasting, AS-REP roasting, ACL abuse, and delegation abuse — mapped by BloodHound as attack paths
+- Cloud privilege escalation varies by provider but commonly involves IAM privilege escalation and role chaining
+- Most privilege escalation is prevented by patch management and least privilege — deploy PAM/JIT to reduce standing privileges, and continuous monitoring to detect escalation attempts

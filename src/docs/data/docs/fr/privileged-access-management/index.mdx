@@ -1,0 +1,106 @@
+---
+title: "Gestion des Accès Privilégiés"
+description: "Gestion des Accès Privilégiés (PAM) — stratégies de contrôle des accès administrateurs, coffre-fort d'identifiants, accès juste-à-temps, gestion des sessions, découverte de comptes et gouvernance des privilèges."
+sidebar:
+  order: 3
+  label: "Gestion des Accès Privilégiés"
+---
+
+La Gestion des Accès Privilégiés (PAM) est la discipline qui consiste à sécuriser, contrôler et surveiller l'accès aux systèmes et données sensibles par des utilisateurs disposant de droits élevés. Les comptes privilégiés sont la cible numéro un des attaquants car ils permettent un accès illimité aux données critiques.
+
+## Le Paysage des Menaces PAM
+
+Les comptes privilégiés représentent le risque de sécurité le plus élevé dans toute organisation :
+
+| Statistique | Source |
+|-------------|--------|
+| **80%** des violations de sécurité impliquent des identifiants privilégiés | Verizon DBIR |
+| **74%** des organisations ont subi une violation liée à un accès privilégié | Ponemon Institute |
+| **60%** des attaquants utilisent des comptes privilégiés pour exfiltrer des données | CrowdStrike |
+| **10 jours** — temps moyen de détection d'un abus de privilège | IBM Cost of Data Breach |
+
+## Capacités Clés de la PAM
+
+| Capacité | Description | Bénéfice Principal |
+|----------|-------------|-------------------|
+| **Coffre-fort d'identifiants** | Stockage sécurisé des mots de passe, clés SSH, secrets d'application et certificats | Élimination des mots de passe partagés et codés en dur |
+| **Gestion des sessions** | Proxy d'accès avec enregistrement des sessions (RDP, SSH, HTTP) | Traçabilité complète des actions administrateurs |
+| **Accès juste-à-temps (JIT)** | Élévation temporaire des privilèges avec expiration automatique | Réduction des privilèges permanents (standing privileges) |
+| **Découverte de comptes** | Détection automatique des comptes privilégiés sur les systèmes cibles | Visibilité complète du périmètre privilégié |
+| **Rotation des identifiants** | Changement automatique des mots de passe après utilisation | Limitation de la fenêtre d'exposition en cas de compromission |
+| **Moindre privilège** | Octroi des droits minimaux nécessaires pour une tâche spécifique | Réduction de la surface d'attaque |
+| **Gouvernance des accès** | Workflows d'approbation, certifications, rapports d'audit | Conformité réglementaire (SOX, PCI, HIPAA) |
+
+## L'Architecture PAM
+
+```
+┌─────────────────────────────────────────────────────────┐
+|                     PLATEFORME PAM                        |
+|                                                           |
+|  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐|
+|  | Coffre   |  | Gestion  |  | Proxy de |  | Moteur   ||
+|  | d'Identi-|  | de       |  | Session  |  | de       ||
+|  | fiants   |  | Politique|  | (RDP/SSH)|  | Découv-  ||
+|  └──────────┘  └──────────┘  └──────────┘  | erte     ||
+|                                             └──────────┘|
+|  ┌──────────┐  ┌───────────────────────────┐            |
+|  | Moteur   |  |   API et Connecteurs       |            |
+|  | Rotation |  |   (Windows, Linux, DB,     |            |
+|  └──────────┘  |   Cloud, Réseau, HSM)      |            |
+|                └──────────────────────────────┘           |
+|                                                           |
+|  ┌──────────────────────────────────────────────────┐   |
+|  |     Interface d'Administration et Rapports         |   |
+|  └──────────────────────────────────────────────────┘   |
+└─────────────────────────────────────────────────────────┘
+```
+
+## Mapping de Conformité PAM
+
+| Cadre Réglementaire | Exigence PAM | Contrôle PAM |
+|--------------------|--------------|--------------|
+| **SOX 404** | Contrôle d'accès aux systèmes financiers | Enregistrement des sessions PAM, coffre-fort des identifiants ERP |
+| **PCI DSS v4.0 Req. 7 & 8** | MFA pour tout accès admin, ID uniques | PAM + MFA, suppression des comptes partagés |
+| **HIPAA 164.312(a)** | Contrôle d'accès pour ePHI, procédure d'urgence | Coffre-fort PAM avec break-glass, session recording |
+| **NIST SP 800-53** | AC-6 (Moindre privilège), AC-2 (Gestion de comptes) | JIT, rotation d'identifiants, revue de sessions |
+| **ISO 27001 A.8.2** | Droits d'accès privilégiés | PAM, JIT, révision périodique des accès privilégiés |
+| **RGPD Article 32** | Sécurité du traitement des données | Journalisation de tout accès privilégié aux données personnelles |
+
+## Plan du Module
+
+<Steps>
+### Qu'est-ce que la PAM ?
+Définition, comparaison IAM vs PAM, business case, principe de moindre privilège, lien avec le Zero Trust.
+
+### Comptes Privilégiés
+Taxonomie complète : comptes locaux, domaine, service (gMSA vs legacy), application-à-application, clés SSH, rôles cloud, break-glass. Méthodes de découverte.
+
+### Coffre-fort d'Identifiants
+Architecture du coffre (stockage HSM, contrôle d'accès, rotation), modèles de déploiement, politiques de rotation, cycle de vie des clés SSH, gestion des secrets, opérations.
+
+### Accès Juste-à-Temps (JIT)
+Risques des privilèges permanents, architecture JIT, méthodes d'élévation, workflows d'approbation, intégration ITSM, défis.
+
+### Gestion des Sessions
+Architecture proxy, méthodes d'enregistrement (vidéo, frappe, texte), alertes temps réel, filtrage de commandes, terminaison de session, forensique.
+
+### Chemins d'Élévation de Privilèges
+Windows (token, services, DLL), Linux (SUID, sudo, noyau), AD (Kerberoasting, ACL), cloud, défenses.
+
+### Architecture PAM
+Modèle de maturité 4 niveaux, modèle de tiering Microsoft (Tier 0/1/2), architecture HA, intégrations, cadre décisionnel.
+
+### Accès d'Urgence (Break-Glass)
+Scénarios, principes de conception (double garde, preuve d'altération, accès minimal, rotation automatique, audit complet), procédure, test.
+
+### Maturité du Programme PAM
+Modèle de maturité, cadre d'évaluation (8 dimensions), feuille de route 36 mois, KPI, pièges courants.
+</Steps>
+
+## Points Clés à Retenir
+
+- Les comptes privilégiés représentent le risque de sécurité le plus élevé — 80% des violations impliquent des identifiants privilégiés, et la PAM est la principale défense
+- Les capacités clés de la PAM incluent le coffre-fort d'identifiants, la gestion des sessions, le JIT, la découverte de comptes, la rotation des identifiants, le moindre privilège et la gouvernance
+- La PAM est requise par tous les cadres réglementaires majeurs (SOX, PCI DSS, HIPAA, NIST, ISO 27001, RGPD) — ce n'est pas un choix mais une obligation de conformité
+- L'architecture PAM comprend six composants principaux : coffre-fort, gestion de politique, proxy de session, moteur de découverte, moteur de rotation, et connecteurs pour les systèmes cibles
+- Les pages suivantes approfondissent chaque capacité PAM, des concepts fondamentaux à la mise en œuvre opérationnelle et à la maturation du programme

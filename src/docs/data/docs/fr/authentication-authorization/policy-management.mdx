@@ -1,0 +1,229 @@
+---
+title: "Gestion des Politiques"
+description: "Gestion et cycle de vie des politiques d'autorisation — architecture PDP/PEP/PIP/PAP/PRP, algorithmes de combinaison, Rego vs Cedar vs XACML, GitOps pour les politiques, et plateformes d'entreprise."
+sidebar:
+  order: 10
+  label: "Gestion des Politiques"
+---
+
+La gestion des politiques d'autorisation est la pratique consistant à définir, déployer, surveiller et réviser les règles qui déterminent l'accès aux ressources. À mesure que les organisations évoluent vers l'ABAC et le PBAC, la gestion des politiques devient une discipline d'ingénierie à part entière.
+
+## Architecture de Gestion des Politiques
+
+### Référence XACML
+
+L'architecture XACML (eXtensible Access Control Markup Language) définit les composants standards de la gestion des politiques :
+
+```
+                    ┌──────────┐
+                    │    PAP    │  ← Interface de gestion des politiques
+                    │ (Admin)  │    (console, API, Git)
+                    └────┬─────┘
+                         │ Publier les politiques
+                         v
+                    ┌──────────┐
+                    │    PRP   │  ← Référentiel de politiques
+                    │(Store)  │    (Git, DB, système de fichiers)
+                    └────┬─────┘
+                         │
+              ┌──────────┴──────────┐
+              │                     │
+         ┌────┴─────┐         ┌────┴─────┐
+         │    PIP    │         │    PDP   │  ← Moteur de décision
+         │(Attributs)│         │(Decision)│    (OPA, AuthzForce)
+         └────┬─────┘         └────┬─────┘
+              │                     │
+              │  Attributs          │  Décision (Permettre/Refuser)
+              │                     │
+         ┌────┴─────────────────────┴────┐
+         │              PEP              │  ← Point de force
+         │           (Enforce)           │    (Middleware, proxy)
+         └───────────────────────────────┘
+                      │
+                      │  Interception des requêtes
+                      v
+               ┌──────────────┐
+               │ Application  │
+               │ ou API       │
+               └──────────────┘
+```
+
+## Algorithmes de Combinaison de Politiques
+
+Lorsque plusieurs politiques s'appliquent à une même requête, des algorithmes de combinaison déterminent la décision finale :
+
+| Algorithme | Comportement | Cas d'Usage |
+|-----------|-------------|-------------|
+| **Permettre les prioritaires (Permit Overrides)** | Si une politique permet, la décision finale est Permettre | Ouverture par défaut, environnement de confiance |
+| **Refuser les prioritaires (Deny Overrides)** | Si une politique refuse, la décision finale est Refuser | Refus par défaut, environnement sécurisé |
+| **Première applicable (First Applicable)** | La première politique qui correspond à la requête est appliquée | Règles de pare-feu, listes de contrôle |
+| **Seulement un (Only One)** | Une seule politique doit correspondre ; si plusieurs, indéterminé | Audit financier, SoD |
+| **Combinaison ordonnée (Ordered Permit/Deny)** | Évaluation séquentielle avec override spécifique | Politiques complexes avec exceptions documentées |
+
+### Exemple de Combinaison
+
+```
+Politique 1 : "Permettre aux médecins de lire les dossiers des patients"
+Politique 2 : "Refuser l'accès aux dossiers des patients VIP sauf autorisation spéciale"
+Algorithme : Deny Overrides (Refus prioritaire)
+
+Scénario : 
+- Un médecin tente d'accéder au dossier d'un patient VIP
+- Politique 1 → Permettre
+- Politique 2 → Refuser
+- Résultat final → REFUSER (Deny Overrides)
+```
+
+## Langages de Politique
+
+### Rego (OPA)
+
+```rego
+package app.rbac
+
+# Définir les rôles et leurs permissions
+roles := {
+    "admin":   {"read", "write", "delete", "manage_users"},
+    "editor":  {"read", "write"},
+    "viewer":  {"read"},
+}
+
+# Vérifier si l'utilisateur a le rôle requis
+default allow = false
+
+allow {
+    # Récupérer les rôles de l'utilisateur
+    user_roles := input.user.roles[_]
+    
+    # Récupérer les permissions du rôle
+    user_permissions := roles[user_roles][_]
+    
+    # Vérifier que la permission demandée est incluse
+    user_permissions == input.action
+}
+```
+
+### Cedar (AWS)
+
+```
+permit (
+    principal in AWS::Principal::Role::"admin",
+    action in [AWS::Action::"s3:GetObject", AWS::Action::"s3:PutObject"],
+    resource in AWS::Resource::Bucket::"financial_reports"
+);
+
+forbid (
+    principal,
+    action == AWS::Action::"s3:DeleteObject",
+    resource
+) unless {
+    resource in AWS::Resource::Bucket::"backup_bucket"
+};
+```
+
+### Comparaison Rego vs Cedar vs XACML
+
+| Caractéristique | Rego (OPA) | Cedar (AWS) | XACML |
+|----------------|------------|-------------|-------|
+| **Syntaxe** | Déclarative (Prolog-like) | Déclarative (simple) | XML (verbeux) |
+| **Bouclage (Iteration)** | Implicite (variables, compréhension) | Explicite (quantificateurs) | Fonctions XPath |
+| **Fonctions intégrées** | Riche (HTTP, JWT, time, regex) | Limité | Étendu via extensions |
+| **Tests** | Intégré (rego test) | Indépendant | Fournisseur |
+| **Performance** | Excellente | Excellente | Bonne |
+| **Courbe d'apprentissage** | Modérée | Faible | Élevée |
+| **Écosystème** | Large (K8s, Envoy, TF) | AWS-centric | Solutions commerciales |
+| **Idéal pour** | Cloud-native, stack polyglotte | Applications AWS | Entreprise traditionnelle |
+
+## Cycle de Vie des Politiques
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                CYCLE DE VIE DES POLITIQUES                │
+│                                                           │
+│  1. CRÉATION : Écrire la politique (Rego/Cedar/XACML)   │
+│     - Spécification des exigences métier                   │
+│     - Rédaction dans le langage de politique               │
+│     - Documentation des cas d'usage                        │
+│     - Révision par les pairs                              │
+│                                                           │
+│  2. TEST : Valider la politique                            │
+│     - Tests unitaires (rego test)                         │
+│     - Tests d'intégration (scénarios réels)               │
+│     - Tests de performance                                │
+│     - Vérification des cas limites                         │
+│                                                           │
+│  3. DÉPLOIEMENT : Publier la politique                    │
+│     - PR dans le dépôt Git → Révision → Merge             │
+│     - CI/CD : Build → Test → Package → Deploy             │
+│     - Déploiement progressif (canary)                     │
+│     - Activation contrôlée                                │
+│                                                           │
+│  4. APPLICATION : Évaluation des décisions                │
+│     - PDP charge la politique depuis le PRP               │
+│     - Évaluation des requêtes d'accès en temps réel       │
+│     - Logging des décisions pour audit                    │
+│                                                           │
+│  5. SURVEILLANCE : Analyser l'impact                      │
+│     - Tableau de bord des décisions (Permettre/Refuser)   │
+│     - Alertes sur les changements de comportement         │
+│     - Analyse des faux positifs / négatifs                │
+│                                                           │
+│  6. RÉVISION : Mettre à jour la politique                 │
+│     - Révision périodique des politiques                  │
+│     - Mise à jour basée sur les retours                   │
+│     - Archivage des versions obsolètes                    │
+│     - Retour à l'étape 1                                  │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Gestion Git des Politiques (GitOps)
+
+```
+Dépôt Git : /policies/app/
+├── README.md
+├── main.rego          # Politiques principales
+├── common.rego        # Règles partagées
+├── tests/
+│   ├── main_test.rego # Tests unitaires
+│   └── fixtures/      # Données de test
+├── ci/
+│   └── pipeline.yaml  # CI/CD pipeline (test → deploy)
+└── versions/
+    └── CHANGELOG.md   # Historique des changements
+```
+
+**Pipeline CI/CD typique :**
+
+```
+1. Développeur crée une branche → Modifie la politique
+2. Push → GitHub Action déclenchée
+3. rego test → tests unitaires
+4. rego check → validation syntaxique
+5. Intégration → tests avec données réelles
+6. Review → approbation par pair
+7. Merge → déploiement automatique vers le PDP
+8. Canary → 10% du trafic pendant 5 minutes
+9. Full rollout → 100% du trafic
+10. Rollback → si anomalie détectée dans les 30 minutes
+```
+
+## Plateformes de Gestion des Politiques
+
+| Plateforme | Type | Langage | Cas d'Usage |
+|-----------|------|---------|-------------|
+| **Open Policy Agent (OPA)** | Open Source | Rego | Cloud-native, Kubernetes, API |
+| **AWS Verified Permissions** | SaaS | Cedar | Applications AWS |
+| **Axiomatics** | Commercial | ALFA (XACML simplifié) | Entreprise réglementée |
+| **PlainID** | Commercial | Propriétaire | ABAC d'entreprise |
+| **NextLabs** | Commercial | XACML + propriétaire | Protection des données |
+| **Permit.io** | SaaS | Rego | Applications modernes |
+| **Topaz** | Open Source | Rego | Alternative OPA avec API REST |
+
+## Points Clés à Retenir
+
+- L'architecture de gestion des politiques (XACML) sépare cinq composants : PAP (création), PRP (stockage), PIP (attributs), PDP (décision), PEP (application) — cette séparation des préoccupations est essentielle pour la gestion des politiques à l'échelle
+- Les algorithmes de combinaison de politiques (Permit Overrides, Deny Overrides, First Applicable, Only One, Ordered) déterminent la décision finale lorsque plusieurs politiques s'appliquent — Deny Overrides (refus prioritaire) est le plus sécurisé
+- Rego (OPA) est le langage de politique le plus largement adopté pour les environnements cloud-native — il se compare à Cedar (AWS, plus simple) et XACML (plus lourd, plus complexe) selon l'écosystème et les exigences
+- Le cycle de vie des politiques suit six étapes : création → test → déploiement → application → surveillance → révision — la gestion GitOps avec CI/CD (PR → test → review → canary → full rollout → rollback) est la meilleure pratique pour le déploiement des politiques
+- Les tests de politiques sont essentiels — rego test pour les tests unitaires, scénarios d'intégration avec données réelles, et validation des cas limites (absence d'attribut, conflit de politiques, performance)
+- Les plateformes de gestion des politiques incluent OPA (open source, cloud-native), AWS Verified Permissions (AWS), Axiomatics (entreprise réglementée), et Permit.io (applications modernes) — le choix dépend de l'écosystème et des exigences de gouvernance

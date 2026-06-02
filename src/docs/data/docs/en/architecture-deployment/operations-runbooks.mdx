@@ -1,0 +1,150 @@
+---
+title: "Operations & Runbooks"
+description: "Day-2 IAM/PAM operations — monitoring, alerting, backup and restore, certificate rotation, platform upgrades, incident response runbooks, operational maturity, and team structure."
+sidebar:
+  order: 10
+  label: "Operations & Runbooks"
+---
+
+Day-2 operations are where IAM/PAM programs succeed or fail. A well-designed architecture is worthless without competent operations — monitoring, incident response, backup/restore, upgrades, and continuous improvement. This page covers the operational practices that keep IAM/PAM systems running reliably.
+
+## Operational Maturity Model
+
+| Level | Name | Characteristics | Monitoring | Incident Response | Change Management |
+|-------|------|-----------------|------------|-------------------|-------------------|
+| **1** | Reactive | No monitoring, manual checks | None | Firefighting | Unplanned |
+| **2** | Basic | Basic health checks, email alerts | CPU, memory, disk | Manual, inconsistent | Change windows |
+| **3** | Proactive | Full monitoring, dashboards, SLAs | Latency, throughput, errors | Documented runbooks | CAB approval |
+| **4** | Automated | Automated remediation, self-healing | Predictive analytics, trend analysis | Automated containment | CI/CD for IAM config |
+| **5** | Predictive | AI-driven operations, capacity forecasting | ML-based anomaly detection | Self-healing | Continuous delivery |
+
+## Monitoring and Alerting
+
+### IAM/PAM Monitoring Dimensions
+
+| Layer | What to Monitor | Tooling | Alert Threshold |
+|-------|----------------|---------|-----------------|
+| **IdP** | Authentication success/failure rate, latency, MFA delivery | IdP health dashboard, SIEM | Success rate < 99.5%, p99 latency > 2s |
+| **PAM** | Session start/end, credential check-out rate, vault availability | PAM monitoring, SIEM | Session failure > 1%, vault offline |
+| **Directory** | LDAP bind latency, replication latency, CPU/memory | Directory monitoring, Windows Admin Center | Bind time > 50ms, replication lag > 5 min |
+| **IGA** | Provisioning success rate, certification completion rate | IGA platform monitoring | Provisioning success < 99%, cert completion < 95% |
+| **Infrastructure** | CPU, memory, disk, network, TLS certificate expiry | Infrastructure monitoring (Prometheus, Datadog) | CPU > 80%, disk > 85%, cert < 30 days |
+| **Security** | Anomalous authentication patterns, privilege misuse | SIEM, UEBA | Rule-based alerting, scoring threshold |
+| **Compliance** | Certification overdue, SoD violations, orphaned accounts | IGA compliance dashboard | Cert overdue > 7 days, SoD violation detected |
+
+### Key Monitoring Metrics
+
+| Metric | Good | Warning | Critical | Aggregation |
+|--------|------|---------|----------|-------------|
+| **Authentication latency (p50)** | < 500ms | > 1s | > 2s | 5-minute average |
+| **Authentication latency (p99)** | < 2s | > 3s | > 5s | 5-minute average |
+| **Authentication success rate** | > 99.9% | < 99.5% | < 99% | 1-minute window |
+| **MFA push delivery time** | < 2s | > 5s | > 10s | 5-minute average |
+| **Directory bind latency** | < 10ms | > 50ms | > 200ms | 5-minute average |
+| **Provisioning success rate** | > 99.5% | < 99% | < 95% | Per execution batch |
+| **Certificate expiry** | > 90 days | < 30 days | < 7 days | Daily check |
+| **PAM session failure rate** | < 0.1% | > 0.5% | > 1% | Hourly count |
+
+## Incident Response Runbooks
+
+### Runbook: IdP Outage
+
+| Step | Action | Owner | Timeframe |
+|------|--------|-------|-----------|
+| **1. Detect** | IdP health check fails, authentication errors spike | Monitoring system | Immediate |
+| **2. Acknowledge** | On-call engineer acknowledges alert | On-call IAM Engineer | 5 minutes |
+| **3. Assess** | Determine scope (single IdP node, all nodes, data centre, region) | On-call Engineer | 10 minutes |
+| **4. Communicate** | Post incident to #iam-alerts channel, notify service desk | On-call Engineer | 10 minutes |
+| **5. Failover** | If primary IdP cluster affected, trigger DNS failover to DR IdP | On-call Engineer | 15 minutes |
+| **6. Validate** | Verify authentication is working through DR IdP | On-call Engineer | 15 minutes |
+| **7. Investigate** | Root cause analysis: check IdP logs, infrastructure, directory connectivity | IAM Engineering | Ongoing |
+| **8. Remediate** | Apply fix (restart service, patch, configuration change) | IAM Engineering | Per fix |
+| **9. Failback** | If temporary failover, schedule failback to primary during maintenance window | IAM Engineering | Per schedule |
+| **10. Post-mortem** | Document incident, root cause, lessons learned, preventive actions | IAM Lead | Within 5 business days |
+
+### Runbook: PAM Vault Unavailable
+
+| Step | Action | Owner | Timeframe |
+|------|--------|-------|-----------|
+| **1. Detect** | PAM vault health check fails, credential check-out errors | Monitoring system | Immediate |
+| **2. Acknowledge** | On-call engineer acknowledges alert | On-call PAM Engineer | 5 minutes |
+| **3. Impact assessment** | Determine which systems are affected (all credentials vs. some) | On-call Engineer | 10 minutes |
+| **4. Activate break-glass** | If administrators cannot access systems, activate emergency access procedure | PAM Admin | 15 minutes |
+| **5. PAM failover** | If primary vault cluster, activate standby vault | PAM Engineer | 30 minutes |
+| **6. Credential verification** | Verify that emergency credentials are functional | PAM Admin | 15 minutes |
+| **7. Root cause** | Check vault service, database, network, storage | PAM Engineer | Ongoing |
+| **8. Restore** | Restore vault service from backup if necessary | PAM Engineer | Per scenario |
+| **9. Credential rotation** | Rotate any credentials exposed during outage | PAM Admin | 24 hours |
+| **10. Post-mortem** | Document incident, root cause, lessons learned | PAM Lead | Within 5 business days |
+
+## Backup and Restore
+
+### Backup Schedule
+
+| Component | Backup Type | Frequency | Retention | Restore Time Target |
+|-----------|-------------|-----------|-----------|---------------------|
+| **IdP configuration** | Configuration export (JSON/YAML) | After each change + daily | 90 days | 1 hour |
+| **IdP database** | Encrypted SQL dump | Daily + transaction log (15 min) | 90 days | 4 hours |
+| **PAM vault database** | Encrypted database backup | Daily + transaction log (15 min) | 90 days | 4 hours |
+| **PAM session recordings** | Immutable object storage (S3/WORM) | Continuous (write-once) | Compliance-defined + 1 year | 2 hours |
+| **Directory (AD)** | System state backup | Daily | 60 days | 4 hours |
+| **IGA database** | Database backup | Daily + transaction log (hourly during campaigns) | 90 days | 4 hours |
+| **HSM / key store** | Encrypted key backup | Weekly | 1 year | 1 hour |
+| **TLS certificates** | Certificate backup (PKCS12) | After each renewal | Lifetime + 1 year | 1 hour |
+
+### Restore Scenarios
+
+| Scenario | Procedure | RTO | Complexity |
+|----------|-----------|-----|------------|
+| **Single IdP node failure** | Remove node from LB, deploy new node from image, join to cluster | 30 min | Low |
+| **Full IdP cluster failure** | Restore from database backup, re-initialise cluster nodes | 4 hours | Medium |
+| **PAM vault corruption** | Restore vault database from backup, verify credential integrity | 4-8 hours | High |
+| **Directory corruption** | Restore from system state backup, verify replication | 4 hours | High |
+| **Certificate compromise** | Revoke certificate, issue new cert, update all services | 2 hours | Medium |
+| **HSM / key loss** | Restore HSM from key backup, verify signing operations | 4 hours | High |
+
+## Platform Upgrades
+
+### Upgrade Strategy
+
+| Upgrade Type | Frequency | Duration | Migration Approach | Risk Level |
+|-------------|-----------|----------|-------------------|------------|
+| **Patch (security fix)** | As needed | Hours | In-place or rolling | Low |
+| **Minor version** | Quarterly | Days | Blue-green or rolling | Low-Medium |
+| **Major version** | Annually | Weeks | Side-by-side with migration | Medium-High |
+| **Platform migration** | Every 3-5 years | Months | Phased coexistence | High |
+
+### Upgrade Runbook (PAM Major Version)
+
+| Phase | Activity | Duration | Validation |
+|-------|----------|----------|------------|
+| **1. Pre-upgrade assessment** | Review release notes, check compatibility, identify deprecated features | 1 week | Compatibility matrix complete |
+| **2. Lab deployment** | Deploy new version in test environment | 1 week | All features functional in lab |
+| **3. Integration testing** | Test all integrations (SIEM, ITSM, directory) | 2 weeks | Integration tests pass |
+| **4. User acceptance testing** | Admin team validates new version | 2 weeks | All workflows validated |
+| **5. Staging deployment** | Deploy to staging, run parallel with production | 1 week | Staging mirrors production |
+| **6. Production rollout** | Deploy to production (rolling or blue-green) | 1-2 weeks | Zero upgrade-related incidents |
+| **7. Post-upgrade monitoring** | Monitor for issues for 2 weeks post-upgrade | 2 weeks | Performance at or above baseline |
+| **8. Rollback plan** | If critical issue, rollback to previous version | Per incident | Rollback tested in lab |
+
+## IAM Operations Team Structure
+
+| Role | Responsibilities | Typical Size (10K+ Org) |
+|------|-----------------|-------------------------|
+| **IAM Operations Lead** | Team management, SLA oversight, vendor management | 1 |
+| **IdP Engineer** | IdP configuration, SSO integrations, MFA management | 1-2 |
+| **PAM Engineer** | Credential vaulting, session management, connector management | 2-3 |
+| **Directory Engineer** | AD/LDAP operations, replication, performance tuning | 1-2 |
+| **IGA Analyst** | Certification campaigns, provisioning operations, SoD analysis | 1-2 |
+| **Security Engineer (IAM)** | SIEM integration, threat detection for IAM, incident response | 1 |
+| **Automation Engineer** | Runbook automation, CI/CD for IAM config, tooling | 1 |
+
+## Key Takeaways
+
+- IAM/PAM operational maturity progresses from reactive (Level 1) through basic, proactive, automated, to predictive (Level 5) — most organisations operate at Level 2-3 with documented monitoring and runbooks but limited automation
+- Monitoring covers seven dimensions: IdP, PAM, directory, IGA, infrastructure, security, and compliance — each dimension has specific metrics, tooling, and alert thresholds with good/warning/critical boundaries
+- Incident response runbooks must be documented and tested for the two most critical scenarios: IdP outage (failover to DR, validate auth, investigate root cause, remediate, failback, post-mortem) and PAM vault unavailable (activate break-glass, failover vault, verify credentials, restore, rotate exposed creds, post-mortem)
+- Backup strategy requires defined backup types, frequency, retention, and restore time targets for each component — IdP configuration (daily + after change, 90-day retention, 1-hour restore), PAM vault database (daily + 15-min t-logs, 90-day retention, 4-hour restore), directory system state (daily, 60-day retention, 4-hour restore)
+- Platform upgrades follow a phased approach: assessment, lab deployment, integration testing, UAT, staging, production rollout, post-upgrade monitoring, with a defined rollback plan for each phase — major version upgrades require side-by-side deployment with phased migration
+- The IAM operations team for a 10K+ user organisation typically includes 8-12 people: IAM Operations Lead, IdP Engineer(s), PAM Engineer(s), Directory Engineer(s), IGA Analyst(s), Security Engineer, and Automation Engineer
+- Day-2 operations are where IAM/PAM programs succeed or fail — the most mature architecture is ineffective without competent monitoring, documented runbooks, tested backup/restore procedures, and ongoing operational investment

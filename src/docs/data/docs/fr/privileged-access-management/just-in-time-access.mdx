@@ -1,0 +1,132 @@
+---
+title: "Accès Juste-à-Temps (JIT)"
+description: "Accès juste-à-temps pour les privilèges — risques des privilèges permanents, architecture JIT, méthodes d'élévation, workflows d'approbation, intégration ITSM, et défis de mise en œuvre."
+sidebar:
+  order: 5
+  label: "Accès Juste-à-Temps (JIT)"
+---
+
+L'accès juste-à-temps (JIT) est le principe selon lequel les privilèges ne sont accordés que lorsqu'ils sont nécessaires, pour la durée exacte de la tâche, puis automatiquement révoqués. Le JIT remplace le modèle traditionnel des privilèges permanents (standing privileges) par un modèle d'élévation temporaire.
+
+## Risques des Privilèges Permanents
+
+| Risque | Impact | Statistique |
+|--------|--------|-------------|
+| **Fenêtre d'exposition permanente** | Un compte compromise donne un accès admin permanent | Durée de vie moyenne d'un accès permanent : années |
+| **Dérive des privilèges** | Accumulation de droits sans révision | 30% des comptes privilégiés ont plus de droits que nécessaire |
+| **Impossible de distinguer accès légitime et abus** | Toutes les actions admin se ressemblent | 60% des attaquants utilisent des comptes privilégiés existants |
+| **Rotation impossible** | Mot de passe rarement changé | 40% des organisations n'ont jamais changé le mot de passe admin par défaut |
+| **Conformité non respectée** | Auditeurs rejettent les privilèges permanents | PCI DSS v4.0 exige JIT ou justification d'accès admin |
+
+## Architecture JIT
+
+### Flux JIT Standard
+
+```
+1. DÉCLENCHEUR : Administrateur a besoin d'accès
+   │
+   ├── Manuel : Demande via portail PAM
+   │   └── "Je besoin d'accès admin au serveur DB-Prod pour 2 heures"
+   │
+   ├── Automatique : Déclenché par ticket ITSM
+   │   └── "Ticket INC-12345 : Incident de performance DB"
+   │
+   └── Programmé : Déclenché par calendrier
+       └── "Fenêtre de maintenance DB : mardi 22h-23h"
+   
+2. APPROBATION (si requise)
+   │
+   ├── Automatique : Politique JIT (heure, jour, serveur)
+   ├── Manager : Approbation par le responsable
+   └── Double : Deux approbations pour les accès critiques
+
+3. ÉLÉVATION
+   │
+   ├── Ajout temporaire au groupe AD "DB-Admins"
+   ├── Attribution de rôle cloud (Azure PIM / AWS IAM)
+   └── Élévation sudo (sudoers temporaire)
+
+4. ACCÈS
+   │
+   └── Session via proxy PAM avec enregistrement
+
+5. EXPIRATION (automatique)
+   │
+   ├── Retrait du groupe AD
+   ├── Expiration du rôle cloud
+   └── Suppression de la règle sudoers
+```
+
+## Méthodes d'Élévation JIT
+
+| Méthode | Plateforme | Délai d'Élévation | Réversibilité |
+|---------|-----------|-------------------|---------------|
+| **Groupe AD temporaire** | Windows, AD | 1-5 minutes (réplication AD) | Retrait automatique du groupe |
+| **Role cloud (Azure PIM)** | Azure | 1-2 minutes | Expiration du rôle configurée |
+| **IAM Identity Center** | AWS | 1-2 minutes | Fin de session SSO |
+| **Just Enough Admin (JEA)** | Windows PowerShell | Instantané | Fin de session PowerShell |
+| **sudo temporaire** | Linux | Secondes | Suppression du fichier sudoers |
+| **Conteneur éphémère** | Kubernetes, Docker | Minutes | Destruction du conteneur |
+
+### Azure PIM (Privileged Identity Management)
+
+Azure PIM est l'implémentation JIT native de Microsoft pour les rôles Azure AD et Azure RBAC :
+
+| Fonctionnalité | Description |
+|---------------|-------------|
+| **Activation JIT** | Activation temporaire d'un rôle (1-8 heures) |
+| **Approbation** | Workflow d'approbation pour les rôles critiques |
+| **MFA obligatoire** | Activation requise avec MFA |
+| **Justification** | Champ obligatoire pour chaque activation |
+| **Notifications** | Alertes par email aux approbateurs et administrateurs |
+| **Audit** | Journalisation complète de chaque activation |
+| **Délégation** | Délégation de la gestion des rôles aux approbateurs |
+
+## Workflows d'Approbation
+
+### Niveaux d'Approbation
+
+| Niveau | Type d'Accès | Approbateur | Délai d'Approbation |
+|--------|--------------|------------|---------------------|
+| **1 — Automatique** | Serveur de dev/test, heures ouvrables, utilisateur autorisé | Politique (automatique) | Instantané |
+| **2 — Manager** | Serveur de production, heures ouvrables | Responsable direct | Minutes-heures |
+| **3 — Double** | Serveur de production critique, base de données financière | Manager + Responsable sécurité | Heures |
+| **4 — Urgence** | Tout serveur, dehors des heures ouvrables | Comité d'urgence (pré-défini) | Minutes (appel téléphonique + ticket) |
+
+### Intégration ITSM (ServiceNow, Jira)
+
+```
+Portail PAM ──> Ticket ITSM créé ──> Approbateur notifié
+    │               │                        │
+    │         "Accès admin DB-Prod      "Approuvez-vous ?
+    │          pour incident INC-12345"   Jean D. demande
+    │                                     accès admin DB
+    │                                     pour 2 heures"
+    │                                        │
+    │                              Approuvé ─┴── Refusé
+    │                                 │           │
+    │<── JIT accordé ─────────────    │           │
+    │    (durée: 2h)                  │           │
+    │    (justification: incident)    │           │
+    │    (approbateur: Marie M.)      │           │
+```
+
+## Défis du JIT
+
+| Défi | Description | Atténuation |
+|------|-------------|-------------|
+| **Latence d'élévation** | Réplication AD peut prendre 5-15 minutes | Pré-staging des groupes, scripts de réplication forcée |
+| **Fenêtre de maintenance longue** | Certaines tâches dépassent la fenêtre JIT standard | Demande de prolongation avec justification, JIT flexible |
+| **Automatisation incompatible** | Scripts legacy qui supposent un accès permanent | Réécriture des scripts avec API PAM, secrets management |
+| **Réticence des admins** | Les admins résistent au changement ("on a toujours fait comme ça") | Communication, formation, preuve de valeur |
+| **Comptes de service** | Les services ne peuvent pas faire de JIT humain | Identité de charge de travail, certificats, rotation automatique |
+| **Urgences** | Pas le temps pour un workflow d'approbation | Break-glass avec procédure d'urgence et revue post-accès |
+
+## Points Clés à Retenir
+
+- Les privilèges permanents créent une fenêtre d'exposition permanente et empêchent la distinction entre accès légitime et abus — le JIT remplace ce modèle par une élévation temporaire avec expiration automatique
+- L'architecture JIT suit cinq étapes : déclencheur (manuel, automatique via ITSM, ou programmé) → approbation (automatique, manager, double) → élévation (groupe AD, rôle cloud, sudo) → accès (via proxy PAM) → expiration automatique
+- Les méthodes d'élévation incluent les groupes AD temporaires (1-5 min), les rôles cloud Azure PIM/AWS IAM Identity Center (1-2 min), JEA PowerShell (instantané), sudo temporaire Linux (secondes), et les conteneurs éphémères (minutes)
+- Azure PIM est l'implémentation JIT native la plus mature : activation temporaire (1-8h), workflow d'approbation, MDA obligatoire à l'activation, justification requise, notifications et journalisation complète
+- Les workflows d'approbation JIT ont quatre niveaux : automatique (dev/test, heures ouvrables), manager (production), double (critique), urgence — l'intégration ITSM (ServiceNow, Jira) automatise la création de tickets et la notification des approbateurs
+- Les défis du JIT incluent la latence de réplication AD, les fenêtres de maintenance longues, l'automatisation legacy, la réticence des admins, les comptes de service et les urgences — chaque défi a une atténuation spécifique

@@ -1,0 +1,203 @@
+---
+title: "Integration Patterns"
+description: "IAM/PAM integration patterns with enterprise systems — HRIS, ITSM, SIEM, DevOps, cloud platforms — using SCIM, web services, event-driven, and file-based integration approaches."
+sidebar:
+  order: 7
+  label: "Integration Patterns"
+---
+
+IAM and PAM platforms do not operate in isolation. They must integrate with the broader enterprise toolchain — HR systems for identity lifecycle, ITSM for access requests, SIEM for logging and alerting, and DevOps tools for automated operations.
+
+## Integration Architecture
+
+### The IAM Integration Landscape
+
+```
+┌────────────────────────────────────────────────────────────┐
+│                    ENTERPRISE INTEGRATIONS                    │
+├──────────┬──────────┬──────────┬──────────┬────────────────┤
+│   HRIS   │   ITSM   │   SIEM   │  DevOps  │  Cloud         │
+├──────────┼──────────┼──────────┼──────────┼────────────────┤
+│ Workday  │ServiceNow│ Splunk   │ Jenkins  │ AWS IAM        │
+│ SAP SF   │ Jira     │ Sentinel │ Ansible  │ Azure Entra    │
+│ Oracle   │ Zendesk  │ QRadar   │ GitLab   │ GCP IAM        │
+│ BambooHR │ Cherwell │ LogRhythm│ Terraform│ Kubernetes     │
+└──────────┴──────────┴──────────┴──────────┴────────────────┘
+         │          │          │          │
+         └──────────┴──────────┴──────────┴── IAM/PAM Platform
+                                                    │
+                                        ┌───────────┴───────────┐
+                                        │    Target Systems      │
+                                        │  (Managed by IAM/PAM)  │
+                                        └───────────────────────┘
+```
+
+## HRIS Integration
+
+### Purpose
+
+HRIS integration is the foundation of automated identity lifecycle management. The HR system is the authoritative source for identity attributes and employment status changes that drive provisioning and deprovisioning.
+
+| Integration Type | Direction | Protocol | Data | Use Case |
+|-----------------|-----------|----------|------|----------|
+| **User provisioning** | HRIS → IAM | SCIM, REST, file feed | New hire attributes, role/group membership | Create user accounts on onboarding |
+| **Status changes** | HRIS → IAM | Event-driven (webhook), batch | Active → terminated, department change, manager change | Deprovision on termination, role update on transfer |
+| **Attribute sync** | HRIS → IAM | Scheduled batch, delta feed | Name, email, title, department, location | Maintain attribute accuracy across systems |
+| **Roles** | HRIS → IAM | REST, SCIM | Job code, cost centre, business unit | Role assignment/mapping for RBAC |
+
+### SCIM for HRIS Integration
+
+SCIM (System for Cross-domain Identity Management) is the standard protocol for identity provisioning:
+
+| SCIM Operation | HRIS Event | IAM Action |
+|----------------|------------|------------|
+| **POST /Users** | New employee record created | Create user account in IdP, PAM, target systems |
+| **PUT /Users/{id}** | Employee attribute change | Update user attributes, trigger role recalculation |
+| **PATCH /Users/{id}** | Partial attribute update | Update specific attributes without full replacement |
+| **DELETE /Users/{id}** | Employee record deleted (retired) | Disable user account, trigger deprovisioning workflow |
+| **POST /Groups** | New department/team created | Create corresponding group in IAM |
+| **PATCH /Groups/{id}** | Group membership change | Add/remove user from group, recalculate entitlements |
+
+### HRIS Integration Patterns
+
+| Pattern | Real-Time? | Complexity | Best For |
+|---------|------------|------------|----------|
+| **SCIM (push)** | Yes | Medium | Cloud IGA/IdP with SCIM-capable HRIS |
+| **Webhook trigger** | Yes | Low-Medium | HRIS with webhook support (Workday, BambooHR) |
+| **REST API polling** | Near-real-time (5-15 min) | Medium | HRIS with REST API but no webhook |
+| **File-based (SFTP)** | Batch (daily/hourly) | Low | Legacy HRIS or air-gapped environments |
+| **JDBC connector** | Batch (near-real-time) | Medium | Direct database integration (less common, higher risk) |
+
+## ITSM Integration
+
+### Purpose
+
+ITSM integration connects IAM access request workflows with the enterprise service desk, providing a single interface for users to request access and for approvers to review requests.
+
+| Integration Point | Direction | Protocol | Use Case |
+|-------------------|-----------|----------|----------|
+| **Access request creation** | ITSM → IAM | REST API, webhook | User submits access request in portal |
+| **Access fulfilment** | IAM → ITSM | REST API | IAM provisions access, updates ticket status |
+| **Certification tasks** | IAM → ITSM | REST API, email | Create ITSM tasks for certification reviewers |
+| **Approval workflows** | ITSM → IAM | Webhook, API callback | Approver decision from ITSM portal |
+
+### Common ITSM Integration Flow
+
+```
+User submits request ──> ITSM Ticket Created ──> Approver Notified
+      in ServiceNow           (RITM/SCTASK)     (via email/SMS/portal)
+                                                      │
+                                                      v
+                                            Approver Approves/Rejects
+                                                      │
+                                              Approve ─┴── Reject
+                                                 │          │
+                            IAM provisions access     Ticket closed
+                            (via SCIM/API/connector)  "Rejected"
+                                                 │
+                            Ticket updated: "Fulfilled"
+                            User notified of access grant
+```
+
+## SIEM Integration
+
+### Purpose
+
+SIEM integration centralises IAM/PAM audit logs for security monitoring, compliance reporting, and threat detection.
+
+| Log Source | Data to Send | Protocol | Volume (Events/Day, Typical) |
+|------------|-------------|----------|------------------------------|
+| **IdP authentication logs** | Login success/failure, MFA events, token issuance | Syslog, REST API (SIEM connector) | 100K - 10M |
+| **PAM session logs** | Session start/end, command execution, file transfer | Syslog, REST API | 10K - 500K |
+| **PAM credential events** | Check-out, check-in, rotation | Syslog | 1K - 10K |
+| **IGA provisioning events** | User creation, modification, deletion | Syslog, REST API | 5K - 50K |
+| **IGA certification events** | Campaign start/end, reviewer decisions | Syslog, REST API | 100 - 10K (spiky) |
+| **Directory audit logs** | Account changes, group changes, password resets | Syslog (Windows Event Forwarding) | 100K - 5M |
+
+### SIEM Log Standardisation
+
+| Standard | Format | IAM/PAM Support | Recommendation |
+|----------|--------|-----------------|---------------|
+| **CEF (Common Event Format)** | Key-value pairs | Broad support (ArcSight) | Good for on-prem SIEM |
+| **LEEF (Log Event Extended Format)** | Key-value pairs with header | IBM QRadar | Use if QRadar is the SIEM |
+| **JSON** | Structured JSON | All modern platforms (Okta, Azure AD) | Preferred for cloud SIEM (Splunk, Sentinel) |
+| **Syslog (RFC 5424)** | Structured text | All PAM/IGA platforms | Universal standard, limited structure |
+| **Windows Event Log** | XML | AD, ADFS, Windows servers | For Windows-centric environments |
+
+## DevOps Integration
+
+### Purpose
+
+DevOps integration enables automated credential management, secret rotation, and policy-as-code in CI/CD pipelines.
+
+| Integration | Direction | Protocol | Use Case |
+|-------------|-----------|----------|----------|
+| **Secret retrieval** | CI/CD → PAM vault | REST API (Vault API) | CI/CD pipeline retrieves database/service credentials |
+| **Secret rotation** | PAM → DevOps pipeline | Webhook, API trigger | Post-rotation notification to update dependent systems |
+| **SSH key management** | DevOps → PAM | REST API, agent | Automated SSH key deployment to servers |
+| **Policy-as-code** | Git → PAM/IGA | Git push, API import | GitOps for IAM policy management |
+| **Terraform provider** | IaC → IAM/PAM | Terraform provider API | Infrastructure-as-Code for IAM configuration |
+
+### CI/CD Secret Retrieval Flow
+
+```
+Developer pushes code ──> CI/CD Pipeline triggered
+                                  │
+                    Build starts ──┴── Test execution
+                                  │
+                    ┌─────────────┘
+                    v
+            Request credentials from PAM vault
+                    │
+          ┌─────────┴─────────┐
+          │                   │
+    Check user/role       Token validation
+    authorisation         and expiry check
+          │                   │
+          └─────────┬─────────┘
+                    v
+          Temporary credential issued
+          (TTL: pipeline duration only)
+                    │
+            Pipeline uses credential
+                    │
+            Credential expires / returned
+```
+
+## Event-Driven Integration
+
+### Integration Bus Architecture
+
+```
+┌────────────────────────────────────────────────────────────┐
+│                   EVENT BUS (Kafka/EventBridge)              │
+├──────────┬──────────┬──────────┬──────────┬────────────────┤
+│  Identity│  Access  │  Certif. │  Audit   │  Anomaly       │
+│  Events  │  Events  │  Events  │  Events  │  Events        │
+├──────────┼──────────┼──────────┼──────────┼────────────────┤
+│          │          │          │          │                │
+│  HRIS    │  IGA     │  IGA     │  IdP     │  SIEM          │
+│  IdP     │  PAM     │  IGA     │  PAM     │  UEBA          │
+│  IGA     │  IdP     │          │  AD      │  IdP           │
+└──────────┴──────────┴──────────┴──────────┴────────────────┘
+```
+
+### Event Types
+
+| Event Category | Example Events | Consumers |
+|---------------|----------------|-----------|
+| **Identity lifecycle** | User created, user terminated, attribute changed | IGA (provisioning), HRIS (confirmation), SIEM (audit) |
+| **Access events** | Role granted, role revoked, access request approved | Target systems (provision), ITSM (ticket update) |
+| **Authentication events** | Login success, login failure, MFA challenge | SIEM (monitoring), IdP (risk scoring) |
+| **Privileged session events** | Session started, command executed, session ended | SIEM (monitoring), PAM (session record) |
+| **Compliance events** | Certification started, certification completed, SoD violation | IGA (reporting), ITSM (remediation), SIEM (audit) |
+
+## Key Takeaways
+
+- IAM/PAM platforms integrate with four primary enterprise systems: HRIS (identity lifecycle), ITSM (access request management), SIEM (logging and monitoring), and DevOps (automated credential management) — each integration type uses different protocols and patterns
+- SCIM is the standard protocol for HRIS-to-IAM provisioning — operations include POST (create), PUT/PATCH (update), and DELETE (deactivate) for both Users and Groups, enabling automated joiner/mover/leaver processes
+- ITSM integration connects IAM access request workflows to enterprise service desks — the typical flow: user request → ITSM ticket → approval → IAM fulfilment → ticket update, with the IAM platform performing the actual provisioning
+- SIEM integration requires log standardisation (CEF, LEEF, JSON, Syslog, Windows Event Log) — each IAM/PAM component generates specific event types at different volumes, from low-volume certification events (100-10K/day) to high-volume authentication logs (100K-10M/day)
+- DevOps integration enables automated secret retrieval in CI/CD pipelines — temporary credentials issued with TTL matching pipeline duration (JIT for build processes)
+- Event-driven architecture (via Kafka or EventBridge) enables real-time integration across identity lifecycle, access, authentication, privileged session, and compliance events — consumers subscribe to relevant event types for immediate action
+- The integration pattern choice (SCIM, REST, webhook, file-based, JDBC) depends on the source system's capabilities, real-time requirements, network topology, and security constraints

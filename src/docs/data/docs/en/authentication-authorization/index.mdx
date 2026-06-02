@@ -1,0 +1,134 @@
+---
+title: "Authentication & Authorization"
+description: "Deep dive into authentication methods, multi-factor authentication, single sign-on, federated identity, and authorization models including RBAC and ABAC."
+sidebar:
+  order: 1
+  label: "Overview"
+---
+
+Authentication verifies *who you are*; authorization determines *what you can do*. These two functions form the core of access control — the gate through which every user, service, and device must pass before interacting with protected resources. While conceptually simple, their implementation spans diverse protocols, architectures, and policy models that every IAM professional must master.
+
+This module covers the full spectrum of authentication and authorization: from password fundamentals and multi-factor authentication to federated identity, OAuth 2.0 flows, and policy-based access control.
+
+## The Authentication-Authorization Relationship
+
+Authentication and authorization form a sequential chain — authorization is meaningless without prior authentication, but authentication alone does not grant any access rights.
+
+```
+User → Authentication (prove identity) → Authorization (determine permissions) → Access (grant or deny)
+```
+
+A common analogy is airport security:
+- **Authentication** = Checking your passport and verifying you are who you claim to be
+- **Authorization** = Checking whether your ticket allows you into the first-class lounge
+
+Without authentication, there is no identity to authorize. Without authorization, authentication has no purpose — every authenticated user would have unlimited access.
+
+## The Authentication Landscape
+
+Authentication methods vary widely in security strength, user experience, and deployment complexity:
+
+| Method | Security | UX | Deployment | Phishing Resistant |
+|--------|----------|-----|------------|--------------------|
+| Password only | Low | Low | Low | No |
+| Password + SMS OTP | Medium | Medium | Low | No |
+| Password + TOTP | High | Medium | Low | No |
+| Push notification | High | High | Medium | No (MFA fatigue) |
+| FIDO2 / WebAuthn | Very High | High | Medium | Yes |
+| Smart card / PIV | Very High | Medium | High | Yes |
+| Passwordless (FIDO2) | Very High | Very High | Medium | Yes |
+
+The industry is moving decisively toward phishing-resistant, passwordless authentication. The US government's Executive Order 14028 and OMB Memo M-22-09 mandate phishing-resistant MFA across all federal agencies, accelerating enterprise adoption.
+
+## The Authorization Landscape
+
+Authorization determines what an authenticated identity can do. The major models form a spectrum of flexibility and complexity:
+
+<Aside variant="tip">
+Choose the simplest authorization model that meets your requirements. RBAC covers ~80% of enterprise use cases. Reserve ABAC and PBAC for scenarios requiring fine-grained, context-aware policies.
+</Aside>
+
+| Model | Granularity | Administration | Scalability | Best For |
+|-------|-------------|---------------|-------------|----------|
+| **DAC** (Discretionary) | Per-object | Resource owner | Poor | Small teams, file systems |
+| **MAC** (Mandatory) | Classification-based | Central authority | Moderate | Government, military |
+| **RBAC** (Role-Based) | Role-level | Role engineering | Good | Enterprise applications |
+| **ABAC** (Attribute-Based) | Attribute-level | Policy engineering | Good | Cloud, microservices |
+| **PBAC** (Policy-Based) | Policy-level | Centralized policy | Very Good | Large-scale, heterogeneous |
+| **ReBAC** (Relationship-Based) | Relationship-level | Graph-based | Moderate | Social platforms, file sharing |
+
+## Protocols and Standards
+
+The authentication and authorization ecosystem is built on several key standards that every professional should understand:
+
+### Authentication Protocols
+- **Password-based** — HTTP Basic Auth, Digest Auth (legacy)
+- **Kerberos** — Network authentication protocol, Windows domain foundation
+- **RADIUS** — AAA protocol for network access, VPN, Wi-Fi
+- **EAP** — Extensible Authentication Protocol, 802.1X
+
+### Federation Protocols
+- **SAML 2.0** — XML-based, enterprise-focused, strongest in government and higher education
+- **OpenID Connect (OIDC)** — Modern JSON-based, built on OAuth 2.0, dominant in SaaS
+- **WS-Federation** — Legacy Microsoft protocol, still in use in hybrid Exchange/ADFS deployments
+
+### Authorization Frameworks
+- **OAuth 2.0** — Delegated authorization for APIs (not authentication)
+- **XACML** — XML-based policy language for ABAC
+- **OPA / Rego** — Open Policy Agent, policy-as-code for cloud-native
+- **Cedar** — AWS's policy language, used by AWS Verified Permissions
+
+## Why Authentication and Authorization Matter
+
+The business impact of getting this wrong is severe:
+
+<Aside variant="danger">
+The 2024 Verizon Data Breach Investigations Report found that **68% of breaches involved the human element** — with stolen credentials and privilege abuse as the primary vectors. Weak authentication and authorization controls are directly responsible for the majority of security incidents.
+</Aside>
+
+- **Credential theft** — 49% of breaches involved stolen or compromised credentials
+- **Privilege misuse** — 31% of breaches involved privilege abuse by insiders
+- **Ransomware** — 92% of ransomware attacks involved credential access or privilege escalation
+- **Cost per breach** — IBM's 2024 Cost of a Data Breach report puts the average cost at $4.88M, with compromised credentials as the most common initial attack vector
+
+## Module Roadmap
+
+This module is structured to build from foundational concepts to advanced topics:
+
+<Steps>
+### Authentication Methods
+Password authentication, credential management, authentication factors, and modern passwordless approaches. Understanding the building blocks of identity verification.
+
+### Multi-Factor Authentication
+MFA methods, deployment architectures, bypass vectors, step-up authentication, and risk-based adaptive authentication. How to deploy MFA effectively.
+
+### Single Sign-On
+SSO protocols, SP-initiated vs IdP-initiated flows, session management, and enterprise SSO deployment patterns. How users authenticate once and access multiple systems.
+
+### OAuth 2.0 & OpenID Connect
+OAuth 2.0 grant types, PKCE, token types, OIDC identity layer, and token binding. The foundation of modern API authorization and federated identity.
+
+### Federated Identity
+Federation concepts, trust relationships, SAML and OIDC federation, SCIM provisioning, cross-domain identity management, and CIAM patterns.
+
+### Role-Based Access Control
+RBAC models, role design methodology, role mining, NIST RBAC standard, and role engineering best practices. The most widely deployed authorization model.
+
+### ABAC & Policy-Based Access
+Attribute-based and policy-based access control, XACML, OPA/Rego, ReBAC, and policy-as-code approaches for fine-grained authorization.
+
+### Authorization Strategies
+Comparing authorization models, hybrid approaches, microservices authorization, and API authorization patterns. Decision frameworks for choosing the right model.
+
+### Policy Management
+PDP/PEP/PIP architecture, policy lifecycle, policy-as-code workflows, and enterprise policy management platforms.
+</Steps>
+
+## Key Takeaways
+
+- Authentication (proving identity) and authorization (determining permissions) form a sequential chain — both are required for secure access control
+- The authentication landscape spans from passwords (low security) to FIDO2/WebAuthn (phishing-resistant) with the industry moving decisively toward passwordless
+- Six major authorization models exist (DAC, MAC, RBAC, ABAC, PBAC, ReBAC) — RBAC covers ~80% of enterprise use cases
+- Standards form the backbone: SAML 2.0 and OIDC for federation, OAuth 2.0 for delegated authorization, XACML and OPA for policy management
+- Compromised credentials remain the #1 attack vector — MFA is the single most effective mitigating control
+- This module covers nine areas that build from authentication fundamentals through advanced authorization architecture

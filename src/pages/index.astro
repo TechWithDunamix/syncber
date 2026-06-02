@@ -1,0 +1,17 @@
+---
+import ModuleCards from "@/docs/components/feature/ModuleCards.astro";
+import Hero from "@/docs/components/hero/Hero.astro";
+import { getLocaleFromUrl } from "@/docs/js/localeUtils";
+import { getTranslatedData } from "@/docs/js/translationUtils";
+import DocsLandingLayout from "@/docs/layouts/DocsLandingLayout.astro";
+
+const currLocale = getLocaleFromUrl(Astro.url);
+const siteData = getTranslatedData("siteData", currLocale);
+---
+
+<DocsLandingLayout title={siteData.title} description={siteData.description}>
+  <main class="overflow-hidden">
+    <Hero />
+    <ModuleCards />
+  </main>
+</DocsLandingLayout>

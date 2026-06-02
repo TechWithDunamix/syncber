@@ -1,0 +1,111 @@
+---
+title: "Gestion des Sessions"
+description: "Gestion des sessions privilégiées — architecture proxy (RDP, SSH, HTTP), méthodes d'enregistrement (vidéo, frappe, texte), alertes temps réel, filtrage de commandes, terminaison de session, et forensique."
+sidebar:
+  order: 6
+  label: "Gestion des Sessions"
+---
+
+La gestion des sessions privilégiées est la capacité d'enregistrer, surveiller et contrôler les sessions actives des administrateurs sur les systèmes critiques. C'est la seule façon de savoir exactement ce qu'un administrateur a fait pendant une session privilégiée.
+
+## Architecture Proxy PAM
+
+### Flux de Session Proxy
+
+```
+┌─────────┐       ┌──────────┐       ┌──────────┐       ┌──────────┐
+| Admin   |──────>| PAM Proxy|──────>| Serveur  |       | Stockage |
+| (SSH/   |       | (RDP/    |       | Cible    |       | Sessions |
+|  RDP)   |<──────|  SSH/    |<──────|          |       | (S3/WORM)|
+└─────────┘       |  HTTP)   |       └──────────┘       └──────────┘
+                  └──────────┘                              │
+                       │                                   Enregistrement
+                       │                                   (vidéo, texte,
+                  Contrôle d'accès                          frappe)
+                  (MFA, politique)
+```
+
+### Composants du Proxy PAM
+
+| Composant | Fonction | Considération de Performance |
+|-----------|----------|------------------------------|
+| **Proxy de connexion** | Point d'entrée pour les connexions RDP/SSH/HTTP | ~50ms de latence ajoutée par saut proxy |
+| **Enregistreur de session** | Capture et stocke l'activité de la session | ~1-100 KB/s selon la méthode d'enregistrement |
+| **Moteur d'alerte temps réel** | Analyse les commandes et actions en direct | Traitement sous 100ms pour ne pas impacter la session |
+| **Moteur de filtrage** | Bloque ou permet les commandes selon la politique | Vérification avant exécution de la commande |
+| **Terminaison de session** | Déconnecte la session sur déclencheur | Action immédiate (< 1s) |
+
+## Méthodes d'Enregistrement
+
+| Méthode | Taille de Stockage (par heure) | Niveau de Détail | Recherchable | Relecture |
+|---------|-------------------------------|-----------------|--------------|-----------|
+| **Vidéo (RDP)** | ~500 MB - 2 GB (selon résolution) | Écran complet (pixels) | Non | Oui (comme une vidéo) |
+| **Texte (SSH/CLI)** | ~3.6 MB (1 KB/s) | Commandes et sortie texte | Oui (grep) | Oui (relecture texte) |
+| **Frappe (Keystroke)** | < 1 MB | Chaque frappe, copie, clic | Oui (recherche de chaîne) | Oui (rejeu de frappes) |
+| **Métadonnées** | < 0.1 MB | Début, fin, durée, utilisateur, cible | Oui | Non |
+
+### Recommandations par Type de Session
+
+| Type de Session | Méthode d'Enregistrement | Rétention | Stockage Est. (50 admins) |
+|----------------|-------------------------|-----------|--------------------------|
+| **SSH (Linux)** | Texte + Frappe | 1 an | ~15 GB |
+| **RDP basse résolution** | Vidéo (1024x768, 5fps) | 1 an | ~4 TB |
+| **RDP haute résolution** | Vidéo (1920x1080, 15fps) | 1 an | ~18 TB |
+| **HTTP/HTTPS (console web)** | Vidéo + Métadonnées | 1 an | ~8 TB |
+| **Base de données** | Texte (requêtes SQL) | 1 an | ~5 GB |
+
+## Alertes Temps Réel
+
+### Règles d'Alerte
+
+| Règle | Déclencheur | Action | Séverité |
+|-------|-------------|--------|----------|
+| **Commande dangereuse** | rm -rf /, shutdown, userdel | Alerte + notification SOC | Critique |
+| **Accès hors heures** | Session après 20h ou avant 6h | Alerte + journalisation | Moyenne |
+| **Pays inhabituel** | IP source d'un pays non autorisé | Alerte + terminaison de session | Critique |
+| **Téléchargement de fichier** | SCP/SCP de fichier vers IP inconnue | Alerte + blocage | Élevée |
+| **Élévation de privilège suspecte** | sudo su -, utilisation de root | Alerte + notification | Élevée |
+| **Plusieurs sessions** | >3 sessions simultanées | Alerte + verification | Moyenne |
+
+### Filtrage de Commandes
+
+| Politique | Comportement | Exemple |
+|-----------|-------------|---------|
+| **Allowlist (liste blanche)** | Seules les commandes autorisées sont exécutées | Permettre : systemctl restart app, tail -f log |
+| **Blocklist (liste noire)** | Les commandes interdites sont bloquées | Bloquer : rm -rf /, shutdown, passwd |
+| **Approbation requise** | Certaines commandes nécessitent une approbation | Approuver : chmod 777, useradd admin |
+| **Double commande** | Deux admins doivent exécuter la commande simultanément | Exiger : wall -n "Confirmez-vous cette action ?" |
+
+## Terminaison de Session
+
+### Critères de Terminaison
+
+| Critère | Description | Délai |
+|---------|-------------|-------|
+| **Violation de politique** | Commande interdite détectée | Immédiat (< 1s) |
+| **Inactivité** | Pas d'activité pendant une période définie | 5-30 minutes (configurable) |
+| **Expiration de durée** | Durée maximale de session atteinte | 2-8 heures (configurable) |
+| **Fin de fenêtre JIT** | Fenêtre d'élévation JIT expirée | 5 minutes (grace period) |
+| **Détection d'anomalie** | Comportement anormal détecté | Immédiat |
+| **Déconnexion manuelle** | Administrateur PAM met fin à la session | Immédiat |
+
+## Forensique des Sessions
+
+### Enquête Post-Incident
+
+| Élément de Preuve | Source PAM | Analyse |
+|-------------------|------------|---------|
+| **Quand ?** | Horodatage début/fin de session | Chronologie de l'incident |
+| **Qui ?** | Identifiant utilisateur PAM + MFA | Attribution de l'action |
+| **Quoi ?** | Enregistrement texte, vidéo, commandes | Reconstruction de l'action |
+| **Où ?** | IP source, serveur cible, port | Périmètre de l'incident |
+| **Comment ?** | Méthode d'authentification, élévation | Vecteur d'attaque |
+
+## Points Clés à Retenir
+
+- La gestion des sessions PAM utilise une architecture proxy intermédiaire (l'admin se connecte au proxy, le proxy se connecte au serveur cible) — le proxy contrôle l'accès, enregistre l'activité et peut terminer la session en temps réel
+- Les méthodes d'enregistrement varient : texte/CLI pour SSH (3.6 MB/h, recherchable), vidéo pour RDP (500 MB-2 GB/h, rejouable comme une vidéo), frappe pour l'analyse granulaire — choisissez la méthode en fonction du type de session et des exigences de conformité
+- Les alertes temps réel analysent les commandes pendant la session et peuvent déclencher des notifications, des blocages de commandes, ou des terminaisons de session — les règles incluent les commandes dangereuses, les horaires inhabituels, les IP suspectes, les téléchargements de fichiers et les élévations de privilège
+- Le filtrage de commandes permet quatre politiques : allowlist (seules les commandes autorisées), blocklist (commandes interdites), approbation requise (pour les commandes sensibles), double commande (deux admins nécessaires)
+- La terminaison de session est déclenchée par violation de politique, inactivité, expiration de durée, fin de fenêtre JIT, détection d'anomalie ou déconnexion manuelle — l'action est immédiate (< 1s)
+- La forensique des sessions utilise les enregistrements PAM pour répondre à cinq questions clés : quand, qui, quoi, où, comment — c'est la source de preuve la plus fiable pour les enquêtes post-incident

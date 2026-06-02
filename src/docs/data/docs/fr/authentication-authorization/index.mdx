@@ -1,0 +1,87 @@
+---
+title: "Authentification et Autorisation"
+description: "Plongez dans les méthodes d'authentification, l'authentification multi-facteurs (MFA), l'authentification unique (SSO), l'identité fédérée, OAuth 2.0, OIDC, RBAC, ABAC et les stratégies d'autorisation d'entreprise."
+sidebar:
+  order: 2
+  label: "Authentification & Autorisation"
+---
+
+L'authentification vérifie *qui vous êtes* ; l'autorisation détermine *ce que vous pouvez faire*. Bien que ces deux concepts soient distincts, ils fonctionnent ensemble pour sécuriser l'accès aux applications, aux API et aux données. Ce module couvre en profondeur les protocoles, les modèles et les politiques qui constituent l'épine dorsale du contrôle d'accès en entreprise.
+
+## Le Paysage de l'Authentification
+
+### Facteurs d'Authentification
+
+L'authentification repose sur trois catégories de facteurs, souvent combinés dans le cadre de l'authentification multi-facteurs (MFA) :
+
+| Facteur | Exemples | Niveau de Sécurité | Vulnérabilité |
+|---------|----------|-------------------|---------------|
+| **Quelque chose que vous savez** | Mot de passe, NIP, phrase secrète | Faible | Hameçonnage, réutilisation, force brute |
+| **Quelque chose que vous avez** | Jeton OATH, smartphone, carte à puce | Moyen | Perte, vol, SMS intercepté |
+| **Quelque chose que vous êtes** | Empreinte digitale, reconnaissance faciale | Élevé | Coût du capteur, préoccupations de confidentialité |
+| **Quelque part où vous êtes** | Géolocalisation, adresse IP réseau | Faible (contextuel) | VPN, spoofing |
+| **Quelque chose que vous faites** | Dynamique de frappe, schéma de défilement | Moyen (comportemental) | Apprentissage automatique imparfait |
+
+### Protocoles d'Authentification
+
+| Protocole | Type | Cas d'Usage | Sécurité |
+|-----------|------|-------------|----------|
+| **LDAP** | Annuaire | Authentification d'entreprise en backend | Déconseillé sans TLS |
+| **Kerberos** | Ticket réseau | Windows Active Directory, SSO d'entreprise | Très sécurisé dans un domaine |
+| **SAML 2.0** | Basé sur assertion | SSO d'entreprise, fédération B2B | Bon (avec signature) |
+| **OIDC** | Basé sur jeton JWT | SSO moderne, applications mobiles | Très bon (standardisé) |
+| **RADIUS** | AAA réseau | Wi-Fi, VPN, accès réseau | Bon (avec EAP) |
+
+## Le Paysage de l'Autorisation
+
+L'autorisation détermine ce qu'un utilisateur authentifié peut faire. Les modèles standard incluent :
+
+### Modèles d'Autorisation
+
+| Modèle | Granularité | Complexité | Passage à l'Échelle | Meilleur Pour |
+|--------|-------------|------------|---------------------|---------------|
+| **DAC (Discretionary Access Control)** | Contrôle par le propriétaire | Très faible | Faible | Petites équipes, fichiers partagés |
+| **MAC (Mandatory Access Control)** | Basé sur des étiquettes de sécurité | Élevée | Faible | Gouvernement, militaire |
+| **RBAC (Role-Based Access Control)** | Basé sur des rôles professionnels | Faible-Moyenne | Très bonne | La plupart des déploiements d'entreprise |
+| **ABAC (Attribute-Based Access Control)** | Basé sur des attributs (utilisateur, ressource, environnement) | Élevée | Excellente | Organisations complexes, cloud |
+| **ReBAC (Relationship-Based Access Control)** | Basé sur des relations entre entités | Moyenne | Excellente | Applications sociales, SaaS multi-locataire |
+
+### Module Roadmap
+
+<Steps>
+### Méthodes d'Authentification
+Facteurs d'authentification, hachage de mots de passe (Argon2id, bcrypt), NIST SP 800-63B, vecteurs d'attaque, FIDO2 et authentification sans mot de passe.
+
+### Authentification Multi-Facteurs (MFA)
+Méthodes MFA (TOTP, push, WebAuthn, SMS), architectures de déploiement, RBA (Risk-Based Authentication), contournement de la MFA, stratégies d'atténuation.
+
+### Authentification Unique (SSO)
+SAML 2.0 vs OIDC, flux initiés par SP et IdP, types de jetons, modèles de déploiement d'entreprise, risques de sécurité.
+
+### Autorisation OAuth 2.0
+Types d'octroi OAuth 2.0, flux PKCE, types de jetons, OIDC comme couche d'identité, DPoP, changements OAuth 2.1.
+
+### Identité Fédérée
+Concepts de fédération, modèles de confiance (direct, courtier, maillé), échange de métadonnées SAML, fédération OIDC, provisionnement SCIM.
+
+### RBAC — Contrôle d'Accès Basé sur les Rôles
+Niveaux RBAC NIST, ingénierie des rôles descendante et ascendante, pièges (explosion de rôles, dérive des privilèges, rôles orphelins), meilleures pratiques.
+
+### ABAC et PBAC
+Attributs ABAC, architecture XACML (PAP/PDP/PEP/PIP), politique en tant que code avec OPA/Rego, ReBAC (modèle Zanzibar), tableau comparatif des modèles.
+
+### Stratégies d'Autorisation
+Spectre des modèles (DAC→ReBAC), hybrides (RBAC+ABAC), autorisation de microservices, modèles d'authentification API, cadre décisionnel.
+
+### Gestion des Politiques
+Architecture PDP/PEP/PIP/PAP/PRP, algorithmes de combinaison de politiques, Rego vs Cedar vs XACML, cycle de vie des politiques avec GitOps.
+</Steps>
+
+## Points Clés à Retenir
+
+- L'authentification vérifie l'identité à l'aide de trois facteurs (connaissance, possession, inhérence) — la MFA combine au moins deux facteurs pour une sécurité renforcée
+- L'autorisation détermine ce qu'un utilisateur authentifié peut faire via des modèles comme DAC, MAC, RBAC, ABAC et ReBAC — chaque modèle offre un équilibre différent entre granularité, complexité et passage à l'échelle
+- Les protocoles d'authentification évoluent de LDAP/Kerberos (sur site) à SAML/OIDC (cloud et fédéré), avec FIDO2/WebAuthn comme avenir sans mot de passe
+- La séparation entre authentification et autorisation est fondamentale : l'authentification répond "qui êtes-vous ?" tandis que l'autorisation répond "que pouvez-vous faire ?"
+- Choisir le bon modèle d'autorisation est une décision architecturale majeure — RBAC pour la simplicité et les déploiements standard, ABAC pour la granularité et le contexte, ReBAC pour les systèmes sociaux et multi-locataires
+- Les six prochaines pages approfondissent chaque méthode d'authentification et modèle d'autorisation, fournissant des conseils pratiques pour la mise en œuvre en entreprise

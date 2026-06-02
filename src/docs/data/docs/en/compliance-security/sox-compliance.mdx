@@ -1,0 +1,142 @@
+---
+title: "SOX Compliance"
+description: "Sarbanes-Oxley Act compliance — Section 302, 404, 409 requirements, internal controls over financial reporting, IAM controls for financial systems, access certification, and segregation of duties."
+sidebar:
+  order: 3
+  label: "SOX Compliance"
+---
+
+The Sarbanes-Oxley Act of 2002 (SOX) was enacted in response to major corporate accounting scandals (Enron, WorldCom, Tyco). SOX requires public companies to establish, document, test, and maintain internal controls over financial reporting — and IAM controls are a critical component of those internal controls.
+
+## SOX Sections Relevant to IAM
+
+### Section 302 — Corporate Responsibility for Financial Reports
+
+CEOs and CFOs must certify quarterly and annually that financial reports are accurate and that they are responsible for establishing and maintaining internal controls. This creates personal liability for executives, making them direct stakeholders in IAM effectiveness.
+
+**IAM implications:**
+- Financial system access must be tightly controlled and reviewed
+- Executives must have visibility into who has access to financial data
+- Access control deficiencies must be reported to the audit committee
+- Certifying officers must be notified of IAM control failures in a timely manner
+
+### Section 404 — Management Assessment of Internal Controls
+
+The most significant section for IAM. Management must assess and report on the effectiveness of internal controls over financial reporting, and the external auditor must attest to this assessment.
+
+**IAM controls that typically fall under Section 404:**
+
+| Control Area | Example Control | Testing Approach |
+|-------------|----------------|------------------|
+| **User access provisioning** | Only authorised users receive access to financial systems | Test user creation against authorised request documentation |
+| **Access termination** | Access revoked within 24 hours of termination | Test terminated user accounts for active access |
+| **Access certification** | Quarterly recertification of financial system access | Test certification completion rate and remediation |
+| **Segregation of duties** | SoD controls prevent conflicting access combinations | Test for toxic combinations in financial systems |
+| **Privileged access** | Privileged access to financial systems is logged and reviewed | Test privileged activity logs for review completion |
+| **Password controls** | Password policies meet minimum standards | Test password complexity, rotation, lockout settings |
+
+### Section 409 — Real-Time Issuer Disclosures
+
+Material changes in financial condition must be disclosed on a rapid and current basis. For IAM, this means that material access control failures (e.g., an unauthorised user with access to the general ledger) must be disclosed if they could affect financial reporting.
+
+## IAM Controls for Financial Systems
+
+### ERP Application Access
+
+Enterprise Resource Planning (ERP) systems like SAP, Oracle EBS, and Microsoft Dynamics contain the core financial data. IAM controls for ERPs include:
+
+```
+┌──────────────────────────────────────────────┐
+│            ERP Financial Modules              │
+├──────────┬──────────┬──────────┬──────────────┤
+│  General │ Accounts │ Accounts │  Fixed       │
+│  Ledger  │ Payable  │ Receivable│  Assets      │
+├──────────┴──────────┴──────────┴──────────────┤
+│            IAM Control Layer                   │
+├──────────────────────────────────────────────┤
+│  Provisioning │ SoD │ Cert. │ PAM │ Logging   │
+└──────────────────────────────────────────────┘
+```
+
+**Critical ERP IAM controls:**
+
+| Control | SAP | Oracle EBS | Microsoft Dynamics |
+|---------|-----|------------|-------------------|
+| **User provisioning** | SU01 / SU10 | FND_USER | System Users |
+| **Role assignment** | PFCG roles | Responsibility mapping | Security roles |
+| **SoD analysis** | GRC Access Control | Advanced Access Controls | Dynamics SoD tools |
+| **Critical access** | Sensitive authorisations | Function-level access | Privileged permissions |
+
+### Segregation of Duties in Financial Processes
+
+SoD is the cornerstone of SOX IAM compliance. The following are common toxic combinations that must be prevented in financial systems:
+
+| Toxic Combination | Risk | Typical Dual Roles |
+|------------------|------|-------------------|
+| **Create vendor + Process invoices** | Create fake vendor, approve fake invoices | AP Clerk + AP Manager |
+| **Create PO + Receive goods** | Create purchase orders, receive goods without verification | Buyer + Warehouse |
+| **Create customer + Process refund** | Create fake customer, process fraudulent refunds | Sales Rep + Credit Clerk |
+| **Approve timesheet + Process payroll** | Approve inflated hours, process to payroll | Supervisor + Payroll Clerk |
+| **Create journal entry + Approve entry** | Post fraudulent adjustments without review | Staff Accountant + GL Manager |
+| **Change vendor bank + Process payment** | Redirect vendor payments to personal account | AP Clerk + Treasury |
+
+### Segregation of Duties Remediation
+
+When a toxic combination is detected, organisations typically:
+
+1. **Analyse the conflict** — Determine if the SoD violation is actual or theoretical
+2. **Assess mitigating controls** — Identify existing compensating controls (e.g., manager approval, transaction limits, audit review)
+3. **Document mitigation** — Formally document the mitigating control and how it addresses the risk
+4. **Implement remediation** — Reassign conflicting roles, add approval workflows, or implement real-time SoD enforcement
+5. **Monitor and re-certify** — Regularly re-verify that SoD controls remain effective
+
+<Aside variant="caution">
+SoD conflicts should NEVER be accepted without documented compensating controls. SOX auditors will flag undocumented SoD acceptances as control deficiencies. Every exception must have a mitigating control, a defined owner, periodic re-validation, and a target date for remediation.
+</Aside>
+
+## SOX Access Certification
+
+Access certification (recertification) is the process of periodically verifying that users have appropriate access to financial systems.
+
+### Certification Best Practices
+
+| Practice | Recommendation | Auditor Expectation |
+|----------|---------------|-------------------|
+| **Frequency** | Quarterly for financial systems, annually for non-financial | At least annually for all systems |
+| **Reviewer** | System owners / data owners with business knowledge | Reviewer must understand the access being reviewed |
+| **Scope** | All users with access to financial systems | Full population, no sampling |
+| **Evidence** | Complete certification reports with signature/digital approval | Dated evidence of certification completion |
+| **Remediation** | Remove flagged access within 30 days | Documented remediation with dates |
+| **Non-response** | Escalate after 3 reminders, auto-remove after 5 business days | Clear policy for non-response handling |
+
+### Access Certification Workflow
+
+<Steps>
+1. **Define scope** — Identify financial systems, applications, and critical data stores to be included in the certification campaign
+2. **Generate certification list** — Extract current user entitlements from each target system and organise by reviewing owner
+3. **Distribute to reviewers** — Send certification tasks to data owners with clear instructions on what to review and the criteria for approval/revocation
+4. **Reviewer completes analysis** — Reviewer examines each user's access against their job function and designates access as "approved," "revoked," or "needs modification"
+5. **Escalate non-responses** — Automated reminder sequence and management escalation for reviewers who have not completed their certification within the allowed timeframe
+6. **Implement changes** — Access changes (revocations, modifications) are executed in the target systems with change documentation
+7. **Report and archive** — Generate completion report with metrics (completion rate, changes made, non-responsive reviewers) and archive for auditor access
+</Steps>
+
+## Common SOX IAM Audit Findings
+
+| Finding | Root Cause | Remediation |
+|---------|------------|-------------|
+| Users with inappropriate access to financial systems | Weak provisioning controls, no access recertification | Implement RBAC with quarterly certification |
+| Terminated users still active in financial systems | Manual deprovisioning, no automated integration | Implement automated deprovisioning with HRIS integration |
+| Excessive privileged access to financial systems | No privileged access management | Implement PAM with JIT access for financial systems |
+| SoD conflicts in financial applications | No SoD analysis tool, manual review only | Deploy automated SoD analysis and enforcement |
+| Generic/shared accounts in financial systems | No unique user IDs for service accounts | Eliminate shared accounts, implement service account management |
+| Incomplete access certification evidence | No systematic certification campaigns | Implement IGA with automated certification campaigns |
+
+## Key Takeaways
+
+- SOX Section 404 is the primary driver for IAM controls over financial reporting — companies must document, test, and maintain internal controls over financial reporting
+- The most critical IAM controls for SOX are: user provisioning/termination, access certification, segregation of duties, privileged access management, and audit logging
+- Segregation of Duties (SoD) is the cornerstone control — common toxic combinations in ERP systems (create vendor + process invoices, create PO + receive goods) must be prevented or mitigated with documented compensating controls
+- Access certification (quarterly for financial systems) with proper reviewer selection, escalation, and evidence retention is a fundamental SOX requirement
+- Common SOX audit findings include inappropriate access, orphaned accounts, excessive privileges, unresolved SoD conflicts, shared accounts, and incomplete certification evidence — all addressable with a mature IAM program
+- SOX creates personal liability for CEOs and CFOs (Section 302), making them direct stakeholders in IAM control effectiveness

@@ -1,0 +1,75 @@
+---
+/**
+ * * These are alternating side cards with titles, text, and images
+ * Recommend using 2 or 3 cards in a row
+ */
+import infraSecImg from "@images/feature/infrastructure-security.png";
+import leaderMgmtImg from "@images/feature/leadership-management.png";
+import fullStackImg from "@images/feature/full-stack-creator.png";
+import cyberDefenseImg from "@images/feature/cyber-defense-analytics.png";
+
+import { docsRoute } from "@/docs/js/docsUtils";
+import FeatureCard from "./FeatureCardSideImage.astro";
+
+interface FeatureItem {
+  image: ImageMetadata; // an imported image
+  title: string;
+  description: string;
+  href: string; // link to learn more
+  buttonText: string; // button text
+}
+
+const featureData: FeatureItem[] = [
+  {
+    image: infraSecImg,
+    title: "Infrastructure & Security Engineering",
+    description:
+      "Master the fundamentals of secure infrastructure design, cloud architecture, and cybersecurity. Learn to build resilient systems that scale.",
+    href: `/${docsRoute}/infrastructure-security/`,
+    buttonText: "View Course",
+  },
+  {
+    image: leaderMgmtImg,
+    title: "Leadership & Business Management",
+    description:
+      "Develop the strategic mindset to lead AI-driven organizations. Covering team management, product strategy, and business transformation.",
+    href: `/${docsRoute}/leadership-management/`,
+    buttonText: "View Course",
+  },
+  {
+    image: fullStackImg,
+    title: "Full Stack Creator",
+    description:
+      "From frontend to backend, learn to build complete AI-powered applications. Covers modern frameworks, APIs, and deployment workflows.",
+    href: `/${docsRoute}/full-stack-creator/`,
+    buttonText: "View Course",
+  },
+  {
+    image: cyberDefenseImg,
+    title: "Cyber Defense & Analytics Professional",
+    description:
+      "Train in threat detection, incident response, and security analytics. Gain hands-on experience with industry-standard defense tools.",
+    href: `/${docsRoute}/cyber-defense-analytics/`,
+    buttonText: "View Course",
+  },
+];
+---
+
+<section id="feature-side-image" class="my-12 overflow-hidden py-6 md:py-12">
+  <div class="docs-home-container">
+    <div class="flex flex-col gap-16 md:gap-24">
+      {
+        featureData.map((feature, idx) => (
+          <FeatureCard
+            title={feature.title}
+            description={feature.description}
+            image={feature.image}
+            imageSide={idx % 2 === 0 ? "right" : "left"}
+            href={feature.href}
+            buttonText={feature.buttonText}
+          />
+        ))
+      }
+    </div>
+  </div>
+</section>

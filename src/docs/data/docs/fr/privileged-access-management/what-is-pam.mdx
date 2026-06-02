@@ -1,0 +1,109 @@
+---
+title: "Qu'est-ce que la PAM ?"
+description: "Définition de la Gestion des Accès Privilégiés — différences IAM vs PAM, business case, principe de moindre privilège, lien avec le Zero Trust, et place de la PAM dans la stratégie de sécurité."
+sidebar:
+  order: 2
+  label: "Qu'est-ce que la PAM ?"
+---
+
+La Gestion des Accès Privilégiés (PAM) est la discipline de sécurité qui se concentre sur le contrôle, la surveillance et la sécurisation des comptes disposant de privilèges élevés au sein d'une organisation. Alors que l'IAM gère les accès de tous les utilisateurs, la PAM se concentre spécifiquement sur les comptes qui peuvent causer le plus de dégâts s'ils sont compromis.
+
+## IAM vs PAM
+
+| Dimension | IAM (Gestion des Identités et des Accès) | PAM (Gestion des Accès Privilégiés) |
+|-----------|------------------------------------------|--------------------------------------|
+| **Population** | Tous les utilisateurs (employés, partenaires, clients) | Administrateurs, comptes de service, utilisateurs à privilèges |
+| **Comptes** | Comptes utilisateur standards | Comptes admin, super-utilisateurs, root, service |
+| **Modèle d'accès** | Basé sur les rôles (RBAC), accès permanent | Juste-à-temps (JIT), moindre privilège, zéro privilège permanent |
+| **Authentification** | MFA standard | MFA renforcée, biométrie, smart card, FIDO2 |
+| **Surveillance** | Journalisation standard des connexions | Enregistrement de session (vidéo/texte), alertes temps réel |
+| **Cycle de vie** | Provisionnement, certification, déprovisionnement | Rotation d'identifiants, découverte de comptes, élévation temporaire |
+| **Risque** | Modéré — accès aux applications métier | Très élevé — accès à l'infrastructure critique |
+
+### Complémentarité
+
+```
+IAM et PAM ne sont pas en compétition — ils sont complémentaires :
+
+IAM gère : "Qui peut accéder à l'application RH ?"
+PAM gère : "Qui peut administrer le serveur de base de données RH ?"
+
+IAM = Accès fonctionnel (ce dont les utilisateurs ont besoin pour travailler)
+PAM = Accès technique (ce dont les administrateurs ont besoin pour maintenir)
+```
+
+## Le Business Case de la PAM
+
+### Coût des Violences de Données Liées aux Privilèges
+
+| Coût | Valeur |
+|------|--------|
+| **Coût moyen d'une violation** | 4,45 M$ (IBM 2023) |
+| **Coût moyen par identifiant compromis** | 162 $ par enregistrement |
+| **Temps moyen de détection d'un abus de privilège** | 10 jours |
+| **Réduction du coût avec PAM** | 60-80% de réduction du risque |
+
+### Retour sur Investissement (ROI) PAM
+
+| Bénéfice | Impact | Mesure |
+|----------|--------|--------|
+| **Réduction du risque de violation** | 60-80% | Diminution des incidents liés aux privilèges |
+| **Conformité réglementaire** | Évite les amendes | Audit pass (SOX, PCI, HIPAA, ISO 27001) |
+| **Efficacité opérationnelle** | 70% moins de temps de gestion des mots de passe | Réduction des tickets de réinitialisation |
+| **Productivité administrateur** | 50% d'accès plus rapide via JIT | Temps d'approvisionnement réduit |
+| **Audit et reporting** | 90% de temps en moins pour les audits | Préparation d'audit en jours au lieu de semaines |
+
+## Le Principe de Moindre Privilège
+
+Le moindre privilège est le principe fondamental de la PAM. Il stipule qu'un utilisateur ou un processus ne devrait disposer que des droits minimalement nécessaires pour accomplir sa tâche, et ce uniquement pendant la durée nécessaire.
+
+### Application du Moindre Privilège
+
+| Niveau | Application | Exemple |
+|--------|-------------|---------|
+| **Identité** | Droits utilisateur limités au rôle | Administrateur SQL avec droit DB_Owner uniquement sur les bases nécessaires |
+| **Temps** | Accès limité dans le temps | Élévation JIT pour 4 heures pour une maintenance programmée |
+| **Action** | Commandes et actions spécifiques autorisées | sudo autorisé uniquement pour systemctl restart app |
+| **Étendue** | Périmètre limité (serveurs, applications, données) | Accès admin uniquement aux serveurs de production d'une application spécifique |
+
+## PAM et Zero Trust
+
+La PAM est un pilier fondamental de l'architecture Zero Trust :
+
+| Principe Zero Trust | Implémentation PAM |
+|--------------------|-------------------|
+| **Vérifier explicitement** | Chaque accès privilégié est authentifié (MFA) et autorisé (PDP) avant d'être accordé |
+| **Accès au moindre privilège** | JIT, juste-assez-de-privilège (JEA), pas de privilèges permanents |
+| **Supposer la brèche (Assume Breach)** | Enregistrement de session, rotation d'identifiants après chaque utilisation |
+
+```
+┌──────────────────────────────────────────────────────────┐
+|                ZERO TRUST + PAM                            |
+|                                                            |
+|  Accès Admin ──> Vérification ──> Autorisation ──> Session|
+|       │            │                 │              │     |
+|       │    Authentification      Politique JIT    Proxy   |
+|       │    MFA + Context         RBAC/ABAC        PAM     |
+|       │                                             │     |
+|       v                                             v     |
+|  ✅ Approuvé                                  Enregistrement
+|  ❌ Refusé                                    + Rotation    |
+└──────────────────────────────────────────────────────────┘
+```
+
+## Types de Solutions PAM
+
+| Type | Description | Exemples | Cas d'Usage |
+|------|-------------|---------|-------------|
+| **Suite PAM complète** | Plateforme intégrée (coffre, sessions, JIT, découverte) | CyberArk, BeyondTrust, Delinea, Wallix | Entreprises de taille moyenne à grande |
+| **PAM Cloud / SaaS** | PAM en tant que service cloud | Akeyless, Keeper, StrongDM | Organisations cloud-native, équipes distantes |
+| **Gestion des secrets** | Coffre-fort pour secrets d'application et CI/CD | HashiCorp Vault, AWS Secrets Manager, Azure Key Vault | DevOps, CI/CD, conteneurs |
+| **Élévation de privilèges** | Contrôle fin des commandes sudo/admin | BeyondTrust PowerBroker, CyberArk EPM | Postes de travail utilisateurs (moindre privilège) |
+
+## Points Clés à Retenir
+
+- La PAM est une discipline distincte mais complémentaire de l'IAM — l'IAM gère l'accès fonctionnel de tous les utilisateurs, tandis que la PAM se concentre sur le contrôle, la surveillance et la sécurisation des comptes à privilèges élevés
+- Le business case de la PAM est solide : 80% des violations impliquent des identifiants privilégiés, et la PAM peut réduire le risque de violation de 60-80% tout en réduisant les coûts d'audit et de conformité
+- Le principe de moindre privilège s'applique à quatre dimensions : identité (droits minimaux), temps (durée limitée), action (commandes spécifiques) et étendue (périmètre restreint)
+- La PAM est un pilier du Zero Trust — chaque accès privilégié est vérifié (MFA), autorisé (PDP JIT/ABAC), et surveillé (enregistrement de session) sans confiance implicite
+- Les solutions PAM incluent les suites complètes (CyberArk, BeyondTrust), les solutions cloud SaaS (Akeyless, Keeper), la gestion des secrets (HashiCorp Vault), et l'élévation de privilèges (EPM)

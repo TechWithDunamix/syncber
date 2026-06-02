@@ -1,0 +1,152 @@
+---
+title: "Multi-Factor Authentication"
+description: "Comprehensive coverage of multi-factor authentication — methods comparison, deployment architectures, bypass attack vectors, step-up authentication, and risk-based adaptive authentication."
+sidebar:
+  order: 3
+  label: "Multi-Factor Authentication"
+---
+
+Multi-factor authentication (MFA) requires users to present evidence from two or more different authentication factor categories before granting access. MFA is the single most impactful security control an organisation can deploy — Microsoft reports that MFA blocks **99.9%** of automated attacks, and organisations with MFA enforcement experience 99% fewer account compromises than those without.
+
+However, not all MFA is created equal. The security provided by MFA varies dramatically depending on the methods used, how they are deployed, and the sophistication of the threats being defended against.
+
+## MFA Methods — Comprehensive Comparison
+
+| Method | Factors | Security Level | Phishing Resistant | User Friction | Cost | Deployment Complexity |
+|--------|---------|----------------|--------------------|---------------|------|----------------------|
+| **SMS OTP** | Possession (phone) | Low | No | Low | Low (per-message) | Low |
+| **Voice OTP** | Possession (phone) | Low | No | Moderate | Low | Low |
+| **Email OTP** | Possession (inbox) | Low | No | Low | Free | Low |
+| **TOTP (Authenticator app)** | Possession (seed) | High | No | Moderate | Free | Low |
+| **Push notification** | Possession (device) | High | No | Low | Free–Moderate | Medium |
+| **FIDO2 / WebAuthn** | Possession (key) | Very High | Yes | Low | Moderate | Medium |
+| **Hardware token (YubiKey)** | Possession (token) | Very High | Yes | Moderate | Moderate–High ($20-70) | Medium |
+| **Smart card (PIV/CAC)** | Possession + Knowledge | Very High | Yes | Moderate | High ($50-100 + PKI) | High |
+| **Biometric (FIDO2)** | Inherence | Very High | Yes (liveness) | Very Low | Varies | Medium |
+
+<Aside variant="danger">
+SMS and voice OTP are considered **deprecated** by NIST SP 800-63B due to demonstrated vulnerabilities including SIM swapping, SS7 attacks, and phishing. They should only be used as a fallback when no other MFA method is available. Organisations subject to US Executive Order 14028 must use phishing-resistant MFA (FIDO2 or PIV).
+</Aside>
+
+## MFA Deployment Architectures
+
+### Primary MFA — Required at Every Login
+
+Primary MFA is enforced at every authentication event. The user must complete both primary authentication and the secondary factor before gaining access.
+
+**Typical flow**:
+```
+User → Password + TOTP → IdP verifies credentials → Session token issued → Access granted
+```
+
+**Best for**: All users, including employees, contractors, and customers. Primary MFA should be the default for every organisation.
+
+### Step-Up Authentication — Risk-Triggered MFA
+
+Step-up authentication requires additional verification when a user attempts a high-risk action, even if they already have an active session. This balances security with user experience — most actions proceed with standard authentication, while sensitive operations demand stronger proof.
+
+| Risk Level | Trigger | Required Auth | Example |
+|------------|--------|---------------|---------|
+| **Low** | Normal application access | Primary auth (passwordless or password) | Browsing dashboards, reading documents |
+| **Medium** | Data modification | Primary auth + standard MFA (TOTP) | Editing records, submitting forms |
+| **High** | Privileged action | Primary auth + step-up MFA (FIDO2 hardware key) | Admin console access, bulk data export, role changes |
+| **Critical** | Security boundary crossing | Primary auth + step-up MFA + approval workflow | Production deployment, data classification change |
+
+### Risk-Based Authentication (Adaptive MFA)
+
+Risk-based authentication (RBA) evaluates contextual risk factors in real time and adjusts the authentication strength requirement dynamically:
+
+| Risk Signal | Low-Risk Indicator | High-Risk Indicator |
+|-------------|-------------------|---------------------|
+| **Device** | Known, managed, compliant device | Unknown device, jailbroken/rooted, out-of-date OS |
+| **Location** | Corporate office, home office, trusted geography | Foreign country, known high-risk region, Tor exit node |
+| **Time** | Business hours, typical pattern | 3 AM, never-before-seen time |
+| **Network** | Corporate VPN, trusted IP range | Public Wi-Fi, data centre IP, residential proxy |
+| **Behaviour** | Normal usage pattern, typical application sequence | Mass download, first-time admin access, impossible travel |
+| **Credential age** | Recently changed | Compromised in known breach, expired, never changed |
+
+**RBA policy example**:
+- **Low risk score**: Passwordless or password + device trust — seamless experience, no MFA prompt
+- **Medium risk score**: Standard MFA required (TOTP or push notification)
+- **High risk score**: Step-up MFA with FIDO2 hardware key + written justification required
+
+## MFA Bypass Attack Vectors
+
+MFA is powerful but not invulnerable. Sophisticated attackers have developed techniques to bypass MFA, which IAM professionals must understand to deploy effective countermeasures.
+
+### MFA Fatigue (Push Bombing)
+
+**How it works**: The attacker repeatedly sends push MFA notifications to the target's device — often 20-30 notifications in rapid succession — until the user either accidentally accepts or accepts to stop the annoyance.
+
+**Real-world impact**: Multiple high-profile breaches in 2024 involved MFA fatigue, including the MGM Resorts ransomware attack and Uber breach.
+
+**Mitigations**:
+- Number matching: User must enter a number displayed on the login screen into the push notification
+- Rate limiting: Maximum 3-5 push requests within a 15-minute window
+- Admin approval required: No push acceptance outside business hours
+- FIDO2: Hardware keys are immune to MFA fatigue — the user must physically touch the key
+
+### SIM Swapping
+
+**How it works**: Attacker socially engineers the mobile carrier to port the victim's phone number to a SIM card in the attacker's possession. The attacker then receives SMS OTP codes sent to the victim's number.
+
+**Mitigations**:
+- **Eliminate SMS OTP** — Replace with TOTP, push, or FIDO2
+- Port-out PIN — Require a unique PIN for SIM porting requests
+- Carrier alerts — Notify the account holder when a port request is made
+- Number-locking — Lock the phone number to the current carrier
+
+### Adversary-in-the-Middle (AiTM) Proxy
+
+**How it works**: Attacker deploys a reverse proxy (using tools like Evilginx or Modlishka) that sits between the user and the legitimate login page. The proxy captures both the password AND the MFA code in real time, then uses them to authenticate to the real service. The session cookie is then handed to the attacker.
+
+**Mitigations**:
+- **FIDO2/WebAuthn** — Private key is origin-bound, cannot be proxied
+- Certificate-based authentication — Client certificates bind the session to the device
+- Token binding — Cryptographically binds tokens to the TLS connection
+
+### Session Cookie Theft
+
+**How it works**: After the user completes MFA, the application issues a session cookie. If the attacker can steal this cookie (via XSS, malware, network interception, or browser extension compromise), they can use it to access the application without triggering MFA — the MFA token is already validated in the session.
+
+**Mitigations**:
+- Short session lifetimes (15-60 minutes)
+- HTTP-only, Secure, SameSite cookies
+- Device fingerprint binding (session bound to device characteristics)
+- IP binding (session bound to originating IP — problematic in mobile scenarios)
+- Token binding (cryptographic binding to TLS connection)
+
+### Backup Code Exploitation
+
+**How it works**: Users are given backup/recovery codes when enrolling in MFA. If the user stores these in an insecure location (email, cloud drive, desk drawer), an attacker who gains access to the user's digital life can bypass MFA entirely.
+
+**Mitigations**:
+- Educate users on secure backup code storage (password manager, safe deposit box)
+- Audit backup code usage — flag bulk access or unusual patterns
+- Encrypt backup codes at rest
+- Allow one-time use only — regenerated after use
+
+## MFA Deployment — Practical Guidance
+
+| Deployment Phase | Action | Priority |
+|-----------------|--------|----------|
+| **Phase 1** | Enforce MFA for all privileged users (admins, IT, security team) | Critical |
+| **Phase 2** | Enforce MFA for all employees | High |
+| **Phase 3** | Replace SMS OTP with TOTP or push notification | High |
+| **Phase 4** | Deploy phishing-resistant MFA (FIDO2) for privileged users | Medium |
+| **Phase 5** | Implement step-up authentication for high-risk actions | Medium |
+| **Phase 6** | Deploy risk-based adaptive MFA across all authentication flows | Low (ongoing) |
+| **Phase 7** | Migrate all users to passwordless + FIDO2 | Long-term goal |
+
+<Aside variant="tip">
+The fastest path to meaningful security improvement is Phase 1 + Phase 4 for privileged users. If you can only do one thing, enforce FIDO2 for all administrative access. This single step eliminates the vast majority of credential-based attack vectors.
+</Aside>
+
+## Key Takeaways
+
+- MFA blocks 99.9% of automated attacks and is the single most impactful security control an organisation can deploy — but not all MFA methods provide equal protection
+- SMS and voice OTP are deprecated by NIST due to SIM swapping and SS7 vulnerabilities — migrate to TOTP, push, or FIDO2
+- Step-up authentication applies additional MFA requirements only for high-risk actions, balancing security with user experience
+- Risk-based authentication evaluates contextual signals (device, location, time, network, behaviour) to dynamically adjust authentication strength
+- MFA bypass attacks (fatigue, SIM swap, AiTM proxy, session theft) are real and increasing — FIDO2/WebAuthn is the most effective mitigation as it is phishing-resistant and origin-bound
+- Deploy MFA in phases: privileged users first, then all employees, then migrate from SMS to stronger methods, and ultimately toward passwordless FIDO2

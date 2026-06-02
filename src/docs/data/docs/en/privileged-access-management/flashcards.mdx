@@ -1,0 +1,30 @@
+---
+title: "Privileged Access Management Flashcards"
+description: "Test your knowledge with interactive flashcards — one deck, all cards. Flip to reveal the answer and swipe through the deck."
+sidebar:
+  order: 11
+  label: "Flashcards"
+---
+
+Test your understanding of the Privileged Access Management module. Click a card to flip it between question and answer. Use the arrows, keyboard (&larr; &rarr;), or swipe on mobile to move through the deck.
+
+<FlashCardDeck>
+  <FlashCard question="What is Privileged Access Management (PAM)?" answer="PAM protects an organisation's most sensitive assets by securing, managing, and monitoring privileged accounts and access. It specifically focuses on the highest-risk accounts — those with elevated permissions to critical systems." />
+  <FlashCard question="What percentage of identity attacks target privileged accounts according to Microsoft?" answer="99% of identity attacks target privileged accounts, making PAM a core requirement for any mature security program." />
+  <FlashCard question="What are the six core PAM capabilities?" answer="1. Credential vaulting. 2. Session management. 3. Just-in-time (JIT) access. 4. Least privilege enforcement. 5. Privileged account discovery. 6. Governance and compliance." />
+  <FlashCard question="How does credential vaulting work?" answer="Privileged credentials (passwords, SSH keys, API tokens) are stored in a secure, encrypted vault. Users check out credentials on demand rather than knowing them permanently. The vault enforces password rotation, access workflows, and audit trails." />
+  <FlashCard question="What is Just-In-Time (JIT) access?" answer="JIT elevates privileges only for the duration of a specific task. After the task completes, privileges are automatically removed. This eliminates standing administrative rights and reduces the attack surface." />
+  <FlashCard question="What are the three types of privileged session controls?" answer="Session Recording (video playback for forensic investigation), Session Monitoring (real-time oversight with alerting on suspicious commands), and Session Isolation (proxy-based access preventing direct network connectivity to targets)." />
+  <FlashCard question="What types of accounts does PAM manage?" answer="IT administrators, database administrators, service accounts (automated processes), application identities (system-to-system auth), cloud administrators, and network engineers." />
+  <FlashCard question="What is pass-the-hash and how does PAM mitigate it?" answer="Pass-the-hash is an attack where the attacker reuses an NTLM hash to authenticate. PAM mitigates it through Credential Guard, removing NTLM where possible, and managing local admin credentials through the vault." />
+  <FlashCard question="What is a break-glass (emergency access) procedure in PAM?" answer="A designed process that balances security with operational continuity during emergencies. It provides a controlled way to gain privileged access when normal approval workflows cannot be followed, with full audit logging of the emergency access." />
+  <FlashCard question="What are the five levels of PAM program maturity?" answer="PAM maturity progresses from initial/ad hoc through defined (documented processes), managed (automated vaulting), measured (continuous monitoring with KPIs), to optimised (predictive analytics and adaptive controls)." />
+  <FlashCard question="What is privileged account discovery?" answer="Continuous scanning to identify privileged accounts across the enterprise — local admin accounts, domain admin accounts, service accounts and their dependencies, SSH keys and their usage, and cloud IAM roles with elevated permissions." />
+  <FlashCard question="What compliance frameworks mandate PAM controls?" answer="SOX (access controls over financial systems), PCI DSS v4.0 (Requirement 8 — MFA for admin access), HIPAA (technical safeguards for ePHI), GDPR (technical measures to protect personal data), ISO 27001 (A.9.2.3 — management of privileged access rights), and NIST SP 800-53 (AC-6 — least privilege)." />
+</FlashCardDeck>
+
+---
+
+<Aside variant="tip">
+Review any cards you got wrong by navigating to the corresponding module page for a deeper explanation.
+</Aside>

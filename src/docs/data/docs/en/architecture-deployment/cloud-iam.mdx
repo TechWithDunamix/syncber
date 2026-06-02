@@ -1,0 +1,151 @@
+---
+title: "Cloud IAM"
+description: "Identity and access management for AWS, Azure, and GCP — workload identity, cloud IdP federation, multi-cloud IAM strategies, cloud-native PAM, and cloud identity governance."
+sidebar:
+  order: 3
+  label: "Cloud IAM"
+---
+
+Cloud IAM presents unique challenges compared to traditional on-premises identity management. Cloud providers offer native IAM capabilities that must be integrated with enterprise IAM platforms to provide consistent governance across hybrid and multi-cloud environments.
+
+## Cloud IAM Comparison
+
+| Capability | AWS IAM | Azure RBAB / Entra ID | GCP IAM |
+|-----------|---------|----------------------|---------|
+| **Identity provider** | IAM (AWS-native), IAM Identity Center (SSO) | Entra ID (formerly Azure AD) | Cloud Identity, Google Workspace |
+| **User type** | IAM users, federated users, workload identities | Users, groups, service principals, managed identities | Google accounts, service accounts, Google groups |
+| **Role type** | IAM roles (service-linked, customer-managed, AWS-managed) | Azure roles (built-in, custom), Entra ID roles | IAM roles (primitive, predefined, custom) |
+| **Policy language** | JSON policy documents | JSON policy definition (RBAC) | YAML/JSON policy bindings |
+| **Federation** | SAML 2.0, OIDC, custom IdP broker | SAML 2.0, OIDC, WS-Fed | SAML 2.0, OIDC |
+| **Conditional access** | IAM conditions, SCPs | Conditional Access policies | Context-aware access, VPC Service Controls |
+| **Resource hierarchy** | Organisation → OU → Account → Resource | Management group → Subscription → RG → Resource | Organisation → Folder → Project → Resource |
+| **Privileged access** | IAM Access Analyzer, IAM last accessed | PIM (Privileged Identity Management) | Privileged Access Manager (PAM) |
+| **Audit logging** | CloudTrail | Azure Monitor (Activity Log, Diagnostic Settings) | Cloud Audit Logs |
+
+## Workload Identity
+
+Workload identity is how applications and services authenticate to cloud resources without using human credentials.
+
+### Cloud Workload Identity Methods
+
+| Cloud | Workload Identity Type | Use Case | Credential Lifecycle |
+|-------|----------------------|----------|---------------------|
+| **AWS** | IAM Roles (EC2, Lambda, ECS) | Instance-level service identity | Automatic rotation (AWS-managed) |
+| **AWS** | IAM Roles Anywhere | External workload identity | Certificate-based, short-lived |
+| **Azure** | Managed Identities (System-assigned, User-assigned) | Azure resource identity | Automatic rotation (Azure-managed) |
+| **Azure** | Service Principals (with certificate or secret) | Application identity | Manual or automated rotation |
+| **GCP** | Service Accounts | Resource-level identity | Automatic key rotation (Google-managed) |
+| **GCP** | Workload Identity Federation | External workload identity (AWS, on-prem) | OIDC token exchange, short-lived |
+
+### Workload Identity Best Practices
+
+| Practice | Rationale | Implementation |
+|----------|-----------|----------------|
+| **Prefer cloud-managed identities** | Automatic credential rotation reduces risk | Use IAM Roles, Managed Identities, Service Accounts over long-lived keys |
+| **Use short-lived credentials** | Limit blast radius of credential compromise | STS temporary credentials, OAuth tokens with short TTL |
+| **Avoid long-lived access keys** | Static keys are a primary attack vector | Use workload identity federation or managed identities |
+| **Restrict service account permissions** | Least privilege applies to workloads too | Custom roles with minimum required permissions |
+| **Monitor workload credential usage** | Detect anomalous access patterns | CloudTrail / Activity Log / Audit Log monitoring |
+| **Rotate secrets automatically** | Regular rotation limits exposure window | AWS Secrets Manager, Azure Key Vault, GCP Secret Manager |
+
+## Cloud IAM Federation
+
+### Federating Enterprise Identity to Cloud
+
+```
+Enterprise IdP ──> Cloud IdP ──> Cloud Resources
+      │               │               │
+   Okta/Azure      AWS IAM        EC2, S3, RDS
+   Ping/One        Identity       ─────────────────
+                    Center         |
+   SAML/OIDC ───> Role mapping     |
+                    ────────       |
+                 User attributes   |
+                 mapped to roles   v
+                              Access granted
+                              based on role policy
+```
+
+### Federation Architecture
+
+| Component | AWS | Azure | GCP |
+|-----------|-----|-------|-----|
+| **External IdP trust** | IAM Identity Provider | Entra ID External Identities | Workforce Identity Federation |
+| **Attribute mapping** | SAML assertion → IAM role session tags | Claims → directory attribute mapping | SAML attributes → Google groups |
+| **Provisioning** | SCIM to IAM Identity Center | SCIM to Entra ID | SCIM to Cloud Identity |
+| **Role assignment** | IAM roles assigned to federated users | Azure RBAC role assignments | IAM policy bindings |
+| **Session duration** | Configurable (default 1 hour, max session) | Token lifetime policy | Session length policy |
+
+## Multi-Cloud IAM
+
+Managing IAM across multiple cloud providers requires abstraction and consistent governance:
+
+### Multi-Cloud IAM Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   ENTERPRISE IdP (Okta/Azure AD)              │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
+│  │ AWS IAM     │  │ Azure Entra │  │ GCP Cloud   │        │
+│  │ Identity Ctr│  │ ID          │  │ Identity    │        │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘        │
+│         │                │                │                  │
+└─────────┼────────────────┼────────────────┼──────────────────┘
+          │                │                │
+    ┌─────┴─────┐    ┌─────┴─────┐    ┌─────┴─────┐
+    │  AWS      │    │  Azure    │    │  GCP      │
+    │  Workload │    │ Workload  │    │ Workload  │
+    └───────────┘    └───────────┘    └───────────┘
+```
+
+### Multi-Cloud IAM Challenges
+
+| Challenge | Impact | Mitigation |
+|-----------|--------|------------|
+| **Inconsistent policy languages** | Different syntax and semantics for each cloud | Use policy-as-code abstraction layer (OPA, Crossplane) |
+| **Identity silos** | Separate user directories per cloud | Centralised enterprise IdP with federation to each cloud |
+| **Audit fragmentation** | Logs in different formats and locations | Centralised SIEM with cloud log ingestion |
+| **Permission complexity** | Different RBAC models and inheritance | Governance platform with cross-cloud entitlement visibility |
+| **Cost management** | IAM policy violations can create unexpected costs | Cloud IAM policy with cost-control guardrails |
+| **Compliance consistency** | Different compliance certifications per cloud | Unified compliance framework with cloud-specific control mapping |
+
+## Cloud-Native PAM
+
+### Cloud Privileged Access Challenges
+
+| Challenge | Traditional PAM | Cloud-Native Approach |
+|-----------|-----------------|----------------------|
+| **Console access** | PAM gateway proxies SSH/RDP | Cloud IdP with PIM/PAM, JIT elevation |
+| **API access** | Not supported by traditional PAM | OAuth client credentials, mTLS, short-lived tokens |
+| **Service accounts** | Manual management in vault | Managed identities, automatic credential rotation |
+| **Infrastructure as Code** | No IaC integration | Policy-as-code, GitOps for IAM policies |
+| **Multi-cloud** | Single-cloud PAM focus | Cloud-agnostic PAM with federation |
+
+### Cloud PAM Implementation Patterns
+
+| Pattern | Description | Example |
+|---------|-------------|---------|
+| **JIT elevation through cloud IdP** | Cloud-native privilege elevation (Azure PIM, AWS IAM Identity Center) | User requests "Security Admin" role, approved for 4 hours |
+| **Cloud credential vaulting** | Cloud secret management with rotation | AWS Secrets Manager, Azure Key Vault |
+| **Session recording via cloud-native tools** | Cloud console session recording | AWS CloudTrail, Azure Resource Manager audit |
+| **Policy-as-code enforcement** | IAM policies in CI/CD pipelines | OPA Gatekeeper, AWS Config rules, Azure Policy |
+| **Just-enough-access via temporary credentials** | STS tokens for specific actions | AWS STS, Azure Managed Identity tokens |
+
+## Cloud Identity Governance
+
+| Governance Activity | AWS | Azure | GCP |
+|--------------------|-----|-------|-----|
+| **Entitlement visibility** | IAM Access Analyzer, IAM Policy Simulator | Entra ID access reviews, Azure AD entitlement management | Policy Analyzer, Policy Troubleshooter |
+| **Access certification** | IAM Access Analyzer external access findings | Entra ID access reviews (automated campaigns) | Recommender, policy analysis |
+| **SoD analysis** | IAM Access Analyzer custom policies | Entra ID entitlement management with access packages | Custom analysis through Cloud Asset Inventory |
+| **Privilege monitoring** | IAM last accessed, unused keys report | PIM alerts, sign-in logs | Service Account Key Last Used, OAuth consent |
+| **Compliance validation** | AWS Config, Security Hub | Microsoft Defender for Cloud | Security Command Center |
+
+## Key Takeaways
+
+- Each cloud provider has a unique IAM model — AWS (policy-based), Azure (role-based with Entra ID), GCP (policy bindings) — but all support federation with enterprise IdPs via SAML 2.0 and OIDC
+- Workload identity (IAM Roles, Managed Identities, Service Accounts) should be preferred over long-lived access keys — cloud-managed identities with automatic rotation significantly reduce credential compromise risk
+- Cloud federation requires attribute mapping from enterprise IdP to cloud roles — SAML assertions carry user attributes that are mapped to IAM roles/policies at the cloud provider
+- Multi-cloud IAM challenges include inconsistent policy languages, identity silos, fragmented audit, permission complexity, and compliance inconsistency — centralised enterprise IdP federation and policy-as-code abstraction are key mitigations
+- Cloud-native PAM replaces traditional PAM gateway approaches — JIT elevation through cloud PIM/PAM, credential vaulting in cloud secret managers, and temporary credentials through STS are the cloud-native patterns
+- Cloud IAM governance is evolving — each provider offers entitlement visibility, access certification, privilege monitoring, and compliance validation tools that integrate with enterprise IGA platforms

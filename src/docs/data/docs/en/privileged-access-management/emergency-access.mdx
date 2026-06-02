@@ -1,0 +1,167 @@
+---
+title: "Emergency Access & Break Glass"
+description: "Designing break-glass procedures for PAM — emergency access workflows, dual custody, tamper-evident controls, failover procedures, and post-emergency incident review."
+sidebar:
+  order: 9
+  label: "Emergency Access & Break Glass"
+---
+
+Emergency access — commonly called "break glass" — is the process for granting privileged access when normal PAM systems are unavailable or when a situation requires immediate action that bypasses standard approval workflows. Break-glass procedures are a critical part of any PAM architecture because they represent the ultimate fallback.
+
+The challenge is fundamental: you must have a mechanism for emergency access that works when everything else fails, but that mechanism must be secure enough that it cannot be abused as a backdoor.
+
+## When Break-Glass Is Required
+
+Break-glass procedures should be activated only in specific, documented scenarios:
+
+| Scenario | Example | Risk of Not Having Break-Glass |
+|----------|---------|-------------------------------|
+| **PAM system outage** | Vault is offline, cannot check out credentials | Critical systems become unmanageable |
+| **Network outage** | PAM proxy is unreachable, but target systems are accessible | Administrators locked out of infrastructure |
+| **Emergency security incident** | Active breach requiring immediate containment | Attacker continues to operate while waiting for approval |
+| **PAM administrator lockout** | PAM admin account is compromised and rotated | No one can administer the PAM system itself |
+| **Critical production issue** | Severity 1 incident requiring immediate remediation | Extended downtime, revenue loss, SLA breach |
+| **Natural disaster / DR event** | Primary data centre is unavailable | Complete loss of access to critical systems |
+
+## Break-Glass Design Principles
+
+### Principle 1: Dual Custody
+
+No single individual should be able to activate break-glass procedures. Break-glass credentials should be split between two or more individuals, each holding one part.
+
+**Implementation**:
+- Credential printed in two parts (e.g., half the password on each card)
+- Stored in separate tamper-evident envelopes
+- Issued to different individuals (e.g., Security Officer and IT Director)
+- Both must be present to reconstruct the full credential
+
+### Principle 2: Tamper Evidence
+
+Every break-glass credential must be stored in a container that makes any access physically detectable.
+
+| Method | Tamper Evidence | Cost | Best For |
+|--------|----------------|------|----------|
+| **Tamper-evident envelope** | Clearly visible when opened | Low | Password printouts |
+| **Tamper-evident seal** | Shows "VOID" when removed | Low | Sealed documentation |
+| **Physical safe with audit log** | Safe access is logged | Medium | Hardware tokens, HSMs |
+| **Smart safe / e-locker** | Digital access log + camera | High | Large-scale deployments |
+
+### Principle 3: Minimal Viable Access
+
+Break-glass credentials should grant only the minimum access required for emergency scenarios — not full administrative rights to everything.
+
+| Credential | Scope | Access Granted |
+|------------|-------|----------------|
+| **Vault admin password** | PAM system itself | Full PAM system access |
+| **Domain admin (limited)** | Specific domain, not forest | Manage authentication for one domain |
+| **Server console access** | Critical servers only | Console/out-of-band access |
+| **Application admin** | Business-critical applications only | Application-level emergency access |
+
+### Principle 4: Automatic Rotation After Use
+
+Every break-glass credential must be automatically rotated after any use — whether the use was legitimate or not.
+
+**Rotation triggers**:
+- After each emergency access event
+- After scheduled testing (quarterly break-glass drills)
+- After any suspected tampering (broken seal, unlocked safe)
+- At minimum, every 6 months even if unused
+
+### Principle 5: Full Audit
+
+Every break-glass activation must generate an immutable audit record.
+
+| Event | Audit Data |
+|-------|------------|
+| **Safe/envelope opened** | Who opened, when, witnessed by, reason |
+| **Credential used** | Target system, timestamp, source IP, commands executed |
+| **Credential rotated** | Who performed rotation, new credential stored |
+| **Incident review** | Post-incident analysis report, lessons learned |
+
+## Break-Glass Procedure — Step by Step
+
+<Steps>
+### Incident Declaration
+An administrator identifies a situation requiring break-glass access. They declare an emergency incident via the incident management system (e.g., P1 ticket in ServiceNow). The declaration includes: incident description, systems requiring access, expected duration, and authorisation chain.
+
+### Initial Authorisation
+The administrator contacts the authorised approver(s) according to the escalation matrix. For high-severity incidents, this may be the on-call executive or CISO. The approver validates the incident and authorises break-glass activation.
+
+### Dual-Custody Retrieval
+Two authorised individuals (e.g., Security Officer + IT Director) retrieve their respective parts of the break-glass credential from secure storage. They document the retrieval time, the condition of the tamper-evident packaging, and any witnesses present.
+
+### Credential Reconstruction
+The two parts of the credential are combined in the presence of both custodians. The reconstructed credential is entered into the PAM system or directly into the target system as required by the emergency.
+
+### Emergency Access
+The administrator performs the required emergency actions using the break-glass credential. All actions are logged. The session is recorded if technically possible. The administrator documents all actions taken during the emergency access window.
+
+### Credential Rotation
+Immediately after the emergency access is complete, the break-glass credential is rotated. New credentials are generated and stored in new tamper-evident packaging. The old credential is invalidated and archived for audit purposes.
+
+### Post-Incident Review
+Within 5 business days, a post-incident review is conducted. The review analyses: whether break-glass was genuinely required, whether the procedure was followed correctly, whether any unauthorised actions occurred, and what process improvements are needed.
+</Steps>
+
+## Break-Glass Credential Storage
+
+### Physical Storage Options
+
+| Storage Method | Security Level | Access Speed | Cost | Audit Trail |
+|---------------|---------------|--------------|------|-------------|
+| **Tamper-evident envelope in locked drawer** | Low | Fast | Very low | None (manual log) |
+| **Sealed envelope in manager's safe** | Medium | Moderate | Low | Manual log |
+| **Smart safe / e-locker** | High | Fast | Medium | Digital audit log + camera |
+| **Bank safe deposit box** | Very high | Slow (bank hours) | High | Bank's access log |
+| **HSM-based key ceremony** | Extreme | Slow (multi-party) | Very high | Full digital ceremony audit |
+
+### Digital Storage Options
+
+| Method | Description | Use Case |
+|--------|-------------|----------|
+| **PAM system emergency backup** | Vault stores an encrypted backup in a separate secure location | DR scenario where vault is available |
+| **Password manager (emergency team)** | Organisation's password manager with shared emergency vault | Lower-security break-glass |
+| **Split with Shamir Secret Sharing** | Secret split into N parts; K required for reconstruction | Highest security digital approach |
+
+<Aside variant="caution">
+The faster the break-glass access, the harder it is to secure. There is a fundamental tension between **access speed** (minutes) and **security level** (tamper-proof, multi-party). Your break-glass design must explicitly decide this trade-off based on your risk tolerance and operational requirements.
+</Aside>
+
+## Break-Glass Testing
+
+Break-glass procedures must be tested regularly to ensure they work when needed.
+
+| Test Type | Frequency | Description |
+|-----------|-----------|-------------|
+| **Tabletop exercise** | Quarterly | Walk through the procedure verbally with all stakeholders |
+| **Full functional test** | Bi-annually | Physically open break-glass envelope, test credential, rotate |
+| **"Day in the life" (no-notice)** | Annually | Simulate an emergency requiring break-glass activation |
+| **DR failover test** | Annually | Test failover with PAM system completely unavailable |
+| **Credential rotation test** | Quarterly | Verify rotation procedure works without incident |
+
+### What to Validate During Testing
+
+- Can the custodians be reached in a reasonable time?
+- Are the tamper-evident seals intact?
+- Does the credential work on the target system?
+- Does the rotation procedure function correctly?
+- Is the post-incident review process understood?
+
+## Break-Glass Governance
+
+| Governance Element | Requirement | Frequency |
+|--------------------|-------------|-----------|
+| **Documentation review** | Review and approve break-glass procedures | Annual |
+| **Custodian review** | Verify custodians are still authorised and reachable | Quarterly |
+| **Audit log review** | Review all break-glass activations (including tests) | Monthly |
+| **Credential refresh** | Rotate all break-glass credentials | Every 6 months |
+| **Procedure improvement** | Incorporate lessons learned from activations and tests | As needed |
+
+## Key Takeaways
+
+- Break-glass procedures are the ultimate fallback for PAM — designed for scenarios where normal systems are unavailable, and must balance rapid access with strong security controls
+- Five design principles govern break-glass: dual custody (two people required), tamper evidence (visible if accessed), minimal access (only what's needed), automatic rotation (after every use), and full audit (immutable record)
+- The break-glass process follows a defined sequence: incident declaration → authorisation → dual-custody retrieval → credential reconstruction → emergency access → credential rotation → post-incident review
+- Physical storage (tamper-evident envelope, smart safe, bank deposit box) provides stronger tamper evidence than digital storage
+- Break-glass procedures must be tested regularly (quarterly tabletop, bi-annual functional test, annual no-notice exercise) — untested break-glass is a false sense of security
+- There is a fundamental trade-off between access speed and security level — your break-glass design must explicitly balance these based on organisational risk tolerance

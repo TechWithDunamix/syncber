@@ -1,0 +1,170 @@
+---
+title: "Segregation of Duties"
+description: "Segregation of Duties principles — SoD policy frameworks, toxic combination analysis, preventive and detective controls, SoD in ERP and cloud environments, and mitigating controls."
+sidebar:
+  order: 4
+  label: "Segregation of Duties"
+---
+
+Segregation of Duties (SoD) is a fundamental internal control that prevents any single individual from holding conflicting permissions that could enable fraud, error, or abuse. The principle is simple: no single person should be able to complete a critical process from start to finish without independent verification.
+
+In IAM terms, SoD means that the same user should not be assigned roles or entitlements that create a conflict of interest. SoD analysis detects these **toxic combinations** across all of a user's accumulated access.
+
+## The SoD Principle
+
+The classic SoD example is financial transactions:
+
+```
+Without SoD (Fraud Opportunity):
+Employee can: Create vendor + Approve invoice + Issue payment
+→ Employee creates fake vendor, approves fake invoice, payment sent to attacker
+
+With SoD:
+Employee A: Can create vendors
+Employee B: Can approve invoices  
+Employee C: Can issue payments
+→ Collusion required for fraud (much harder)
+```
+
+### The Four-Eyes Principle
+
+SoD is often called the **four-eyes principle** — two people must be involved in any sensitive operation. This is implemented as:
+
+- **Segregation of functional responsibilities** — Different people perform different parts of a process
+- **Segregation of accountability** — No single person can both authorise and execute an action
+- **Segregation of custody** — No single person controls a valuable asset from creation to disposal
+
+## Types of SoD Controls
+
+### Preventive SoD Controls
+
+Preventive controls block the assignment of conflicting permissions before they occur:
+
+| Control | Description | Implementation |
+|---------|-------------|----------------|
+| **Role-level SoD** | Conflicting roles cannot be assigned to the same user | IGA platform enforces role assignment rules |
+| **Entitlement-level SoD** | Conflicting individual permissions cannot be held simultaneously | Access request system evaluates SoD before granting |
+| **Provisioning-time check** | SoD evaluated before any entitlement is provisioned | Real-time SoD check during provisioning |
+| **Segregated role design** | Roles are designed to be mutually exclusive | Role engineering with SoD built in |
+
+### Detective SoD Controls
+
+Detective controls identify existing SoD violations that must be remediated:
+
+| Control | Description | Frequency |
+|---------|-------------|-----------|
+| **Periodic SoD analysis** | Scan all user entitlements for toxic combinations | Daily or weekly |
+| **Access certification** | SoD violations flagged during certification campaigns | Per campaign cycle |
+| **Continuous monitoring** | Real-time detection of new violations as access changes | Continuous |
+| **Incident-based review** | SoD violations investigated when incidents occur | As needed |
+
+## Common SoD Scenarios by Domain
+
+### Financial Systems (ERP)
+
+| Toxic Combination | Risk | Typical Mitigating Control |
+|-------------------|------|---------------------------|
+| Vendor creation + Invoice approval | Create fake vendor, approve fake invoice | Manager approval for new vendors |
+| Purchase order approval + Goods receipt | Approve PO, receive goods without verification | Separate receiving department |
+| Journal entry + Account reconciliation | Create and conceal fraudulent entries | Periodic reconciliation review by supervisor |
+| Customer master + Credit approval | Create customer with excessive credit terms | Dual approval for credit limit changes |
+| Employee master + Payroll processing | Create fake employee, process payroll | HR department manages employee master |
+
+### IT / Infrastructure
+
+| Toxic Combination | Risk | Typical Mitigating Control |
+|-------------------|------|---------------------------|
+| Code commit + Production deployment | Push malicious code to production without review | Mandatory code review, separate deployer role |
+| AD admin + Security group management | Create backdoor accounts with full access | Separate security and IT admin roles |
+| Database admin + Audit log access | Modify data and delete audit evidence | Immutable audit storage, separate DBA and security roles |
+| Network admin + Firewall management | Create network backdoor | Change management, separate approval |
+
+### Cloud
+
+| Toxic Combination | Risk | Mitigation |
+|-------------------|------|------------|
+| IAM admin + Resource admin | Grant self excessive permissions | Permission boundaries, separate AWS accounts |
+| Billing admin + Resource creation | Create costly resources, conceal spend | Budget alerts, separate billing and engineering roles |
+| Data access + Log access | Exfiltrate data and delete logs | Immutable logs in separate account |
+
+## SoD Analysis Framework
+
+### Policy Definition
+
+SoD policies define what combinations are prohibited:
+
+```
+Policy: CREATE_VENDOR_AND_APPROVE_INVOICE
+Description: A user cannot both create vendors and approve invoices
+Risk Level: High
+Applies To: Finance SAP ECC
+Conflicting Permissions:
+  - SAP: Vendor Create (transaction code XK01)
+  - SAP: Invoice Approve (transaction code MRBR)
+```
+
+### SoD Analysis Process
+
+<Steps>
+### Data Collection
+Collect all user-to-entitlement assignments from target systems. This includes direct assignments (user has permission) and indirect assignments (user has role that grants permission).
+
+### Policy Matching
+Match each user's entitlements against all defined SoD policies. For each user, identify any policy where they hold both conflicting entitlements.
+
+### Risk Scoring
+Score each violation by:
+- **Policy risk level** (high, medium, low)
+- **Number of violations per user**
+- **User's overall access profile** (privileged users with SoD violations are highest risk)
+- **Mitigating controls in place**
+
+### Remediation Planning
+For each violation:
+- **Remove** one of the conflicting entitlements (preferred)
+- **Implement mitigating control** (if removal is not feasible)
+- **Accept risk** (with documented sign-off and time limit)
+
+### Remediation Execution
+Execute remediation actions: revoke entitlements, implement compensating controls, update policy exception records.
+
+### Re-Analysis
+Re-run SoD analysis to confirm violations are remediated. Monitor continuously for new violations.
+</Steps>
+
+## Mitigating Controls
+
+When a SoD violation cannot be fully remediated (due to operational requirements, small team constraints, or legacy system limitations), **mitigating controls** reduce the risk to an acceptable level.
+
+| Mitigating Control | Effectiveness | Description |
+|--------------------|---------------|-------------|
+| **Manager approval** | Low-Medium | Manager must approve each instance of the conflicting action |
+| **Supervisory review** | Medium | Supervisor reviews transactions after processing |
+| **Transaction limits** | Medium | Limit the value or volume of individual transactions |
+| **Dual approval** | High | Two people must approve the conflicting transaction |
+| **Audit trail + sampling** | Medium | All transactions logged, random sample audited |
+| **Periodic reconciliation** | Medium-High | Conflicting activities reconciled by separate department |
+| **Time-based access** | Medium | Conflicting access granted only in separate time windows |
+
+<Aside variant="caution">
+Mitigating controls are second-best to full SoD remediation. A policy with "manager approval" as the only mitigation may not survive external audit scrutiny. Use mitigating controls only when full remediation is genuinely impossible, and ensure controls are documented, tested, and audited.
+</Aside>
+
+## SoD in Small Organisations
+
+Small organisations face a fundamental SoD challenge: there are not enough people to fully segregate duties. In this case:
+
+1. **Document the limitation** — Explicitly acknowledge that resource constraints prevent full SoD
+2. **Implement compensating controls** — Manager review, transaction monitoring, random audits
+3. **Focus on highest-risk combinations** — Prioritise SoD for financial transactions and data access
+4. **Consider external review** — Use external auditors or consultants to review sensitive transactions
+5. **Automate monitoring** — Use IGA platform to detect and flag violations even if they cannot be prevented
+
+## Key Takeaways
+
+- Segregation of Duties prevents any single individual from holding conflicting permissions that could enable fraud, error, or abuse — it is a fundamental internal control in every compliance framework
+- Preventive SoD controls block assignment of conflicting permissions before they occur; detective controls identify existing violations through periodic scanning
+- Common SoD scenarios span financial systems (vendor + invoice), IT (code + deploy), and cloud (IAM + resource admin)
+- SoD analysis follows a defined process: collect user entitlements → match against SoD policies → score risk → plan remediation → execute → re-analyse
+- Mitigating controls (manager approval, supervisory review, dual approval) reduce risk when full SoD is not operationally feasible
+- Small organisations may not have enough people for full SoD — document limitations, implement compensating controls, and prioritise highest-risk combinations

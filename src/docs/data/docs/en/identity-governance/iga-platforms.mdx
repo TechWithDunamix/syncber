@@ -1,0 +1,141 @@
+---
+title: "IGA Platforms & Architecture"
+description: "Identity Governance and Administration platforms — core capabilities, deployment models, integration patterns, platform selection criteria, and the IGA vendor landscape."
+sidebar:
+  order: 10
+  label: "IGA Platforms & Architecture"
+---
+
+Identity Governance and Administration (IGA) platforms provide the technology foundation for identity governance. They automate the processes of identity lifecycle management, access certification, role management, SoD analysis, and compliance reporting.
+
+Choosing the right IGA platform and architecture is one of the most consequential decisions an IAM architect makes — the platform must serve the organisation for 5-10 years while the identity landscape continues to evolve.
+
+## IGA Platform Capabilities
+
+### Core Capabilities
+
+| Capability | Description | Maturity Required |
+|------------|-------------|-------------------|
+| **Identity lifecycle management** | Automated provisioning and deprovisioning across target systems | Foundational |
+| **Access certification** | Campaign management, reviewer workflows, remediation automation | Foundational |
+| **Role management** | Role engineering, role mining, role lifecycle, role certification | Intermediate |
+| **Segregation of duties** | SoD policy definition, analysis, violation management | Intermediate |
+| **Access request** | Self-service portal, approval workflows, entitlement catalogue | Foundational |
+| **Compliance reporting** | Dashboard, evidence collection, auditor evidence packages | Intermediate |
+| **Identity analytics** | Risk scoring, anomaly detection, peer group analysis | Advanced |
+| **Privileged access governance** | Integration with PAM for privileged account lifecycle governance | Advanced |
+
+### IGA Platform Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                   IGA Platform                            │
+├─────────────────────────────────────────────────────────┤
+│  ┌──────────────┐  ┌──────────────┐  ┌────────────────┐ │
+│  │ Identity     │  │ Governance   │  │ Compliance     │ │
+│  │ Lifecycle    │  │ Engine       │  │ Reporting      │ │
+│  │              │  │              │  │                │ │
+│  │ • Provision  │  │ • Certific.  │  │ • Dashboards   │ │
+│  │ • Sync       │  │ • SoD        │  │ • Evidence     │ │
+│  │ • Recon      │  │ • Roles      │  │ • Auditor      │ │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬─────────┘ │
+│         │                 │                 │           │
+│  ┌──────┴─────────────────┴─────────────────┴──────────┐ │
+│  │              Integration Bus (Connectors)            │ │
+│  │  ┌───────┐ ┌───────┐ ┌───────┐ ┌───────┐ ┌──────┐ │ │
+│  │  │AD/    │ │LDAP   │ │SCIM   │ │JDBC   │ │ REST │ │ │
+│  │  │AzureAD│ │       │ │Client │ │       │ │ API  │ │ │
+│  │  └───────┘ └───────┘ └───────┘ └───────┘ └──────┘ │ │
+│  └─────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+         │                │                    │
+         ▼                ▼                    ▼
+    ┌────────┐    ┌────────────┐       ┌───────────┐
+    │  HR    │    │  Target    │       │  SIEM /   │
+    │  System│    │  Systems   │       │  Audit    │
+    └────────┘    └────────────┘       └───────────┘
+```
+
+## Deployment Models
+
+| Model | Description | Pros | Cons |
+|-------|-------------|------|------|
+| **SaaS / Cloud** | Fully managed by vendor | No infrastructure, automatic upgrades, elastic scaling | Data sovereignty, vendor dependency |
+| **On-premises** | Deployed in organisation's data centre | Full data control, air-gap options, custom integrations | Infrastructure overhead, manual upgrades |
+| **Hybrid** | Core IGA in cloud, on-prem connectors for legacy | Best of both worlds | Complexity, integration challenges |
+| **Managed service** | Vendor operates IGA for the organisation | Lowest operational burden | Highest TCO, limited customisation |
+
+## Integration Patterns
+
+### Connector Architecture
+
+IGA platforms use connectors to integrate with target systems:
+
+| Connector Type | Protocol | Examples | Sync Direction |
+|---------------|----------|----------|----------------|
+| **Native connector** | Built-in by vendor | AD, Azure AD, SAP, Workday | Bidirectional |
+| **SCIM connector** | SCIM 2.0 | Salesforce, ServiceNow, Zoom, Slack | IGA → Target (provisioning) |
+| **JDBC connector** | SQL database | Oracle DB, SQL Server, PeopleSoft | Bidirectional |
+| **LDAP connector** | LDAPv3 | OpenLDAP, Oracle DSEE | Bidirectional |
+| **File-based connector** | CSV, XML, JSON | Legacy systems, flat-file HR feeds | IGA → Target (one-way) |
+| **REST API connector** | HTTP/REST | Any system with REST API | Bidirectional |
+
+### Key Integration Patterns
+
+| Integration | Purpose | Criticality |
+|-------------|---------|-------------|
+| **HR → IGA** | Identity feed for joiner/mover/leaver | Critical |
+| **IGA → Directory** | Account creation, group membership | Critical |
+| **IGA → Target Systems** | Provisioning and deprovisioning | High |
+| **IGA → PAM** | Privileged account lifecycle governance | Medium |
+| **IGA → SIEM** | Event forwarding for security monitoring | Medium |
+| **IGA → ITSM** | Ticket creation, change management | Medium |
+
+## IGA Platform Selection Criteria
+
+| Criterion | Weight | Evaluation Questions |
+|-----------|--------|---------------------|
+| **Target system coverage** | 25% | How many connectors are available? Are all our target systems supported? |
+| **Certification capabilities** | 20% | Does it support risk-based certification, usage-based review, advanced reviewer workflows? |
+| **Role management** | 15% | Does it include role mining? Role lifecycle management? Role certification? |
+| **Scalability** | 10% | Can it handle our user count, entitlement count, and transaction volume? |
+| **Deployment flexibility** | 10% | Is SaaS available? On-premises? Hybrid? |
+| **API and extensibility** | 10% | Does it have a well-documented REST API? Custom connector SDK? |
+| **Reporting and analytics** | 5% | Are dashboards customisable? Can evidence be organised by compliance framework? |
+| **Total cost of ownership** | 5% | Licensing, implementation, ongoing operations, upgrade costs |
+
+## IGA Vendor Landscape
+
+| Vendor | Deployment | Strengths | Best For |
+|--------|-----------|-----------|----------|
+| **SailPoint** | SaaS, On-prem | Most mature IGA, strong identity AI, broadest connector library | Large enterprises, complex IGA requirements |
+| **Saviynt** | SaaS | Cloud-native IGA, strong SoD and PAM integration, risk analytics | Cloud-first organisations, mid-large enterprises |
+| **Microsoft** | SaaS (Entra ID) | Integrated with Microsoft ecosystem, strong identity analytics, PIM for Azure AD | Microsoft-centric organisations |
+| **Okta** | SaaS | Strong lifecycle management, excellent integration marketplace, workforce + customer IAM | Modern IT environments, cloud-native |
+| **Omada** | SaaS, On-prem | Strong role management, certified SAP connectors | SAP-centric organisations, European market |
+| **One Identity** | On-prem, SaaS | Strong PAM integration, mature on-premises deployment | Large on-premises environments |
+| **Hitachi ID** | On-prem | Strong legacy system support, privileged access governance | Highly regulated, legacy-heavy enterprises |
+
+<Aside variant="tip">
+When selecting an IGA platform, prioritise **target system coverage** above all other criteria. The best IGA platform in the world is useless if it cannot connect to your most critical applications. Evaluate connectors for your specific target systems in the proof of concept, not just in the vendor's documentation.
+</Aside>
+
+## IGA Implementation Best Practices
+
+| Phase | Activity | Pitfalls to Avoid |
+|-------|----------|-------------------|
+| **Discovery** | Document all target systems, user populations, and integration requirements | Underestimating the number of target systems or integration complexity |
+| **Design** | Design role model, certification campaigns, approval workflows | Over-engineering before proving value; review with real managers |
+| **Build** | Configure connectors, develop workflows, implement role model | Custom development where vendor functionality exists |
+| **Test** | Test provisioning, certification, and reporting end-to-end | Testing only in lab — test with real user data |
+| **Deploy** | Phased rollout — start with one target system or user group | Big-bang deployment; start with pilot group |
+| **Operate** | Establish IGA operations team, define SLAs, monitor health | Assuming IGA runs itself — it requires ongoing administration |
+
+## Key Takeaways
+
+- IGA platforms automate identity lifecycle, access certification, role management, SoD analysis, and compliance reporting — they are the technology foundation of identity governance
+- IGA architecture centres on an integration bus with connectors to HR systems, target systems, directories, SIEM, and ITSM — connector coverage is the most critical selection criterion
+- Deployment models span SaaS (lowest overhead), on-premises (maximum control), hybrid (balanced), and managed service (minimum operations)
+- Key integration patterns include HR → IGA (identity feed), IGA → Directory (account management), and IGA → Target Systems (provisioning)
+- Platform selection should prioritise target system coverage, certification capabilities, role management, and scalability — evaluate connectors with your specific systems in the proof of concept
+- Implementation best practices include phased rollout starting with a pilot group, testing with real user data, and dedicating ongoing operational resources — IGA is a program, not a one-time project

@@ -1,0 +1,173 @@
+---
+title: "Federated Identity"
+description: "Federated identity concepts — trust relationships, SAML and OIDC federation, SCIM provisioning, cross-domain identity management, social login, and CIAM patterns."
+sidebar:
+  order: 6
+  label: "Federated Identity"
+---
+
+Federated identity extends single sign-on across organisational boundaries. It enables users from one organisation (the home domain) to access resources in another organisation (the resource domain) using their existing credentials — without the resource domain needing to provision or manage separate user accounts.
+
+Federation is a cornerstone of modern enterprise architecture. It enables business partnerships, cloud adoption, mergers and acquisitions, and customer-facing identity scenarios.
+
+## Federation Concepts
+
+### What Is Federation?
+
+Federation is a set of agreements, standards, and technologies that enable an organisation to **trust identities from another organisation's identity system**. The key concept is the **trust relationship** — the resource organisation trusts the identity organisation to properly authenticate its users.
+
+```
+User at Company A ──→ Company A's IdP (authenticates) ──→ Federation assertion ──→ Company B's SP (accepts assertion) ──→ Access granted
+```
+
+### Key Federation Terminology
+
+| Term | Definition | Example |
+|------|------------|---------|
+| **Identity Provider (IdP)** | The system that authenticates users and issues identity assertions | Azure AD, Okta, PingFederate |
+| **Service Provider (SP)** | The system that consumes identity assertions and grants access to resources | Salesforce, AWS, Workday |
+| **Relying Party (RP)** | OIDC term for the system that accepts ID Tokens from an OIDC Provider | Any OIDC-integrated application |
+| **Circle of Trust** | A group of SPs and IdPs that have established trust relationships with each other | A federation between partners |
+| **Federation Hub** | An intermediary that connects multiple IdPs and SPs, reducing the number of point-to-point trust relationships | A centralized federation gateway |
+| **Home Claim / Realm Discovery** | Determining which IdP should authenticate the user based on their email domain or other attribute | User@company.com → Company A's IdP |
+
+## Trust Models
+
+### Direct Trust (Point-to-Point)
+
+Each IdP and SP establish trust directly with each other. This is the simplest model but does not scale — N organisations require N² trust relationships.
+
+**Best for**: Small numbers of integrated applications or single-partner scenarios.
+
+### Brokered Trust (Federation Hub)
+
+A central federation hub (broker) intermediates between all IdPs and SPs. Each entity trusts only the hub, reducing N² trust relationships to N.
+
+**Best for**: Large enterprises, multi-cloud environments, ecosystems with many partners.
+
+### Cross-Certification (Mesh)
+
+Organisations cross-certify each other's certificate authorities or metadata, creating a mesh of trust relationships. Each organisation independently validates every other organisation.
+
+**Best for**: Government networks, research collaborations, highly regulated industries.
+
+## SAML 2.0 Federation
+
+### Metadata Exchange
+
+SAML federation begins with metadata exchange. Each party publishes an XML metadata document containing:
+
+- **Entity ID** — Unique identifier for the IdP or SP
+- **SSO endpoints** — URLs for binding-specific SSO endpoints (HTTP-Redirect, HTTP-POST, ArtifactResolution)
+- **Certificate(s)** — X.509 certificates for signature verification and encryption
+- **Name ID formats** — Supported name identifier formats (persistent, transient, email, unspecified)
+- **Attributes** — Attributes the IdP can release and the SP can consume
+
+### SAML Federation Flow
+
+<Steps>
+### Inter-Organisation SAML Federation
+1. User at Partner A attempts to access an application at Company B
+2. Company B's SP determines the user is from Partner A (realm discovery)
+3. SP redirects user to Partner A's IdP with a SAML Authentication Request
+4. Partner A's IdP authenticates the user (password, MFA, passwordless)
+5. IdP generates a SAML Assertion signed with IdP's private key
+6. Assertion is sent to Company B's SP via HTTP POST or Artifact binding
+7. SP validates the assertion signature using Partner A's public certificate (from metadata)
+8. SP checks audience, timestamps, and conditions
+9. SP creates a local session for the user based on the assertion attributes
+10. **Result**: User accesses Company B's application using Partner A's credentials
+</Steps>
+
+## OpenID Connect Federation
+
+OIDC supports federation through the **OpenID Connect Federation** specification (OIEC — OpenID Federation). It defines a metadata-based trust model where:
+
+- Entities publish their metadata in a standard JSON format
+- Trust is established through **subordinate metadata statements** signed by superiors
+- **Automatic registration** reduces manual configuration
+- **Trust chains** enable transitive trust through intermediate authorities
+
+### OIDC Federation vs SAML Federation
+
+| Aspect | SAML Federation | OIDC Federation |
+|--------|----------------|-----------------|
+| **Metadata format** | XML | JSON |
+| **Trust establishment** | Manual metadata exchange | Automatic via trust chains |
+| **Registration** | Static (pre-configured) | Dynamic (via discovery URL) |
+| **Scalability** | Moderate (manual N²) | High (automatic discovery) |
+| **Standalone** | Yes | Via OpenID Federation spec |
+| **Adoption** | Mature (20+ years) | Emerging |
+
+## SCIM — Provisioning Federated Identities
+
+While federation handles authentication, **SCIM (System for Cross-domain Identity Management)** handles provisioning. SCIM enables automated user and group management across organisational boundaries.
+
+| SCIM Operation | HTTP Method | Endpoint | Description |
+|---------------|-------------|----------|-------------|
+| **Create User** | POST | `/Users` | Create a new user account |
+| **Read User** | GET | `/Users/{id}` | Retrieve user details |
+| **Update User** | PUT | `/Users/{id}` | Replace user attributes |
+| **Patch User** | PATCH | `/Users/{id}` | Partial attribute update |
+| **Delete User** | DELETE | `/Users/{id}` | Remove user account |
+| **List Users** | GET | `/Users?filter=...` | Query users with filter |
+| **Group Operations** | Same pattern | `/Groups` | Manage group membership |
+
+**Federation + SCIM workflow**:
+1. User is created in HR system → SCIM creates account in downstream applications
+2. User authenticates via federation (SAML/OIDC) to access those applications
+3. User is terminated in HR system → SCIM deletes/deactivates accounts across all applications
+
+<Aside variant="tip">
+Federation without SCIM is incomplete. Federation authenticates existing accounts — SCIM provisions those accounts in the first place. Deploy both together for a complete identity lifecycle across organisations.
+</Aside>
+
+## Customer Identity and Access Management (CIAM)
+
+CIAM applies federation concepts to customer-facing identity. Unlike enterprise federation (which integrates known employees), CIAM must handle:
+
+| Challenge | Enterprise IAM | CIAM |
+|-----------|---------------|------|
+| **User population** | Known (employees, contractors) | Unknown (customers, prospects) |
+| **Scale** | Thousands to tens of thousands | Hundreds of thousands to millions |
+| **Registration** | Automatic (HR feed) | Self-service (user signs up) |
+| **Authentication** | Corporate credentials | Social login, email magic links, SSO |
+| **Profile management** | HR system is source of truth | User self-service, consent management |
+| **Regulation** | Employment law, internal policy | Data privacy (GDPR, CCPA, LGPD) |
+| **User experience** | Secondary priority | Primary priority (conversion, retention) |
+
+### Social Login — Federation for CIAM
+
+Social login allows users to authenticate using their existing social media or digital identity accounts (Google, Apple, Facebook, LinkedIn, GitHub).
+
+**Benefits**:
+- Reduces registration friction — no new password to create and remember
+- Higher conversion rates — social login increases sign-up completion by 30-50%
+- Richer profile data — IdP can provide verified email, name, and profile photo
+- Built-in MFA — the social IdP handles authentication security
+
+**Risks**:
+- Vendor lock-in — users are tied to the social IdP
+- Privacy concerns — users may not want to share social identity data
+- IdP outage — if the social IdP is down, users cannot authenticate
+- Account takeover — if the social account is compromised, the CIAM account is also compromised
+
+## Federation Security Considerations
+
+| Threat | Description | Mitigation |
+|--------|-------------|------------|
+| **Assertion replay** | Attacker intercepts and reuses a SAML assertion or OIDC token | Use short assertion lifetimes (minutes), one-time use conditions, and audience restrictions |
+| **Assertion tampering** | Attacker modifies assertion content before forwarding to SP | Always sign assertions with IdP's private key; use XML Signature for SAML, JWS for OIDC |
+| **Malicious IdP** | A rogue IdP impersonates a legitimate IdP | Maintain a trusted IdP list; validate IdP certificates against trusted roots; use metadata signatures |
+| **SAML response manipulation** | Attacker intercepts IdP → SP response and modifies redirect | Use Artifact binding (back-channel validation) for high-security scenarios; always use HTTPS |
+| **Account provisioning race** | User is deprovisioned at IdP but SP still has active session | Short session lifetimes; real-time SCIM deactivation; session revocation propagation |
+| **Shadow IT federation** | Departments create unauthorised federation connections | Federation governance; automated discovery of all federation configurations; periodic audits |
+
+## Key Takeaways
+
+- Federated identity enables users from one organisation to access resources in another using their existing credentials — eliminating separate account provisioning across partners
+- Federation is built on trust relationships between Identity Providers (IdP) and Service Providers (SP), using either direct trust (point-to-point), brokered trust (hub), or cross-certification (mesh) models
+- SAML 2.0 federation uses XML metadata exchange with signed assertions; OIDC Federation uses JSON metadata with automatic trust chains and dynamic registration
+- SCIM is the provisioning complement to federation — it automates user and group lifecycle across organisational boundaries
+- CIAM applies federation for customer-facing use cases with social login, self-service registration, and privacy regulation compliance
+- Federation introduces specific security threats (assertion replay, tampering, malicious IdP, shadow IT) that require architectural mitigations including assertion signing, short lifetimes, and federation governance

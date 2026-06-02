@@ -1,0 +1,170 @@
+---
+title: "ABAC et PBAC"
+description: "Attribute-Based Access Control (ABAC) et Policy-Based Access Control (PBAC) — attributs, architecture XACML, politique en tant que code avec OPA/Rego, ReBAC (modèle Zanzibar), et comparaison des modèles d'autorisation."
+sidebar:
+  order: 8
+  label: "ABAC & PBAC"
+---
+
+L'ABAC (Attribute-Based Access Control) utilise des attributs plutôt que des rôles prédéfinis pour déterminer l'accès. Chaque décision d'accès est évaluée dynamiquement en fonction des attributs de l'utilisateur, de la ressource, de l'action et de l'environnement. Le PBAC (Policy-Based Access Control) étend ce concept avec des politiques explicites et externalisées.
+
+## Modèle ABAC
+
+### Attributs ABAC
+
+L'ABAC s'appuie sur quatre catégories d'attributs :
+
+| Catégorie | Exemples | Source |
+|-----------|----------|--------|
+| **Sujet (utilisateur)** | Rôle, département, niveau de sécurité, localisation, âge, certification | Annuaire, RH, IdP |
+| **Ressource** | Type, classification, propriétaire, projet, région | Gestion des ressources, catalogue de données |
+| **Action** | Lecture, écriture, modification, suppression, export | Application, API |
+| **Environnement** | Heure, jour, emplacement réseau, niveau de menace, conformité de l'appareil | Contexte d'exécution, SIEM, MDM |
+
+### Exemple de Politique ABAC
+
+```
+Permettre l'accès si :
+    Sujet.département == Ressource.département
+    ET Sujet.niveau_sécurité >= Ressource.classification
+    ET Action == "lecture" OU Action == "écriture"
+    ET Environnement.heure BETWEEN 08:00 AND 19:00
+    ET Environnement.appareil.conforme == true
+```
+
+## Architecture XACML
+
+XACML (eXtensible Access Control Markup Language) définit une architecture de référence pour l'ABAC/PBAC :
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                    ARCHITECTURE XACML                      │
+│                                                            │
+│  ┌────────────┐                                           │
+│  │     PEP     │ (Policy Enforcement Point)               │
+│  │   Point     │                                           │
+│  │   de Force  │                                           │
+│  └──────┬─────┘                                           │
+│         │                                                  │
+│         │ Requête d'accès (XACML Request)                  │
+│         v                                                  │
+│  ┌──────────────────────────────────────────────────┐    │
+│  │                      PDP                          │    │
+│  │       Policy Decision Point                       │    │
+│  │     (Moteur de décision d'accès)                   │    │
+│  └──────────────────────────────────────────────────┘    │
+│         ▲                        │                         │
+│         │                        │                         │
+│  ┌──────┴──────┐       ┌────────┴───────┐               │
+│  │    PIP       │       │      PAP        │               │
+│  │ Policy Info  │       │  Policy Admin   │               │
+│  │  Point       │       │    Point        │               │
+│  │ (Sources     │       │ (Gestion des    │               │
+│  │  d'attributs)│       │  politiques)    │               │
+│  └─────────────┘       └─────────────────┘               │
+│                                                            │
+│  ┌──────────────────────────────────────────────────┐    │
+│  │                      PRP                          │    │
+│  │        Policy Retrieval Point                      │    │
+│  │       (Référentiel de politiques)                  │    │
+│  └──────────────────────────────────────────────────┘    │
+└──────────────────────────────────────────────────────────┘
+```
+
+### Rôles XACML
+
+| Composant | Fonction | Exemple d'Implémentation |
+|-----------|----------|-------------------------|
+| **PEP** | Intercepte les requêtes d'accès et demande une décision au PDP | Middleware d'application, proxy API, agent |
+| **PDP** | Évalue les politiques et rend une décision (Permettre/Refuser/Indéterminé) | OPA, AuthzForce, Axiomatics |
+| **PIP** | Récupère les attributs du sujet, de la ressource, de l'environnement | Source d'attributs : annuaire IdP, base de données, API externe |
+| **PAP** | Interface de gestion des politiques | Console d'administration, éditeur de politiques |
+| **PRP** | Stockage et récupération des politiques | Git, base de données, système de fichiers |
+
+## Politique en Tant que Code avec OPA
+
+Open Policy Agent (OPA) est le moteur de politique open source le plus populaire pour la politique en tant que code.
+
+### Rego — Langage de Politique OPA
+
+```rego
+package iam.abac
+
+# Définition des rôles et permissions
+default allow = false
+
+# Règle : Un utilisateur peut lire un document si :
+# - Le document est dans son département
+# - OU le document est public
+# - ET l'utilisateur est connecté pendant les heures ouvrables
+allow {
+    input.action == "read"
+    input.resource.type == "document"
+    
+    # Condition 1 : Même département OU document public
+    (input.resource.department == input.user.department)
+    input.resource.visibility == "public"
+    
+    # Condition 2 : Heures ouvrables
+    time.clock(input.time.hour) >= 8
+    time.clock(input.time.hour) < 19
+}
+```
+
+### Comparaison OPA vs Cedar vs XACML
+
+| Caractéristique | OPA (Rego) | Cedar (AWS) | XACML |
+|----------------|------------|-------------|-------|
+| **Origine** | Styra/CNCF | AWS | OASIS |
+| **Format** | Rego (langage déclaratif) | Cedar (langage déclaratif simple) | XML |
+| **Performance** | Très bonne | Excellente | Bonne |
+| **Cas d'usage** | Cloud-native, Kubernetes, API | AWS Verified Permissions, applications | Entreprise traditionnelle |
+| **Externalisation PDP** | OPA sidecar ou serveur | Cedar agent intégré | PDP dédié |
+| **Complexité** | Moyenne | Faible-Moyenne | Élevée |
+| **Écosystème** | Large (Kubernetes, Envoy, Terraform) | AWS- centré | Solutions commerciales |
+| **Apprentissage** | Courbe modérée | Courbe faible | Courbe raide |
+
+## ReBAC — Relationship-Based Access Control
+
+Le ReBAC (Relationship-Based Access Control) modèle l'autorisation en fonction des relations entre entités. Popularisé par le système Zanzibar de Google (documenté dans le papier "Zanzibar: Google's Consistent, Global Authorization System").
+
+### Modèle Zanzibar
+
+```
+┌────────────────────────────────────────────────────────────┐
+│                    MODÈLE ZANZIBAR                          │
+│                                                             │
+│  Relation Tuples : (objet, relation, sujet)                  │
+│                                                             │
+│  Exemples :                                                  │
+│  document:contrat#propriétaire@utilisateur:jean            │
+│  document:contrat#lecteur@utilisateur:marie                │
+│  document:contrat#lecteur@groupe:comptables                │
+│  dossier:projets#parent@document:contrat                   │
+│                                                             │
+│  Requête : "Jean peut-il lire le document:contrat ?"       │
+│  Réponse : VRAI (Jean est propriétaire du contrat)          │
+│                                                             │
+│  Requête : "Marie peut-elle lire le document:contrat ?"    │
+│  Réponse : VRAI (Marie est lectrice via le groupe "comptables")
+└────────────────────────────────────────────────────────────┘
+```
+
+### Comparaison des Modèles d'Autorisation
+
+| Modèle | Granularité | Complexité | Performance | Auditabilité | Approprié pour |
+|--------|-------------|------------|-------------|--------------|----------------|
+| **DAC** | Faible | Très faible | Excellente | Faible | Fichiers personnels, petites équipes |
+| **MAC** | Haute | Élevée | Bonne | Haute | Gouvernement, militaire |
+| **RBAC** | Moyenne | Faible-Moyenne | Excellente | Haute | La plupart des entreprises |
+| **ABAC** | Haute | Élevée | Bonne | Haute | Grandes organisations, cloud |
+| **ReBAC** | Haute | Moyenne | Très bonne | Moyenne | SaaS multi-locataire, social |
+| **PBAC** | Haute | Élevée | Bonne | Très haute | Réglementé, financier, santé |
+
+## Points Clés à Retenir
+
+- ABAC utilise quatre catégories d'attributs (sujet, ressource, action, environnement) pour évaluer dynamiquement chaque décision d'accès — contrairement au RBAC qui utilise des rôles prédéfinis, l'ABAC évalue chaque requête individuellement
+- L'architecture XACML sépare les responsabilités en cinq composants : PEP (point de force), PDP (point de décision), PIP (point d'information), PAP (point d'administration) et PRP (point de récupération) — cette séparation est essentielle pour l'ABAC/PBAC à l'échelle
+- Open Policy Agent (OPA) avec son langage Rego est le moteur de politique en tant que code le plus populaire — il se compare favorablement à Cedar (AWS, plus simple) et XACML (plus lourd, plus complexe) selon le cas d'usage
+- ReBAC (modèle Zanzibar de Google) utilise des relation tuples (objet, relation, sujet) pour modéliser l'autorisation basée sur les relations — idéal pour les applications sociales et SaaS multi-locataire où les permissions sont définies par des relations entre entités
+- Le choix du modèle dépend des exigences : RBAC pour 90% des déploiements d'entreprise, ABAC/PBAC pour la granularité et le contexte, ReBAC pour les systèmes relationnels, et une approche hybride RBAC+ABAC pour de nombreuses organisations

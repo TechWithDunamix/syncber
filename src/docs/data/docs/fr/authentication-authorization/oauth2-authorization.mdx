@@ -1,0 +1,162 @@
+---
+title: "Autorisation OAuth 2.0"
+description: "OAuth 2.0 et OpenID Connect — types d'octroi (grant types), flux PKCE, jetons d'accès et d'ID, rôles OAuth, couche d'identité OIDC, DPoP, et différences avec OAuth 2.1."
+sidebar:
+  order: 5
+  label: "OAuth 2.0 & OIDC"
+---
+
+OAuth 2.0 est le standard de l'industrie pour l'autorisation déléguée. Il permet à une application d'obtenir un accès limité à des ressources protégées au nom d'un utilisateur sans exposer les identifiants de ce dernier. OpenID Connect (OIDC) ajoute une couche d'authentification au-dessus d'OAuth 2.0.
+
+## Rôles OAuth 2.0
+
+| Rôle | Description | Exemple |
+|------|-------------|---------|
+| **Resource Owner (Propriétaire de la ressource)** | Entité qui peut accorder l'accès à une ressource protégée | L'utilisateur final |
+| **Client (Application)** | Application demandant l'accès à une ressource protégée | Application web, application mobile, script |
+| **Authorization Server (AS)** | Serveur qui délivre des jetons d'accès après authentification | Okta, Azure AD, Auth0, Keycloak |
+| **Resource Server (RS)** | Serveur hébergeant les ressources protégées, validant les jetons | API REST, serveur de fichiers |
+
+## Types d'Octroi OAuth 2.0
+
+| Type d'Octroi | Cas d'Usage | Sécurité | Nécessite Secret Client |
+|--------------|-------------|----------|------------------------|
+| **Code d'Autorisation (Authorization Code)** | Application web avec backend | Très élevée | Oui |
+| **Code d'Autorisation + PKCE** | Application mobile, SPA | Très élevée | Non |
+| **Implicite (Implicit)** | Déprécié — ne plus utiliser | Faible | Non (obsolète dans OAuth 2.1) |
+| **Mot de passe (Password)** | Déprécié — ne plus utiliser | Faible | Oui |
+| **Identifiants Client (Client Credentials)** | Application à application, M2M | Élevée | Oui |
+| **Jeton de Rafraîchissement (Refresh Token)** | Obtention de nouveaux access tokens | Variable | Oui |
+| **Appareil (Device Code)** | Appareils sans navigateur (TV, CLI) | Moyenne | Non |
+
+### Flux du Code d'Autorisation avec PKCE
+
+PKCE (Proof Key for Code Exchange, RFC 7636) protège contre l'interception du code d'autorisation :
+
+```
+Application Mobile                    Authorization Server
+      │                                      │
+      │  1. Générer code_verifier           │
+      │  2. Calculer code_challenge          │
+      │     = SHA256(code_verifier)          │
+      │                                      │
+      │  3. Demande d'autorisation           │
+      │     + code_challenge                 │
+      │──────────────────────────────────────>│
+      │                                      │
+      │  4. Authentification utilisateur     │
+      │  (Navigateur externe ou in-app)      │
+      │<──────────────────────────────────────│
+      │                                      │
+      │  5. Code d'autorisation              │
+      │<──────────────────────────────────────│
+      │                                      │
+      │  6. Échange : code + code_verifier   │
+      │──────────────────────────────────────>│
+      │                                      │
+      │  7. Vérifier SHA256(code_verifier)   │
+      │     == code_challenge                │
+      │                                      │
+      │  8. Access Token + Refresh Token     │
+      │<──────────────────────────────────────│
+      │                                      │
+      │  9. Appeler API avec Access Token    │
+      │──────────────────────────────────────>│
+      │                                      │
+      │  10. Réponse API                    │
+      │<──────────────────────────────────────│
+```
+
+## Types de Jetons
+
+### Access Token
+
+| Propriété | Valeur Typique |
+|-----------|---------------|
+| **Format** | JWT (JSON Web Token) ou opaque |
+| **Contenu** | sub, aud, iss, exp, iat, scopes |
+| **Durée de vie** | 15-60 minutes |
+| **Validation** | Signature (RS256/ES256), audience, expiration |
+| **Transport** | En-tête HTTP Authorization: Bearer <token> |
+
+Exemple de JWT Access Token décodé :
+
+```json
+{
+  "iss": "https://auth.example.com",
+  "sub": "user_12345",
+  "aud": "https://api.example.com",
+  "exp": 1718000000,
+  "iat": 1717996400,
+  "scope": "openid profile email read:reports write:reports",
+  "roles": ["analyst", "report_viewer"]
+}
+```
+
+### ID Token (OIDC)
+
+L'ID Token est un JWT qui contient les claims d'identité de l'utilisateur :
+
+| Claim | Description | Toujours Présent ? |
+|-------|-------------|-------------------|
+| **iss** | Émetteur du jeton | Oui |
+| **sub** | Identifiant unique du sujet | Oui |
+| **aud** | Audience (destinataire du jeton) | Oui |
+| **exp** | Date d'expiration | Oui |
+| **iat** | Date d'émission | Oui |
+| **auth_time** | Moment de l'authentification | Optionnel |
+| **nonce** | Valeur unique liant la session | Oui (si fourni dans la requête) |
+| **at_hash** | Hash de l'Access Token | Optionnel |
+| **c_hash** | Hash du code d'autorisation | Optionnel |
+| **email** | Adresse email (si scope email) | Optionnel |
+
+## OIDC — Couche d'Identité
+
+OIDC étend OAuth 2.0 en ajoutant un flux d'authentification standardisé :
+
+```
+OAuth 2.0 : "Cette application peut-elle accéder aux rapports au nom de Jean ?"
+OIDC      : "Qui est Jean ?" + "Cette application peut-elle accéder aux rapports au nom de Jean ?"
+```
+
+### Mapping Scope vers Claim OIDC
+
+| Scope | Claims Inclus | Usage |
+|-------|---------------|-------|
+| **openid** | sub (toujours inclus) | REQUIS pour OIDC |
+| **profile** | name, family_name, given_name, picture | Profil utilisateur |
+| **email** | email, email_verified | Communication |
+| **address** | address (format json structuré) | Adresse postale |
+| **phone** | phone_number, phone_number_verified | Contact téléphonique |
+
+## DPoP — Demonstration of Proof-of-Possession
+
+DPoP (RFC 9449) lie un Access Token à un client spécifique via une clé publique :
+
+```
+1. Client génère une paire de clés (publique/privée)
+2. Inclut la clé publique (thumbprint) dans la demande d'autorisation
+3. Le serveur inclut cnf (confirmation) avec le thumbprint dans l'Access Token
+4. À chaque requête API, le client prouve la possession de la clé privée
+5. Même si le jeton est intercepté, l'attaquant ne peut pas l'utiliser sans la clé privée
+```
+
+## OAuth 2.1 — Principaux Changements
+
+| Changement | OAuth 2.0 | OAuth 2.1 |
+|-----------|-----------|-----------|
+| **Octroi implicite** | Autorisé | Supprimé |
+| **Octroi mot de passe** | Autorisé | Supprimé |
+| **PKCE obligatoire** | Optionnel (recommandé) | **Obligatoire** pour tous les clients |
+| **Refresh Token rotation** | Optionnel | Recommandé (rotation automatique) |
+| **Refresh Token sender-constrained** | Optionnel | Recommandé (DPoP ou mTLS) |
+| **Redirect URI exact match** | Pattern matching autorisé | Correspondance exacte obligatoire |
+
+## Points Clés à Retenir
+
+- OAuth 2.0 définit quatre rôles (Resource Owner, Client, Authorization Server, Resource Server) et plusieurs types d'octroi — le code d'autorisation avec PKCE est le flux recommandé pour toutes les applications modernes
+- PKCE (RFC 7636) protège contre l'interception du code d'autorisation — le client génère un code_verifier aléatoire, envoie SHA256(code_verifier) comme code_challenge dans la demande d'autorisation, et prouve sa possession lors de l'échange du code
+- Les types d'octroi implicite et mot de passe sont dépréciés dans OAuth 2.1 — les applications legacy doivent migrer vers le code d'autorisation avec PKCE ou les identifiants client pour les flux M2M
+- OpenID Connect (OIDC) ajoute une couche d'identité à OAuth 2.0 avec l'ID Token (JWT contenant les claims utilisateur) et le scop openid requis — OAuth sans OIDC ne fournit que l'autorisation, pas l'authentification
+- DPoP (RFC 9449) lie l'Access Token à un client spécifique via une paire de clés — même si le jeton est intercepté, l'attaquant ne peut pas l'utiliser sans la clé privée
+- OAuth 2.1 supprime les flux implicite et mot de passe, rend PKCE obligatoire pour tous les clients, et recommande la rotation des refresh tokens avec sender-constraining (DPoP ou mTLS)

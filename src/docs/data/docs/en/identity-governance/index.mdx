@@ -1,0 +1,121 @@
+---
+title: "Identity Governance"
+description: "Explore identity governance frameworks — role management, access certifications, Segregation of Duties, entitlement reviews, policy-driven access controls, and IGA platforms."
+sidebar:
+  order: 1
+  label: "Overview"
+---
+
+Identity Governance is the discipline of ensuring that the right people have the right access to the right resources — and that this access is properly controlled, reviewed, and auditable. While IAM focuses on provisioning and authentication, governance provides the **accountability layer**: proving that access controls are working, access is appropriate, and compliance requirements are met.
+
+Identity Governance and Administration (IGA) platforms automate these processes, turning IAM from a technical implementation into a controlled, auditable business process.
+
+## Why Identity Governance Matters
+
+Without governance, IAM operations are blind:
+- Who has access to what? **Unknown**
+- Is that access still appropriate? **Unreviewed**
+- Are there conflicts of interest in access? **Undetected**
+- Can we prove compliance to auditors? **No**
+
+The consequences of inadequate governance are severe: SOX violations, GDPR fines, insider fraud, and data breaches that could have been prevented by timely access review.
+
+## Core Governance Functions
+
+### Identity Lifecycle Management
+
+The identity lifecycle governs how digital identities are created, maintained, and removed across the enterprise:
+
+| Phase | Process | Governance Control |
+|-------|---------|-------------------|
+| **Joiner** | Account creation, role assignment | Automated provisioning based on HR data |
+| **Mover** | Role changes, transfers, promotions | Access recertification triggered by role change |
+| **Leaver** | Account deactivation, data handover | Immediate deprovisioning, manager certification |
+| **Rehire** | Account restoration | Reactivation policy, entitlement review |
+
+### Access Certification
+
+Periodic reviews where managers and resource owners validate whether users still need their current access. Certification campaigns are the primary mechanism for detecting and remediating privilege creep.
+
+### Segregation of Duties (SoD)
+
+SoD policies prevent any single individual from holding conflicting permissions that could enable fraud or abuse. SoD analysis detects toxic permission combinations across all of a user's roles and entitlements.
+
+### Role Management
+
+Roles are the building blocks of access governance. Role management includes role mining (discovering natural role groupings from existing access data), role design (creating roles aligned with business functions), and role lifecycle management (creating, updating, retiring roles over time).
+
+### Identity Analytics
+
+Advanced analytics detect anomalies in identity behaviour: dormant accounts, unusual access patterns, privilege escalation, and potential insider threats. Analytics transform IGA from a reactive compliance tool into a proactive security capability.
+
+## Governance Frameworks and Regulations
+
+Identity Governance is required by every major compliance framework:
+
+| Framework | Governance Requirements |
+|-----------|------------------------|
+| **SOX** | Section 404: Internal controls over financial reporting — including access controls and periodic review |
+| **GDPR** | Article 5: Accountability — organisations must demonstrate compliance with data protection principles |
+| **HIPAA** | 45 CFR §164.312(a)(1): Access control policies for ePHI; §164.308(a)(1)(ii)(D): Information access management |
+| **PCI DSS v4.0** | Requirement 7: Restrict access to cardholder data by business need-to-know; Requirement 9: Periodic access review |
+| **ISO 27001** | A.9.2: User access provisioning; A.9.2.5: Review of user access rights |
+| **NIST SP 800-53** | AC-2: Account management; AC-6: Least privilege; AU-6: Audit review, analysis, and reporting |
+
+## IGA in the Governance, Risk, and Compliance (GRC) Context
+
+```
+                    ┌─────────────────────────────┐
+                    │         GRC Strategy          │
+                    ├─────────────────────────────┤
+                    │  ┌──────────┐ ┌──────────┐  │
+                    │  │Governance│ │  Risk    │  │
+                    │  │  (IGA)   │ │(Risk Mgmt│  │
+                    │  └──────────┘ └──────────┘  │
+                    │  ┌──────────┐                │
+                    │  │Compliance│                │
+                    │  │ (Audit)  │                │
+                    │  └──────────┘                │
+                    └─────────────────────────────┘
+```
+
+IGA is the governance pillar of GRC. It provides the data and controls that feed risk management (which access combinations create risk?) and compliance (can we prove access is appropriately controlled?).
+
+## Module Roadmap
+
+<Steps>
+### Identity Lifecycle Management
+Joiner/mover/leaver processes, HR-driven provisioning, automated lifecycle events, and entitlement lifecycle.
+
+### Access Certifications
+Certification campaign design, reviewer workflows, remediation enforcement, and certifying application access vs. infrastructure access.
+
+### Segregation of Duties
+SoD policy frameworks, toxic combination analysis, mitigating controls, and SoD in cloud environments.
+
+### Role Management & Mining
+Role engineering methodologies, role mining algorithms, role lifecycle, and role certification.
+
+### Identity Analytics
+User behaviour analytics, anomaly detection, privilege creep identification, and identity risk scoring.
+
+### Self-Service IAM
+Access requests, approval workflows, password management, and user experience in modern IGA.
+
+### Governance & Policies
+Policy lifecycle, governance policy frameworks, policy enforcement automation, and exception management.
+
+### Compliance & Reporting
+Audit evidence collection, compliance reporting, real-time dashboards, and auditor workflows.
+
+### IGA Platforms & Architecture
+IGA platform capabilities, deployment models, integration patterns, and vendor landscape.
+</Steps>
+
+## Key Takeaways
+
+- Identity Governance is the accountability layer of IAM — it proves that access controls are working, access is appropriate, and compliance requirements are met
+- Core governance functions include identity lifecycle management, access certification, segregation of duties, role management, and identity analytics
+- Every major compliance framework (SOX, GDPR, HIPAA, PCI DSS, ISO 27001, NIST) requires identity governance controls
+- IGA is the governance pillar of GRC, providing data and controls that feed risk management and compliance activities
+- Without governance, organisations cannot answer the most basic audit question: "Who has access to what, and is that access appropriate?"

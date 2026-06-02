@@ -1,0 +1,183 @@
+---
+title: "ISO 27001 & ISMS"
+description: "ISO/IEC 27001 Information Security Management System — Annex A controls for IAM, certification process, Statement of Applicability, risk assessment, and continuous improvement."
+sidebar:
+  order: 10
+  label: "ISO 27001 & ISMS"
+---
+
+ISO/IEC 27001 is the international standard for Information Security Management Systems (ISMS). Unlike SOX, GDPR, or PCI DSS, ISO 27001 is a voluntary certification that demonstrates an organisation has implemented a comprehensive information security management system. IAM is a critical component of ISO 27001, with multiple Annex A controls specifically addressing identity and access management.
+
+## ISO 27001 Structure
+
+### Clauses 4-10 (Mandatory Requirements)
+
+These clauses define the ISMS requirements that any organisation must implement to be certifiable:
+
+| Clause | Title | IAM Relevance |
+|--------|-------|---------------|
+| **4** | Context of the organisation | Determine which regulations and stakeholders drive IAM requirements |
+| **5** | Leadership | Top management commitment to IAM policy and objectives |
+| **6** | Planning | IAM risk assessment, risk treatment, and control selection |
+| **7** | Support | IAM awareness training, competency, communication |
+| **8** | Operation | Operational IAM processes — provisioning, certification, access reviews |
+| **9** | Performance evaluation | IAM monitoring, measurement, internal audit, management review |
+| **10** | Improvement | IAM nonconformity management, corrective action, continuous improvement |
+
+### Annex A (Control Reference)
+
+Annex A lists 93 controls across 4 categories. Annex A controls are selected based on the risk assessment — not all controls are mandatory, but the Statement of Applicability (SoA) must justify why each control is included or excluded.
+
+## Annex A Controls Relevant to IAM
+
+### A.5 — Organisational Controls
+
+| Control | Description | IAM Implementation |
+|---------|-------------|-------------------|
+| **A.5.1** | Policies for information security | IAM policy, access control policy, password policy |
+| **A.5.2** | Information security roles and responsibilities | IAM team roles, access owners, data owners |
+| **A.5.8** | Information security in project management | IAM requirements included in new system projects |
+| **A.5.11** | Return of assets | User offboarding — asset return before account disablement |
+| **A.5.15** | Access control | Access control policy, rules, rights, and restrictions |
+| **A.5.16** | Identity management | Full identity lifecycle — creation, maintenance, deletion |
+| **A.5.17** | Authentication information | Password policy, MFA, credential management |
+| **A.5.18** | Access rights | Provisioning, privilege management, access reviews |
+| **A.5.23** | Information security for use of cloud services | Cloud IAM, identity federation with cloud providers |
+| **A.5.24** | Information security incident management | Incident response with identity forensics |
+| **A.5.31** | Legal, statutory, regulatory, and contractual requirements | Compliance with SOX/GDPR/PCI/HIPAA through IAM |
+| **A.5.32** | Intellectual property rights | Access controls over proprietary information |
+| **A.5.33** | Protection of records | Audit trail preservation, access to records |
+| **A.5.36** | Compliance with policies and standards | Access certification, compliance monitoring |
+
+### A.6 — People Controls
+
+| Control | Description | IAM Implementation |
+|---------|-------------|-------------------|
+| **A.6.1** | Screening | Background checks before access provisioning |
+| **A.6.2** | Terms and conditions of employment | Acceptable use policy for access, confidentiality agreements |
+| **A.6.3** | Information security awareness, education, and training | IAM security awareness, phishing training |
+| **A.6.5** | Post-employment responsibilities | Continued confidentiality obligations, access removal |
+
+### A.7 — Physical Controls
+
+| Control | Description | IAM Implementation |
+|---------|-------------|-------------------|
+| **A.7.1** | Physical security perimeters | Physical access to server rooms, data centres (PACS integration) |
+| **A.7.2** | Physical entry controls | Badge access, visitor management |
+| **A.7.6** | Working in secure areas | Clean desk policy, locked workstations |
+
+### A.8 — Technological Controls
+
+| Control | Description | IAM Implementation |
+|---------|-------------|-------------------|
+| **A.8.1** | User endpoint devices | Device compliance for access (MDM, device posture) |
+| **A.8.2** | Privileged access rights | PAM — JIT, elevation, approval, recording |
+| **A.8.3** | Information access restriction | RBAC/ABAC, need-to-know, least privilege |
+| **A.8.4** | Access to source code | Repository access controls, code review requirements |
+| **A.8.5** | Secure authentication | MFA, passwordless, single sign-on |
+| **A.8.8** | Management of technical vulnerabilities | Patching with authenticated vulnerability scanning |
+| **A.8.9** | Configuration management | Baseline configurations enforced through access controls |
+| **A.8.11** | Data masking | Dynamic data masking based on user role |
+| **A.8.12** | Data leakage prevention | DLP policies linked to user identity |
+| **A.8.15** | Logging | Authentication logs, access logs, privileged session logs |
+| **A.8.16** | Monitoring activities | Real-time monitoring of IAM events |
+| **A.8.24** | Use of cryptography | Encryption for credential storage, TLS for authentication |
+| **A.8.25** | Secure development lifecycle | Secure coding for IAM integrations |
+| **A.8.29** | Security testing in development and acceptance | IAM control testing, penetration testing |
+| **A.8.30** | Outsourced development | Vendor IAM control requirements |
+
+## ISO 27001:2022 Annex A Changes Impacting IAM
+
+The 2022 revision introduced 11 new controls and updated several existing controls relevant to IAM:
+
+| New/Updated Control | 2022 Change | IAM Action Required |
+|--------------------|-------------|---------------------|
+| **A.5.23** — Cloud services (NEW) | Explicit cloud security requirements | Cloud IAM, workload identity federation |
+| **A.5.30** — ICT continuity (NEW) | ICT readiness for business continuity | IAM availability, PAM disaster recovery |
+| **A.5.37** — Operating procedures (NEW) | Documented operating procedures | IAM operational procedures, runbooks |
+| **A.8.2** — Privileged access rights (UPDATED) | Stronger focus on privilege management | PAM program, JIT access, privileged session recording |
+| **A.8.5** — Secure authentication (UPDATED) | Emphasis on MFA and passwordless | MFA deployment, passwordless authentication |
+| **A.8.16** — Monitoring (UPDATED) | Continuous monitoring requirement | IAM event monitoring, SIEM integration |
+| **A.8.23** — Web filtering (NEW) | Web access controls | Identity-aware web gateway integration |
+| **A.8.28** — Secure coding (NEW) | Coding standards for security | IAM API security, OAuth/OIDC secure implementation |
+
+## ISO 27001 Certification Process for IAM
+
+### Preparation Phase (3-6 Months)
+
+| Step | Activities | IAM Deliverables |
+|------|------------|------------------|
+| **1. Define ISMS scope** | Determine which systems, processes, and locations are in scope | IAM scope: which identity stores, applications, and infrastructure are covered |
+| **2. IAM policy** | Establish IAM policy aligned with business and legal requirements | IAM Policy document, Access Control Policy |
+| **3. Risk assessment** | Identify IAM risks, assess likelihood and impact | IAM Risk Assessment Register |
+| **4. Risk treatment** | Select Annex A controls to address identified risks | Statement of Applicability (SoA) with IAM controls |
+| **5. Control implementation** | Implement selected IAM controls | IAM operational controls deployed (PAM, IGA, IdP, MFA) |
+
+### Risk Assessment for IAM
+
+ISO 27001 requires a risk assessment process. For IAM risks, the assessment typically covers:
+
+| IAM Risk | Threat | Likelihood | Impact | Selected Control |
+|----------|--------|------------|--------|------------------|
+| **Unauthorised access** | Weak authentication, credential theft | High | High | MFA (A.8.5) |
+| **Excessive privileges** | Privilege creep, no PAM | Medium | High | PAM (A.8.2) |
+| **Orphaned accounts** | No deprovisioning process | Medium | Medium | Identity lifecycle (A.5.16) |
+| **SoD violation** | Conflicting access rights | Medium | High | Access rights review (A.5.18) |
+| **Insider threat** | Authorised user misuse | Low | High | Monitoring (A.8.16) |
+| **Third-party access** | Vendor account compromise | Medium | Medium | Cloud security (A.5.23) |
+
+### Implementation Phase (6-12 Months)
+
+| Activity | Deliverable | Audit Evidence |
+|----------|-------------|----------------|
+| **Deploy IAM controls** | IGA, PAM, IdP, MFA deployed per SoA | Deployment documentation, architecture diagrams |
+| **Document procedures** | IAM operational procedures, runbooks | Procedure documents, change management records |
+| **Train staff** | IAM awareness training for all users | Training records, completion reports |
+| **Monitor and measure** | IAM control monitoring, KPI tracking | Monitoring dashboards, KPI reports |
+| **Internal audit** | Pre-certification internal audit of IAM controls | Internal audit reports, remediation records |
+
+### Certification Audit (2-3 Weeks)
+
+| Phase | Activities | IAM Focus |
+|-------|------------|-----------|
+| **Stage 1 — Documentation review** | Auditor reviews policies, SoA, risk assessment | IAM policy completeness, SoA accuracy, risk assessment adequacy |
+| **Stage 2 — Implementation audit** | Auditor tests controls, interviews staff, reviews evidence | IAM control operation, evidence quality, staff competency |
+
+### Surveillance and Recertification
+
+| Activity | Frequency | IAM Requirements |
+|----------|-----------|------------------|
+| **Surveillance audit** | Annual | Ongoing IAM control effectiveness, incident review |
+| **Recertification audit** | Every 3 years | Full reassessment of IAM controls, updated risk assessment |
+| **Internal audit** | At least annually | IAM internal audit with independent auditors |
+| **Management review** | At least annually | IAM performance review, resource adequacy, improvement opportunities |
+
+## Statement of Applicability (SoA)
+
+The SoA is a critical document that lists all Annex A controls and specifies whether each is applicable, and if excluded, the justification:
+
+```
+Control ID: A.5.16 — Identity management
+Applicable: YES
+Justification: Identity management is essential for controlling access to information assets
+Implementation Status: Implemented
+Implementation Description: Full identity lifecycle management through IGA platform integrated with HRIS
+Evidence: IGA platform, provisioning/de-provisioning process documentation
+
+Control ID: A.7.3 — Securing offices, rooms, and facilities
+Applicable: YES
+Justification: Physical security is required for on-premise identity infrastructure
+Implementation Status: Implemented
+Implementation Description: Data centre access controlled by badge system with visitor logs
+Evidence: Physical access policy, badge access logs, visitor register
+```
+
+## Key Takeaways
+
+- ISO 27001 is a voluntary certification for an Information Security Management System (ISMS) — it requires a risk-based approach where IAM controls are selected based on the organisation's specific risk assessment rather than prescribed by the standard
+- Annex A contains 93 controls across 4 categories (organisational, people, physical, technological) — IAM-relevant controls include A.5.15 (access control), A.5.16 (identity management), A.5.17 (authentication), A.5.18 (access rights), A.8.2 (privileged access rights), A.8.5 (secure authentication), and A.8.15 (logging)
+- The 2022 revision introduced new controls that impact IAM: A.5.23 (cloud services requiring cloud IAM), A.8.2 (stronger privileged access focus), A.8.5 (emphasis on MFA/passwordless), and A.8.16 (continuous monitoring requirements)
+- The Statement of Applicability (SoA) is the key document — it lists each Annex A control and justifies why it is included or excluded based on the risk assessment
+- Certification requires a risk assessment identifying IAM risks (unauthorised access, excessive privileges, orphaned accounts, SoD violations, insider threats), selection of appropriate Annex A controls, documentation of procedures, staff training, monitoring, and internal audit
+- The certification process spans preparation (3-6 months), implementation (6-12 months), Stage 1 audit (documentation review), Stage 2 audit (control testing), annual surveillance audits, and triennial recertification
+- IAM controls are interconnected — risk assessment for IAM must consider the full attack chain: authentication weaknesses, authorisation gaps, privilege management, lifecycle management, monitoring, and incident response

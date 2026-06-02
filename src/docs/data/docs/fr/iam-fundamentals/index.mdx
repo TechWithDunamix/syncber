@@ -1,0 +1,39 @@
+---
+title: "Fondamentaux de l'IAM"
+description: "Apprenez les concepts de base de la Gestion des Identités et des Accès — cycles de vie des identités, annuaires, provisionnement et les modèles fondamentaux qui alimentent l'IAM en entreprise."
+sidebar:
+  order: 1
+  label: "Fondamentaux de l'IAM"
+---
+
+La Gestion des Identités et des Accès (IAM) est la discipline qui garantit que les bonnes personnes ont le bon accès aux bonnes ressources au bon moment. Ce module couvre les éléments de base de tout programme IAM.
+
+## Concepts Fondamentaux
+
+### Cycle de Vie des Identités
+
+Chaque identité numérique suit un cycle de vie : **création → provisionnement → maintenance → déprovisionnement**. Comprendre ce flux est essentiel pour concevoir des systèmes IAM sécurisés.
+
+- **Arrivée** — Intégration des utilisateurs, création de comptes, attribution des accès initiaux
+- **Mobilité** — Changements de rôle, transferts de département, modifications d'accès
+- **Départ** — Désactivation, révocation des identifiants
+
+### Annuaires d'Identités
+
+Les annuaires sont la source faisant autorité pour les données d'identité. Les services d'annuaire courants incluent :
+
+- **Active Directory (AD)** — Service d'annuaire Microsoft pour les environnements Windows
+- **LDAP** — Protocole léger d'accès aux annuaires, standard ouvert
+- **Annuaires Cloud** — Azure AD, Okta Universal Directory, Google Cloud Identity
+
+### Provisionnement des Utilisateurs
+
+Le provisionnement est le processus de création, de mise à jour et de suppression des comptes utilisateurs dans les systèmes cibles. Les plateformes IAM modernes supportent :
+
+- **Provisionnement Juste-à-Temps (JIT)** — Création de comptes au premier accès
+- **Synchronisation** — Synchronisation bidirectionnelle entre les RH et les annuaires
+- **SCIM** — System for Cross-domain Identity Management, standard ouvert de provisionnement
+
+## Points Clés
+
+À la fin de ce module, vous devriez comprendre le cycle de vie des identités, le rôle des annuaires et comment le provisionnement relie l'IAM à l'écosystème d'entreprise.

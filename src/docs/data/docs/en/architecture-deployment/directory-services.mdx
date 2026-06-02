@@ -1,0 +1,166 @@
+---
+title: "Directory Services"
+description: "Directory service architecture — Active Directory, Entra ID, LDAP directories, cloud directories — replication topology, performance tuning, security hardening, and migration strategies."
+sidebar:
+  order: 4
+  label: "Directory Services"
+---
+
+Directory services are the backbone of identity infrastructure. They store identity attributes, authenticate users, and provide authorisation information to applications and services. Understanding directory architecture is essential for designing resilient, performant IAM systems.
+
+## Directory Types
+
+| Directory Type | Protocol | Primary Use Case | Strengths | Limitations |
+|---------------|----------|-----------------|-----------|-------------|
+| **Active Directory** | LDAP, Kerberos, NTLM | Enterprise user/computer management, Windows integration | Group Policy, Kerberos trust, application compatibility | Complex replication topology, Windows-centric |
+| **Entra ID (Azure AD)** | REST, OAuth, OIDC | Cloud identity, SaaS SSO, device management | Cloud-native, conditional access, rich APIs | No LDAP, no Kerberos, different object model |
+| **OpenLDAP / 389 Directory** | LDAP | Linux/Unix environments, custom schema | Open source, flexible schema, lightweight | No Kerberos, limited management tools |
+| **PingDirectory** | LDAP, SCIM, REST | Large-scale directory, cloud-delivered | High performance, multi-tenancy, SCIM support | Commercial licensing |
+| **Okta Universal Directory** | REST, SCIM, OIDC | Cloud application identity, lifecycle | Cloud-native, SCIM outbound, app integration | No LDAP, dependent on Okta platform |
+| **JumpCloud Directory** | LDAP, RADIUS, SSH | Cloud-delivered directory | Multi-OS, simple management, MDM | Limited on-prem integration |
+
+## Active Directory Architecture
+
+### Domain Topology
+
+| Component | Purpose | Scalability Consideration |
+|-----------|---------|--------------------------|
+| **Forest** | Security boundary, contains one+ domains | Root domain in multi-forest: trust management |
+| **Domain** | Replication boundary, contains OUs | Domain count kept minimal (1-3 typical for most orgs) |
+| **Organisational Unit (OU)** | Administrative boundary, GPO application | Rationalised OU structure reduces GPO management overhead |
+| **Site** | Physical network topology for replication | Site design affects replication traffic and logon performance |
+
+### Domain Controller Roles
+
+| Role | Function | Recommendations |
+|------|----------|-----------------|
+| **Global Catalog** | Universal group membership, forest-wide search | All DCs should be GC in single-domain forest |
+| **PDC Emulator** | Time sync, password changes, group policy | Most performant DC, backed up first, monitored most closely |
+| **RID Master** | Security identifier allocation | Ensure sufficient RID pool; single-failure point but low-criticality |
+| **Infrastructure Master** | Cross-domain object references | Place on non-GC DC in multi-domain forest |
+| **Schema Master** | Schema modification control | Keep offline except during schema changes |
+| **Domain Naming Master** | Domain add/remove | Place on same DC as Schema in small environments |
+
+### Replication Topology
+
+```
+┌──────────────────────────────────────────────────────┐
+│                    AD REPLICATION                       │
+│                                                          │
+│  ┌─────────┐         ┌─────────┐         ┌─────────┐  │
+│  │ DC SiteA │<──────>│ DC SiteB │<──────>│ DC SiteC │  │
+│  │  (PDC)   │   int   │         │   int   │         │  │
+│  └────┬─────┘         └─────────┘         └─────────┘  │
+│       │                    │                    │       │
+│       v                    v                    v       │
+│  ┌─────────┐         ┌─────────┐         ┌─────────┐  │
+│  │ DC SiteA│         │ DC SiteB│         │ DC SiteC │  │
+│  │  (RODC) │         │  (RODC) │         │  (RODC) │  │
+│  └─────────┘         └─────────┘         └─────────┘  │
+│                                                          │
+│  int = Intersite replication (compressed, scheduled)    │
+│  v   = Intrasite replication (uncompressed, immediate)  │
+└──────────────────────────────────────────────────────┘
+```
+
+### Replication Best Practices
+
+| Practice | Rationale | Configuration |
+|----------|-----------|---------------|
+| **2+ DCs per site** | Fault tolerance for authentication and directory lookups | Deploy 2+ DCs in each physical site |
+| **RODCs in branch offices** | Read-only DCs prevent credential theft at remote locations | RODC with password replication policy |
+| **Custom replication schedule** | Control bandwidth usage during business hours | Schedule intersite replication intervals (e.g., every 15 min) |
+| **Separate site links** | Route replication over least-cost paths | Create site links matching WAN topology |
+| **Monitor replication health** | Detect replication failures early | repadmin /replsummary, AD health checks |
+
+## LDAP Directory Architecture
+
+### LDAP Tree Structure
+
+```
+┌─────────────────────────────────────────────┐
+│                   dc=example,dc=com           │
+│                                               │
+│  ┌───────────┴───────────┐                    │
+│  │                         │                    │
+│  ou=People              ou=Groups              │
+│  │                         │                    │
+│  ├── uid=jdoe            ├── cn=Developers     │
+│  ├── uid=asmith          ├── cn=Admins         │
+│  └── uid=bjohnson        └── cn=Analysts       │
+│                                                │
+│  ┌─────────────────────────────────┐           │
+│  │          ou=Applications          │           │
+│  │  ├── cn=ERP                     │           │
+│  │  ├── cn=CRM                     │           │
+│  │  └── cn=HRIS                    │           │
+│  └─────────────────────────────────┘           │
+└─────────────────────────────────────────────┘
+```
+
+### LDAP Performance Tuning
+
+| Parameter | Impact | Recommended Setting |
+|-----------|--------|---------------------|
+| **Indexing** | Search performance | Index attributes used in search filters (uid, mail, memberOf, objectClass) |
+| **Connection pooling** | Directory connection efficiency | Pool of 10-50 connections per application server |
+| **Page size** | Search result paging | 1000 results per page (vs. default 100) |
+| **Idle timeout** | Connection resource management | 5-10 minutes (balance between reconnect overhead and resource savings) |
+| **Cache size** | Entry cache hit ratio | Entry cache: 50%+ of total directory data; DB cache: 20-30% of DB size |
+| **Thread pool** | Concurrent operation handling | 10-50 worker threads per CPU core |
+| **Referral chasing** | Cross-server operation | Off for client applications, on for admin tools |
+
+## Directory Security Hardening
+
+| Hardening Measure | AD | OpenLDAP | Cloud Directory |
+|------------------|-----|----------|-----------------|
+| **Disable weak protocols** | NTLMv1, LM hash, SMBv1 | Simple binds over TLS only | OAuth token enforcement |
+| **Secure channel** | LDAPS (port 636) or StartTLS | LDAPS required | TLS required (HTTPS only) |
+| **Password policy** | Fine-grained password policy | ppolicy overlay | Built-in conditional access |
+| **Account lockout** | Lockout threshold + duration | ppolicy lockout | Smart lockout / risk-based |
+| **Audit logging** | Advanced Audit Policy | Access log, error log, audit log | Sign-in logs, audit logs |
+| **Admin security** | Tier 0 admin model, PAWs | sudo/role-based admin | PIM / privileged roles |
+| **Backup protection** | AD backup with DSRM password | LDIF export, directory backup | Cloud back-up and restore |
+
+### Active Directory Security Recommendations
+
+| Recommendation | Category | Implementation |
+|----------------|----------|----------------|
+| **Deploy Tier 0 admin model** | Admin security | Separate admin accounts, PAW workstations, restricted admin groups |
+| **Enable Advanced Audit Policy** | Auditing | Audit account logon, account management, directory service changes, privilege use |
+| **Implement Group Managed Service Accounts (gMSA)** | Service accounts | Automatic password rotation, SPN management |
+| **Restrict NTLM** | Protocol security | NTLM audit mode → block via Group Policy |
+| **Enable LAPS** | Local admin passwords | Managed local admin password on all workstations and servers |
+| **Deploy RODCs in branches** | Credential security | Password replication policy for branch-specific accounts |
+| **Monitor for Golden Ticket attacks** | Detection | KRBTGT password change monitoring, event ID 4670, 4769 |
+
+## Directory Migration
+
+### Migration Approaches
+
+| Approach | Complexity | Risk | Duration | Use Case |
+|----------|------------|------|----------|----------|
+| **Domain migration (ADMT)** | High | Medium | Months | AD-to-AD migration (merger/acquisition) |
+| **Forest migration** | Very High | High | Months to Year | Multi-forest consolidation |
+| **Cloud migration (Entra ID)** | Medium | Medium | Months | On-prem AD → Entra ID |
+| **IdP migration** | Medium-High | High | Months | One IdP to another (Okta → Azure, Ping → Okta) |
+
+### AD-to-Entra ID Migration
+
+| Phase | Activities | Duration | Risk |
+|-------|------------|----------|------|
+| **1. Assessment** | Application inventory, authentication method audit, SSO readiness | 2-4 weeks | Low |
+| **2. Pilot** | Migrate pilot user group, test authentication, validate app compatibility | 4-8 weeks | Medium |
+| **3. Identity sync** | Deploy Entra ID Connect, sync identities, password hash sync / PHS | 4 weeks | Medium |
+| **4. Phased migration** | Migrate apps from AD auth to Entra ID, one application at a time | 8-16 weeks | Medium-High |
+| **5. Cutover** | Disable AD authentication for migrated apps, redirect to Entra ID | 2-4 weeks | High |
+| **6. Decommission** | Remove remaining AD dependencies, decommission DCs | 4-8 weeks | Low |
+
+## Key Takeaways
+
+- Directory services form the backbone of identity infrastructure — the choice between AD, Entra ID, OpenLDAP, and cloud directories depends on existing investments, application requirements, and cloud adoption strategy
+- Active Directory replication topology requires careful design — 2+ DCs per site, RODCs in branch offices, custom replication schedules based on WAN topology, and regular replication health monitoring are essential
+- LDAP performance tuning centres on proper indexing, connection pooling, page sizing, cache sizing, and thread pool configuration — an untuned directory can add 100-500ms latency per lookup
+- Directory security hardening spans disabling weak protocols (NTLMv1, SMBv1), enforcing LDAPS, implementing strong password policies, deploying Tier 0 administrative models, enabling advanced audit policies, and deploying gMSAs and LAPS
+- AD-to-Entra ID migration is a phased process (assessment → pilot → sync → phased migration → cutover → decommission) — application readiness assessment is the most critical success factor
+- Cloud directories (Okta Universal Directory, JumpCloud) offer simplified management and cloud-native capabilities but may lack LDAP support and deep on-premises integration

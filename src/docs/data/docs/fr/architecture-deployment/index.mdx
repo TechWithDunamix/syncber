@@ -1,0 +1,67 @@
+---
+title: "Architecture et Déploiement"
+description: "Concevez et déployez des architectures IAM/PAM prêtes pour la production — modèles de déploiement, intégrations système, haute disponibilité, reprise après sinistre et bonnes pratiques opérationnelles."
+sidebar:
+  order: 6
+  label: "Architecture & Déploiement"
+---
+
+Le dernier module rassemble tout ce qui a été appris : conception, déploiement et exploitation de solutions IAM/PAM en environnement de production.
+
+## Modèles d'Architecture
+
+### Hub-and-Spoke
+
+Une plateforme IAM/PAM centrale (hub) se connecte à plusieurs systèmes cibles (spokes). Ce modèle centralise la gestion des politiques tout en distribuant l'application.
+
+### Cloud-Hybride
+
+Les organisations disposant de ressources sur site et dans le cloud ont besoin d'architectures qui relient les deux mondes :
+
+- Fournisseur d'identité cloud (IdP) comme source faisant autorité
+- Annuaires sur site synchronisés vers le cloud
+- PAM pour l'accès à la console cloud et aux serveurs sur site
+
+### Prêt pour les Microservices
+
+Les architectures modernes utilisent l'IAM axée sur les API avec :
+
+- OAuth 2.0 / OIDC pour l'authentification service à service
+- Politique en tant que code pour une autorisation fine
+- Gestion de session distribuée
+
+## Considérations de Déploiement
+
+### Haute Disponibilité
+
+Les systèmes IAM/PAM sont des infrastructures critiques. Prévoyez :
+
+- Composants redondants dans plusieurs zones de disponibilité
+- Clustering actif-passif ou actif-actif
+- Basculement et réplication de base de données
+- Équilibrage de charge pour le trafic d'authentification
+
+### Reprise Après Sinistre
+
+- Sauvegarde régulière de la configuration et des politiques
+- Procédures de reprise documentées avec objectifs RTO/RPO
+- Options de repli à froid, tiède ou chaud
+- Tests de reprise réguliers
+
+### Performance
+
+- Mise en cache des sessions pour réduire la latence d'authentification
+- Pool de connexions pour les recherches d'annuaire
+- Passage à l'échelle du stockage d'enregistrement de sessions PAM
+- Surveillance et alertes sur les métriques de performance
+
+## Modèles d'Intégration
+
+- **Systèmes RH** (Workday, SAP SuccessFactors) — Flux d'identités pour arrivée/mobilité/départ
+- **ITSM** (ServiceNow, Jira) — Traitement des demandes d'accès
+- **SIEM** (Splunk, Sentinel) — Ingestion des journaux d'audit et alertes
+- **DevOps** (Jenkins, Ansible) — Rotation automatisée des secrets
+
+## Points Clés
+
+Vous devriez maintenant être capable de concevoir une architecture IAM/PAM adaptée à votre organisation, de planifier la HA/DR et d'intégrer l'IAM avec l'écosystème d'entreprise.

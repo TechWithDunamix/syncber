@@ -1,0 +1,117 @@
+---
+title: "Compliance, Auditing & Reporting"
+description: "How IAM and PAM map to regulatory frameworks — SOX, GDPR, PCI DSS, HIPAA, ISO 27001 — and building audit-ready access controls, compliance automation, and evidence management."
+sidebar:
+  order: 1
+  label: "Overview"
+---
+
+Compliance is often the primary driver for IAM and PAM investments. Regulatory frameworks mandate specific controls over who can access what, how access is monitored, and how organisations prove that their access controls are operating effectively.
+
+This module covers the major regulatory frameworks that govern identity and access controls, the auditing processes that validate compliance, and the reporting and automation capabilities that transform compliance from a periodic audit scramble into a continuous, predictable process.
+
+## Why Compliance Drives IAM
+
+For many organisations, the business case for IAM and PAM begins with compliance. The board cares about fines, audit findings, and reputational risk. The IAM program provides the controls and evidence that keep the organisation compliant.
+
+| Framework | Geographic Scope | Key IAM Focus | Maximum Penalty |
+|-----------|-----------------|---------------|-----------------|
+| **SOX** | US (public companies) | Internal controls over financial reporting | $5M + 20 years imprisonment |
+| **GDPR** | EU/EEA (global reach) | Personal data protection, consent, access rights | €20M or 4% of global revenue |
+| **PCI DSS** | Global (cardholder data) | Access control for payment data | $500K/month + brand damage |
+| **HIPAA** | US (healthcare) | ePHI access controls, audit trails | $1.5M per violation category |
+| **ISO 27001** | Global | Information security management system (ISMS) | Certification revocation |
+| **NIST SP 800-53** | US (federal) | Comprehensive security and privacy controls | Contract loss (federal) |
+
+## The Anatomy of a Compliance Control
+
+Every regulation requires **controls** — specific measures that address a stated requirement. IAM controls typically fall into three categories:
+
+### Preventive Controls
+
+Controls that prevent security incidents before they occur:
+
+| Control | IAM Implementation | Typically Required By |
+|---------|-------------------|----------------------|
+| Least privilege | RBAC, ABAC, JIT access | SOX, PCI, HIPAA, NIST |
+| Segregation of duties | SoD analysis and enforcement | SOX, PCI |
+| MFA for privileged access | MFA enforcement, FIDO2 | PCI, NIST, CISA directive |
+| Unique user IDs | No shared accounts | PCI, HIPAA, SOX |
+
+### Detective Controls
+
+Controls that detect security incidents after they occur:
+
+| Control | IAM Implementation | Typically Required By |
+|---------|-------------------|----------------------|
+| Access logging | Authentication and authorisation logs | SOX, PCI, HIPAA, NIST |
+| Privileged session recording | PAM session recording | PCI, NIST |
+| Access certification | Periodic review campaigns | SOX, PCI, HIPAA |
+| SoD violation monitoring | Automated SoD scanning | SOX |
+
+### Corrective Controls
+
+Controls that respond to and remediate security incidents:
+
+| Control | IAM Implementation | Typically Required By |
+|---------|-------------------|----------------------|
+| Account disablement on termination | Automated deprovisioning | SOX, PCI, HIPAA |
+| Credential rotation after compromise | PAM auto-rotation | PCI, NIST |
+| Breach notification | Identity-aware notification workflows | GDPR |
+
+## The IAM Compliance Stack
+
+```
+┌─────────────────────────────────────────────────────────┐
+│               REGULATORY FRAMEWORKS                       │
+│   SOX   │   GDPR   │   PCI DSS   │   HIPAA   │   NIST   │
+├─────────────────────────────────────────────────────────┤
+│               CONTROL OBJECTIVES                          │
+│   Access Control │ Audit Trail │ SoD │ Cert. │ Privacy  │
+├─────────────────────────────────────────────────────────┤
+│               IAM IMPLEMENTATION                          │
+│   IGA │ PAM │ SSO/MFA │ Provisioning │ Governance       │
+├─────────────────────────────────────────────────────────┤
+│               EVIDENCE AND REPORTING                      │
+│   Cert. Reports │ Audit Logs │ SoD Reports │ Dashboards  │
+└─────────────────────────────────────────────────────────┘
+```
+
+## Module Roadmap
+
+<Steps>
+### Regulatory Frameworks
+Overview of all major frameworks — what they require, who they apply to, and how IAM supports compliance.
+
+### SOX Compliance
+Internal controls over financial reporting — access certification, SoD, privileged access management for financial systems.
+
+### GDPR & Privacy
+Data protection requirements — consent management, right to erasure, data subject access requests, and privacy-by-design IAM.
+
+### PCI DSS
+Payment card industry data security standard — CDE access control, MFA for admin access, logging and monitoring requirements.
+
+### HIPAA Compliance
+Healthcare privacy and security — ePHI access controls, audit controls, emergency access procedures.
+
+### Audit Readiness
+Building an audit-ready IAM program — evidence collection, auditor workflows, pre-audit preparation, and managing audit findings.
+
+### Compliance Automation
+Automating compliance through policy-as-code, continuous monitoring, automated evidence collection, and self-service audit portals.
+
+### Incident Response & Forensics
+Identity forensics, user attribution, access analysis during incident response, and IAM's role in breach investigation.
+
+### ISO 27001 & ISMS
+Information Security Management System — Annex A controls for IAM, certification process, and continuous improvement.
+</Steps>
+
+## Key Takeaways
+
+- Compliance is often the primary driver for IAM and PAM investments — regulatory frameworks mandate specific controls over identity and access
+- IAM controls fall into three categories: preventive (least privilege, SoD, MFA), detective (logging, certification, monitoring), and corrective (deprovisioning, rotation, notification)
+- Each framework (SOX, GDPR, PCI DSS, HIPAA, ISO 27001, NIST) has specific IAM requirements with defined penalties for non-compliance
+- The IAM compliance stack spans regulatory frameworks → control objectives → IAM implementation → evidence and reporting
+- Building an audit-ready IAM program requires preventive controls that reduce risk, detective controls that identify issues, and evidence management that proves controls are operating effectively

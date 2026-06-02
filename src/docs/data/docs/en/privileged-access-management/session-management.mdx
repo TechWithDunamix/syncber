@@ -1,0 +1,177 @@
+---
+title: "Session Management & Monitoring"
+description: "Privileged session management — session recording, real-time monitoring, session isolation, command filtering, keystroke logging, and forensic session analysis."
+sidebar:
+  order: 6
+  label: "Session Management & Monitoring"
+---
+
+Session management is the real-time control component of PAM. While credential vaulting secures **who** can access privileged accounts, session management monitors **what they do** during that access. Every privileged session — RDP, SSH, web console, database client — should be recorded, monitored, and auditable.
+
+Session management serves three purposes: **deterrence** (knowing they are watched, users are less likely to abuse privileges), **detection** (suspicious activity triggers real-time alerts), and **investigation** (recorded sessions provide forensic evidence after an incident).
+
+## Session Management Architecture
+
+### Proxy-Based Architecture
+
+The most secure approach is proxy-based session management, where the user never has direct network connectivity to the target system:
+
+```
+User ──→ PAM Session Proxy ──→ Target System
+│           │                          │
+│     ┌─────┴──────┐                  │
+│     │ Recording  │                  │
+│     │ Monitoring │                  │
+│     │ Filtering  │                  │
+│     │ Command    │                  │
+│     │ Control    │                  │
+│     └────────────┘                  │
+│                                     │
+└────── Session is proxied ───────────┘
+    (no direct network path)
+```
+
+### Session Architecture Comparison
+
+| Model | Security | Network Complexity | User Experience | Performance |
+|-------|----------|-------------------|-----------------|-------------|
+| **Direct connection** | Low — user can bypass controls | Simple | Best (native client) | Best |
+| **Jump host / bastion** | Medium — single entry point | Moderate | Good (SSH to jump host) | Good |
+| **Proxy with recording** | High — all traffic recorded | Moderate | Moderate (proxy negotiates) | Moderate |
+| **Proxy with isolation** | Very High — no direct path, full control | Complex | Moderate (proxy appears as gateway) | Moderate |
+| **Remote browser isolation** | Very High — no code reaches endpoint | Complex | Reduced | Lower |
+
+<Aside variant="danger">
+Direct connections to privileged systems should be prohibited. Every privileged session must pass through a PAM session proxy that enforces recording, monitoring, and access controls. Without a proxy, there is no way to prevent or detect credential sharing, session hijacking, or data exfiltration.
+</Aside>
+
+## Session Recording
+
+### Recording Methods
+
+| Method | Captures | Storage Size | Playback Quality | Use Case |
+|--------|----------|--------------|------------------|----------|
+| **Video recording** | Screen pixels | Large | High (exact visual playback) | Windows/RDP sessions, web consoles |
+| **Keystroke logging** | Keys pressed | Small | Medium (text-only reconstruction) | SSH sessions, command-line tools |
+| **Metadata logging** | Session timing, source/dest, commands | Very small | Low (no content) | Low-risk sessions, compliance checkboxes |
+| **Text capture** | All visible text output | Medium | High (searchable text) | SSH sessions with text extraction |
+
+### Session Recording Architecture
+
+```
+Recording Pipeline:
+Session Input → Capture Agent → Encoder → Storage → Index → Playback
+                  │                              │
+                  │                         ┌────┴────┐
+                  │                         │ Object  │
+                  └── Encrypted stream ─────→ Storage  │
+                                              │(S3/Azure│
+                                              └─────────┘
+```
+
+**Storage recommendations**:
+- Compress recordings (H.264 for video, gzip for text)
+- Encrypt at rest (AES-256)
+- Retain based on compliance requirements (SOX: 7 years, PCI: 1 year, GDPR: as needed)
+- Tier storage: hot (30 days for active review) → warm (90 days) → cold (archive for compliance)
+
+## Real-Time Session Monitoring
+
+### Alerting Rules
+
+Real-time monitoring can trigger alerts based on:
+
+| Alert Type | Trigger | Severity | Response |
+|------------|---------|----------|----------|
+| **Command blacklist** | User enters blocked command (`rm -rf`, `shutdown`, `dsrm`) | Critical | Session terminated immediately |
+| **Sensitive data access** | Access to known sensitive files or databases | High | Alert + session recording flagged |
+| **Geographic anomaly** | Session originates from unexpected location | High | MFA re-prompt, possible termination |
+| **Time anomaly** | Session outside normal hours without approved change window | Medium | Alert + session flagged for review |
+| **Concurrent sessions** | Same credentials used from multiple locations | Critical | Immediate termination + credential rotation |
+| **Copy/paste detection** | Large data transfer via clipboard | High | Block copy/paste, alert security team |
+| **File transfer detection** | Large file upload or download | High | Alert, require approval for large transfers |
+
+### Session Termination Criteria
+
+Sessions can be terminated automatically or manually:
+
+| Termination Reason | Automatic | Manual | Post-Action |
+|-------------------|-----------|--------|-------------|
+| **Policy violation** | Command blacklist match | Yes | Lock account, notify security team |
+| **Session timeout** | Inactivity beyond threshold | No | Rotate credential, log session |
+| **Approval window expired** | Elevation duration exceeded | No | Force logout, rotate credential |
+| **Suspicious activity** | Alert threshold reached | Yes | Initiate incident response process |
+| **User request** | N/A | User-initiated | Clean termination, log duration |
+
+## Command Filtering and Control
+
+### Allowlisting vs Blocklisting
+
+| Approach | Description | Pros | Cons |
+|----------|-------------|------|------|
+| **Command allowlisting** | Only specified commands can be executed | Secure by default, predictable | High initial setup effort, blocks legitimate new commands |
+| **Command blocklisting** | Only specified commands are prohibited | Flexible, low setup | Prone to bypass, misses novel attack commands |
+
+**Recommendation**: Use **command blocklisting** for initial deployment (block the most dangerous commands), then migrate toward **command allowlisting** for critical systems as you refine your understanding of required commands.
+
+### Dangerous Commands by Platform
+
+| Platform | Dangerous Commands | Reason |
+|----------|-------------------|--------|
+| **Linux** | `rm -rf /`, `chmod -R 777 /`, `dd if=/dev/zero of=/dev/sda`, `:(){ :\|:& };:` | System destruction, fork bomb |
+| **Windows (CMD)** | `del /F /S /Q C:\*`, `format`, `diskpart`, `reg delete` | File deletion, disk operations |
+| **Windows (PowerShell)** | `Remove-Item -Recurse`, `Stop-Service`, `Disable-ADAccount` | Bulk operations, service disruption |
+| **Windows (AD)** | `dsrm`, `ntdsutil`, `repadmin /syncall` | AD object deletion, forced replication |
+| **SQL** | `DROP DATABASE`, `TRUNCATE TABLE`, `DELETE FROM` without WHERE | Data destruction |
+| **Cloud CLI** | `Delete-S3Bucket`, `Delete-RDSInstance`, `Disable-Key` | Infrastructure destruction |
+
+## Session Forensics and Investigation
+
+### Post-Incident Investigation Using Session Recordings
+
+<Steps>
+### Identify the Session
+Using the incident timestamp and user identity, locate all privileged sessions active during the incident window. Cross-reference with incident detection system alerts.
+
+### Review Session Metadata
+Examine session metadata: source IP, target system, duration, credential used, any alerts triggered during the session.
+
+### Playback Recording
+Play back the session recording. For video recordings, watch the administrator's actions. For SSH sessions, review the keystroke log and command output.
+
+### Identify Anomalous Actions
+Flag commands or actions that deviate from the user's normal pattern, from approved change plans, or from standard operating procedures.
+
+### Capture Evidence
+Export relevant segments of the session recording, command logs, and metadata as evidence. Preserve in immutable storage for the duration required by the incident response policy.
+</Steps>
+
+### Playback Features to Look For
+
+| Feature | Importance | Description |
+|---------|------------|-------------|
+| **Time-indexed playback** | Critical | Jump to specific timestamps in long recordings |
+| **Speed control** | Critical | 2x, 4x, 8x for efficient review of long sessions |
+| **Activity detection** | High | Skip inactivity periods automatically |
+| **Text search** | High | Search for specific commands, file names, IP addresses |
+| **Thumbnail timeline** | Medium | Visual timeline showing activity heatmap |
+| **Session comparison** | Medium | Side-by-side playback of related sessions |
+
+## Session Management Compliance Requirements
+
+| Standard | Session Recording | Session Monitoring | Session Duration Limits |
+|----------|------------------|-------------------|------------------------|
+| **PCI DSS v4.0** | Required for all non-console admin access (Req. 10.3) | Required (Req. 10.2) | Reasonable time limits |
+| **SOX** | Recommended for financial system access | Required for access logging | Not specified |
+| **HIPAA** | Required for ePHI access (45 CFR §164.312(b)) | Required | Time-limited access encouraged |
+| **NIST SP 800-53** | AC-6(9) — Audit of privileged functions | AU-3 — Content of audit records | AC-2(3) — Time-limited access |
+| **GDPR** | Article 5(2) — Accountability requires evidence | Article 30 — Records of processing activities | Data minimisation principle |
+
+## Key Takeaways
+
+- Session management provides the monitoring and control component of PAM — recording what privileged users do during their sessions through video, keystroke logging, or metadata capture
+- Proxy-based architecture is the most secure model — users never have direct network connectivity to target systems, and all traffic passes through the PAM proxy for recording and monitoring
+- Real-time session monitoring triggers alerts on suspicious commands, data access patterns, geographic anomalies, and policy violations — with automatic session termination for critical violations
+- Command filtering can use allowlisting (secure by default) or blocklisting (flexible) — start with blocklisting and migrate toward allowlisting for critical systems
+- Session recordings provide forensic evidence for post-incident investigation with key features including time-indexed playback, speed control, text search, and activity detection
+- Compliance frameworks (PCI DSS, SOX, HIPAA, NIST, GDPR) mandate session recording, monitoring, and duration limits for privileged access

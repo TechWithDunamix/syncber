@@ -1,0 +1,297 @@
+---
+interface Props {
+  class?: string;
+}
+
+const { class: className } = Astro.props;
+---
+
+<div class:list={["flashcard-deck not-content", className]}>
+  <div class="flashcard-deck-inner mx-auto max-w-lg">
+    <!-- Card number badge -->
+    <div class="mb-3 flex items-center justify-center">
+      <span class="flashcard-number inline-flex items-center gap-1 rounded-full border bg-card px-4 py-1 text-sm font-medium text-muted-foreground shadow-xs select-none">
+        <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="20" x="4" y="2" rx="2" ry="2"/><line x1="9" x2="15" y1="10" y2="10"/><line x1="12" x2="12" y1="13" y2="13"/></svg>
+        <span class="flashcard-current font-semibold text-foreground">1</span>
+        <span class="text-muted-foreground/60">/</span>
+        <span class="flashcard-total font-semibold text-foreground">0</span>
+      </span>
+    </div>
+
+    <!-- Card deck stack -->
+    <div class="flashcard-deck-stack relative" style="min-height: 640px;">
+      <slot />
+    </div>
+
+    <!-- Navigation -->
+    <div class="flashcard-nav relative z-50 mt-5 flex items-center justify-center gap-4">
+      <button
+        class="flashcard-nav-btn flashcard-prev inline-flex h-10 w-10 items-center justify-center rounded-full border bg-card text-foreground shadow-sm transition-all duration-200 hover:bg-muted hover:shadow-md active:scale-95 disabled:pointer-events-none disabled:opacity-20"
+        aria-label="Previous card"
+        disabled
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+
+      <span class="text-xs font-medium text-muted-foreground select-none">
+        Swipe or use arrows
+      </span>
+
+      <button
+        class="flashcard-nav-btn flashcard-next inline-flex h-10 w-10 items-center justify-center rounded-full border bg-card text-foreground shadow-sm transition-all duration-200 hover:bg-muted hover:shadow-md active:scale-95 disabled:pointer-events-none disabled:opacity-20"
+        aria-label="Next card"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  class FlashCardDeckHandler {
+    private container: HTMLElement;
+    private cards: HTMLElement[];
+    private currentIndex: number = 0;
+    private deck: HTMLElement;
+    private prevBtn: HTMLButtonElement;
+    private nextBtn: HTMLButtonElement;
+    private currentSpan: HTMLElement;
+    private totalSpan: HTMLElement;
+    private isAnimating: boolean = false;
+
+    constructor(deckEl: HTMLElement) {
+      this.container = deckEl;
+      this.deck = deckEl.querySelector(".flashcard-deck-stack") as HTMLElement;
+      this.cards = Array.from(this.deck.querySelectorAll(".flashcard"));
+      this.prevBtn = deckEl.querySelector(".flashcard-prev") as HTMLButtonElement;
+      this.nextBtn = deckEl.querySelector(".flashcard-next") as HTMLButtonElement;
+      this.currentSpan = deckEl.querySelector(".flashcard-current") as HTMLElement;
+      this.totalSpan = deckEl.querySelector(".flashcard-total") as HTMLElement;
+
+      if (this.cards.length === 0) return;
+
+      this.totalSpan.textContent = String(this.cards.length);
+
+      // Card click to flip (only current card flips)
+      this.cards.forEach((card) => {
+        card.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const isActive = this.cards[this.currentIndex] === card;
+          if (isActive) {
+            const flipped = card.dataset.flipped === "true";
+            card.dataset.flipped = flipped ? "false" : "true";
+          }
+        });
+      });
+
+      // Navigation
+      this.prevBtn.addEventListener("click", () => this.goPrev());
+      this.nextBtn.addEventListener("click", () => this.goNext());
+
+      // Keyboard navigation
+      this.container.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowLeft" || e.key === "ArrowUp") this.goPrev();
+        if (e.key === "ArrowRight" || e.key === "ArrowDown" || e.key === " ") {
+          e.preventDefault();
+          this.goNext();
+        }
+      });
+
+      // Touch swipe support
+      let touchStartX = 0;
+      let touchStartY = 0;
+      this.container.addEventListener("touchstart", (e) => {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+      }, { passive: true });
+      this.container.addEventListener("touchend", (e) => {
+        const dx = e.changedTouches[0].clientX - touchStartX;
+        const dy = e.changedTouches[0].clientY - touchStartY;
+        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
+          if (dx < 0) this.goNext();
+          else this.goPrev();
+        }
+      }, { passive: true });
+
+      // Initialize
+      this.render(false);
+    }
+
+    private render(animate: boolean = true) {
+      const total = this.cards.length;
+      if (total === 0) return;
+
+      // Unflip current before transition
+      this.cards[this.currentIndex].dataset.flipped = "false";
+
+      // Set transition duration based on animate flag
+      const duration = animate ? "0.45s" : "0s";
+
+      this.cards.forEach((card, i) => {
+        const offset = i - this.currentIndex;
+        let x: number, y: number, rotate: number, scale: number, opacity: number, zIndex: number;
+
+        if (offset === 0) {
+          // Active card — centered, full size, prominent shadow
+          x = 0;
+          y = 0;
+          rotate = 0;
+          scale = 1;
+          opacity = 1;
+          zIndex = 100;
+          card.dataset.active = "true";
+        } else if (offset === 1) {
+          // First peek card — peeking from top-right
+          x = 2;
+          y = -36;
+          rotate = -1.5;
+          scale = 0.97;
+          opacity = 0.85;
+          zIndex = 90;
+          card.dataset.active = "false";
+        } else if (offset === 2) {
+          // Second peek — further up-right
+          x = 4;
+          y = -68;
+          rotate = -3;
+          scale = 0.94;
+          opacity = 0.6;
+          zIndex = 80;
+          card.dataset.active = "false";
+        } else if (offset === 3) {
+          // Third peek — deeper still
+          x = 6;
+          y = -96;
+          rotate = -4.5;
+          scale = 0.91;
+          opacity = 0.3;
+          zIndex = 70;
+          card.dataset.active = "false";
+        } else if (offset > 3) {
+          // Deep in deck — hidden up-right
+          x = 6;
+          y = -96 + (offset - 3) * -8;
+          rotate = -4.5 + (offset - 3) * -1.5;
+          scale = 0.88;
+          opacity = 0;
+          zIndex = 70 - offset;
+          card.dataset.active = "false";
+        } else {
+          // offset < 0 — previously viewed, fly down-left
+          x = 0;
+          y = 80 + offset * -15;
+          rotate = 8 + offset * 3;
+          scale = 0.88;
+          opacity = 0;
+          zIndex = 50 + offset;
+          card.dataset.active = "false";
+        }
+
+        card.style.transition = `all ${duration} cubic-bezier(0.4, 0, 0.2, 1)`;
+        card.style.transform = `translate(${x}px, ${y}px) rotate(${rotate}deg) scale(${scale})`;
+        card.style.opacity = String(opacity);
+        card.style.zIndex = String(zIndex);
+      });
+
+      // Update counter
+      this.currentSpan.textContent = String(this.currentIndex + 1);
+
+      // Update buttons
+      this.prevBtn.disabled = this.currentIndex === 0;
+      this.nextBtn.disabled = this.currentIndex >= total - 1;
+    }
+
+    private goNext() {
+      if (this.isAnimating || this.currentIndex >= this.cards.length - 1) return;
+      this.isAnimating = true;
+      this.currentIndex++;
+      this.render(true);
+      // Reset flip lock after animation
+      setTimeout(() => {
+        this.isAnimating = false;
+      }, 500);
+    }
+
+    private goPrev() {
+      if (this.isAnimating || this.currentIndex <= 0) return;
+      this.isAnimating = true;
+      this.currentIndex--;
+      this.render(true);
+      setTimeout(() => {
+        this.isAnimating = false;
+      }, 500);
+    }
+  }
+
+  // Initialize all decks
+  const initDecks = () => {
+    document.querySelectorAll<HTMLElement>(".flashcard-deck").forEach((deck) => {
+      if (!deck.dataset.initialized) {
+        deck.dataset.initialized = "true";
+        deck.setAttribute("tabindex", "0");
+        deck.setAttribute("role", "region");
+        deck.setAttribute("aria-label", "Flashcard deck");
+        new FlashCardDeckHandler(deck);
+      }
+    });
+  };
+
+  initDecks();
+  document.addEventListener("astro:after-swap", initDecks);
+</script>
+
+<style is:global>
+  @import "tailwindcss/theme" theme(reference);
+  @import "@/styles/tailwind-theme.css" theme(reference);
+
+  /* Deck stack positioning */
+  .flashcard-deck-stack .flashcard {
+    position: absolute;
+    inset-inline: 0;
+    top: 0;
+    will-change: transform, opacity;
+  }
+
+  /* Active card shadow */
+  .flashcard-deck-stack .flashcard[data-active="true"] .flashcard-inner {
+    box-shadow: 0 20px 60px -12px rgba(0, 0, 0, 0.25),
+                0 8px 24px -8px rgba(0, 0, 0, 0.15);
+  }
+
+  .dark .flashcard-deck-stack .flashcard[data-active="true"] .flashcard-inner {
+    box-shadow: 0 20px 60px -12px rgba(0, 0, 0, 0.5),
+                0 8px 24px -8px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Peek cards subtle shadow */
+  .flashcard-deck-stack .flashcard[data-active="false"] .flashcard-inner {
+    box-shadow: 0 2px 8px -4px rgba(0, 0, 0, 0.08);
+  }
+
+  .dark .flashcard-deck-stack .flashcard[data-active="false"] .flashcard-inner {
+    box-shadow: 0 2px 8px -4px rgba(0, 0, 0, 0.15);
+  }
+
+  /* Flip transition */
+  .flashcard-inner {
+    transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Card text balance */
+  .flashcard-text {
+    text-wrap: balance;
+  }
+
+  /* Focus ring for accessibility */
+  .flashcard-deck:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 4px;
+    border-radius: 8px;
+  }
+
+  @media (max-width: 640px) {
+    .flashcard-deck-stack {
+      min-height: 540px !important;
+    }
+  }
+</style>

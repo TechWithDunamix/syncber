@@ -1,0 +1,72 @@
+---
+title: "Fondamentaux de l'Authentification & MFA"
+description: "Comment fonctionne l'authentification — facteurs d'authentification, politiques de mots de passe, architectures MFA, authentification sans mot de passe."
+sidebar:
+  order: 7
+  label: "Authentification & MFA"
+---
+
+L'authentification est le processus de vérification qu'un utilisateur est bien celui qu'il prétend être. C'est la première ligne de défense du contrôle d'accès.
+
+## Facteurs d'Authentification
+
+| Type de Facteur | Exemples | Niveau de Sécurité |
+|-----------------|----------|-------------------|
+| **Connaissance** (ce que vous savez) | Mot de passe, PIN | Faible |
+| **Possession** (ce que vous avez) | Téléphone, jeton, carte à puce | Moyen |
+| **Inhérence** (ce que vous êtes) | Empreinte, visage, iris | Élevé |
+| **Lieu** (où vous êtes) | Geo-IP, GPS, réseau | Contextuel |
+
+<Aside variant="caution">
+Utiliser deux facteurs de la MÊME catégorie (ex : mot de passe + PIN) n'est PAS de l'authentification multi-facteurs. Les facteurs doivent provenir de catégories différentes.
+</Aside>
+
+## Authentification par Mot de Passe
+
+### Meilleures Pratiques
+
+| Politique | Recommandation |
+|-----------|---------------|
+| **Longueur minimale** | 12+ caractères |
+| **Complexité** | Non requise (NIST SP 800-63B) |
+| **Expiration** | Pas de rotation périodique sauf compromission |
+| **Multi-facteurs** | Toujours activer |
+
+### Attaques Courantes
+
+- **Force brute** — Essayer toutes les combinaisons
+- **Credential stuffing** — Utiliser des identifiants divulgués
+- **Phishing** — Pages de connexion factices
+- **Keylogging** — Capture des frappes clavier
+
+## Authentification Multi-Facteurs (MFA)
+
+Selon Microsoft, la MFA bloque **99,9 %** des attaques automatisées.
+
+### Méthodes MFA
+
+| Méthode | Sécurité |
+|---------|----------|
+| **SMS OTP** | Faible (risque SIM swap) |
+| **TOTP (Authenticator)** | Élevée |
+| **Notification push** | Élevée |
+| **FIDO2 / WebAuthn** | Très élevée (résiste au phishing) |
+| **Jeton matériel (YubiKey)** | Très élevée |
+
+### Vecteurs de Contournement MFA
+
+- **MFA fatigue** — Notifications push répétées jusqu'à acceptation
+- **SIM swapping** — Détournement du numéro de téléphone
+- **Vol de cookie de session** — Vol du jeton post-MFA
+
+## Authentification Sans Mot de passe
+
+FIDO2/WebAuthn élimine les mots de passe en utilisant des paires de clés cryptographiques. La clé privée ne quitte jamais l'appareil de l'utilisateur, rendant l'hameçonnage impossible.
+
+## Points Clés
+
+- Les facteurs d'authentification doivent provenir de catégories différentes pour une vraie MFA
+- La MFA bloque 99,9 % des attaques automatisées
+- FIDO2/WebAuthn fournit une authentification sans mot de passe résistante au phishing
+- Comprendre les vecteurs de contournement MFA (fatigue, SIM swap, vol de token)
+- Les politiques de mots de passe doivent privilégier la longueur et l'activation MFA

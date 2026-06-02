@@ -1,0 +1,174 @@
+---
+title: "GDPR & Privacy"
+description: "General Data Protection Regulation compliance for IAM — data subject rights, consent management, DSAR workflows, breach notification, privacy-by-design identity management, and records of processing."
+sidebar:
+  order: 4
+  label: "GDPR & Privacy"
+---
+
+The General Data Protection Regulation (GDPR) represents the most comprehensive data privacy regulation ever enacted. While SOX focuses on financial controls, GDPR focuses on the protection of personal data and the rights of data subjects — the individuals whose data is processed. IAM systems are both a controller of personal data (employee identity data) and a critical control for protecting the personal data processed by business applications.
+
+## GDPR Principles and IAM
+
+### Article 5 — Principles Relating to Processing of Personal Data
+
+| Principle | IAM Implication | Implementation |
+|-----------|----------------|----------------|
+| **Lawfulness, fairness, transparency** | Data subjects must know how their identity data is processed | Privacy notice, consent collection for identity data uses |
+| **Purpose limitation** | Identity data collected for IAM should not be repurposed | Data classification, purpose-based access controls |
+| **Data minimisation** | Only collect minimum identity attributes needed | Minimal attribute collection, attribute-level access controls |
+| **Accuracy** | Identity data must be accurate and kept current | Self-service profile updates, HRIS sync for authoritative data |
+| **Storage limitation** | Identity data retained only as long as necessary | Retention policies, automated archival and deletion of stale identities |
+| **Integrity and confidentiality** | Identity data protected against unauthorised access | RBAC for identity stores, PAM for directory admin, encryption of identity data at rest and in transit |
+| **Accountability** | Organisation must demonstrate compliance | Audit trails for identity and access management activities |
+
+## Data Subject Rights
+
+### Article 15 — Right of Access (DSAR)
+
+Data subjects have the right to obtain confirmation of whether their personal data is being processed and, if so, access to that data.
+
+**IAM DSAR workflow:**
+
+| DSAR Step | IAM Action | Responsibility |
+|-----------|------------|----------------|
+| **1. Submit request** | Receive DSAR through portal or legal channel | Data Protection Officer (DPO) |
+| **2. Verify identity** | Confirm data subject identity to prevent unauthorised access | IAM team validates identity proof |
+| **3. Search identity data** | Query IAM systems, HR systems, access logs, and directories for personal data of the data subject | IAM system |
+| **4. Compile response** | Assemble all personal data records, access history, and identity attributes | IAM system + HR system |
+| **5. Review and redact** | Review compiled data for third-party information or legal exemptions | DPO / Legal |
+| **6. Deliver response** | Provide response within 30 days (Article 12 — reasonable interval) | DPO |
+
+### Article 17 — Right to Erasure (Right to be Forgotten)
+
+Data subjects can request deletion of their personal data when:
+- Data is no longer necessary for the original purpose
+- Consent is withdrawn
+- Data was unlawfully processed
+- Legal obligation requires erasure
+
+**IAM implications of erasure:**
+
+| Identity Data Element | Can Be Deleted? | Consideration |
+|---------------------|----------------|---------------|
+| User account | Yes | Check legal hold, archive before deletion |
+| Access logs | No (security/compliance retention) | Anonymise or pseudonymise; retain for legal hold |
+| HR records | No (employment retention obligations) | HR data retention supersedes, but restrict access |
+| PAM session recordings | No (security incident investigation) | Anonymise references, retain for defined period |
+| Audit trail | No (SOX/GDPR accountability) | Retain with restricted access; do not delete even for erasure requests |
+| Consent records | No (must document withdrawal) | Retain consent withdrawal records |
+
+<Aside variant="info">
+The tension between the right to erasure and legal retention obligations is a common challenge. The solution is data classification: identity data that is no longer needed is deleted; audit-relevant data is retained but access is restricted; and records of the erasure request itself are kept permanently to prove compliance.
+</Aside>
+
+### Other Data Subject Rights
+
+| Right | Article | IAM Implementation |
+|-------|---------|-------------------|
+| **Right to rectification** | Article 16 | Self-service profile update, HRIS sync for corrections |
+| **Right to restrict processing** | Article 18 | Access suspension, account disablement without deletion |
+| **Right to data portability** | Article 20 | Export user identity and entitlement data in machine-readable format |
+| **Right to object** | Article 21 | Opt-out mechanisms for non-essential identity data processing |
+| **Automated individual decision-making** | Article 22 | Re-review automated access approval decisions |
+
+## Consent Management
+
+### Valid Consent Requirements
+
+For identity data processing that relies on consent as the legal basis:
+
+| Requirement | Description | IAM Implementation |
+|-------------|-------------|-------------------|
+| **Freely given** | No coercion, no negative consequences for refusal | Separate consent from employment terms |
+| **Specific** | Individual purposes clearly stated | Separate consent for each purpose |
+| **Informed** | Clear language about what data, how used, retention | Readable privacy notice in plain language |
+| **Unambiguous** | Clear affirmative action required | No pre-ticked boxes, active opt-in |
+| **Withdrawable** | As easy to withdraw as to give | One-click consent withdrawal |
+| **Documented** | Record of consent maintained | Consent record with timestamp and version |
+
+### Consent Lifecycle in IAM
+
+```
+User Onboarding ──> Consent Collection ──> Consent Record Store
+                                                │
+                          ┌─────────────────────┤
+                          │                     │
+                    Processing based         Periodic Consent
+                    on consent terms         Review / Refresh
+                          │                     │
+                    Consent Withdrawal <────────┘
+                          │
+                    Restrict Processing
+                          │
+                    Retention or Deletion
+```
+
+## Breach Notification
+
+### Article 33 — Notification to Supervisory Authority
+
+- Required within **72 hours** of becoming aware of a personal data breach
+- Notification must include: nature of breach, categories of data subjects, approximate number of records, DPO contact, likely consequences, measures taken
+
+### Article 34 — Communication to Data Subjects
+
+- Required when the breach is likely to result in **high risk** to data subjects
+- Must describe breach nature, DPO contact, likely consequences, and recommended mitigation measures
+
+### IAM's Role in Breach Response
+
+| Breach Response Phase | IAM Action | Timeframe |
+|-----------------------|------------|-----------|
+| **Detection** | Access anomaly detection, privilege misuse alerting, log correlation | Real-time |
+| **Containment** | Account suspension, credential rotation, access revocation | Minutes |
+| **Investigation** | User attribution, access reconstruction, session recording review | Hours |
+| **Notification** | Identify affected data subjects from identity records | 72 hours |
+| **Remediation** | Policy update, control enhancement, additional PAM controls | Days to weeks |
+| **Post-mortem** | Access control review, policy improvement | Weeks |
+
+## Records of Processing Activities (Article 30)
+
+Organisations with 250+ employees must maintain records of processing activities — including IAM-related processing:
+
+| Record Field | IAM-Specific Content |
+|-------------|---------------------|
+| **Controller/processor** | Identity and contact details of each entity |
+| **Purposes of processing** | Access management, identity verification, authentication, authorisation, audit |
+| **Categories of data subjects** | Employees, contractors, partners, customers |
+| **Categories of personal data** | Identity attributes (name, email, title, department, manager), authentication factors, access entitlements, access patterns |
+| **Recipients** | Application owners, system administrators, auditors, SIEM systems |
+| **International transfers** | Identity data transfer to other regions/subsidiaries |
+| **Retention periods** | Active account: employment duration; audit logs: defined retention period; archived accounts: defined period |
+| **Technical/organisational measures** | Access control, MFA, encryption, logging, monitoring, PAM, IGA controls |
+
+## Privacy by Design in IAM
+
+### Article 25 — Data Protection by Design and Default
+
+| Principle | IAM Implementation |
+|-----------|-------------------|
+| **Data minimisation** | Minimal identity attributes, role-mining for least privilege, attribute-level access restriction |
+| **Purpose limitation** | Attribute release policies based on application need-to-know |
+| **Storage limitation** | Automated archival of inactive accounts, deletion after defined period |
+| **Access control** | RBAC/ABAC, MFA, JIT privileged access, attribute-based release |
+| **Transparency** | User access self-service, privacy dashboards, consent management |
+| **Security** | Encryption, audit logging, anomaly detection, session recording |
+
+## GDPR Fines and Penalties
+
+| Violation Category | Maximum Fine | Examples from IAM Context |
+|-------------------|-------------|--------------------------|
+| **Lower tier** (Art. 83(4)) | €10M or 2% of global revenue | Failure to maintain records of processing, failure to notify breach to data subjects |
+| **Upper tier** (Art. 83(5)) | €20M or 4% of global revenue | Processing without legal basis, failure to implement data subject rights, inadequate security measures |
+| **Reputational** | Brand damage, customer loss | Public enforcement actions, litigation, media coverage |
+
+## Key Takeaways
+
+- GDPR gives individuals (data subjects) eight rights over their personal data — IAM systems must support the right of access (DSARs), right to erasure (data deletion with retention exceptions), right to rectification, and right to data portability
+- Consent management requires valid consent to be freely given, specific, informed, unambiguous, and easily withdrawn — IAM must document consent records with timestamps and version tracking
+- Breach notification requires notification to authorities within 72 hours — IAM's role spans detection, containment (account suspension, credential rotation), investigation (user attribution, session review), and affected-subject identification
+- The right to erasure creates a specific challenge: PII must be deleted, but security/audit logs and consent records must be retained to demonstrate compliance
+- Article 30 requires records of IAM processing activities — data subjects, categories, retention periods, international transfers, and security measures
+- Privacy by design (Article 25) requires data minimisation in identity data collection, purpose-based attribute release, and automated lifecycle management
+- IAM systems are both data controllers (of employee identity data) and data processors (for customer identity data in CIAM deployments)

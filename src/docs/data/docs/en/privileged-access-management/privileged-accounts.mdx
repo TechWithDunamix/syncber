@@ -1,0 +1,155 @@
+---
+title: "Privileged Account Types"
+description: "A comprehensive taxonomy of privileged accounts — local admin, domain admin, service accounts, application identities, SSH keys, cloud IAM roles, and emergency accounts."
+sidebar:
+  order: 3
+  label: "Privileged Account Types"
+---
+
+Privileged accounts come in many forms, each with distinct characteristics, risk profiles, and management requirements. A complete PAM program must identify and manage every type of privileged account across the enterprise — including accounts that may not be immediately obvious as "privileged."
+
+## On-Premises Privileged Accounts
+
+### Local Administrator Accounts
+
+Built-in administrator accounts on individual servers, workstations, and network devices.
+
+| Account | Default Username | Default Privileges | Risk Level |
+|---------|-----------------|-------------------|------------|
+| **Windows Local Admin** | `Administrator` | Full control over local machine | High |
+| **Linux Root** | `root` (UID 0) | Full control over Linux system | Very High |
+| **macOS Root** | `root` | Full control over macOS system | High |
+| **Network Device Admin** | `admin`, `cisco`, `enable` | Full device configuration access | Very High |
+
+**Key risks**: Shared default passwords across machines, credential reuse, static passwords rarely rotated, difficult to attribute actions to individuals.
+
+**Management approach**: Use Local Administrator Password Solution (LAPs) or similar to automatically manage unique passwords per machine.
+
+### Domain Administrator Accounts
+
+Active Directory domain accounts with elevated privileges across the domain or forest.
+
+| Type | Scope | Typical Count | Risk if Compromised |
+|------|-------|---------------|---------------------|
+| **Domain Admin** | Single AD domain | 5-20 per domain | Full control over all domain-joined systems |
+| **Enterprise Admin** | Entire AD forest | 2-10 per forest | Full control over all domains in forest |
+| **Schema Admin** | AD schema | 1-5 per forest | Can modify AD schema (irreversible changes) |
+| **Built-in Admin** (`Administrator`) | Domain | 1 per domain | Default domain admin account (often overused) |
+
+**Key risks**: Standing admin rights, over-provisioned (many users who don't need daily admin access), infrequent rotation, hardcoded in scripts and scheduled tasks.
+
+## Service Accounts
+
+Service accounts are non-human identities used by applications, services, and automated processes. They are the most frequently overlooked privileged account category.
+
+| Type | Description | Privilege Level | Prevalence |
+|------|-------------|-----------------|------------|
+| **Windows Service Account** | Runs Windows services, scheduled tasks | Varies (often LOCAL_SYSTEM or NETWORK_SERVICE) | Very High |
+| **Managed Service Account (MSA)** | AD-managed service account with automatic password management | Domain-joined service | Medium |
+| **Group MSA (gMSA)** | MSA shared across multiple servers | Domain-joined service | Increasing |
+| **Linux Daemon Account** | Runs background services (nginx, mysql, postgres) | Application-specific | Very High |
+| **Database Service Account** | Runs database engine, replication | High (direct data access) | High |
+
+**Key risks**: Service accounts often have standing admin rights, passwords never expire (set to "password never expires"), orphaned when applications are decommissioned, no individual accountability (shared credentials).
+
+<Aside variant="caution">
+Service accounts typically outnumber user accounts by 3:1 in large enterprises. They represent the largest blind spot in most PAM programs. If you have not conducted a service account discovery in the last 12 months, start there.
+</Aside>
+
+### Managed vs Unmanaged Service Accounts
+
+| Property | Traditional Service Account | gMSA (Group Managed Service Account) |
+|----------|---------------------------|---------------------------------------|
+| **Password management** | Manual (often never rotated) | Automatic (AD-managed, rotated regularly) |
+| **SPN management** | Manual | Automatic |
+| **Multi-server support** | Manual configuration | Native (gMSA can be used on multiple servers) |
+| **Delegation** | Manual configuration | Automatic (supported by AD) |
+| **Script/stored credential risk** | High — password often in scripts | None — password not exposed |
+| **Recommended?** | Legacy | **Yes** |
+
+## Application-to-Application (A2A) Accounts
+
+A2A accounts are used for machine-to-machine authentication between applications, APIs, and microservices.
+
+| Type | Description | Authentication Method |
+|------|-------------|----------------------|
+| **API Keys** | Static tokens passed in API headers | HMAC, bearer token |
+| **OAuth Client Credentials** | OAuth 2.0 client_id + client_secret | JWT assertion, client secret |
+| **Service Principals** | Cloud identity for applications | Certificate, password |
+| **Mutual TLS Certificates** | X.509 certificates for mTLS | Certificate-based |
+| **Database Connection Strings** | Embedded credentials for DB access | Username/password in connection string |
+
+**Key risks**: Hardcoded credentials in configuration files, no audit trail (who used the API key?), difficult to rotate without downtime, exposed in source code repositories and CI/CD pipelines.
+
+## SSH Keys
+
+SSH keys provide passwordless authentication to Unix/Linux systems. They are widely used for automation, system administration, and file transfers — and equally widely mismanaged.
+
+| SSH Key Type | Typical Use | Common Issues |
+|--------------|-------------|---------------|
+| **User SSH Keys** | Individual admin access to Linux servers | No centralised management, keys persist after employee departure |
+| **Host SSH Keys** | Server identity verification (known_hosts) | Rarely managed, host key rotation during DR is complex |
+| **Automation SSH Keys** | Used by scripts, Ansible, Jenkins, backup tools | Keys stored in scripts, config files, CI/CD variables |
+| **Root SSH Keys** | Passwordless root access | Extreme risk — root key compromise = full system compromise |
+
+<Aside variant="tip">
+Treat SSH keys as privileged passwords. Implement SSH key management with: centralised key storage, automatic key rotation, key usage monitoring, and removal of keys from user home directories. Target 100% discovery and management of all SSH keys in the enterprise.
+</Aside>
+
+## Cloud Privileged Accounts
+
+### Cloud IAM Roles
+
+| Cloud Provider | Privileged Role | Permissions | Risk |
+|----------------|----------------|-------------|------|
+| **AWS** | `AdministratorAccess` | Full access to all AWS resources | Critical |
+| **AWS** | `PowerUserAccess` | Full access except IAM | Very High |
+| **Azure** | `Global Administrator` | Full access to all Azure AD and management features | Critical |
+| **Azure** | `Privileged Role Administrator` | Manage Azure AD roles | Very High |
+| **GCP** | `roles/owner` | Full resource access + IAM management | Critical |
+| **GCP** | `roles/editor` | Full resource access (except IAM) | Very High |
+
+### Cloud-Specific Privileged Account Types
+
+| Account Type | Description | Management Challenge |
+|--------------|-------------|---------------------|
+| **Cloud Console Root User** | AWS account root, Azure tenant root, GCP super admin | Extreme sensitivity — shared email/password |
+| **Cloud Service Principals** | Azure AD app registrations and service principals | Proliferation — every app creates multiple principals |
+| **AWS IAM Roles** | Assumed roles with temporary credentials | Complex permission boundaries and trust policies |
+| **GCP Service Accounts** | GCP-specific service identities | Large numbers — enterprises often have 1000s |
+| **Cloud API Keys** | Google API keys, Azure subscription keys | Exposed in mobile apps, web clients |
+
+## Emergency / Break-Glass Accounts
+
+Accounts created specifically for emergency access when normal PAM systems are unavailable.
+
+| Type | Characteristics | Management Requirements |
+|------|-----------------|------------------------|
+| **Firecall / Break-Glass** | Enabled only during emergencies | Offline storage, dual custody, tamper-evident packaging |
+| **Local Admin Bypass** | Local accounts with privileges | Unique credentials per system, emergency-only use |
+| **Disaster Recovery Accounts** | Pre-created for DR scenarios | Stored securely, tested during DR exercises |
+| **Console Access** | Direct console (out-of-band) access | Requires physical access, limited to authorised personnel |
+
+<Aside variant="danger">
+Break-glass accounts are a necessary evil. Each one is a standing privileged account that bypasses normal controls. They must be: (1) physically secured, (2) logged every time they are accessed, (3) automatically rotated after use, and (4) audited monthly even if unused.
+</Aside>
+
+## Privileged Account Discovery
+
+| Discovery Method | What It Finds | Frequency |
+|-----------------|---------------|-----------|
+| **Active Directory scan** | Domain admin groups, privileged AD users, service accounts | Weekly |
+| **Local system scan** | Local admin group members, SUID binaries, sudoers | Monthly |
+| **Network scan + brute force** | Default credentials, shared local accounts | Quarterly |
+| **Cloud API enumeration** | IAM roles, service principals, admin users | Weekly |
+| **SSH key scan** | Authorized_keys files, known_hosts files | Monthly |
+| **Configuration management** | Hardcoded credentials in config files, scripts, CI/CD | Continuous |
+
+## Key Takeaways
+
+- Privileged accounts span on-premises (local/domain admin), service accounts, A2A, SSH keys, cloud IAM roles, and emergency accounts — each requires specific management approaches
+- Service accounts outnumber user accounts 3:1 and are the most overlooked privileged account category — conduct service account discovery at least annually
+- SSH keys are effectively privileged passwords and require centralised management including rotation, monitoring, and removal from user home directories
+- Cloud privileged accounts include IAM roles (Owner/Global Admin), service principals, and API keys — cloud complexity makes discovery and management more challenging than on-premises
+- Break-glass accounts are standing privileges that bypass normal controls — they must be physically secured, logged, rotated after use, and audited monthly
+- Continuous privileged account discovery is essential — use multiple methods (AD scan, local scan, cloud API enumeration, SSH key scan) to achieve comprehensive coverage

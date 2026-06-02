@@ -1,0 +1,146 @@
+---
+title: "Privileged Access Management"
+description: "Master PAM fundamentals — credential vaulting, session management, just-in-time access, least privilege enforcement, privileged account discovery, and PAM program maturity."
+sidebar:
+  order: 1
+  label: "Overview"
+---
+
+Privileged Access Management (PAM) protects an organisation's most sensitive assets by securing, managing, and monitoring privileged accounts and access. While Identity and Access Management (IAM) manages all digital identities, PAM specifically focuses on the highest-risk accounts — those with elevated permissions to critical systems, data, and infrastructure.
+
+Privileged accounts are the most valuable target for attackers. The 2024 Verizon DBIR reports that **privilege abuse was involved in 31% of breaches**, and the Microsoft Digital Defense Report notes that **99% of identity attacks target privileged accounts**. Effective PAM is not optional — it is a core requirement for any mature security program.
+
+## What Is PAM?
+
+PAM encompasses the security strategies, technologies, and processes used to control, monitor, and audit access to critical systems by users with elevated privileges. These users include:
+
+- **IT administrators** managing servers, networks, and databases
+- **Database administrators (DBAs)** with direct data access
+- **Service accounts** running automated processes
+- **Application identities** authenticating between systems
+- **Cloud administrators** managing cloud infrastructure
+- **Network engineers** configuring firewalls and routers
+
+<Aside variant="info">
+PAM is often described as "the keys to the kingdom." If IAM controls who can enter the building, PAM controls who can access the vault. A compromise of privileged credentials bypasses most other security controls.
+</Aside>
+
+## Core PAM Capabilities
+
+A comprehensive PAM program includes six interrelated capabilities:
+
+### Credential Vaulting
+
+Privileged credentials (passwords, SSH keys, API tokens) are stored in a secure, encrypted vault. Users check out credentials on demand rather than knowing them permanently. The vault enforces:
+
+- **Password rotation** — Automatically change credentials after each checkout
+- **Access workflows** — Require approval for credential access
+- **Audit trail** — Every credential access is logged and attributable
+
+### Session Management
+
+Privileged sessions are recorded, monitored, and controlled in real time:
+
+- **Session Recording** — Video playback of all privileged activity for forensic investigation
+- **Session Monitoring** — Real-time oversight by security teams with alerting on suspicious commands
+- **Session Termination** — Kill active sessions that violate policy
+- **Session Isolation** — Proxy-based access prevents direct network connectivity to targets
+
+### Just-In-Time (JIT) Access
+
+JIT elevates privileges only for the duration of a specific task. After the task completes, privileges are automatically removed. This eliminates standing administrative rights and reduces the attack surface.
+
+### Least Privilege Enforcement
+
+The principle of least privilege ensures users and processes operate with the minimum permissions needed to perform their function. PAM enforces this at scale through:
+
+- Application control (allowlisting approved software)
+- Privilege elevation (temporary admin rights for specific tasks)
+- User rights management (removing local admin rights from standard users)
+
+### Privileged Account Discovery
+
+Before you can manage privileged accounts, you must find them. Discovery scans continuously identify:
+
+- Local admin accounts on servers and workstations
+- Domain admin and enterprise admin accounts
+- Service accounts and their dependencies
+- SSH keys and their usage
+- Cloud IAM roles with elevated permissions
+
+### Governance and Compliance
+
+PAM provides the controls and evidence required by compliance frameworks:
+
+| Framework | PAM Requirement |
+|-----------|-----------------|
+| **SOX** | Access controls over financial systems, audit trails for privileged actions |
+| **PCI DSS v4.0** | Requirement 7: Restrict access based on need-to-know. Requirement 8: MFA for non-console admin access |
+| **HIPAA** | Technical safeguards for ePHI access, audit controls |
+| **GDPR** | Technical measures to protect personal data, access logging |
+| **ISO 27001** | A.9.2.3 — Management of privileged access rights |
+| **NIST SP 800-53** | AC-6 — Least privilege, AC-17 — Remote access |
+
+## The PAM Threat Landscape
+
+Understanding the threat landscape motivates PAM investment and informs architecture decisions:
+
+```
+Attack Path Progression:
+Initial Access → Privilege Escalation → Lateral Movement → Privilege Escalation → Data Exfiltration
+     │                                                      │
+     │                                                      └── PAM controls here
+     │                                                          (JIT, elevation approval)
+     └── PAM controls here
+         (credential vaulting, MFA)
+```
+
+| Attack Type | Description | PAM Mitigation |
+|-------------|-------------|----------------|
+| **Credential theft** | Attacker steals privileged password or hash | Vaulted credentials with automatic rotation |
+| **Pass-the-hash** | Attacker reuses NTLM hash to authenticate | Credential Guard, remove NTLM, PAM for local admin management |
+| **Kerberoasting** | Attacker requests TGS tickets for service accounts and cracks offline | Strong service account passwords (30+ chars), managed service accounts |
+| **Token theft** | Attacker steals access token and impersonates privileged user | Short token lifetimes, token binding, session isolation |
+| **Insider threat** | Authorised user abuses privileges | Session monitoring, real-time alerting, approval workflows |
+
+## Module Roadmap
+
+This module progresses from PAM fundamentals through advanced architecture:
+
+<Steps>
+### What Is PAM?
+Foundation concepts — the business case for PAM, risk drivers, and the relationship between IAM and PAM.
+
+### Privileged Account Types
+Comprehensive taxonomy of privileged accounts across on-premises, cloud, and hybrid environments.
+
+### Credential Vaulting
+Vault architecture, password rotation, SSH key management, secrets management, and vault deployment best practices.
+
+### Just-In-Time Access
+JIT architecture, ephemeral privilege elevation, approval workflows, and integration with ITSM/ITOM tools.
+
+### Session Management & Monitoring
+Session recording, real-time monitoring, session isolation, command filtering, and forensic analysis.
+
+### Privilege Escalation Paths
+Understanding how attackers escalate privileges in Windows, Linux, cloud, and Active Directory environments.
+
+### PAM Architecture
+Enterprise PAM deployment models, tiering, high availability, integration patterns, and architecture decisions.
+
+### Emergency Access & Break Glass
+Designing break-glass procedures that balance security with operational continuity during emergencies.
+
+### PAM Program Maturity
+Assessing PAM maturity, building a PAM roadmap, measuring success, and sustaining program momentum.
+</Steps>
+
+## Key Takeaways
+
+- PAM specifically secures privileged accounts — the highest-risk identities in any organisation — through credential vaulting, session management, JIT access, and least privilege enforcement
+- Privileged accounts are involved in 31% of breaches and are the primary target in 99% of identity attacks
+- A comprehensive PAM program spans six capabilities: credential vaulting, session management, JIT access, least privilege, discovery, and governance
+- Compliance frameworks (SOX, PCI DSS, HIPAA, GDPR, ISO 27001) mandate PAM controls — PAM is both a security and compliance requirement
+- Attack path progression typically involves privilege escalation as a key step — PAM controls at both the initial access and escalation stages are critical
+- This module covers nine areas from PAM fundamentals through program maturity, providing a complete foundation for PAM architecture and operations

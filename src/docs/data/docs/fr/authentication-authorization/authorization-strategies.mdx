@@ -1,0 +1,134 @@
+---
+title: "Stratégies d'Autorisation"
+description: "Stratégies d'autorisation pour architectures modernes — spectre des modèles, hybrides RBAC+ABAC, autorisation de microservices, modèles d'authentification API, cadre décisionnel pour choisir le bon modèle."
+sidebar:
+  order: 9
+  label: "Stratégies d'Autorisation"
+---
+
+Choisir la bonne stratégie d'autorisation est une décision architecturale qui a des conséquences durables sur la sécurité, la maintenabilité et l'expérience utilisateur. Ce chapitre explore les stratégies d'autorisation pour les architectures modernes, des plus simples aux plus sophistiquées.
+
+## Spectre des Modèles d'Autorisation
+
+```
+DAC ──> RBAC ──> RBAC+ABAC hybride ──> ABAC ──> ReBAC ──> PBAC
+ │         │            │                │        │         │
+ Simple                                           Complexe
+ Faible                                            Forte
+ contrôlabilité                                  contrôlabilité
+```
+
+| Modèle | Quand l'utiliser | Quand l'éviter |
+|--------|-----------------|----------------|
+| **DAC** | Petites équipes, fichiers partagés | Toute application réglementée, plus de 50 utilisateurs |
+| **RBAC (plat/hiérarchique)** | Applications d'entreprise standard | Permissions très granulaires, contextuelles |
+| **RBAC + ABAC hybride** | La plupart des organisations modernes | Si le RBAC seul suffit (simplicité) |
+| **ABAC pur** | Grandes organisations, cloud multi-région | Petites équipes, overhead de gestion d'attributs |
+| **ReBAC** | SaaS multi-locataire, social, collaboration | Applications sans relations entre entités |
+| **PBAC (policy-as-code)** | CI/CD, infrastructure cloud, Kubernetes | Applications sans besoin de politique externalisée |
+
+## Hybrides RBAC+ABAC
+
+L'approche la plus pragmatique pour la plupart des organisations : utiliser RBAC comme modèle de base avec des règles ABAC pour les cas complexes.
+
+### Architecture Hybride
+
+```
+1. Évaluation RBAC (base) :
+   L'utilisateur a-t-il un rôle qui permet l'action demandée ?
+   │
+   ├── NON  → REFUSER (fin de l'évaluation)
+   │
+   └── OUI  → Continuer vers l'évaluation ABAC
+
+2. Évaluation ABAC (contexte) :
+   Les attributs (temps, lieu, appareil, classification) sont-ils valides ?
+   │
+   ├── NON  → REFUSER ou demander élévation
+   │
+   └── OUI  → PERMETTRE
+```
+
+### Exemples d'Implémentation
+
+| Scénario | Base RBAC | Règle ABAC supplémentaire |
+|----------|-----------|--------------------------|
+| **Accès aux dossiers patients** | Rôle = Médecin | Permettre uniquement si patient assigné au médecin |
+| **Approbation de commande** | Rôle = Manager | Permettre uniquement si montant < 10 000 € (sinon directeur) |
+| **Export de données** | Rôle = Analyste | Permettre uniquement depuis le réseau d'entreprise |
+| **Administration système** | Rôle = Administrateur | Permettre uniquement pendant les heures ouvrables (sauf urgence) |
+
+## Autorisation dans les Microservices
+
+### Défis Spécifiques
+
+| Défi | Description | Solution |
+|------|-------------|----------|
+| **Décentralisation** | Chaque service doit vérifier l'autorisation | PDP centralisé (OPA sidecar), tokens JWT avec claims |
+| **Latence** | Les appels interservices ajoutent de la latence | Cache local des décisions, tokens auto-suffisants |
+| **Consistance** | Les politiques changent, les décisions doivent rester cohérentes | Versionnage des politiques, propagation asynchrone |
+| **Traçabilité** | Qui a fait quoi à travers N services ? | Identité de bout en bout (JWT propagé), logging structuré |
+
+### Modèles d'Autorisation pour Microservices
+
+| Modèle | Description | Avantage | Inconvénient |
+|--------|-------------|----------|--------------|
+| **API Gateway** | L'autorisation est vérifiée au niveau du gateway | Centralisé, simple | Le gateway connaît toutes les routes ; contournable |
+| **Sidecar (OPA)** | Un sidecar PDP accompagne chaque service | Décentralisé, faible latence | Complexité de déploiement (sidecar mesh) |
+| **JWT avec claims** | Les permissions sont incluses dans le jeton | Auto-suffisant, zéro latence | Taille du jeton, révocation difficile |
+| **Service Mesh** | Autorisation au niveau du mesh (Istio, envoy) | Transparent pour l'application | Complexité de l'infrastructure mesh |
+| **PDP centralisé** | Un service d'autorisation central | Cohérence, audit centralisé | Point de défaillance unique, latence |
+
+## Modèles d'Authentification API
+
+| Modèle | Sécurité | Cas d'Usage | Mise en Œuvre |
+|--------|----------|-------------|---------------|
+| **Clé API** | Faible | Accès machine, faible sensibilité | En-tête X-API-Key |
+| **JWT (Bearer Token)** | Moyenne | API REST, utilisateur connecté | En-tête Authorization: Bearer <token> |
+| **OAuth 2.0 Client Credentials** | Élevée | M2M, service à service | OAuth 2.0 flow |
+| **mTLS (Mutual TLS)** | Très élevée | Service mesh, API financières | Certificat client + serveur |
+| **HMAC / Signature de requête** | Très élevée | API sensibles (paiement, signature) | Signature HMAC de la requête |
+| **Webhook signature** | Élevée | Webhooks sécurisés | Signature HMAC du payload |
+
+### Comparaison Détaillée des Modèles API
+
+| Critère | Clé API | JWT | OAuth CC | mTLS | HMAC |
+|---------|---------|-----|----------|------|------|
+| **Rotation d'identifiants** | Manuelle | Automatique (TTL court) | Automatique (Refresh) | Par certificat | Par changement de clé |
+| **Révocation** | Immédiate | Attendre expiration | Attendre expiration | Révoquer certificat | Immédiate |
+| **Délégation** | Non | Oui (scopes) | Oui (scopes) | Non | Non |
+| **Auditabilité** | Faible | Bonne | Bonne | Bonne | Très bonne |
+| **Performance** | Excellente | Bonne | Bonne | Bonne (coût TLS) | Bonne |
+
+## Cadre Décisionnel pour le Choix du Modèle
+
+### Questions à se Poser
+
+1. **Combien d'utilisateurs ?** (< 100 → DAC/RBAC simple, > 10 000 → RBAC+ABAC)
+2. **Quelle granularité de permissions ?** (Fonction métier → RBAC, Attribut/contexte → ABAC)
+3. **Les relations entre entités sont-elles importantes ?** (Oui → ReBAC)
+4. **Quelle est la maturité opérationnelle ?** (Faible → RBAC, Élevée → PBAC/policy-as-code)
+5. **L'application est-elle réglementée ?** (Oui → RBAC+ABAC avec audit complet)
+6. **Architecture monolithique ou microservices ?** (Monolithe → RBAC classique, Microservices → Sidecar/PDP centralisé)
+7. **Quelle est la fréquence des changements de politiques ?** (Faible → RBAC, Élevée → ABAC/PBAC)
+8. **Avez-vous besoin d'autorisation déléguée ?** (Oui → OAuth 2.0)
+
+### Arbre de Décision Simplifié
+
+```
+Besoin de granularité fine ?
+├── NON → RBAC
+└── OUI → Besoin de contexte (temps, lieu, classification) ?
+         ├── NON → RBAC avec rôles supplémentaires
+         └── OUI → Relations entre entités importantes ?
+                   ├── OUI → ReBAC (Zanzibar)
+                   └── NON → ABAC ou RBAC+ABAC hybride
+```
+
+## Points Clés à Retenir
+
+- Le spectre des modèles d'autorisation va de DAC (le plus simple) à PBAC (le plus sophistiqué) — le choix du bon modèle dépend du nombre d'utilisateurs, de la granularité requise, des relations entre entités et de la maturité opérationnelle
+- L'approche hybride RBAC+ABAC est la plus pragmatique pour la plupart des organisations : RBAC pour le contrôle d'accès de base basé sur les rôles, avec des règles ABAC pour les décisions contextuelles (temps, lieu, classification de la ressource)
+- L'autorisation dans les microservices présente des défis spécifiques : décentralisation, latence, consistance et traçabilité — les solutions incluent API Gateway, sidecar OPA, JWT avec claims, service mesh et PDP centralisé
+- Les modèles d'authentification API vont de la clé API (faible sécurité, facile) à mTLS et HMAC (haute sécurité, complexe) — OAuth 2.0 Client Credentials est le meilleur équilibre pour les communications M2M
+- Le cadre décisionnel pour choisir le modèle d'autorisation repose sur 8 questions clés — l'arbre de décision simplifié guide le choix : RBAC pour les besoins simples, ABAC ou RBAC+ABAC pour la granularité contextuelle, ReBAC pour les relations entre entités

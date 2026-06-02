@@ -1,0 +1,146 @@
+---
+title: "PCI DSS"
+description: "Payment Card Industry Data Security Standard — Requirement 7 (access control), Requirement 8 (authentication), Requirement 10 (logging), and Requirement 12 (policy) for cardholder data environments."
+sidebar:
+  order: 5
+  label: "PCI DSS"
+---
+
+The Payment Card Industry Data Security Standard (PCI DSS) is a contractual security standard that applies to any organisation that stores, processes, or transmits cardholder data. PCI DSS v4.0 (effective March 2024) introduces significant changes to IAM requirements, including more prescriptive access control and authentication controls.
+
+## PCI DSS Requirements Map to IAM
+
+| PCI DSS Req. | Title | IAM Focus Area |
+|-------------|-------|----------------|
+| **Req. 7** | Restrict access to cardholder data by business need-to-know | Access control policy, RBAC, need-to-know |
+| **Req. 8** | Identify users and authenticate access to system components | Unique IDs, MFA, password management |
+| **Req. 9** | Restrict physical access to cardholder data | Physical access control, visitor management |
+| **Req. 10** | Log and monitor all access to network resources and cardholder data | Audit logging, SIEM integration |
+| **Req. 12** | Support information security with organisational policies and programs | Security awareness, risk assessment, access review |
+
+### Requirement 7 — Access Control
+
+| PCI DSS v4.0 Sub-Requirement | IAM Control |
+|------------------------------|-------------|
+| **7.2.1** | Access control systems grant access based on job classification and function |
+| **7.2.2** | Access is granted using least privileges |
+| **7.2.4** | All access to CDE systems/applications is reviewed every 6 months |
+| **7.2.5** | Access for terminated users is immediately revoked |
+| **7.3.1** | CDE user accounts are managed through an access control system |
+| **7.3.2** | CDE accounts support and enforce least privilege |
+| **7.3.3** | All user access is authorised before provisioning |
+
+### Requirement 8 — Authentication
+
+| PCI DSS v4.0 Sub-Requirement | IAM Control |
+|------------------------------|-------------|
+| **8.3.1** | MFA implemented for all non-console admin access to CDE |
+| **8.3.2** | MFA implemented for all remote access to CDE |
+| **8.3.3** | MFA implemented for all remote access originating from outside the entity's network |
+| **8.4.1** | MFA systems are managed to prevent misuse |
+| **8.5.1** | Passwords and passphrases meet defined complexity and length |
+| **8.6.1** | Users authenticate before accessing the CDE |
+| **8.6.2** | User identity is verified before modifying authentication factors |
+| **8.6.3** | All user account changes are logged |
+
+### PCI DSS v4.0 New IAM Requirements
+
+v4.0 introduces several new requirements that significantly impact IAM programs:
+
+| New Requirement | v4.0 Effective Date | IAM Action Required |
+|----------------|---------------------|---------------------|
+| **7.2.4** — Access reviews every 6 months | March 2025 | Implement automated certification campaigns with 6-month frequency |
+| **8.3.1** — MFA for all non-console admin access | March 2024 | MFA enrolment for all administrative users |
+| **8.6.1** — Users authenticate before accessing CDE | March 2025 | Implement session authentication validation |
+| **8.6.2** — Identity verification for auth factor changes | March 2025 | Out-of-band verification for MFA token changes |
+| **10.4.2.1** — Automated logging of all access to CDE | March 2025 | SIEM integration with automated log collection |
+
+## Cardholder Data Environment (CDE) Access Control
+
+### Defining the CDE
+
+The CDE includes:
+- Systems that store, process, or transmit cardholder data
+- Systems that connect to or support CDE systems
+- Network segments that contain CDE systems
+- Administrative workstations that manage CDE systems
+
+<Aside variant="tip">
+Use network segmentation to reduce the scope of PCI DSS. A well-segmented CDE means IAM controls only need to apply to a limited set of systems rather than the entire enterprise. Each system excluded from CDE scope must be justified with documented network segmentation controls.
+</Aside>
+
+### CDE Access Control Architecture
+
+```
+┌─────────────────────────────────────────────────────┐
+│                   Enterprise Network                   │
+│                                                        │
+│  ┌───────────────────────────────────────────────┐    │
+│  │           CDE - Cardholder Data Environment     │    │
+│  │                                                  │    │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐     │    │
+│  │  │ Payment  │  │  Token   │  │  Card    │     │    │
+│  │  │ Gateway  │  │  Vault   │  │  Data DB │     │    │
+│  │  └──────────┘  └──────────┘  └──────────┘     │    │
+│  │                                                  │    │
+│  │  ┌──────────────────────────────────────────┐   │    │
+│  │  │       PAM Gateway (Session Proxy)        │   │    │
+│  │  └──────────────────────────────────────────┘   │    │
+│  └───────────────────────────────────────────────┘    │
+│                                                        │
+│  ┌───────────────────────────────────────────────┐    │
+│  │        Admin Access (JIT through PAM)          │    │
+│  │  - MFA required                                │    │
+│  │  - Session recording                           │    │
+│  │  - Approval workflow for elevated access       │    │
+│  └───────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────┘
+```
+
+## PCI DSS Access Review
+
+### Requirement 7.2.4 — Access Reviews Every 6 Months
+
+PCI DSS v4.0 specifically requires that all access to CDE systems and applications be reviewed every 6 months. This is an explicit requirement, not a recommendation.
+
+| Access Review Element | Requirement | Implementation |
+|----------------------|-------------|----------------|
+| **Frequency** | Every 6 months | Set certification campaigns with 6-month recurrence |
+| **Scope** | All user accounts with CDE access | Include application, system, and service accounts |
+| **Reviewer** | System owner, data owner, or authorised manager | Each CDE system must have a designated owner |
+| **Evidence** | Signed/dated review report | Digital signatures or audit-approved electronic records |
+| **Privileged access** | Separate review track for privileged users | Include PAM review as part of certification |
+
+### Service Account Management for PCI
+
+Service accounts in the CDE present a particular challenge because they cannot use individual credentials (no interactive login). PCI DSS v4.0 addresses this:
+
+| Service Account Requirement | Implementation |
+|----------------------------|----------------|
+| Unique IDs for each service account | No shared service accounts in CDE |
+| Passwords changed at least every 6 months | Automated password rotation |
+| MFA alternatives (certificate-based) | Certificate-based authentication with automated renewal |
+| Documented business justification | Service account inventory with business case |
+| Access reviewed every 6 months | Include service accounts in access review scope |
+
+## PCI DSS Logging and Monitoring
+
+### Requirement 10 — Log and Monitor Access
+
+| Audit Log Element | PCI DSS Requirement | IAM Data Source |
+|------------------|---------------------|-----------------|
+| **User identification** | 10.3.1 | Authentication logs, session records |
+| **Event type** | 10.3.2 | Access type (login, create, modify, delete) |
+| **Date and time** | 10.3.3 | Timestamp from authoritative time source |
+| **Success/failure indication** | 10.3.4 | Authentication success/failure, access grant/deny |
+| **Origination** | 10.3.5 | Source IP, device ID, geolocation |
+| **Identity of affected data** | 10.3.6 | Cardholder data access events |
+
+## Key Takeaways
+
+- PCI DSS v4.0 introduces significant new IAM requirements effective March 2024-2025 — including mandatory MFA for all non-console admin access, 6-month access reviews, identity verification for authentication factor changes, and automated logging of all CDE access
+- Requirement 7 mandates that access to cardholder data is restricted by business need-to-know using least privilege — implement RBAC or ABAC for CDE systems and enforce with PAM for privileged access
+- Requirement 8 requires unique IDs for every user in the CDE, MFA for all non-console admin and remote access, and password policies meeting defined complexity standards — service accounts must also have unique IDs with 6-month password rotation
+- Network segmentation reduces PCI scope — only systems in the Cardholder Data Environment (CDE) require full PCI DSS compliance, and JIT access through a PAM gateway is the recommended architecture for CDE administration
+- Service accounts in the CDE present special challenges: no shared accounts, automated password rotation every 6 months, documented business justification, and inclusion in 6-month access reviews
+- PCI DSS logging (Requirement 10) requires user identification, event type, timestamp, success/failure status, origination IP, and affected data identity for all CDE access events

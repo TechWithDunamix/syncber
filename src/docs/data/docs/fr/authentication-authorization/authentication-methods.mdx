@@ -1,0 +1,117 @@
+---
+title: "Méthodes d'Authentification"
+description: "Explorez les méthodes d'authentification — facteurs de connaissance, possession et inhérence, hachage de mots de passe, NIST SP 800-63B, vecteurs d'attaque, FIDO2 et authentification sans mot de passe."
+sidebar:
+  order: 2
+  label: "Méthodes d'Authentification"
+---
+
+L'authentification est le processus de vérification de l'identité d'un utilisateur. C'est la première ligne de défense de tout système de sécurité. Ce chapitre explore les méthodes d'authentification, leurs forces, leurs faiblesses et comment les déployer efficacement en entreprise.
+
+## Facteurs d'Authentification
+
+### Facteur de Connaissance (Quelque chose que vous savez)
+
+Le mot deasse est la forme la plus ancienne et la plus répandue d'authentification. Malgré ses vulnérabilités bien documentées, il reste le facteur d'authentification le plus utilisé.
+
+**Hachage de mots de passe :**
+
+| Algorithme | Année | Longueur du Hash | Résistance au GPU | Résistance au ASIC | Sel | Recommandation |
+|------------|-------|------------------|-------------------|--------------------|-----|---------------|
+| **MD5** | 1992 | 128 bits | Très faible | Très faible | Non | Ne jamais utiliser |
+| **SHA-1** | 1995 | 160 bits | Faible | Faible | Non | Ne jamais utiliser |
+| **SHA-256** | 2001 | 256 bits | Faible (hachage rapide) | Faible | Non | Non pour les mots de passe |
+| **bcrypt** | 1999 | 192 bits | Bon (avec facteur de coût) | Bon | Oui (intégré) | Recommandé (facteur de coût ≥ 10) |
+| **PBKDF2** | 2000 | Variable | Modéré | Modéré | Oui | Acceptable (itérations ≥ 310 000) |
+| **scrypt** | 2009 | Variable | Très bon (intensif en mémoire) | Très bon | Oui | Recommandé pour les charges de travail intensives |
+| **Argon2id** | 2015 | Variable | Excellent (CPU+mémoire+parallélisme) | Excellent | Oui | **Meilleur choix — vainqueur du concours PHC** |
+
+<Aside variant="info">
+Argon2id est l'algorithme de hachage de mots de passe recommandé selon l'OWASP et le NIST SP 800-63B. Il est résistant aux attaques par GPU et ASIC car il nécessite à la fois une mémoire importante et des cycles CPU. Configurez-le avec un temps de 2, une mémoire de 19456 Ko (19 Mo) et un parallélisme de 1 pour un bon équilibre sécurité/performance.
+</Aside>
+
+**NIST SP 800-63B — Directives de mots de passe :**
+
+| Exigence NIST | Recommandation | Pratique d'Entreprise |
+|---------------|---------------|----------------------|
+| Longueur minimale | 8 caractères | 12-16 caractères minimum |
+| Vérification de complexité | Non requise (vérifier les mots de passe compromis) | Mélange de types de caractères encouragé |
+| Changement périodique | Non recommandé sauf en cas de compromission | Changer uniquement en cas de compromission |
+| Indices sur l'écran de verrouillage | Afficher le nombre de tentatives | Limiter à 3-5 tentatives avant verrouillage |
+| Authentificateurs mémorisés | Prendre en charge les caractères Unicode (dont les espaces) | Tous les caractères ASCII et Unicode acceptés |
+| Vérification contre les mots de passe compromis | Vérifier par rapport aux bases de données de mots de passe divulgués | Intégration Have I Been Pwned ou équivalent |
+
+### Facteur de Possession (Quelque chose que vous avez)
+
+**Jetons OATH (Initiative Ouverte pour l'Authentification) :**
+
+| Type | Standard | Mécanisme | Cas d'Usage Typique |
+|------|----------|-----------|---------------------|
+| **TOTP** | RFC 6238 | Code temporel basé sur une clé secrète partagée | Google Authenticator, Authy, Microsoft Authenticator |
+| **HOTP** | RFC 4226 | Code basé sur un compteur d'événements | Jetons matériels, cartes à puce |
+| **Jeton matériel** | Propriétaire | Affichage physique d'un code | RSA SecurID, YubiKey (mode OTP) |
+
+**Sans mot de passe — FIDO2 / WebAuthn :**
+
+| Composant | Description | Standard |
+|-----------|-------------|----------|
+| **WebAuthn** | API JavaScript pour l'authentification par clé publique basée sur le navigateur | W3C |
+| **CTAP2** (Client-to-Authenticator Protocol) | Protocole entre le navigateur et l'authentificateur | FIDO Alliance |
+| **CTAP1** (U2F) | Prédécesseur de CTAP2, support des jetons U2F | FIDO Alliance |
+
+Le flux FIDO2 :
+
+```
+1. Enregistrement :
+   Utilisateur → Site Web : "Je veux m'inscrire"
+   Site Web → Authentificateur : "Générer une paire de clés"
+   Authentificateur → Site Web : "Clé publique + ID d'identifiant"
+   Site Web : Stocke la clé publique associée au compte utilisateur
+
+2. Authentification :
+   Utilisateur → Site Web : "Je veux me connecter"  
+   Site Web → Authentificateur : "Défi (challenge) aléatoire"
+   Utilisateur : Vérifie via biométrie/PIN
+   Authentificateur → Site Web : "Défi signé avec la clé privée"
+   Site Web : Vérifie la signature avec la clé publique
+```
+
+### Facteur d'Inhérence (Quelque chose que vous êtes)
+
+| Biométrie | Taux de Fausse Acceptation (FAR) | Taux de Faux Rejet (FRR) | Préoccupations |
+|-----------|--------------------------------|--------------------------|----------------|
+| **Empreinte digitale** | ~0.001% | ~1-5% | Empreintes résiduelles, humidité |
+| **Reconnaissance faciale** | ~0.0001% (3D) | ~1-3% | Éclairage, angle, masques |
+| **Scan IRIS** | ~0.00001% | ~0.5-2% | Lentilles de contact, coût du matériel |
+| **Voix** | ~0.1-2% | ~2-5% | Bruit de fond, santé |
+
+### Authentification Contextuelle
+
+L'authentification contextuelle évalue les attributs de l'environnement sans interaction explicite de l'utilisateur :
+
+- **Géolocalisation** : L'utilisateur se connecte-t-il depuis un emplacement connu ?
+- **Heure de la journée** : L'heure de connexion correspond-elle aux habitudes de l'utilisateur ?
+- **Appareil** : L'appareil est-il connu et conforme ?
+- **Réseau** : L'utilisateur se connecte-t-il depuis le réseau d'entreprise ou un VPN ?
+- **Modèle comportemental** : La vitesse de frappe, les mouvements de souris correspondent-ils au profil ?
+
+## Vecteurs d'Attaque contre l'Authentification
+
+| Attaque | Cible | Méthode | Atténuation |
+|---------|-------|---------|-------------|
+| **Hameçonnage (Phishing)** | Mot de passe + MFA | Page de connexion frauduleuse collectant les identifiants | FIDO2 (lié au domaine), formation, alertes |
+| **Rejeu (Replay)** | Jeton d'authentification | Interception et rejeu des requêtes d'authentification | Nonces, horodatages, TLS |
+| **Homme du milieu (MITM)** | Trafic d'authentification | Interception du trafic réseau | TLS, certificats clients, mTLS |
+| **Force brute** | Mot de passe | Essai systématique de toutes les combinaisons | Verrouillage de compte, limitation de débit, CAPTCHA |
+| **Bourrage d'identifiants** | Mot de passe | Utilisation de mots de passe divulgués d'autres sites | Vérification des mots de passe compromis (Have I Been Pwned) |
+| **Hameçonnage MFA** | Jeton MFA | Proxy en temps réel capturant le code MFA | FIDO2, MFA résistante au hameçonnage |
+| **Vol de session** | Cookie de session | Vol de cookie de session post-authentification | Liaison de session (IP, empreinte), HttpOnly, Secure |
+
+## Points Clés à Retenir
+
+- L'authentification repose sur trois facteurs : connaissance (mot de passe), possession (jeton, téléphone) et inhérence (biométrie) — la MFA combine au moins deux facteurs pour une sécurité significativement renforcée
+- Argon2id est l'algorithme de hachage de mots de passe recommandé (vainqueur du concours PHC) — configurez-le avec un temps de 2, une mémoire de 19 Mo et un parallélisme de 1 pour un bon équilibre sécurité/performance
+- NIST SP 800-63B recommande des mots de passe longs (8+ caractères), sans changement périodique obligatoire, mais avec vérification contre les bases de mots de passe compromis
+- FIDO2/WebAuthn représente l'avenir de l'authentification sans mot de passe — une paire de clés publique/privée liée au domaine élimine le hameçonnage et le rejeu
+- Les vecteurs d'attaque incluent le hameçonnage, le rejeu, le MITM, la force brute, le bourrage d'identifiants et le hameçonnage MFA — FIDO2 est la seule méthode d'authentification résistante au hameçonnage
+- L'authentification contextuelle (Risk-Based Authentication) évalue la géolocalisation, l'heure, l'appareil, le réseau et les modèles comportementaux pour ajuster le niveau d'authentification requis

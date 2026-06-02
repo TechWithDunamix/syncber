@@ -1,0 +1,112 @@
+---
+title: "Architecture & Deployment"
+description: "Design and deploy production-ready IAM/PAM architectures — deployment patterns, system integrations, high availability, disaster recovery, cloud IAM, migration strategies, and operational best practices."
+sidebar:
+  order: 6
+  label: "Overview"
+---
+
+This module brings together everything from the previous modules into a coherent architectural vision. Designing and deploying IAM/PAM in production requires understanding deployment patterns, system integration, high availability, disaster recovery, cloud architecture, and operational practices.
+
+## The IAM/PAM Architecture Stack
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                 CONSUMPTION LAYER                          │
+│  Applications │ APIs │ Cloud Consoles │ DevOps Tools     │
+├─────────────────────────────────────────────────────────┤
+│                 POLICY & CONTROL LAYER                     │
+│  IGA │ PAM │ IdP │ MFA │ SSO │ RBAC/ABAC │ SoD │ Audit  │
+├─────────────────────────────────────────────────────────┤
+│                 IDENTITY STORE LAYER                       │
+│  Active Directory │ LDAP │ Cloud IdP │ Databases │ Vault │
+├─────────────────────────────────────────────────────────┤
+│                 INTEGRATION LAYER                          │
+│  HRIS │ ITSM │ SIEM │ DevOps │ Cloud APIs │ SCIM │ LDAP  │
+├─────────────────────────────────────────────────────────┤
+│                 INFRASTRUCTURE LAYER                       │
+│  Compute │ Network │ Storage │ KMS/HSM │ Load Balancers  │
+└─────────────────────────────────────────────────────────┘
+```
+
+## Key Architectural Decisions
+
+| Decision | Options | Key Considerations |
+|----------|---------|-------------------|
+| **Identity source of truth** | HRIS (Workday, SAP), directory (AD, LDAP), cloud IdP | Authoritative source for identity attributes, provisioning triggers |
+| **Deployment model** | On-premises, cloud (SaaS/IaaS), hybrid | Data residency, latency, compliance, operational capability |
+| **Identity store** | Active Directory, Azure AD, Okta Universal Directory, PingDirectory, custom LDAP | Protocol support, replication, integration with existing tools |
+| **Authentication protocol** | SAML, OIDC, Kerberos, LDAP, RADIUS | Application compatibility, user experience, security requirements |
+| **Authorisation model** | RBAC, ABAC, ReBAC, or hybrid | Complexity vs. granularity, organisational scale |
+| **Provisioning approach** | SCIM, JDBC, PowerShell, custom API | System compatibility, real-time vs. batch, connector availability |
+
+## Architecture Maturity Model
+
+| Level | Name | Characteristics |
+|-------|------|-----------------|
+| **1** | Ad hoc | Decentralised identity stores, manual provisioning, passwords only, no PAM |
+| **2** | Centralised | Single directory, basic SSO, password policy enforced, manual certifications |
+| **3** | Standardised | IGA platform, RBAC deployed, PAM for servers, MFA for VPN, HRIS integration |
+| **4** | Automated | JIT privileged access, automated provisioning/deprovisioning, continuous certification, SoD automation |
+| **5** | Adaptive | Real-time risk-based access, AI-driven identity analytics, zero standing privileges, passwordless, continuous adaptive trust |
+
+## Architecture Patterns
+
+### Hub-and-Spoke
+Central IAM/PAM platform (hub) connects to multiple target systems (spokes). Centralises policy management while distributing enforcement.
+
+### Cloud-Hybrid
+Bridges on-premises and cloud resources — cloud IdP as the authoritative source with on-prem directory synchronisation.
+
+### Zero Trust
+No implicit trust based on network location — every access request is authenticated, authorised, and encrypted.
+
+## Deployment Considerations
+
+| Area | Key Considerations | Common Pitfall |
+|------|-------------------|----------------|
+| **High Availability** | Redundant components across AZs, active-passive/active-active clustering, load balancing | Underestimating authentication traffic peaks |
+| **Disaster Recovery** | Backup of config/policies, documented RTO/RPO, cold/warm/hot standby, regular DR testing | Not testing DR scenarios regularly |
+| **Scalability** | Session caching, connection pooling, storage scaling for PAM recordings | Not planning for PAM storage growth |
+| **Security** | Encryption at rest and transit, HSM for key storage, network segmentation | Exposing PAM/IdP management interfaces to user networks |
+| **Operations** | Monitoring, alerting, backup/restore, patch management, capacity planning | Lack of operational runbooks for common failure scenarios |
+
+## Module Roadmap
+
+<Steps>
+### IAM/PAM Architectures
+Deep dive into hub-and-spoke, cloud-hybrid, microservices, and zero trust architecture patterns.
+
+### Cloud IAM
+Identity and access management for AWS, Azure, GCP — workload identity, cloud IdP federation, multi-cloud strategies.
+
+### Directory Services
+Active Directory, Azure AD/Entra ID, LDAP directories, cloud directories — architecture, replication, and integration.
+
+### Identity Providers
+IdP architecture patterns — SAML/OIDC flow infrastructure, token handling, session management, and IdP brokering.
+
+### High Availability & Disaster Recovery
+HA architecture for IAM/PAM, RTO/RPO targets, clustering, failover, DR testing, and business continuity planning.
+
+### Integration Patterns
+HRIS, ITSM, SIEM, DevOps, and cloud platform integration — SCIM, web services, event-driven, and file-based patterns.
+
+### Performance & Scalability
+Authentication performance, directory scaling, PAM session storage, caching strategies, and capacity planning.
+
+### Migration Strategies
+IAM/PAM migration — directory migrations, IdP migrations, PAM platform migrations, phased and big-bang approaches.
+
+### Operations & Runbooks
+Day-2 operations — monitoring, backup/restore, certificate rotation, platform upgrades, incident response runbooks, and operational maturity.
+</Steps>
+
+## Key Takeaways
+
+- The IAM/PAM architecture stack has five layers: consumption (apps/APIs), policy/control (IGA/PAM/IdP), identity store (AD/LDAP/cloud), integration (HRIS/ITSM/SIEM), and infrastructure
+- Architecture maturity progresses from ad hoc (Level 1) through centralised, standardised, automated, to adaptive (Level 5) where access decisions are real-time, risk-based, and continuously adaptive
+- Key architectural decisions include identity source of truth, deployment model, identity store technology, authentication protocol, authorisation model, and provisioning approach — each with significant downstream implications
+- Hub-and-spoke, cloud-hybrid, and zero trust are the primary architecture patterns — the right choice depends on organisational scale, cloud adoption, and security requirements
+- Deployment considerations span HA, DR, scalability, security, and operations — the most common pitfall is underestimating PAM session storage growth and authentication traffic peaks
+- The remaining pages in this module cover each architectural domain in depth, providing practical guidance for real-world IAM/PAM deployments

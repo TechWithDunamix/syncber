@@ -1,0 +1,153 @@
+---
+title: "Compliance & Reporting"
+description: "Identity governance compliance — audit evidence collection, compliance reporting frameworks, real-time compliance dashboards, auditor workflows, and continuous compliance monitoring."
+sidebar:
+  order: 9
+  label: "Compliance & Reporting"
+---
+
+Compliance reporting is the output layer of identity governance — it provides the evidence that controls are operating effectively, access is appropriate, and regulatory requirements are met. Well-designed reporting transforms audit preparation from a frantic exercise into a continuous, predictable process.
+
+## The Cost of Non-Compliance
+
+| Regulation | Maximum Fine | Recent Example |
+|------------|-------------|----------------|
+| **GDPR** | €20M or 4% of global annual revenue | Meta: €1.2B (2023) for data transfer violations |
+| **HIPAA** | $1.5M per violation category per year | Anthem: $16M (2018) for data breach |
+| **PCI DSS** | $100K-$500K per month (by acquirers) | Multiple: reputation damage exceeds fines |
+| **SOX** | $5M + 20 years imprisonment | Enron: corporate failure triggered regulation |
+
+## Compliance Reporting Requirements by Framework
+
+### SOX Section 404
+
+Internal controls over financial reporting — including access controls:
+
+| Required Report | Frequency | Content |
+|----------------|-----------|---------|
+| **User access review report** | Quarterly or annual | Confirmation that user access to financial systems has been reviewed |
+| **SoD violation report** | Quarterly | Current SoD violations, remediation status, mitigating controls |
+| **Privileged access report** | Quarterly | List of users with privileged access to financial systems |
+| **Provisioning/de-provisioning report** | Monthly | User accounts created, modified, terminated during period |
+
+### PCI DSS v4.0
+
+| Required Report | Frequency | Content |
+|----------------|-----------|---------|
+| **Access control report** | Quarterly | List of users with access to cardholder data environment |
+| **Access review documentation** | Every 6 months | Evidence of access review completion |
+| **MFA compliance report** | Monthly | MFA enforcement status for administrative access |
+| **Audit trail report** | Monthly | Log review evidence for user activities |
+
+### GDPR
+
+| Required Report | Frequency | Content |
+|----------------|-----------|---------|
+| **Records of processing activities (Article 30)** | Continuous | What personal data is processed, who has access, retention periods |
+| **Access impact assessment** | Per new processing | Risk assessment for processing personal data |
+| **Data subject access request log** | Continuous | Requests received, responses, timelines |
+| **Access control report** | Annual | Who has access to personal data, under what conditions |
+
+## Building a Compliance Reporting Program
+
+### Report Types
+
+| Report Type | Audience | Frequency | Delivery |
+|------------|----------|-----------|----------|
+| **Operational reports** | IAM team, IT operations | Daily or weekly | Automated email, dashboard |
+| **Management reports** | IT management, CISO | Monthly | Dashboard, executive summary |
+| **Compliance reports** | Compliance team, auditors | Quarterly or per audit | Formal report, evidence package |
+| **Board reports** | Board of directors | Annually | Executive summary, key metrics |
+| **Auditor evidence** | External auditors | On demand | Evidence repository with search |
+
+### Evidence Collection
+
+Evidence is the documentation that proves a control is operating effectively:
+
+| Control | Evidence | Collection Method | Retention |
+|---------|----------|-------------------|-----------|
+| **Access certification** | Campaign completion report, reviewer decisions, remediation actions | IGA platform exports | 7 years (SOX), life of audit cycle (other) |
+| **Provisioning/de-provisioning** | Provisioning logs, SCIM transaction records | SIEM or IGA logs | 1-7 years depending on regulation |
+| **Access reviews** | Certifications with reviewer decisions and timestamps | IGA platform exports | 7 years |
+| **SoD monitoring** | SoD analysis reports, exception records | IGA platform | 7 years |
+| **Authentication events** | Login logs, MFA status, failed attempts | SIEM | 1 year (rolling) |
+
+### Automated Compliance Dashboards
+
+Real-time dashboards provide continuous visibility into compliance posture:
+
+**Executive Dashboard Example**:
+```
+┌─────────────────────────────────────────────────────────┐
+│                  IAM COMPLIANCE DASHBOARD                  │
+├─────────────────────────────────────────────────────────┤
+│ COMPLIANCE SCORE: 87/100        Last Updated: [Date]    │
+│                                                         │
+│ SOX: ██████████ 95%   (Target: 95% ✓)                  │
+│ PCI:  ████████░░ 82%   (Target: 90% ✗)                 │
+│ HIPAA: █████████ 89%   (Target: 90% ✗)                 │
+│                                                         │
+│ KEY METRICS:                                             │
+│ ┌─────────────────────┬──────────┬──────────┬──────────┐│
+│ │ Metric              │ Current  │ Target   │ Status   ││
+│ ├─────────────────────┼──────────┼──────────┼──────────┤│
+│ │ Access Cert. Rate   │   94%    │   95%    │   ✓      ││
+│ │ SoD Violations      │   47     │   < 50   │   ✓      ││
+│ │ Orphan Accounts     │   123    │   < 100  │   ✗      ││
+│ │ MFA Coverage        │   88%    │   95%    │   ✗      ││
+│ │ Pass. Rotation      │   92%    │   90%    │   ✓      ││
+│ └─────────────────────┴──────────┴──────────┴──────────┘│
+└─────────────────────────────────────────────────────────┘
+```
+
+## Auditor Workflow
+
+<Steps>
+### Audit Notification
+Auditor notifies organisation of upcoming audit scope (which systems, which controls). IAM team identifies relevant evidence and prepares access for the auditor.
+
+### Evidence Collection
+IAM team gathers evidence from IGA platform, SIEM, PAM, and other sources. Evidence is organised by control framework and control ID. Each evidence item includes: title, description, date, source system, and link to supporting data.
+
+### Evidence Review
+Auditor reviews evidence for completeness, accuracy, and timeliness. Requests additional evidence if initial submission is insufficient. IAM team responds to evidence requests within agreed SLA.
+
+### Control Testing
+Auditor tests controls by: reviewing evidence, interviewing process owners, observing processes, and re-performing control activities. For access controls, the auditor may request live demonstration of certification process or spot-check user access.
+
+### Findings and Remediation
+Auditor reports findings: control deficiencies, observations, and recommendations. IAM team creates remediation plan with owners and deadlines. Remediation status tracked through to closure.
+
+### Report Issuance
+Auditor issues final report. IAM team incorporates findings into continuous improvement plan. Evidence from the audit is archived for future reference.
+</Steps>
+
+## Continuous Compliance
+
+Moving from snapshot-based compliance (evidence collected at audit time) to continuous compliance (real-time monitoring and automated evidence collection):
+
+| Approach | Snapshot-Based | Continuous Compliance |
+|----------|---------------|---------------------|
+| **Evidence collection** | Manual, collected before audit | Automated, collected continuously |
+| **Review frequency** | Annual or quarterly | Real-time or daily |
+| **Issues detected** | At audit time (months old) | Within hours of occurrence |
+| **Remediation speed** | Weeks to months | Days to weeks |
+| **Effort per audit** | 2-4 weeks of intensive preparation | Minimal — evidence is always ready |
+| **Auditor experience** | Auditors find issues that may already be fixed | Auditors validate continuous controls |
+
+### Implementing Continuous Compliance
+
+1. **Automate evidence collection** — Schedule IGA and SIEM report generation at required frequencies
+2. **Monitor control effectiveness** — Define and track KPIs for each control
+3. **Alert on deviations** — Configure alerts when controls are not operating effectively (e.g., certification overdue, SoD violation not remediated)
+4. **Maintain evidence repository** — Store all evidence in a central, searchable repository with versioning
+5. **Pre-certify evidence for auditors** — Organise evidence by control framework for auditor self-service
+
+## Key Takeaways
+
+- Compliance reporting provides the evidence that controls are operating effectively — well-designed reporting transforms audit preparation from frantic to continuous
+- Each regulatory framework (SOX, PCI DSS, HIPAA, GDPR) requires specific reports at specific frequencies — design your reporting program to satisfy all applicable frameworks simultaneously
+- Evidence collection must be automated and continuous — manual evidence gathering is unsustainable and error-prone
+- Automated compliance dashboards provide real-time visibility into compliance posture across all frameworks — key metrics include certification rate, SoD violations, orphan accounts, and MFA coverage
+- Auditor workflow follows a defined sequence: notification → evidence collection → review → control testing → findings → remediation → report issuance
+- Moving from snapshot-based to continuous compliance reduces audit preparation effort, detects issues earlier, and improves auditor confidence

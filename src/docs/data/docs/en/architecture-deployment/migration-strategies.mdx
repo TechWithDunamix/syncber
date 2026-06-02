@@ -1,0 +1,197 @@
+---
+title: "Migration Strategies"
+description: "IAM/PAM migration approaches — directory migrations, IdP migrations, PAM platform migrations, phased vs. big-bang strategies, coexistence patterns, rollback planning, and migration testing."
+sidebar:
+  order: 9
+  label: "Migration Strategies"
+---
+
+IAM/PAM migrations are among the highest-risk infrastructure projects an organisation can undertake. A failed IdP migration can lock users out of all applications. A failed PAM migration can block all administrative access. Successful migrations require careful planning, phased execution, robust rollback plans, and extensive testing.
+
+## Migration Types
+
+| Migration Type | Complexity | Risk Level | Typical Duration |
+|---------------|------------|------------|------------------|
+| **Directory migration (AD → AD)** | High | High | 6-18 months |
+| **IdP migration (Okta → Azure AD)** | High | Very High | 6-12 months |
+| **PAM migration (CyberArk → BeyondTrust)** | High | High | 6-12 months |
+| **On-prem → cloud IdP** | Medium-High | High | 3-9 months |
+| **IGA platform migration** | Medium-High | Medium | 6-12 months |
+| **MFA provider migration** | Medium | Medium | 2-6 months |
+| **Protocol upgrade (Kerberos → SAML)** | Low-Medium | Low-Medium | 1-4 months |
+
+## Migration Strategies
+
+### Big Bang (Cutover)
+
+All users and systems are migrated simultaneously in a planned cutover event.
+
+| Aspect | Consideration |
+|--------|---------------|
+| **When to use** | Small organisation (< 500 users), simple application landscape, weekend maintenance window |
+| **Duration** | Hours to days |
+| **Pros** | Simple planning, no coexistence complexity |
+| **Cons** | Highest risk, all-or-nothing, single point of failure |
+| **Rollback** | Simple — restore previous system from backup |
+| **User impact** | Outage during cutover window |
+| **Testing** | Pre-cutover lab testing, limited user acceptance testing |
+
+### Phased Migration
+
+Users, applications, or systems are migrated in phases over weeks or months.
+
+| Phase Approach | Description | Use Case |
+|---------------|-------------|----------|
+| **Pilot → Group → All** | Start with IT team, then early adopters, then all users | IdP migration, MFA migration |
+| **Application by application** | Migrate one application at a time | SSO/IdP migration |
+| **Geography by geography** | Migrate one region/office at a time | Directory migration |
+| **Business unit by business unit** | Migrate one division at a time | IGA platform migration |
+| **Capability by capability** | Auth-first, then provisioning, then PAM | Multi-component migration |
+
+### Coexistence Pattern
+
+During phased migration, old and new systems operate simultaneously:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    COEXISTENCE PERIOD                         │
+│                                                               │
+│  ┌──────────────────────┐     ┌──────────────────────────┐  │
+│  │   OLD IdP / PAM      │     │    NEW IdP / PAM          │  │
+│  ├──────────────────────┤     ├──────────────────────────┤  │
+│  │  Legacy Apps          │     │  Migrated Apps           │  │
+│  │  Legacy Users         │     │  Onboarded Users         │  │
+│  │  (Running old version)│     │  (Authenticating via new)│  │
+│  └──────────────────────┘     └──────────────────────────┘  │
+│          │                            │                      │
+│          └──────── Attribute Sync ─────┘                     │
+│          (Directory sync, credential sync)                   │
+│                                                               │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  Attribute Synchronisation Services                   │   │
+│  │  - Passwords hash sync (PHS for IdP migration)        │   │
+│  │  - Directory sync (AD Connect for directory migration) │   │
+│  │  - Credential import (PAM vault import)               │   │
+│  └──────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## IdP Migration: Step-by-Step
+
+### Phase 1: Assessment (4-8 Weeks)
+
+| Activity | Deliverable | Success Criteria |
+|----------|-------------|-----------------|
+| **Application inventory** | Complete list of all apps, auth methods, protocol versions | 100% inventory coverage |
+| **User inventory** | User count, groups, roles, MFA methods | Verified against authoritative source |
+| **Integration audit** | APIs, provisioning, SCIM connectors | Documented integration points |
+| **Risk assessment** | Impact analysis for each app and user group | Risk-rated migration priority |
+| **Target IdP evaluation** | Capability gap analysis between old and new IdP | Documented gaps and workarounds |
+
+### Phase 2: Planning (4-8 Weeks)
+
+| Activity | Deliverable |
+|----------|-------------|
+| **Migration design** | Detailed migration architecture, coexistence pattern |
+| **Application migration plan** | Priority ordering, dependencies, timing per application |
+| **User migration plan** | Pilot group, phased rollout, communication schedule |
+| **Test plan** | Unit tests, integration tests, UAT, performance tests |
+| **Rollback plan** | Triggers, procedures, communication for rollback |
+| **Communication plan** | User notifications, training, support desk preparation |
+
+### Phase 3: Build & Test (4-8 Weeks)
+
+| Activity | Description |
+|----------|-------------|
+| **Target IdP deployment** | Configure new IdP, integrate with directory |
+| **Application configuration** | Configure SAML/OIDC apps in new IdP, test connectivity |
+| **Authentication flows** | Test SP-initiated, IdP-initiated, SLO flows |
+| **Coexistence setup** | Configure password hash sync, attribute sync, session bridging |
+| **Integration testing** | Test HRIS, ITSM, SIEM integrations with new IdP |
+| **User acceptance testing** | Pilot group validates login, MFA, SSO across all apps |
+
+### Phase 4: Migration Execution (8-16 Weeks)
+
+```
+Week 1-2:  Pilot group (IT team, 10-20 users)
+            └── Validate all apps, MFA, provisioning
+            └── Fix issues found in pilot
+
+Week 3-4:  Early adopters (100-200 users)
+            └── Broader validation, performance testing
+            └── Support desk training on common issues
+
+Week 5-10: Phased rollout (500-2000 users/week)
+            └── Communication 1 week before each wave
+            └── Support desk staffed for migration support
+
+Week 11-12: Long tail (remaining users)
+            └── Manual follow-up for non-migrated users
+            └── Exception handling
+
+Week 13-16: Cutover complete
+            └── Old IdP decommissioned (or maintained for legacy apps)
+```
+
+### Phase 5: Post-Migration (Ongoing)
+
+| Activity | Duration | Description |
+|----------|----------|-------------|
+| **Stabilisation** | 2-4 weeks | Address post-migration issues, monitor performance |
+| **Legacy decommissioning** | 4-8 weeks | Decommission old IdP after confirming all traffic is migrated |
+| **Optimisation** | 4-8 weeks | Configure advanced features (conditional access, analytics) |
+| **Lessons learned** | 2 weeks | Document what worked and what didn't |
+
+## PAM Migration: Special Considerations
+
+### PAM Migration Challenges
+
+| Challenge | Impact | Mitigation |
+|-----------|--------|------------|
+| **Credential portability** | Passwords stored in old vault cannot be exported in plaintext | Use credential import API, staged credential rotation post-migration |
+| **Session recording continuity** | Old recordings must remain accessible | Archive old recordings, maintain search capability |
+| **Connector reconfiguration** | All managed systems need new connectors | Stage connector deployment, parallel connection during migration |
+| **Admin adoption** | Admins must learn new PAM interface | Training, phased rollout, power user pilot |
+| **Emergency access during migration** | Break-glass must work during transition | Maintain old emergency process until new one is validated |
+
+### PAM Migration Approach
+
+| Phase | Duration | Activities |
+|-------|----------|------------|
+| **1. Discovery and inventory** | 4-6 weeks | Document all privileged accounts, systems, policies, and workflows |
+| **2. New PAM deployment** | 4-8 weeks | Deploy new PAM in parallel, configure vault, policies, connectors |
+| **3. Credential migration** | 4-8 weeks | Migrate credentials (API import or manual re-onboarding of critical systems) |
+| **4. Phased cutover** | 8-16 weeks | Migrate systems one by one or by business unit |
+| **5. Policy and workflow migration** | 4-8 weeks | Rebuild approval workflows, JIT policies, certification campaigns |
+| **6. Decommission** | 4-8 weeks | Maintain old PAM in read-only mode, then decommission |
+
+## Rollback Planning
+
+### Rollback Trigger Criteria
+
+| Trigger | Description | Action |
+|---------|-------------|--------|
+| **Critical application failure** | Top-10 business app non-functional after migration | Pause migration, rollback app to old IdP |
+| **Widespread authentication failure** | > 5% of migrated users cannot authenticate | Rollback to old IdP for affected user group |
+| **Performance degradation** | Auth latency > 2x baseline for > 30 minutes | Scale up or rollback |
+| **Security incident** | Migration introduces vulnerability | Immediate rollback, incident investigation |
+| **Catastrophic failure** | Complete IdP/PAM outage | Execute full rollback plan |
+
+### Rollback Procedures
+
+| Rollback Scenario | Procedure | RTO | RPO |
+|-------------------|-----------|-----|-----|
+| **Single app rollback** | Change app auth config back to old IdP | 30 minutes | Zero (data loss not applicable) |
+| **User group rollback** | Revert DNS/routing for group to old IdP | 1 hour | Zero |
+| **Full IdP rollback** | Fail over to old IdP infrastructure | 4 hours | < 5 minutes (session data) |
+| **Full PAM rollback** | Activate old PAM, redirect connectors | 4 hours | < 1 hour (credentials rotated during migration) |
+
+## Key Takeaways
+
+- IAM/PAM migrations are among the highest-risk infrastructure projects — a failed IdP migration can lock users out of all applications, and a failed PAM migration can block all administrative access
+- Four migration strategies exist: big bang (all-at-once, highest risk, for <500 users), phased (by group, app, geography, or business unit), coexistence (old and new systems operate simultaneously with attribute synchronisation), and hybrid (phased migration with coexistence period)
+- IdP migration follows five phases: assessment (4-8 weeks), planning (4-8 weeks), build and test (4-8 weeks), phased execution (8-16 weeks with pilot → early adopters → phased rollout → long tail), and post-migration stabilisation and optimisation
+- PAM migration presents unique challenges including credential portability (passwords cannot be exported in plaintext — use API import with staged rotation), session recording continuity (archive old recordings, maintain search), and connector reconfiguration for all managed systems
+- Coexistence requires attribute synchronisation between old and new IdPs — password hash sync (PHS) for seamless user authentication during transition, directory sync for attribute consistency, and credential import for PAM
+- Rollback planning must define trigger criteria (critical app failure, widespread auth failure, performance degradation, security incident, catastrophic failure) with specific rollback procedures, RTO targets, and RPO for each scenario
+- Application inventory (100% coverage of all apps, auth methods, and protocol versions) is the single most critical success factor for IdP migration — undocumented apps are the leading cause of migration failures

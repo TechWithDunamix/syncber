@@ -1,0 +1,198 @@
+---
+title: "Identité Fédérée"
+description: "Fédération d'identité — concepts, modèles de confiance (directe, courtier, maillée), échange de métadonnées SAML, fédération OIDC, provisionnement SCIM, et CIAM (Customer IAM)."
+sidebar:
+  order: 6
+  label: "Identité Fédérée"
+---
+
+L'identité fédérée permet à des utilisateurs d'un domaine d'identité (un fournisseur d'identité) d'accéder à des ressources dans un autre domaine (un fournisseur de service) sans créer de compte séparé. La fédération est essentielle pour les partenariats B2B, les acquisitions et les applications multi-cloud.
+
+## Concepts de Fédération
+
+### Qu'est-ce que la Fédération ?
+
+Dans un modèle non fédéré, chaque application gère ses propres comptes utilisateurs. Dans un modèle fédéré, l'authentification est déléguée à un fournisseur d'identité (IdP) que le fournisseur de service (SP) approuve.
+
+```
+Non fédéré :                    Fédéré :
+Application A (compte Jean)    Application A (délègue l'auth à IdP)
+Application B (compte Jean)    Application B (délègue l'auth à IdP)
+Application C (compte Jean)    Application C (délègue l'auth à IdP)
+                                   │
+                              IdP (authentifie Jean une fois)
+```
+
+### Établissement de la Confiance
+
+La fédération repose sur une relation de confiance préétablie entre l'IdP et le SP :
+
+```
+Étape 1 : L'IdP publie ses métadonnées (certificat de signature, endpoints)
+Étape 2 : Le SP importe les métadonnées de l'IdP
+Étape 3 : Le SP publie ses métadonnées (ACS URL, certificat)
+Étape 4 : L'IdP importe les métadonnées du SP
+Étape 5 : La confiance est établie — les assertions signées par l'IdP sont acceptées par le SP
+```
+
+## Modèles de Confiance
+
+### Confiance Directe (Hub-and-Spoke)
+
+Le modèle le plus courant. Chaque SP établit une confiance directe avec l'IdP central.
+
+```
+         ┌─────────────────┐
+         │  IdP Central     │
+         │  (Okta/Azure AD) │
+         └────┬────┬────┬───┘
+              │    │    │
+         ┌────┘    │    └────┐
+         │         │         │
+    ┌────┴────┐ ┌──┴───┐ ┌──┴───┐
+    │  App A  │ │ App B│ │ App C│
+    └─────────┘ └──────┘ └──────┘
+```
+
+**Avantages :** Simple, gestion centralisée, un seul point de confiance.
+**Inconvénients :** L'IdP central est un SPOF ; chaque SP doit configurer la confiance.
+
+### Confiance par Courtier (Broker)
+
+Un courtier d'identité agit comme intermédiaire entre plusieurs IdP et SP :
+
+```
+┌─────────┐   ┌─────────┐   ┌─────────┐
+│ IdP Acq │──>│ Courtier │<──│ App B   │
+│ (Okta)  │   │ (IdP     │   │         │
+└─────────┘   │  Hub)   │   └─────────┘
+┌─────────┐   │         │   ┌─────────┐
+│ IdP Mère│──>│ (Ping   │<──│ App C   │
+│ (AD)    │   │  Federate│  │         │
+└─────────┘   └─────────┘   └─────────┘
+```
+
+**Avantages :** Idéal pour les fusions-acquisitions, abstraction de la complexité IdP.
+**Inconvénients :** Point de défaillance unique, complexité opérationnelle.
+
+### Confiance Maillée (Mesh)
+
+Chaque SP et IdP établit une confiance directe avec chaque autre entité :
+
+```
+       ┌─────────┐
+   ┌──>│  App A  │<──┐
+   │   └─────────┘   │
+   │                 │
+┌──┴──┐          ┌───┴───┐
+│ IdP │<────────>│  App B │
+│     │          │       │
+└──┬──┘          └───┬───┘
+   │                 │
+   │   ┌─────────┐   │
+   └──>│  App C  │<──┘
+       └─────────┘
+```
+
+**Avantages :** Pas de SPOF, résilient, flexible.
+**Inconvénients :** N² relations de confiance à gérer, ne passe pas à l'échelle.
+
+## Échange de Métadonnées SAML
+
+Les métadonnées SAML contiennent les informations nécessaires pour établir la confiance :
+
+### Métadonnées IdP (exemple)
+
+```xml
+<EntityDescriptor entityID="https://idp.example.com">
+  <IDPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+    <KeyDescriptor use="signing">
+      <KeyInfo>
+        <X509Certificate>MII...</X509Certificate>
+      </KeyInfo>
+    </KeyDescriptor>
+    <SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+                         Location="https://idp.example.com/sso"/>
+    <SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+                         Location="https://idp.example.com/slo"/>
+  </IDPSSODescriptor>
+</EntityDescriptor>
+```
+
+## Fédération OIDC
+
+OIDC Federation (défini dans OpenID Connect Federation 1.0) étend OIDC pour supporter la fédération :
+
+| Concept | SAML Federation | OIDC Federation |
+|---------|-----------------|-----------------|
+| **Métadonnées** | XML signé | JSON signé (JWT) |
+| **Découverte** | Manuel ou via URL de métadonnées | .well-known/openid-federation |
+| **Chaîne de confiance** | Relations de confiance directes | Chaîne hiérarchique de confiance (ancres, intermédiaires, feuilles) |
+| **Échange de clés** | Certificat X.509 | JWKS (JSON Web Key Set) |
+| **Provisionnement** | Souvent séparé (SCIM ou manuel) | SCIM intégré dans certains déploiements |
+
+## Provisionnement Fédéré avec SCIM
+
+Le SCIM (System for Cross-domain Identity Management) est le protocole standard pour le provisionnement des identités entre domaines :
+
+| Opération SCIM | Événement IdP | Action SP |
+|---------------|--------------|-----------|
+| **POST /Users** | Nouvel utilisateur ajouté | Créer un compte dans l'application |
+| **PUT /Users/{id}** | Attributs utilisateur modifiés | Mettre à jour les attributs du compte |
+| **PATCH /Users/{id}** | Changement partiel d'attributs | Mise à jour partielle |
+| **DELETE /Users/{id}** | Utilisateur supprimé/désactivé | Désactiver/supprimer le compte |
+| **POST /Groups** | Nouveau groupe créé | Créer un groupe correspondant |
+| **PATCH /Groups/{id}** | Appartenance au groupe modifiée | Ajouter/retirer l'utilisateur du groupe |
+
+### Déploiement SCIM typique
+
+```
+IdP (Okta/Azure AD) ──── SCIM ────> Application (Slack/Salesforce/App personnalisée)
+     │                                  │
+     │  1. Créer utilisateur Jean       │
+     │  POST /Users → {"name":{"given":"Jean","family":"Dupont"},"emails":[{"value":"jean@co.com"}],"active":true}
+     │                                  │
+     │  2. 201 Created                  │
+     │  {"id":"app_user_456","meta":{"created":"2026-01-15T10:00:00Z"}}
+     │                                  │
+     │  3. Ajouter Jean au groupe "Ventes"
+     │  PATCH /Groups/ventes → {"schemas":..., "Operations": [{"op":"add","path":"members","value":[{"value":"app_user_456"}]}]}
+```
+
+## CIAM — Customer IAM
+
+La fédération d'identité pour les clients (B2C) diffère de la fédération employé (B2E) :
+
+| Aspect | B2E (Employé) | B2C / CIAM (Client) |
+|--------|---------------|---------------------|
+| **Nombre d'utilisateurs** | Milliers à centaines de milliers | Millions |
+| **Délégation IdP** | IdP d'entreprise | IdP social (Google/Apple/Facebook) ou email |
+| **Niveau d'assurance** | Élevé (MFA obligatoire) | Variable (email ou OTP social) |
+| **Cycle de vie** | Géré par RH | Auto-inscription, auto-service |
+| **Réglementation** | RGPD, SOX | RGPD, CCPA, COPPA, PSD2 |
+| **Expérience** | Standardisée, application unique | Personnalisable, marque propre |
+
+### CIAM avec Courtier d'Identité
+
+```
+                    ┌─────────────────┐
+                    │  Courtier CIAM   │
+                    │  (Auth0, Cognito)│
+                    └────────┬────────┘
+                             │
+              ┌──────────────┼──────────────┐
+              │              │              │
+         ┌────┴────┐   ┌────┴────┐   ┌────┴────┐
+         │Google   │   │Apple    │   │Facebook │
+         │IdP      │   │IdP      │   │IdP      │
+         └─────────┘   └─────────┘   └─────────┘
+```
+
+## Points Clés à Retenir
+
+- La fédération d'identité permet aux utilisateurs d'un domaine d'identité (IdP) d'accéder à des ressources dans un autre domaine (SP) sans créer de compte séparé — la confiance est établie par l'échange de métadonnées et de certificats de signature
+- Trois modèles de confiance existent : directe (hub-and-spoke, chaque SP fait confiance à un IdP central), par courtier (un intermédiaire traduit entre plusieurs IdP et SP — idéal pour les fusions-acquisitions) et maillée (chaque entité fait confiance à chaque autre entité — flexible mais N² relations)
+- Les métadonnées SAML (XML signé contenant le certificat de signature et les endpoints SSO/SLO) établissent la confiance entre IdP et SP — l'import manuel ou automatisé des métadonnées configure la relation
+- SCIM (System for Cross-domain Identity Management) est le protocole standard pour le provisionnement fédéré — POST/PUT/PATCH/DELETE pour les Users et Groups, permettant la synchronisation automatique des comptes entre domaines d'identité
+- OIDC Federation étend OIDC avec une chaîne hiérarchique de confiance (ancres, intermédiaires, feuilles) et des métadonnées au format JWT — plus moderne que SAML Federation mais moins mature
+- Le CIAM (Customer IAM) diffère significativement du B2E — millions d'utilisateurs, auto-inscription, IdP sociaux, niveaux d'assurance variables, expérience personnalisable et marque propre

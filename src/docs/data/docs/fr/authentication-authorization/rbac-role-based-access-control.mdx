@@ -1,0 +1,170 @@
+---
+title: "RBAC — Contrôle d'Accès Basé sur les Rôles"
+description: "RBAC selon la norme NIST — niveaux RBAC (plat, hiérarchique, contraint, symétrique), ingénierie des rôles descendante et ascendante, analyse statique de conflits, pièges et meilleures pratiques."
+sidebar:
+  order: 7
+  label: "RBAC"
+---
+
+Le contrôle d'accès basé sur les rôles (RBAC) est le modèle d'autorisation le plus largement déployé en entreprise. La norme NIST RBAC (ANSI INCITS 359-2004) définit un modèle de référence avec quatre niveaux de sophistication croissante.
+
+## La Norme NIST RBAC
+
+### Modèle de Référence NIST
+
+Le modèle NIST RBAC définit trois composants principaux :
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                     NIST RBAC MODEL                        │
+│                                                            │
+│  ┌─────────┐    ┌──────────┐    ┌───────────┐           │
+│  │  Users   │───>│  Roles   │───>│Permissions│           │
+│  └─────────┘    └──────────┘    └───────────┘           │
+│       │              │                                      │
+│       │              │                                      │
+│       │     ┌────────┴────────┐                             │
+│       │     │   Sessions      │                             │
+│       │     │  (Activations)  │                             │
+│       │     └─────────────────┘                             │
+│                                                            │
+│  Règles :                                                   │
+│  - Un utilisateur peut avoir plusieurs rôles               │
+│  - Un rôle peut avoir plusieurs permissions                │
+│  - Un utilisateur active des rôles dans une session        │
+│  - Les permissions dérivent des rôles activés              │
+└────────────────────────────────────────────────────────────┘
+```
+
+### Les Quatre Niveaux RBAC
+
+#### Niveau 1 — RBAC Plat (Flat RBAC)
+
+Le niveau de base. Les utilisateurs se voient attribuer des rôles, et les rôles se voient attribuer des permissions.
+
+```
+Rôles : [Vendeur, Manager, Administrateur, Auditeur]
+Utilisateur Jean : Vendeur, Manager
+Utilisateur Marie : Administrateur
+Permissions :
+  Vendeur → lire:fiche_client, écrire:commande
+  Manager → tout lire, approuver:commande
+  Administrateur → tout lire, tout écrire, gérer:utilisateurs
+  Auditeur → lire:tous (lecture seule)
+```
+
+#### Niveau 2 — RBAC Hiérarchique (Hierarchical RBAC)
+
+Ajoute l'héritage de rôles. Si le rôle "Manager" hérite du rôle "Vendeur", alors les permissions de "Vendeur" sont automatiquement incluses dans "Manager".
+
+```
+         Administrateur (toutes permissions)
+               │
+            Manager (lire tout, approuver)
+               │
+            Vendeur (lire client, écrire commande)
+```
+
+#### Niveau 3 — RBAC Contraint (Constrained RBAC)
+
+Ajoute la Séparation des Devoirs (SoD) et les contraintes :
+
+- **SoD statique (SSD)** : Un utilisateur ne peut pas se voir attribuer des rôles en conflit
+  - Exemple : Un utilisateur ne peut pas être à la fois "Créateur de commande" et "Approbateur de commande"
+- **SoD dynamique (DSD)** : Un utilisateur peut avoir des rôles en conflit mais ne peut pas les activer simultanément dans la même session
+  - Exemple : Un utilisateur peut avoir les deux rôles mais doit choisir lequel utiliser pour chaque session
+
+#### Niveau 4 — RBAC Symétrique (Symmetric RBAC)
+
+Ajoute la révision et la vérification des rôles :
+
+- Capacité de lister tous les utilisateurs d'un rôle
+- Capacité de lister tous les rôles d'un utilisateur
+- Révision périodique des affectations de rôles
+
+## Ingénierie des Rôles
+
+### Approche Descendante (Top-Down)
+
+L'approche descendante commence par les structures organisationnelles et métier :
+
+```
+Structure Organisationnelle → Fonctions Métier → Rôles → Permissions
+       │                           │              │         │
+   Départements              Tâches métier    Rôles     Droits
+   (Ventes, RH,               (Vendre,          nommés    spécifiques
+    Finance, IT)               Recruter,         (Vendeur,  sur les
+                                Payer,            RH,       ressources
+                                Développer)       Manager)
+```
+
+**Avantages :** Aligné sur la structure métier, plus facile à expliquer aux auditeurs.
+**Inconvénients :** Peut manquer des permissions granulaires, risque de rôles trop larges.
+
+### Approche Ascendante (Bottom-Up)
+
+L'approche ascendante commence par les permissions existantes et les regroupe en rôles :
+
+```
+Permissions Existantes → Regroupement → Rôles → Validation Métier
+       │                      │            │         │
+   Droits actuels        Clustering      Nouveaux   Vérification
+   sur les systèmes      des permissions  rôles     par les métiers
+   (Acquis, hérités,     similaires       proposés  (validation)
+    accumulés)
+```
+
+**Avantages :** Basé sur les permissions réelles, peut révéler des schémas inattendus.
+**Inconvénients :** Peut perpétuer des accès excessifs (creep), difficile à expliquer.
+
+### Approche Par Data Mining
+
+Utilisation d'algorithmes de role mining pour découvrir automatiquement les rôles :
+
+| Algorithme | Approche | Avantage | Inconvénient |
+|------------|----------|----------|--------------|
+| **Clustering (k-means)** | Regroupe les utilisateurs avec des permissions similaires | Simple, rapide | Défini k à l'avance, clusters non interprétables |
+| **Frequent Itemset Mining** | Trouve les ensembles de permissions qui apparaissent fréquemment ensemble | Interprétable, précis | Peut créer des rôles très nombreux |
+| **NMF (Factorisation Matricielle Non-négative)** | Décompose la matrice utilisateur-permission en matrices rôle-utilisateur et permission-rôle | Robuste, gère le bruit | Complexe, nécessite réglage des paramètres |
+| **Role Mining hiérarchique** | Construit une hiérarchie de rôles basée sur l'inclusion de permissions | Capture la hiérarchie naturelle | Complexe à mettre en œuvre |
+
+## Types de Rôles
+
+| Type de Rôle | Description | Exemple | Cycle de Vie |
+|-------------|-------------|---------|-------------|
+| **Rôle fonctionnel** | Basé sur la fonction métier | Vendeur, Comptable, Ingenieur | Long (années) |
+| **Rôle organisationnel** | Basé sur la structure | Manager, Directeur, Chef d'équipe | Long (années) |
+| **Rôle d'application** | Basé sur l'accès à une application | Utilisateur SAP, Administrateur Salesforce | Moyen (mois-années) |
+| **Rôle temporaire** | Basé sur un besoin temporaire | Auditeur trimestriel, Administrateur de projet | Court (jours-mois) |
+| **Rôle d'urgence** | Accès en cas d'urgence | Break-glass, Administrateur d'urgence | Très court (heures) |
+| **Rôle d'exception** | Déviation approuvée de la politique | Utilisateur autorisé à contourner SoD | Variable (documenté) |
+
+## Pièges du RBAC
+
+| Piège | Description | Symptôme | Remédiation |
+|-------|-------------|----------|-------------|
+| **Explosion de rôles** | Trop de rôles pour être gérables | > 1000 rôles pour 10 000 utilisateurs | Role mining régulier, consolidation, rôles composites |
+| **Rôles orphelins** | Rôles créés mais plus attribués | 20% des rôles sans utilisateur | Désactivation automatique, inventaire périodique |
+| **Rôles super-utilisateur** | Rôles trop larges qui violent le moindre privilège | Rôle avec 500+ permissions | Analyse des permissions, création de rôles granulaires |
+| **Dérive des permissions (permission creep)** | Accumulation de permissions d'anciens rôles | Utilisateur a 5 rôles dont 3 obsolètes | Certifications régulières, révision des rôles actifs |
+| **Chevauchement de rôles** | Plusieurs rôles avec les mêmes permissions | 3 rôles qui donnent accès au même système | Détection de chevauchement, consolidation |
+| **Silos de rôles** | Rôles définis indépendamment par application | "Admin SAP" ≠ "Admin Salesforce" | Rôles d'entreprise abstraits, mapping d'application |
+
+## Meilleures Pratiques RBAC
+
+| Pratique | Description | Mesure |
+|----------|-------------|--------|
+| **Gouvernance des rôles** | Processus défini pour créer, modifier, archiver les rôles | Comité de validation des rôles mensuel |
+| **Certification des rôles** | Révision périodique des rôles et de leurs permissions | Certification trimestrielle des rôles |
+| **Héritage limité** | Hiérarchie de rôles limitée à 3-4 niveaux maximum | Pas plus de 4 niveaux de profondeur |
+| **Documentation métier** | Chaque rôle a une description métier claire | 100% des rôles documentés |
+| **Principe de moindre privilège** | Les rôles accordent le minimum nécessaire | Analyse régulière des permissions inutilisées |
+| **Séparation des devoirs** | SoD statique et dynamique appliquée aux rôles | Matrice SoD avec prévention à la création |
+
+## Points Clés à Retenir
+
+- La norme NIST RBAC (ANSI INCITS 359-2004) définit quatre niveaux : plat (utilisateur→rôle→permission), hiérarchique (héritage de rôles), contraint (SoD statique et dynamique), et symétrique (révision et audit bidirectionnels)
+- L'ingénierie des rôles peut être descendante (structure organisationnelle → rôles → permissions) ou ascendante (permissions existantes → regroupement → rôles) — l'approche par data mining (clustering, frequent itemset, NMF) automatise la découverte mais nécessite validation métier
+- Les pièges courants du RBAC incluent l'explosion de rôles (>1000 rôles non gérables), les rôles orphelins (sans utilisateur), les rôles super-utilisateur (trop larges), la dérive des permissions, le chevauchement de rôles et les silos d'application
+- Les meilleures pratiques incluent une gouvernance des rôles avec comité de validation mensuel, certification trimestrielle, hiérarchie limitée à 3-4 niveaux, documentation métier complète, moindre privilège, et SoD appliquée à la création des rôles
+- Le RBAC est le modèle le plus adapté pour la plupart des déploiements d'entreprise — il offre le meilleur équilibre entre simplicité de gestion, auditabilité et passage à l'échelle

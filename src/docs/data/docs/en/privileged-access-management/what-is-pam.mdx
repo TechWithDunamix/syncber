@@ -1,0 +1,122 @@
+---
+title: "What Is Privileged Access Management?"
+description: "Foundation concepts of PAM — the business case for privileged access security, risk drivers, the relationship between IAM and PAM, and why PAM is critical for modern security programs."
+sidebar:
+  order: 2
+  label: "What Is PAM?"
+---
+
+Privileged Access Management is the discipline of securing, controlling, and monitoring access to an organisation's most critical assets by users and systems with elevated permissions. While IAM manages identity for all users, PAM specifically addresses the highest-risk subset: privileged accounts that have the power to bypass security controls, modify system configurations, and access sensitive data.
+
+## The Business Case for PAM
+
+### Why Privileged Access Is Different
+
+A standard user account can read email, create documents, and access line-of-business applications. A privileged account can:
+
+- Create and delete user accounts (including admin accounts)
+- Modify system configurations and security policies
+- Access all data without restriction
+- Install software and drivers
+- Bypass audit controls
+- Disable security monitoring
+
+The asymmetry is stark: one compromised standard account is a problem, but one compromised privileged account is a catastrophe. The blast radius of a privileged account compromise includes the entire system under its administration.
+
+### The Cost of Not Having PAM
+
+| Scenario | Business Impact | Real-World Example |
+|----------|-----------------|-------------------|
+| **Privileged credential theft** | Full system compromise, data breach | 2023 MGM Resorts: $100M+ loss from privileged credential compromise |
+| **Insider privilege abuse** | Data theft, fraud, reputational damage | 2021 SolarWinds: privileged access abused to distribute malware |
+| **Unmanaged service accounts** | Hidden backdoors, unknown exposure | Average enterprise has 3x more service accounts than user accounts |
+| **Stale privileged access** | Orphan accounts become attack vectors | Former employees with active privileged accounts |
+| **Compliance failure** | Fines, audit findings, revenue loss | Average GDPR fine: €20M+ for access control failures |
+
+## IAM vs PAM — Relationship Diagram
+
+```
+IAM (Identity & Access Management)
+├── Identities (all users, devices, services)
+├── Authentication (passwords, MFA, SSO)
+├── Authorization (RBAC, ABAC, policies)
+├── Governance (certification, SOD)
+│
+└── PAM (Privileged Access Management)
+    ├── Privileged identities (admin, service, root)
+    ├── Credential vaulting & rotation
+    ├── Session monitoring & recording
+    ├── Just-in-time elevation
+    └── Emergency break-glass
+```
+
+<Aside variant="tip">
+Think of IAM as covering the **99%** of normal access and PAM as covering the **1%** of elevated access — but that 1% carries 90% of the risk. Both are essential, and they must be integrated. A mature IAM program includes PAM as a core capability.
+</Aside>
+
+### Key Distinctions
+
+| Dimension | IAM | PAM |
+|-----------|-----|-----|
+| **Primary focus** | All identities | Privileged identities |
+| **User experience** | Frictionless access | Controlled, audited access |
+| **Authentication** | Passwordless, MFA | Strong MFA (FIDO2) required |
+| **Authorization model** | RBAC/ABAC | JIT, approval-based, time-bound |
+| **Credential handling** | User knowledge | Vaulted, rotated, checked out |
+| **Session visibility** | Limited | Full recording and monitoring |
+| **Risk level** | Moderate | Critical |
+| **Compliance scrutiny** | Moderate | High (SOX, PCI, HIPAA) |
+
+## The Principle of Least Privilege
+
+The principle of least privilege (PoLP) states that every user, process, and system should operate with the **minimum set of permissions necessary** to perform its function. PAM is the primary mechanism for enforcing least privilege at scale.
+
+### Implementing Least Privilege
+
+| Method | Description | PAM Technology |
+|--------|-------------|----------------|
+| **Remove standing admin rights** | Standard users operate without local admin privileges | Endpoint privilege management |
+| **Elevate on demand** | Users request temporary elevation for specific tasks | JIT access, privilege elevation |
+| **Time-bound access** | Privileges expire automatically after a defined window | Time-based role assignment |
+| **Approval-based elevation** | Elevation requires manager or owner approval | Approval workflows |
+| **Context-aware elevation** | Elevation is granted based on device, location, network posture | Risk-based PAM |
+
+## PAM Deployment Drivers
+
+### Security Drivers
+- **Reducing breach blast radius** — If an attacker compromises a standard user, PAM prevents privilege escalation to sensitive systems
+- **Controlling lateral movement** — Vaulted credentials prevent pass-the-hash and credential harvesting
+- **Insider threat mitigation** — Monitored sessions deter malicious activity and provide forensic evidence
+
+### Compliance Drivers
+- **SOX** — Section 404 requires control over access to financial systems
+- **PCI DSS v4.0** — Requirement 7 mandates need-to-know access; Requirement 10 requires audit trails
+- **HIPAA** — 45 CFR §164.312 requires technical policies for ePHI access
+- **GDPR** — Article 32 requires technical measures for data protection
+
+### Operational Drivers
+- **Audit efficiency** — Centralised, searchable audit trail for all privileged access
+- **On/offboarding** — Automated privileged account management during employee lifecycle events
+- **Credential hygiene** — Automatic rotation eliminates standing credential risk
+
+## The Zero Trust Connection
+
+PAM is a foundational element of Zero Trust architecture. The Zero Trust principle of "never trust, always verify" applies most critically to privileged access:
+
+| Zero Trust Pillar | PAM Implementation |
+|-------------------|-------------------|
+| **Verify explicitly** | MFA required for every privileged session |
+| **Use least privilege** | JIT elevation, time-bound access |
+| **Assume breach** | Session recording, real-time monitoring |
+
+<Aside variant="danger">
+If you only deploy one Zero Trust control, make it PAM. Privileged access is where the most damage occurs, and PAM provides the most immediate risk reduction for the investment.
+</Aside>
+
+## Key Takeaways
+
+- PAM specifically addresses privileged accounts — the highest-risk identities — through credential vaulting, session management, JIT access, and least privilege enforcement
+- The difference between IAM and PAM is scope vs. risk: IAM covers all identities, PAM focuses on the small subset of privileged accounts that carry disproportionate risk
+- The principle of least privilege is the philosophical foundation of PAM — every user and process should have the minimum permissions required
+- PAM is driven by three categories of drivers: security (breach prevention), compliance (regulatory mandates), and operations (audit efficiency, credential hygiene)
+- PAM is a foundational Zero Trust control — it enforces "never trust, always verify" for the highest-risk access scenarios

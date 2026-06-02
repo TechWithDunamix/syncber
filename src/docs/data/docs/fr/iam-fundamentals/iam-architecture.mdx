@@ -1,0 +1,71 @@
+---
+title: "Modèles d'Architecture IAM"
+description: "Modèles d'architecture IAM d'entreprise — centralisé, décentralisé, hybride et cloud-natif pour la conception de systèmes IAM."
+sidebar:
+  order: 10
+  label: "Modèles d'Architecture IAM"
+---
+
+L'architecture IAM définit la manière dont les services d'identité sont structurés, déployés et intégrés dans une organisation.
+
+## Modèles d'Architecture
+
+### IAM Centralisé
+
+Une plateforme IAM unique sert de hub pour toutes les fonctions de gestion des identités et des accès.
+
+**Avantages :** Source unique de vérité, application cohérente des politiques, audit simplifié.
+**Inconvénients :** Point de défaillance unique, peut ne pas supporter les applications legacy.
+
+### IAM Décentralisé (Fédéré)
+
+Chaque unité commerciale gère sa propre infrastructure d'identité, avec fédération pour l'accès inter-domaines.
+
+**Avantages :** Autonomie des unités, pas de point de défaillance unique.
+**Inconvénients :** Politiques incohérentes, audit complexe, coûts opérationnels plus élevés.
+
+### IAM Hybride
+
+Combine les annuaires sur site avec les plateformes d'identité cloud, synchronisant les données entre eux.
+
+<Aside variant="tip">
+L'IAM hybride est l'architecture la plus courante dans les environnements d'entreprise en cours de migration vers le cloud.
+</Aside>
+
+**Avantages :** Préserve l'investissement sur site, permet une migration progressive vers le cloud.
+**Inconvénients :** Complexité accrue, latence de synchronisation.
+
+## IAM Cloud-Natif
+
+| Composant | Approche Cloud-Native |
+|-----------|----------------------|
+| **Stockage d'identité** | IdP Cloud (Azure AD, Auth0) |
+| **Authentification** | OIDC, OAuth 2.0, WebAuthn |
+| **Autorisation** | PDP Cloud-Native (OPA, Cedar) |
+| **Provisionnement** | SCIM, intégration RH Cloud |
+
+## Architecture Zero Trust
+
+L'IAM est au cœur du Zero Trust — le modèle de sécurité qui suppose qu'aucun utilisateur, appareil ou réseau n'est intrinsèquement digne de confiance.
+
+### Principes Zero Trust pour l'IAM
+
+1. **Vérifier explicitement** — Authentifier et autoriser chaque requête
+2. **Moindre privilège** — Accorder uniquement l'accès minimum requis
+3. **Supposer la brèche** — Segmenter, surveiller, ne rien truster par défaut
+
+## Choix d'une Architecture
+
+| Facteur | Centralisé | Décentralisé | Hybride |
+|---------|------------|--------------|---------|
+| **Taille** | PME | Grande entreprise | Entreprise avec legacy |
+| **Cloud** | Cloud-first | Multi-cloud | Migration en cours |
+| **Réglementation** | Juridiction unique | Multi-juridictions | Mixte |
+
+## Points Clés
+
+- L'IAM centralisé offre cohérence et simplicité ; le décentralisé offre autonomie
+- L'IAM hybride est le modèle d'entreprise le plus courant
+- L'IAM cloud-natif utilise OIDC, OAuth 2.0, WebAuthn
+- Le Zero Trust vérifie chaque requête explicitement
+- Le choix dépend de l'échelle, de la maturité cloud et des besoins réglementaires

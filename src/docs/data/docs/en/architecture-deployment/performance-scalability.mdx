@@ -1,0 +1,214 @@
+---
+title: "Performance & Scalability"
+description: "IAM/PAM performance engineering — authentication throughput, directory scaling, PAM session storage, caching strategies, connection pooling, load testing, and capacity planning."
+sidebar:
+  order: 8
+  label: "Performance & Scalability"
+---
+
+IAM and PAM systems must handle authentication traffic that is both high-volume and bursty (Monday morning logins, incident-driven privilege elevation). Performance engineering ensures that authentication latency remains acceptable under peak load and that the platform can scale to meet growing demand.
+
+## Performance Dimensions
+
+| Dimension | Metric | Target | Impact of Degradation |
+|-----------|--------|--------|----------------------|
+| **Authentication latency** | Time to complete login (IdP) | < 1 second (with MFA: < 3 seconds) | User frustration, app timeouts |
+| **Token issuance** | Tokens per second | Sustained peak × 1.5 buffer | App access failures, login failures |
+| **Directory lookup** | LDAP search response time | < 50ms average, < 200ms p99 | Auth latency, authorisation latency |
+| **PAM session initiation** | Time to establish proxied session | < 5 seconds | Admin productivity loss |
+| **Session recording ingest** | Write throughput to recording storage | > 2x peak concurrent recording bitrate | Lost recordings, compliance gaps |
+| **Provisioning throughput** | User account operations per minute | Peak new-hire day × 2 buffer | Delayed access, productivity loss |
+| **API response time** | REST API request duration | < 500ms average, < 2s p99 | Slow UIs, automation timeouts |
+
+## Authentication Performance
+
+### Factors Affecting Auth Performance
+
+| Factor | Impact | Mitigation |
+|--------|--------|------------|
+| **Directory lookup latency** | High — each auth event may require 1-5 directory lookups | Directory performance tuning, caching, read replicas |
+| **MFA latency** | Medium-High — push notifications, SMS delivery, TOTP validation | Push notification optimisation, pre-warming MFA channels |
+| **Token signing** | Low-Medium — cryptographic operation | HSM acceleration, token caching (where safe) |
+| **Network round trip** | Medium — user to IdP, IdP to directory | CDN for IdP endpoints, regional IdP deployment |
+| **Session store access** | Medium — session lookup on each request | Distributed cache (Redis), session affinity |
+| **Policy evaluation** | Medium — ABAC policy evaluation | Policy engine performance, rule indexing |
+
+### Authentication Throughput Scaling
+
+```
+Auth Requests per Second
+     ^
+     │        ┌──────┐
+     │        │      │         ┌──────┐
+ 400 │        │      │         │      │
+     │        │      │     ┌───┤      │
+ 300 │        │      │     │   │      │
+     │        │      │     │   │      │
+ 200 │   ┌────┤      │     │   │      │
+     │   │    │      │     │   │      │
+ 100 │   │    │      │     │   │      │
+     │   │    │      │     │   │      │
+   0 └───┴────┴──────┴─────┴───┴──────┴──> Time
+          Mon    Tue    Wed   Thu   Fri
+          (Peak: Monday morning login surge)
+```
+
+### Scaling Approach
+
+| Scaling Method | Approach | Effectiveness | Time to Deploy |
+|---------------|----------|---------------|----------------|
+| **Horizontal (IdP nodes)** | Add more IdP instances behind LB | Linear scale (with stateless design) | Minutes (auto-scaling) |
+| **Vertical (IdP instance)** | Larger instance size | Diminishing returns after 8 cores | Minutes (restart) |
+| **Directory read replicas** | Add domain controllers / LDAP replicas | Near-linear for read-heavy auth workloads | Hours to days |
+| **Cache replica** | Add Redis cluster nodes | Significant for session-intensive workloads | Minutes |
+| **Global distribution** | Regional IdP deployments | Eliminates cross-region latency, improves geo-redundancy | Weeks to months |
+
+## Directory Performance
+
+### LDAP Directory Performance Tuning
+
+| Area | Tuning Parameter | Default | Recommended | Impact |
+|------|-----------------|---------|-------------|--------|
+| **Indexing** | Search attributes indexed | Minimal (pre-created) | Index all filter attributes | 10-100x search improvement |
+| **Connection pooling** | Connections per application server | Varies by platform | 10-50 per app server | 5-10x auth throughput increase |
+| **Cache size** | Entry cache percentage | Default (varies) | 50%+ of total directory | 2-5x read performance |
+| **Thread pool** | Worker threads per CPU | Default (varies) | 10-50 per CPU core | 2-3x concurrent op throughput |
+| **Page size** | Search result page size | 100 (varies) | 1000 | Fewer round trips for bulk ops |
+| **Referral chasing** | Client vs. server chase | Server (varies) | Client-disable | Reduces server overhead for simple lookups |
+
+### Active Directory Performance
+
+| Metric | Healthy Threshold | Warning | Critical |
+|--------|------------------|---------|----------|
+| **LDAP bind latency** | < 10ms | > 50ms | > 200ms |
+| **LDAP search time** | < 50ms | > 200ms | > 500ms |
+| **Replication latency** | < 15 seconds | > 5 minutes | > 15 minutes |
+| **CPU utilisation (DC)** | < 40% | > 60% | > 80% |
+| **Memory utilisation** | < 60% | > 75% | > 90% |
+| **Disk queue length** | < 1 | > 3 | > 5 |
+| **Authentication rate** | < 50% of capacity | > 75% of capacity | > 90% of capacity |
+
+## PAM Session Recording Storage
+
+### Storage Requirements
+
+| Session Type | Bitrate | Storage/Hour | Storage/8-Hour Workday | Monthly (50 admins) |
+|-------------|---------|--------------|------------------------|---------------------|
+| **Text/SSH session** | ~1 KB/s | ~3.6 MB | ~28.8 MB | ~3.6 GB |
+| **RDP session (low quality)** | ~100 KB/s | ~360 MB | ~2.9 GB | ~360 GB |
+| **RDP session (medium)** | ~500 KB/s | ~1.8 GB | ~14.4 GB | ~1.8 TB |
+| **RDP session (high quality)** | ~2 MB/s | ~7.2 GB | ~57.6 GB | ~7.2 TB |
+| **Screen recording (video)** | ~1-5 MB/s | ~3.6-18 GB | ~28.8-144 GB | ~3.6-18 TB |
+
+<Aside variant="tip">
+PAM session recording storage grows faster than most organisations expect. A medium-sized deployment (50 admins, RDP medium quality) generates ~1.8 TB per month. Plan for compression (typically 5:1 to 20:1 for RDP), retention policies aligned with compliance requirements, and tiered storage (fast SSD for recent recordings, S3/object storage for archival). Implement lifecycle policies to move recordings to cheaper storage tiers after 30-90 days.
+</Aside>
+
+## Caching Strategy
+
+### What to Cache
+
+| Cache Target | Cache Type | TTL | Cache Hit Ratio Target | Invalidation Strategy |
+|-------------|------------|-----|----------------------|----------------------|
+| **Authentication sessions** | Distributed (Redis) | Session duration | N/A (session data) | Session expiry, admin revoke |
+| **Directory search results** | Local (in-memory) | 30-300 seconds | 80%+ | TTL expiry |
+| **Group membership** | Distributed (Redis) | 60-300 seconds | 90%+ | TTL + directory change notification |
+| **Role assignments** | Distributed (Redis) | 300 seconds | 95%+ | TTL + IGA change event |
+| **Policy evaluation results** | Local (in-memory) | 60-600 seconds | 85%+ | TTL + policy version check |
+| **Public key / JWKS** | Local (in-memory) | 24 hours (until rotation) | 99%+ | Certificate rotation triggered |
+| **MFA trust decisions** | Local (cookie) | 1-14 days | N/A | Device cookie expiration |
+
+### Cache Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                   APPLICATION INSTANCE                     │
+│                                                            │
+│  ┌─────────────────────┐  ┌──────────────────────┐      │
+│  │  Local Cache (L1)    │  │  Distributed Cache   │      │
+│  │  (In-process: expiring│  │  (Redis cluster)     │      │
+│  │   group, role, policy)  │  │  Sessions, tokens    │      │
+│  │  TTL: 30-600s        │  │  Persistent + TTL    │      │
+│  └─────────────────────┘  └──────────────────────┘      │
+│                                                            │
+└─────────────────────────────────────────────────────────┘
+         │                                    │
+         │                                    │
+         v                                    v
+  ┌─────────────────┐              ┌─────────────────┐
+  │  Directory       │              │  Redis Cluster   │
+  │  (Authoritative) │              │  (Sharded + Repl)│
+  └─────────────────┘              └─────────────────┘
+```
+
+## Load Testing
+
+### Load Test Plan
+
+| Test Scenario | Description | Target Metric | Success Criteria |
+|--------------|-------------|---------------|-----------------|
+| **Peak authentication** | Simulate Monday morning login surge | Auth requests per second | p99 latency < 2s, zero errors |
+| **Steady state** | Normal business hours load | Sustained throughput | p50 latency < 500ms, p99 < 2s |
+| **Burst** | Sudden spike (incident, power restoration) | Max sustained throughput | Recover within 30s, no cascading failure |
+| **MFA surge** | All users required MFA simultaneously | MFA throughput | p99 < 5s, push delivery within 2s |
+| **Provisioning peak** | New hire batch (first day of month) | Accounts created per minute | All accounts created within 1 hour |
+| **Directory search** | Concurrent LDAP searches | Searches per second | p99 search time < 200ms |
+| **PAM session rush** | Concurrent session starts | Sessions per second | All sessions established within 5s |
+
+### Load Testing Tools
+
+| Tool | Protocol Support | Best For | Notes |
+|------|-----------------|----------|-------|
+| **JMeter** | HTTP, LDAP, JDBC, custom | IdP API, authentication flows | Extensive plugin ecosystem |
+| **k6** | HTTP, gRPC | Modern API testing, CI/CD integration | JavaScript-based scripting |
+| **Locust** | HTTP, custom | Python-based, distributed | Good for complex auth flows |
+| **Gatling** | HTTP, JMS | High-performance simulation | Scala/Java-based |
+| **Vegeta** | HTTP | Simple, high-throughput HTTP testing | Command-line focused |
+
+## Capacity Planning
+
+### Capacity Planning Formula
+
+```
+Required capacity = (Peak concurrent users × Auth rate per user) × Growth factor × Buffer
+
+Where:
+- Peak concurrent users = Total users × % peak concurrency
+- Auth rate per user = Average auth events per user per hour / 3600
+- Growth factor = Projected user growth over planning horizon (typically 12-24 months)
+- Buffer = 1.5 (50% headroom for unexpected spikes)
+```
+
+### Example Capacity Calculation
+
+| Variable | Value | Source |
+|----------|-------|--------|
+| **Total users** | 50,000 | HRIS headcount |
+| **Peak concurrency** | 30% | Historical Monday peak |
+| **Auth rate per user** | 2/hour | Average SSO app usage |
+| **Peak auths per second** | 50,000 × 0.3 × 2 / 3600 = 8.3 | Calculation |
+| **Growth factor (24 months)** | 1.2 (20% growth) | Business plan |
+| **Buffer** | 1.5 | Standard headroom |
+| **Required capacity** | 8.3 × 1.2 × 1.5 = **~15 auths/sec** | **Final target** |
+
+### Capacity Monitoring Thresholds
+
+| Metric | Warning (Alert) | Critical (Auto-scale) | Action |
+|--------|----------------|----------------------|--------|
+| **IdP CPU** | > 60% | > 80% | Add IdP nodes |
+| **IdP memory** | > 70% | > 85% | Add IdP nodes |
+| **Directory CPU** | > 50% | > 75% | Add directory replicas |
+| **Redis memory** | > 70% | > 85% | Add Redis replicas |
+| **Session recording storage** | > 70% capacity | > 85% capacity | Add storage, review retention |
+| **Authentication latency (p99)** | > 2s | > 5s | Scale out IdP, check directory |
+| **API response time (p99)** | > 2s | > 5s | Scale out API tier |
+
+## Key Takeaways
+
+- IAM/PAM performance has six critical dimensions: authentication latency (< 1s without MFA, < 3s with MFA), token issuance rate, directory lookup speed (< 50ms average), PAM session initiation (< 5s), session recording ingest, and provisioning throughput
+- Authentication performance is affected by directory latency, MFA latency, token signing, network round trips, session store access, and policy evaluation — horizontal scaling of stateless IdP nodes is the most effective scalability approach
+- Directory performance tuning requires proper indexing of search attributes, connection pooling (10-50 per app server), entry cache sizing (50%+ of directory data), thread pool tuning, and page size configuration (1000)
+- PAM session recording storage grows faster than expected — a 50-admin RDP deployment generates ~1.8 TB/month — plan for compression, retention policies, and tiered storage with lifecycle transitions
+- Caching strategy has four layers: local (in-process, short TTL for groups/roles/policies), distributed (Redis for sessions/tokens), read replicas (directory lookups), and CDN (static IdP metadata, JWKS) — each layer has specific TTL and invalidation requirements
+- Capacity planning follows the formula: Peak concurrent users × Auth rate per user × Growth factor × Buffer (1.5x) — monitor CPU (>60% warning, >80% auto-scale), memory, directory load, Redis memory, storage, and latency at p99 to trigger scaling actions
+- Load testing must cover peak, steady state, burst, MFA surge, provisioning peak, directory search, and PAM session rush scenarios — use tools like JMeter, k6, Locust, Gatling, or Vegeta depending on protocol and scripting requirements

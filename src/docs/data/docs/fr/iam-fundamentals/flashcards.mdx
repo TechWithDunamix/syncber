@@ -1,0 +1,54 @@
+---
+title: "Flashcards — Fondamentaux IAM"
+description: "Testez vos connaissances avec ces flashcards interactives — un seul paquet, toutes les cartes. Retournez chaque carte pour voir la réponse."
+sidebar:
+  order: 11
+  label: "Flashcards"
+---
+
+Testez votre compréhension du module Fondamentaux IAM. Cliquez sur une carte pour la retourner entre la question et la réponse. Utilisez les flèches, le clavier (&larr; &rarr;), ou le balayage sur mobile pour naviguer dans le paquet.
+
+<FlashCardDeck>
+  <FlashCard question="Que signifie IAM et quel est son objectif principal ?" answer="Gestion des Identités et des Accès — garantir que les bonnes personnes ont le bon accès aux bonnes ressources au bon moment pour les bonnes raisons." />
+  <FlashCard question="Quels sont les quatre moteurs commerciaux de l'IAM ?" answer="1. Sécurité — réduction des risques de violation. 2. Conformité — respect des mandats réglementaires. 3. Efficacité opérationnelle — automatisation du provisionnement. 4. Expérience utilisateur — SSO et libre-service." />
+  <FlashCard question="Quels sont les trois domaines de capacité de l'IAM ?" answer="Gestion des Identités (création et stockage), Gestion des Accès (authentification et autorisation), et Gouvernance (certification, SOD, audit)." />
+  <FlashCard question="Vrai ou Faux : L'IAM est un seul produit logiciel." answer="Faux. L'IAM est une capacité fournie par les personnes, les processus et la technologie travaillant ensemble." />
+  <FlashCard question="Quels sont les quatre types d'identités numériques ?" answer="1. Identité utilisateur (humaine). 2. Identité de service (API, microservice). 3. Identité d'appareil (ordinateur, serveur). 4. Identité de charge de travail (pod Kubernetes, fonction cloud)." />
+  <FlashCard question="Qu'est-ce que la preuve d'identité (identity proofing) ?" answer="Le processus de collecte et de vérification des preuves concernant une identité avant d'établir une identité numérique de confiance." />
+  <FlashCard question="Quels sont les trois niveaux d'assurance d'identité (IAL) du NIST ?" answer="IAL1 — Auto-déclaré, aucune preuve. IAL2 — Preuve à distance ou en personne (pièce d'identité, KBV). IAL3 — Preuve physique en personne avec comparaison biométrique." />
+  <FlashCard question="Qu'est-ce que la fédération d'identité ?" answer="La fédération permet à une identité créée dans un domaine d'être trusted dans un autre — le fondement du SSO inter-organisationnel." />
+  <FlashCard question="Que signifie JML dans la gestion du cycle de vie des identités ?" answer="Arrivée-Mobilité-Départ (Joiner-Mover-Leaver) — le cadre de gestion des identités de la création à la suppression." />
+  <FlashCard question="Quelles trois actions sont requises immédiatement quand un utilisateur quitte l'organisation ?" answer="1. Désactivation du compte (empêcher la connexion). 2. Révocation des identifiants (réinitialiser mot de passe, révoquer sessions). 3. Suppression des accès (retirer groupes et rôles)." />
+  <FlashCard question="Quelle est la constatation de sécurité la plus courante liée au cycle de vie ?" answer="Le déprovisionnement retardé — des comptes restant actifs après le départ d'un utilisateur." />
+  <FlashCard question="Quelle est l'intégration fondamentale pour l'automatisation du cycle de vie ?" answer="L'intégration RH (SIRH) — connecter l'IAM à la source autorisée des événements d'identité (embauches, départs, transferts)." />
+  <FlashCard question="Quelle est la différence principale entre un service d'annuaire et une base de données relationnelle ?" answer="Les services d'annuaire sont hiérarchiques (arbre), optimisés pour la lecture, utilisent LDAP. Les bases relationnelles sont tabulaires, transactionnelles, utilisent SQL." />
+  <FlashCard question="Que signifie LDAP et que définit-il ?" answer="Lightweight Directory Access Protocol — définit le modèle de données (DIT), la syntaxe de requête (filtres LDAP), les opérations (Bind, Search, Modify) et la sécurité (SASL, LDAPS)." />
+  <FlashCard question="Citez trois services d'annuaire cloud." answer="Azure AD (Entra ID), Okta Universal Directory, Google Cloud Identity, Amazon Cognito." />
+  <FlashCard question="Qu'est-ce que le modèle d'intégration hub-and-spoke ?" answer="Un annuaire d'identité central sert de source d'authentification pour plusieurs applications cibles, plutôt que chaque application maintenant son propre stockage d'identités." />
+  <FlashCard question="Qu'est-ce que le provisionnement Juste-à-Temps (JIT) ?" answer="Les comptes sont créés lors de la première authentification réussie — pas de pré-provisionnement nécessaire. Idéal pour les applications SaaS où la licence dépend des utilisateurs actifs." />
+  <FlashCard question="Que signifie SCIM ?" answer="System for Cross-domain Identity Management (RFC 7642–7644) — le standard REST ouvert pour l'automatisation du provisionnement des identités." />
+  <FlashCard question="Quelles méthodes HTTP SCIM utilise-t-il pour le provisionnement ?" answer="POST — Créer un utilisateur. GET — Lire un utilisateur. PATCH — Mise à jour partielle. PUT — Remplacement complet. DELETE — Supprimer un utilisateur." />
+  <FlashCard question="Quelle est la différence entre désactivation et suppression de compte dans le déprovisionnement ?" answer="La désactivation empêche la connexion mais préserve les données (réversible). La suppression supprime définitivement le compte (irréversible). La désactivation doit être immédiate ; la suppression après la période de conservation." />
+  <FlashCard question="Quels sont les trois principaux types de facteurs d'authentification ?" answer="Connaissance (ce que vous savez), Possession (ce que vous avez), Inhérence (ce que vous êtes). La vraie MFA nécessite au moins deux catégories différentes." />
+  <FlashCard question="Quel pourcentage d'attaques automatisées la MFA bloque-t-elle selon Microsoft ?" answer="99,9 % — la MFA est le contrôle de sécurité le plus efficace qu'une organisation puisse déployer." />
+  <FlashCard question="Qu'est-ce que la fatigue MFA ?" answer="Une attaque où l'adversaire envoie des notifications push MFA répétées jusqu'à ce que l'utilisateur en accepte une, accordant à l'attaquant l'accès." />
+  <FlashCard question="Qu'est-ce qui rend FIDO2/WebAuthn résistant au phishing ?" answer="FIDO2 utilise la cryptographie à clé publique où la clé privée ne quitte jamais l'appareil de l'utilisateur. La clé est liée au domaine d'origine, donc les sites de phishing ne peuvent pas utiliser les identifiants volés." />
+  <FlashCard question="Quelle est la différence entre authentification et autorisation ?" answer="L'authentification vérifie l'identité (&quot;Qui êtes-vous?&quot;). L'autorisation détermine les permissions (&quot;Qu'avez-vous le droit de faire?&quot;)." />
+  <FlashCard question="Quelles sont les trois règles RBAC selon le NIST ?" answer="1. Attribution de rôle — l'utilisateur doit avoir un rôle. 2. Autorisation de rôle — le rôle actif doit être autorisé. 3. Autorisation de permission — la permission doit être autorisée pour le rôle actif." />
+  <FlashCard question="Quels attributs l'ABAC utilise-t-il pour prendre des décisions d'accès ?" answer="Attributs d'utilisateur, de ressource, d'action et de contexte environnemental (heure, réseau, localisation)." />
+  <FlashCard question="Qu'est-ce que le ReBAC et quel système l'a popularisé ?" answer="Contrôle d'Accès Basé sur les Relations — modélise l'accès comme des relations entre entités dans un graphe. Popularisé par Google Zanzibar (utilisé dans Google Drive, YouTube, Gmail)." />
+  <FlashCard question="Qu'est-ce que la certification des accès ?" answer="Revue périodique des droits des utilisateurs par les responsables et propriétaires de ressources pour confirmer ou révoquer chaque accès." />
+  <FlashCard question="Qu'est-ce que la séparation des tâches (SoD) ?" answer="Garantir qu'aucune personne unique n'a suffisamment d'accès pour commettre une fraude ou causer des dommages importants. Les combinaisons d'accès conflictuelles doivent être identifiées et empêchées." />
+  <FlashCard question="Quels cadres de conformité exigent des contrôles IAM ?" answer="Plusieurs — SOX, RGPD, HIPAA, PCI DSS, ISO 27001, NIST SP 800-53 imposent tous des contrôles de gestion des identités et des accès." />
+  <FlashCard question="Quels sont les cinq niveaux de maturité IAM ?" answer="1. Initial (ad-hoc). 2. Défini (documenté). 3. Géré (automatisé). 4. Mesuré (continu). 5. Optimisé (prédictif)." />
+  <FlashCard question="Quel est le modèle d'architecture IAM le plus courant dans les entreprises en migration cloud ?" answer="IAM Hybride — combinant les annuaires sur site (AD) avec les plateformes cloud (Azure AD, Okta) via la synchronisation." />
+  <FlashCard question="Quels sont les trois principes du Zero Trust ?" answer="1. Vérifier explicitement — authentifier et autoriser chaque requête. 2. Moindre privilège — accorder l'accès minimum requis. 3. Supposer la brèche — segmenter, surveiller, ne rien truster par défaut." />
+  <FlashCard question="Quels sont les composants d'un système d'autorisation basé sur les politiques ?" answer="PEP (Policy Enforcement Point) — intercepte les requêtes. PDP (Policy Decision Point) — évalue les politiques. PIP (Policy Information Point) — fournit les données d'attributs." />
+  <FlashCard question="Quand choisir l'IAM centralisé vs décentralisé ?" answer="Centralisé pour les PME à juridiction unique à croissance organique. Décentralisé pour les grandes entreprises multi-régions avec historique d'acquisitions et exigences réglementaires diverses." />
+</FlashCardDeck>
+
+---
+
+<Aside variant="tip">
+Revoyez les cartes que vous avez manquées en naviguant vers le module correspondant pour une explication plus approfondie.
+</Aside>

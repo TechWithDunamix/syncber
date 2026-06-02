@@ -1,0 +1,179 @@
+---
+title: "Role-Based Access Control"
+description: "Comprehensive coverage of RBAC — NIST RBAC models, role design methodology, role mining, role hierarchy, role engineering best practices, and common implementation pitfalls."
+sidebar:
+  order: 7
+  label: "Role-Based Access Control"
+---
+
+Role-Based Access Control (RBAC) is the most widely deployed authorization model in enterprise IT. It assigns permissions to **roles** and roles to **users**, providing a logical abstraction layer that simplifies access management at scale. When implemented correctly, RBAC reduces administrative overhead, enforces consistent access policies, and provides a clear framework for access certification.
+
+## The NIST RBAC Standard
+
+The NIST RBAC standard (ANSI INCITS 359-2012) defines four levels of RBAC, each building on the previous:
+
+### Level 1: Flat RBAC (Core RBAC)
+
+The fundamental concept of RBAC: users are assigned to roles, roles are granted permissions, and users acquire permissions through their role assignments.
+
+```
+Users ──→ Roles (assigned to) ──→ Permissions (granted to)
+                                    ├── Operations
+                                    └── Objects
+```
+
+**Key properties**:
+- **Role assignment** — A user can be a member of multiple roles
+- **Permission authorization** — A role can have multiple permissions
+- **Role authorization** — Subject to role-cardinality constraints (e.g., no more than 3 roles per user)
+
+### Level 2: Hierarchical RBAC
+
+Adds role hierarchies that naturally reflect organisational structure. Senior roles inherit permissions from junior roles.
+
+```
+Admin Role
+    └── Manager Role
+            └── Employee Role
+```
+
+**Inheritance rules**:
+- **General hierarchy** — Role A inherits all permissions from Role B if Role A is senior to Role B
+- **Limited hierarchy** — Inheritance is constrained by scope (e.g., regional manager inherits from regional employee, not all employees)
+- **Multiple inheritance** — A role can inherit from multiple parent roles (e.g., "Project Lead" inherits from both "Developer" and "Team Lead")
+
+### Level 3: Constrained RBAC
+
+Adds separation of duty constraints to prevent conflict-of-interest access combinations:
+
+| Constraint Type | Description | Example |
+|----------------|-------------|---------|
+| **Static Separation of Duty (SSD)** | Mutually exclusive role assignment — a user cannot be assigned conflicting roles simultaneously | A user cannot be assigned both "Purchase Order Creator" and "Purchase Order Approver" |
+| **Dynamic Separation of Duty (DSD)** | Mutually exclusive role activation — a user can be assigned both roles but cannot activate them in the same session | A user can be both "Doctor" and "Patient" but cannot act as both at the same time |
+| **Operational Separation of Duty** | Two-person rule — a sensitive action requires two users with different roles | A nuclear launch requires two keys held by different officers |
+
+### Level 4: Symmetric RBAC (with Reviews)
+
+Adds **role review** and **permission review** as formal processes, closing the loop between role assignment and governance. Reviews ensure that:
+
+- Roles continue to reflect business functions
+- Role memberships remain appropriate
+- Permissions assigned to roles are current and necessary
+
+## Role Design Methodology
+
+### Top-Down Role Engineering
+
+**Approach**: Analyse business processes and job functions, then define roles that align with organisational structure.
+
+**When to use**: Greenfield deployments, significant reorganisation, or when business functions are well-defined.
+
+**Process**:
+1. Analyse business processes and identify job functions
+2. Define role candidates based on job functions
+3. Map permissions to role candidates
+4. Validate with business stakeholders
+5. Refine and document role definitions
+
+**Strengths**: Aligns with business needs, stakeholder buy-in, clean role definitions.
+**Weaknesses**: Time-consuming, may miss exceptions, requires extensive business analysis.
+
+### Bottom-Up Role Mining
+
+**Approach**: Analyse existing user-permission assignments using algorithms to identify natural role groupings.
+
+**When to use**: Brownfield deployments with existing access data, legacy system migration, or when current access patterns need to be understood.
+
+**Process**:
+1. Collect user-permission assignments from target systems
+2. Apply role mining algorithms (clustering, matrix factorisation, frequent itemset mining)
+3. Review candidate roles with business stakeholders
+4. Refine — merge, split, or discard candidates
+5. Ratify roles through governance process
+
+**Strengths**: Data-driven, reveals actual access patterns, faster than top-down.
+**Weaknesses**: May produce roles without business meaning, can entrench existing access issues (entitlement creep).
+
+<Aside variant="tip">
+The best approach is **hybrid**: use bottom-up role mining to generate candidates, then apply top-down business validation to refine and ratify. This combines data-driven discovery with business context.
+</Aside>
+
+### Role Attributes
+
+Each role should have well-defined attributes:
+
+| Attribute | Description | Example |
+|-----------|-------------|---------|
+| **Role ID** | Unique identifier | `ROLE_APP_ADMIN_001` |
+| **Role Name** | Human-readable name | "Application Administrator" |
+| **Description** | Purpose and scope of the role | "Full administrative access to the HR application" |
+| **Owner** | Business owner responsible for the role | "Director of HR Operations" |
+| **Type** | Categorisation | "Job function", "Project-based", "Temporary" |
+| **Systems** | Target systems covered by this role | "Workday, SuccessFactors, PeopleSoft" |
+| **Permissions** | Assigned permissions (by system) | "Workday: Admin full access, PeopleSoft: Read-only" |
+| **Risk level** | Privilege risk classification | "High" (admin), "Medium" (data access), "Low" (read-only) |
+
+## Common RBAC Pitfalls
+
+### Role Explosion
+
+Too many fine-grained roles, defeating the purpose of RBAC. Mitigation: limit roles to 50-200 at a business unit level; use other mechanisms (ABAC, groups) for exceptions.
+
+### Orphan Roles
+
+Roles that no longer correspond to any business function but still have active members. Mitigation: annual role certification, automated role usage reporting.
+
+### Permission Creep (Role Creep)
+
+Users accumulate roles over time, acquiring more permissions than their job requires. Mitigation: periodic access certification, role review, just-in-time access elevation.
+
+### Overlapping Roles
+
+Multiple roles that grant the same or similar permissions, creating confusion and audit issues. Mitigation: role rationalization, merging similar roles, clear naming conventions.
+
+### Over-Privileged Roles
+
+Roles that grant more permissions than required for the job function. Mitigation: granular permission design, principle of least privilege, role risk scoring.
+
+## RBAC Implementation Best Practices
+
+| Practice | Description | Priority |
+|----------|-------------|----------|
+| **Role naming convention** | Consistent naming across all roles (e.g., `{System}_{Function}_{Scope}`) | High |
+| **Role certification** | Annual (or more frequent) review of role definitions and memberships | High |
+| **Role ownership** | Every role must have a named business owner | High |
+| **Default deny** | No implicit trust — all access derived from explicit role assignments | High |
+| **Role cardinality** | Limit the number of roles a single user can hold (recommended: max 10-15) | Medium |
+| **Session limits** | Control how many roles a user can activate in a single session | Medium |
+| **Role risk scoring** | Score roles by privilege level (permissions count, sensitivity of systems, data classification) | Medium |
+
+## RBAC in the Real World — Example
+
+Consider an enterprise HR system with the following RBAC structure:
+
+```
+┌─────────────────────────────────────────┐
+│              HR System RBAC              │
+├─────────────────────────────────────────┤
+│ HR Administrator     (full system admin) │
+│ HR Manager            (department-level)  │
+│ HR Specialist         (functional access) │
+│ HR Assistant          (read + data entry) │
+│ HR Reporting Analyst  (read-only reports) │
+│ Employee Self-Service (own data only)     │
+└─────────────────────────────────────────┘
+```
+
+- **HR Administrator** inherits all permissions from all roles below (hierarchical RBAC)
+- **SSD constraint**: HR Manager cannot also be HR Administrator (separation of duties in access certification)
+- **DSD constraint**: HR Specialist cannot approve their own time-off requests (operational SOD)
+- **Annual certification**: All role memberships reviewed by HR Director
+
+## Key Takeaways
+
+- RBAC assigns permissions to roles and roles to users, providing an abstraction layer that simplifies enterprise access management
+- The NIST RBAC standard defines four levels: Core (flat assignment), Hierarchical (role inheritance), Constrained (SOD rules), and Symmetric (with governance reviews)
+- Role engineering can be top-down (business process analysis) or bottom-up (data mining from existing access patterns) — hybrid approaches combine both strengths
+- Common pitfalls include role explosion (too many fine-grained roles), orphan roles (no business function), permission creep (accumulated roles), and over-privileged roles (excessive permissions)
+- Best practices include naming conventions, role certification, role ownership, default deny, role cardinality limits, and risk scoring
+- RBAC covers ~80% of enterprise authorization needs — when fine-grained, attribute-based policies are required, extend RBAC with ABAC or PBAC rather than creating more granular roles

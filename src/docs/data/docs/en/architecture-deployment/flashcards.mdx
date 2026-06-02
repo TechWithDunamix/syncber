@@ -1,0 +1,30 @@
+---
+title: "Architecture & Deployment Flashcards"
+description: "Test your knowledge with interactive flashcards — one deck, all cards. Flip to reveal the answer and swipe through the deck."
+sidebar:
+  order: 11
+  label: "Flashcards"
+---
+
+Test your understanding of the Architecture & Deployment module. Click a card to flip it between question and answer. Use the arrows, keyboard (&larr; &rarr;), or swipe on mobile to move through the deck.
+
+<FlashCardDeck>
+  <FlashCard question="What are the five layers of the IAM/PAM architecture stack?" answer="1. Consumption layer (apps, APIs). 2. Policy &amp; Control layer (IGA, PAM, IdP, MFA). 3. Identity Store layer (AD, LDAP, cloud IdP). 4. Integration layer (HRIS, ITSM, SIEM, SCIM). 5. Infrastructure layer (compute, network, KMS/HSM)." />
+  <FlashCard question="What are the three primary IAM/PAM architecture patterns?" answer="Hub-and-spoke (central platform with connected target systems), Cloud-hybrid (bridging on-prem and cloud with synchronisation), and Zero Trust (no implicit trust — every request authenticated and authorised)." />
+  <FlashCard question="What are the five levels of the architecture maturity model?" answer="Level 1 Ad hoc (decentralised, manual). Level 2 Centralised (single directory, basic SSO). Level 3 Standardised (IGA platform, RBAC, MFA for VPN). Level 4 Automated (JIT access, automated provisioning/deprovisioning). Level 5 Adaptive (real-time risk-based access, AI-driven, zero standing privileges)." />
+  <FlashCard question="What is the hub-and-spoke architecture pattern?" answer="A central IAM/PAM platform (hub) connects to multiple target applications and systems (spokes). Policy management is centralised while enforcement is distributed across the spokes." />
+  <FlashCard question="What is the cloud-hybrid architecture pattern?" answer="Bridges on-premises and cloud resources. A cloud IdP serves as the authoritative identity source, synchronised with on-premises directories like Active Directory." />
+  <FlashCard question="What key decisions must be made when designing IAM/PAM architecture?" answer="Identity source of truth (HRIS vs directory vs cloud IdP), deployment model (on-prem, cloud, hybrid), identity store technology, authentication protocol, authorisation model, and provisioning approach." />
+  <FlashCard question="What is the most common pitfall in deployment planning for IAM/PAM?" answer="Underestimating authentication traffic peaks and PAM session storage growth. Capacity planning must account for peak loads and the storage requirements of recorded privileged sessions." />
+  <FlashCard question="What does HA and DR mean in the context of IAM/PAM deployment?" answer="High Availability — redundant components across availability zones with clustering and load balancing. Disaster Recovery — documented RTO/RPO with cold/warm/hot standby and regular DR testing." />
+  <FlashCard question="What SCIM protocol is used for in IAM architecture?" answer="System for Cross-domain Identity Management (SCIM) is the open RESTful standard for automating identity provisioning between systems, following RFC 7642-7644." />
+  <FlashCard question="What is the Zero Trust architecture principle in IAM?" answer="No implicit trust is granted based on network location. Every access request is authenticated, authorised, and encrypted regardless of where it originates." />
+  <FlashCard question="What integration patterns are commonly used in IAM/PAM deployments?" answer="HRIS integration (HR as authoritative source for identity events), ITSM integration (service desk for access requests), SIEM integration (log forwarding for security monitoring), DevOps integration (secrets management for CI/CD pipelines)." />
+  <FlashCard question="What are the key considerations for migration when transitioning IAM/PAM platforms?" answer="Directory migration (AD to cloud IdP), IdP migration (SAML/OIDC metadata transfer), PAM platform migration (vault data export/import), and choosing between phased and big-bang migration approaches." />
+</FlashCardDeck>
+
+---
+
+<Aside variant="tip">
+Review any cards you got wrong by navigating to the corresponding module page for a deeper explanation.
+</Aside>

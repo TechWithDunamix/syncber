@@ -1,0 +1,194 @@
+---
+title: "Compliance Automation"
+description: "Automating compliance through policy-as-code, continuous monitoring, automated evidence collection, self-service audit portals, and compliance analytics dashboards."
+sidebar:
+  order: 8
+  label: "Compliance Automation"
+---
+
+Compliance automation transforms compliance from a manual, periodic, reactive process into an automated, continuous, proactive capability. For IAM, automation addresses the most resource-intensive compliance activities: evidence collection, control testing, certification campaigns, and SoD analysis.
+
+## The Case for Compliance Automation
+
+### Manual vs. Automated Compliance
+
+| Activity | Manual Approach (Traditional) | Automated Approach (Modern) |
+|----------|-------------------------------|------------------------------|
+| **Evidence collection** | Email request to system owners, manual export | Automated scheduled extraction from source systems |
+| **Access certification** | Spreadsheet emailed to reviewers, manual tracking | IGA platform with automated reminders, escalation, remediation |
+| **SoD analysis** | Periodic analysis using exported entitlements | Real-time SoD detection and prevention at provisioning time |
+| **Control testing** | Annual manual test by internal audit | Continuous control monitoring with automated alerts |
+| **Policy enforcement** | Manual review for policy violations | Policy-as-code with automated enforcement |
+| **Breach response** | Manual investigation using scattered logs | Automated user attribution, access freeze, credential rotation |
+| **Audit reporting** | Manual report compilation weeks before audit | Real-time compliance dashboard available 24/7 |
+
+### ROI of Compliance Automation
+
+| Metric | Manual | Automated | Improvement |
+|--------|--------|-----------|-------------|
+| **Certification campaign time** | 6-8 weeks | 2-3 weeks | 60% reduction |
+| **Evidence collection time** | 2-3 weeks | 2-3 days | 85% reduction |
+| **SoD analysis time** | 2-4 weeks | Real-time | Near 100% reduction |
+| **Audit preparation time** | 4-6 weeks | 1-2 days | 90%+ reduction |
+| **Control test coverage** | Sample-based (10-20%) | Full population (100%) | 5x improvement |
+| **False positive rate** | Higher (stale data) | Lower (real-time data) | Significant reduction |
+
+## Policy-as-Code for IAM Compliance
+
+Policy-as-code is the practice of defining IAM policies as machine-readable, version-controlled, and automatically enforceable rules.
+
+### Policy Lifecycle
+
+```
+┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
+│  Author  │───>│  Review  │───>│  Deploy  │───>│  Enforce │───>
+│ Policy   │    │  Policy  │    │  Policy  │    │  Policy  │
+└──────────┘    └──────────┘    └──────────┘    └──────────┘
+                                      │
+                                      v
+                               ┌──────────┐
+                               │  Monitor  │
+                               │  Policy   │
+                               └──────────┘
+                                      │
+                                      v
+                               ┌──────────┐
+                               │  Update   │
+                               │  Policy   │<──── Back to Author
+                               └──────────┘
+```
+
+### Policy Categories for Automation
+
+| Policy Category | Example | Automation Method |
+|-----------------|---------|-------------------|
+| **Segregation of duties** | "No user can be both AP Clerk and AP Manager" | Real-time SoD engine at provisioning, periodic batch analysis |
+| **Access requirements** | "All financial system access requires certification" | Provisioning workflow requires certification trigger |
+| **Privileged access** | "No standing privileged access to production" | JIT elevation with expiry and approval workflow |
+| **Password policies** | "Passwords must be 12+ characters" | PAM password policy enforcement, automated rotation |
+| **Authentication** | "MFA required for remote access" | Conditional access policy enforcing MFA |
+| **Lifecycle** | "Access revoked within 24 hours of termination" | HRIS-triggered automated deprovisioning |
+
+### Example: Policy-as-Code with Open Policy Agent
+
+```rego
+# IAM Access Policy — Prevent SoD Violation for Financial Systems
+package iam.sod
+
+# Define toxic combinations
+toxic_combinations = {
+    {"create_vendor", "process_invoice"},
+    {"approve_po", "receive_goods"},
+    {"create_journal", "approve_journal"},
+}
+
+# Check if user has toxic combination
+has_toxic_combination(user) {
+    roles := user_roles[user]
+    combination := toxic_combinations[_]
+    count(roles & combination) >= 2
+}
+
+# Deny provisioning request if it creates toxic combination
+default allow = false
+
+allow {
+    input.action == "provision"
+    not has_toxic_combination(input.user)
+    # Additional access rules...
+}
+```
+
+<Aside variant="info">
+Policy-as-code tools like Open Policy Agent (OPA) enable IAM teams to define access policies in a language like Rego, store them in version control (Git), test them with automated CI/CD pipelines, and enforce them across the infrastructure. This transforms compliance from a documentation exercise into a technical control that is consistently enforced and automatically verifiable.
+</Aside>
+
+## Continuous Control Monitoring
+
+### What to Monitor
+
+| Control | Monitoring Method | Alert Trigger |
+|---------|-------------------|---------------|
+| **User provisioning** | Compare HR data with system accounts hourly | Unauthorised account created, account without approval |
+| **User termination** | Compare terminated employee list with active accounts | Terminated user still active after 24 hours |
+| **Privileged access** | Monitor privilege elevation events | Unusual privilege elevation, elevation outside approved window |
+| **MFA status** | Scan all accounts for MFA enrolment | Admin account without MFA, MFA disabled |
+| **Password expiry** | Check credential age | Password overdue for rotation, service account with static password |
+| **Access certification** | Monitor certification completion rate | Certification overdue, reviewer non-response |
+| **SoD compliance** | Real-time entitlement analysis | New SoD violation detected |
+| **Session activity** | Monitor privileged session events | Suspicious command executed, session outside business hours |
+
+### Continuous Compliance Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                 Source Systems                             │
+│  ┌──────┐  ┌──────┐  ┌──────┐  ┌──────┐  ┌──────┐     │
+│  │ HRIS │  │  IGA │  │ PAM  │  │  IdP │  │ SIEM │     │
+│  └──┬───┘  └──┬───┘  └──┬───┘  └──┬───┘  └──┬───┘     │
+│     │         │         │         │         │          │
+│     v         v         v         v         v          │
+│  ┌─────────────────────────────────────────────────┐    │
+│  │           Compliance Automation Engine            │    │
+│  │  ┌──────────┐ ┌──────────┐ ┌───────────────┐   │    │
+│  │  │Evidence  │ │Control   │ │Policy Engine  │   │    │
+│  │  │Collector │ │Monitor   │ │(OPA/Cedar)    │   │    │
+│  │  └──────────┘ └──────────┘ └───────────────┘   │    │
+│  └─────────────────────────────────────────────────┘    │
+│                    │         │                           │
+│                    v         v                           │
+│  ┌─────────────────────────────────────────────────┐    │
+│  │              Outputs and Actions                  │    │
+│  │  ┌──────────┐ ┌──────────┐ ┌───────────────┐   │    │
+│  │  │Dashboards│ │Automated │ │Audit Evidence │   │    │
+│  │  │& Alerts  │ │Remediation│ │Repository     │   │    │
+│  │  └──────────┘ └──────────┘ └───────────────┘   │    │
+│  └─────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────┘
+```
+
+## Automated Remediation
+
+When a compliance violation is detected, automated remediation can respond faster than human intervention:
+
+| Violation | Automated Response | Timeframe |
+|-----------|-------------------|-----------|
+| **Account for terminated user detected** | Disable account, send notification to security team | Real-time (seconds) |
+| **New SoD violation detected** | Block provisioning, notify approver, escalate | Real-time (seconds) |
+| **Privileged session anomaly** | Terminate session, rotate credentials, alert SOC | Minutes |
+| **MFA disabled on admin account** | Re-enable MFA requirement, notify admin, alert security | Real-time (seconds) |
+| **Password beyond rotation window** | Force password reset, rotate credential, notify user | Real-time (minutes) |
+| **Certification campaign overdue** | Escalate to reviewer's manager, auto-remove if non-responsive | Days |
+
+## Self-Service Audit Portal
+
+A self-service portal allows auditors to access evidence without IAM team involvement:
+
+| Portal Feature | Purpose | Benefit |
+|----------------|---------|---------|
+| **Control inventory** | List all IAM controls with current status | Auditor self-navigation reduces IAM team time |
+| **Evidence download** | Download evidence by control, date range, system | No need to "ask for evidence" — it's always available |
+| **Certification evidence** | Access completed certification reports | Immediate verification that certifications are current |
+| **SoD analysis reports** | View current and historical SoD status | Auditor can independently verify SoD controls |
+| **Policy documents** | Access all IAM policies with version history | Policy-review during audit is streamlined |
+| **Issue tracker** | View all findings with remediation status | Transparent view of control health |
+
+## Compliance Automation Maturity Model
+
+| Level | Name | Characteristics | Automation Coverage |
+|-------|------|-----------------|-------------------|
+| **1** | Initial | Manual evidence collection, spreadsheets, email-based certifications | 0-20% |
+| **2** | Repeatable | Scheduled evidence collection, some automated reports | 20-40% |
+| **3** | Defined | IGA/PAM platforms with automated campaigns, SoD analysis | 40-60% |
+| **4** | Managed | Continuous monitoring, policy-as-code, automated remediation | 60-80% |
+| **5** | Optimising | Predictive compliance, self-healing controls, AI-driven analytics | 80-100% |
+
+## Key Takeaways
+
+- Compliance automation reduces certification campaign time by 60%, evidence collection by 85%, and audit preparation by 90%+ — the ROI is substantial and measurable
+- Policy-as-code (using OPA/Rego, Cedar, or similar) transforms compliance from documentation to enforceable technical controls stored in version control with CI/CD testing
+- Continuous control monitoring provides real-time detection of compliance violations across provisioning, termination, privileged access, MFA, passwords, certifications, and SoD
+- Automated remediation can respond to violations in seconds — account disablement for terminated users, blocking SoD violations at provisioning time, and forcing credential rotation when policies are violated
+- A self-service audit portal allows auditors to independently access evidence, control status, certification reports, SoD analysis, policies, and issue tracking — reducing IAM team involvement in audit preparation
+- The compliance automation maturity model progresses from manual (Level 1) through repeatable, defined, managed, to optimising (Level 5) where controls are self-healing and AI-driven
+- Real-time SoD enforcement at provisioning time is a key automation win — rather than detecting violations after the fact, automation prevents them from occurring

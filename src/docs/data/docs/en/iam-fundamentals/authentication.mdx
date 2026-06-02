@@ -1,0 +1,193 @@
+---
+title: "Authentication Fundamentals & MFA"
+description: "How authentication works — authentication factors, password policies, MFA architectures, passwordless authentication, and common attack vectors."
+sidebar:
+  order: 7
+  label: "Authentication & MFA"
+---
+
+Authentication is the process of verifying that a user is who they claim to be. It is the first line of defence in access control — if authentication fails, nothing else matters. Weak authentication undermines every other security control: no amount of fine-grained authorization, encryption, or monitoring can protect a system if an attacker can simply log in as a legitimate user.
+
+The authentication landscape has changed dramatically in the last decade. The industry is moving from knowledge-based (password) authentication toward possession-based and biometric methods, driven by the recognition that passwords are fundamentally broken as a primary authentication mechanism.
+
+## Authentication Factors
+
+Authentication factors fall into three categories, often remembered as "something you **have**, **know**, or **are**". True multi-factor authentication requires factors from at least two different categories.
+
+| Factor Type | Examples | Security Level | Phishable? | User Friction |
+|-------------|----------|----------------|------------|---------------|
+| **Knowledge** (something you know) | Password, PIN, security question | Low | Yes | Low |
+| **Possession** (something you have) | Phone, hardware token, smart card, TOTP seed | Medium-High | Depends | Low-Medium |
+| **Inherence** (something you are) | Fingerprint, face, voice, iris, palm vein | High | No (biometric liveness) | Low (passive) |
+| **Location** (somewhere you are) | Geo-IP, GPS, network subnet, Wi-Fi SSID | Contextual | Yes (VPN spoofing) | None (passive) |
+| **Behaviour** (something you do) | Typing rhythm, mouse movement, gait pattern | Emerging | Low | None (passive) |
+
+### Single-Factor vs. Multi-Factor
+
+- **Single-factor authentication (1FA)** — Uses one factor (typically a password). Compromised if the single factor is stolen or guessed.
+- **Two-factor authentication (2FA)** — Uses two factors from different categories (e.g., password + TOTP code). Requires the attacker to compromise both channels.
+- **Multi-factor authentication (MFA)** — Uses two or more factors from different categories. MFA and 2FA are often used interchangeably, but strictly MFA can include more than two factors.
+
+<Aside variant="caution">
+Using two factors from the SAME category (e.g., password + PIN, or fingerprint + facial recognition) is NOT multi-factor authentication. Both are knowledge factors or both are biometric factors. True MFA requires factors from different categories.
+</Aside>
+
+## Password Authentication — The Current Reality
+
+Despite decades of advancement in authentication technology, passwords remain the most common authentication method — and the most vulnerable. The challenge is that passwords are both economically and practically difficult to replace at scale.
+
+### Password Policy Best Practices — Modern Approach (NIST SP 800-63B)
+
+| Policy | Traditional Approach | Modern NIST Recommendation | Rationale |
+|--------|---------------------|---------------------------|-----------|
+| **Minimum length** | 8 characters | 12+ characters | Length is the strongest predictor of password strength against brute force |
+| **Complexity** | Require uppercase, lowercase, digit, special character | Not required | Composition rules encourage predictable patterns (Password1!), not actual strength |
+| **Expiration** | Mandatory 30/60/90 day rotation | Do not require periodic rotation | Users choose weaker passwords when forced to change frequently. Only rotate when compromise is suspected |
+| **Password history** | Remember last 10 passwords | Check against known breach databases (haveibeenpwned API) | A unique but weak password is still weak |
+| **Password hints** | Allowed | Prohibit | Hints == security questions (easily guessed or socially engineered) |
+| **Multi-factor** | Optional | Required — always enable MFA | MFA is the most effective compensating control for password weaknesses |
+
+### How Attackers Compromise Passwords
+
+| Attack | Method | Mitigation |
+|--------|--------|------------|
+| **Brute force** | Systematically try all possible password combinations | Account lockout after N failed attempts, rate limiting, CAPTCHA |
+| **Credential stuffing** | Use username/password pairs from previous breaches against other services | Breach detection (haveibeenpwned), MFA, unique passwords per service |
+| **Phishing** | Trick user into entering credentials on a fake login page | Security awareness training, FIDO2/WebAuthn (phishing-resistant), email filtering |
+| **Spear phishing** | Targeted phishing using personal information | Advanced email security, hardware token MFA |
+| **Keylogging** | Malware captures keystrokes | Endpoint protection, hardware-based auth (FIDO2), application allowlisting |
+| **Pass-the-hash** | Reuse NTLM password hashes to authenticate to Windows systems | Credential Guard, LSA protection, disable NTLM where possible |
+| **Rainbow table** | Precomputed hash lookup for common passwords | Salted password hashing (bcrypt, scrypt, Argon2) |
+| **Password spraying** | Try common passwords against many accounts | Rate limiting per IP, MFA, monitoring for unusual login patterns |
+
+## Multi-Factor Authentication (MFA)
+
+MFA significantly reduces the risk of account compromise. According to Microsoft, MFA blocks **99.9%** of automated attacks. Organisations with MFA enforcement experience 99% fewer account compromises than those without.
+
+### MFA Methods Compared in Depth
+
+| Method | User Experience | Security Level | Phishing Resistance | Deployment Complexity | Cost |
+|--------|----------------|----------------|-------------------|----------------------|------|
+| **SMS OTP** | Good — works on any phone | Low — vulnerable to SIM swap, SS7 attacks | None — phishable | Low — carrier integration | Low (per-message cost) |
+| **Voice OTP** | Moderate — requires phone call | Low — similar to SMS | None | Low | Low |
+| **TOTP (Google/Microsoft Authenticator)** | Moderate — open app, type code | High — seed is local, time-limited | Low — code is phishable | Low — QR code setup | Free |
+| **Push notification (Okta Verify, MS Authenticator)** | Excellent — tap approve/reject | High — app-bound, user must actively approve | Medium — MFA fatigue risk | Medium — app installation required | Free–Moderate |
+| **FIDO2 / WebAuthn** | Excellent — touch key or biometric | Very high — private key never leaves device | Very high — origin-bound, cannot be phished | Medium — platform/browser support required | Moderate |
+| **Hardware token (YubiKey, Feitian)** | Good — insert/tap device | Very high — dedicated hardware, tamper-resistant | Very high — origin-bound | Medium — token distribution logistics | Moderate–High ($20-70/token) |
+| **Smart card (PIV/CAC)** | Moderate — insert + PIN | Very high — cryptographic key on card, PIN-protected | Very high — origin-bound | High — PKI infrastructure required | High ($50-100/card + PKI) |
+
+### MFA Deployment Architecture
+
+```
+User
+ │
+ ├── Primary Auth (Password + TOTP)
+ │      │
+ │      └── IdP verifies credentials → Issues session token
+ │
+ └── Step-up Auth (FIDO2 hardware key)
+        │
+        └── IdP challenges for high-risk action → Issues elevated token
+```
+
+**Primary MFA** — Required at every login for every user. Typically TOTP or push notification.
+**Step-up MFA** — Additional factor required for high-risk actions (admin console access, password change, large data export) even if the user already has an active session.
+
+### MFA Bypass Attack Vectors
+
+Even MFA is not invulnerable. Understanding bypass techniques is essential for IAM professionals:
+
+| Attack | How It Works | Target | Mitigation |
+|--------|-------------|--------|------------|
+| **MFA fatigue** | Attacker repeatedly sends push MFA requests until the user accepts (often dozens of notifications in minutes) | Push notification MFA | Number matching (user must enter a number shown on screen), rate limiting push requests |
+| **SIM swapping** | Socially engineer mobile carrier to transfer victim's phone number to attacker's SIM | SMS OTP | Port-out PIN, TOTP or hardware token instead of SMS |
+| **Session cookie theft** | Steal post-MFA session cookie via XSS, malware, or proxy | Any web-based MFA | Short session lifetimes, HTTP-only cookies, device binding, token binding |
+| **Man-in-the-middle (evilginx)** | Proxy authentication flow between user and legitimate site, capturing both password and MFA code | Any phishable MFA (SMS, TOTP) | FIDO2/WebAuthn (origin-bound, cannot be proxied) |
+| **Adversary-in-the-middle (AiTM)** | Same as MITM but with real-time session cookie reuse | OIDC/SAML-based flows | Token binding, certificate-based authentication |
+| **OAuth token replay** | Steal OAuth access token and replay from attacker's device | OAuth-based flows | Sender-constrained tokens (DPoP), token binding |
+
+<Aside variant="danger">
+MFA fatigue attacks are increasingly common and effective. In 2024, multiple high-profile breaches were attributed to MFA fatigue. Deploy number-matching push notifications or FIDO2 to mitigate this vector.
+</Aside>
+
+## Passwordless Authentication
+
+Passwordless authentication eliminates passwords entirely, replacing them with cryptographic key pairs. The goal is to remove both the usability burden and the security risk of passwords.
+
+### FIDO2 / WebAuthn — The Passwordless Standard
+
+FIDO2 is the set of specifications developed by the FIDO Alliance that enables passwordless, phishing-resistant authentication. It includes the WebAuthn standard (W3C) and the CTAP protocol (for external authenticators).
+
+<Steps>
+### FIDO2 Registration Flow
+1. User navigates to service and initiates registration
+2. Service generates a random challenge and sends it to the user's device
+3. User's device creates a public-private key pair
+4. User verifies identity using a local gesture (biometric scan, PIN, or device unlock)
+5. Device signs the challenge with the private key and sends the public key to the service
+6. Service stores the public key associated with the user account
+7. **Result**: Private key never leaves the device. Public key is stored server-side.
+
+### FIDO2 Authentication Flow
+1. User attempts to log in by providing username
+2. Service sends a challenge to the user's device
+3. Device prompts user for local gesture (biometric or PIN)
+4. Device signs the challenge with the private key
+5. Service verifies the signature using the stored public key
+6. **Result**: No password transmitted. No shared secret. Phishing-resistant because the private key is bound to the origin domain.
+
+### Why FIDO2 Is Phishing-Resistant
+Traditional MFA (SMS, TOTP) can be phished — the attacker's fake site captures both the password and the one-time code. FIDO2 prevents this because:
+- The private key is bound to the **origin** (the domain name) at registration time
+- The browser enforces this binding — the private key is only released to the correct origin
+- A phishing site at `evil.example.com` cannot use the credential registered for `example.com`
+- **The credential cannot be phished, stolen from the server, or replayed**
+</Steps>
+
+### Passwordless Deployment Considerations
+
+| Factor | Consideration |
+|--------|--------------|
+| **User enrollment** | Users need a FIDO2-compatible authenticator (platform: Touch ID, Windows Hello; or roaming: YubiKey) |
+| **Fallback mechanism** | TOTP or recovery codes for lost devices or unsupported platforms |
+| **Recovery flow** | How does a user regain access if they lose their FIDO2 key? (Recovery codes, admin reset, secondary email) |
+| **Platform support** | FIDO2 is supported in all major browsers (Chrome, Edge, Firefox, Safari) and platforms (Windows, macOS, iOS, Android) |
+| **Hardware distribution** | For enterprise roaming keys, plan distribution logistics, initial setup, and key replacement processes |
+
+### Risk-Based Authentication (Adaptive Authentication)
+
+Risk-based authentication (RBA) evaluates the risk level of each authentication attempt and adjusts the required authentication strength accordingly:
+
+| Risk Factor | Low Risk | High Risk |
+|-------------|----------|-----------|
+| **Device** | Known, corporate-managed device | Unknown device, personal device |
+| **Location** | Corporate office, home office | Foreign country, known high-risk region |
+| **Time** | Business hours, normal work hours | 3 AM, outside normal pattern |
+| **Network** | Corporate VPN, trusted IP range | Public Wi-Fi, Tor exit node, data centre IP |
+| **Behaviour** | Normal application usage pattern | Large data download, first-time admin access |
+| **Credential type** | Password + MFA | Only password (prompt for MFA) |
+
+**Low risk** → Passwordless or password + device trust (seamless experience)
+**Medium risk** → Standard MFA (TOTP or push)
+**High risk** → Step-up MFA with FIDO2 hardware key + justification required
+
+### Authentication Protocol Comparison
+
+| Protocol | Auth Type | Token Format | Use Case | Passwordless? |
+|----------|-----------|-------------|----------|---------------|
+| **Password-based** | Traditional | Session cookie | Legacy web apps | No |
+| **SAML 2.0** | Federated | XML assertion | Enterprise SSO, government | Yes (with FIDO2) |
+| **OAuth 2.0** | Delegated authorization | Bearer token | API access, app permissions | N/A (authorization, not auth) |
+| **OpenID Connect (OIDC)** | Federated identity | JWT (ID token) | Modern web and mobile SSO | Yes |
+| **WebAuthn (FIDO2)** | Passwordless | Public key cryptography | Passwordless, phishing-resistant | Yes |
+| **Kerberos** | Network authentication | Ticket | Windows domain auth | Yes (with smart card) |
+
+## Key Takeaways
+
+- Authentication factors must come from different categories (knowledge, possession, inherence) for true MFA — using two factors from the same category is not MFA
+- Password policies should prioritise length (12+ characters) and MFA enablement over complexity rules and periodic rotation per NIST SP 800-63B
+- MFA blocks 99.9% of automated attacks — it is the single most impactful security control an organisation can deploy
+- MFA is not invulnerable — understand bypass vectors (MFA fatigue, SIM swap, session token theft, Adversary-in-the-Middle)
+- FIDO2/WebAuthn provides phishing-resistant, passwordless authentication using public-key cryptography — the private key is bound to the origin domain and never leaves the user's device
+- Risk-based authentication adjusts auth requirements based on contextual risk factors (device, location, time, behaviour) to balance security and user experience
+- The industry is moving toward passwordless as the long-term authentication goal, with FIDO2 as the leading standard

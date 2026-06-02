@@ -1,0 +1,157 @@
+---
+title: "HIPAA Compliance"
+description: "Health Insurance Portability and Accountability Act — HIPAA Privacy Rule, Security Rule, ePHI access controls, audit controls, emergency access (break-glass), and business associate agreements for IAM."
+sidebar:
+  order: 6
+  label: "HIPAA Compliance"
+---
+
+The Health Insurance Portability and Accountability Act (HIPAA) establishes national standards for protecting individuals' medical records and other personal health information. The HIPAA Security Rule specifically addresses electronic protected health information (ePHI) and mandates administrative, physical, and technical safeguards — including significant IAM requirements.
+
+## HIPAA Rules Relevant to IAM
+
+### HIPAA Privacy Rule (45 CFR §164.500-534)
+
+Establishes standards for the use and disclosure of protected health information (PHI):
+
+- Defines who can access PHI and under what circumstances
+- Establishes patient rights over their health information
+- Requires minimum necessary standard for PHI access
+- Mandates training for workforce members on privacy policies
+
+### HIPAA Security Rule (45 CFR §164.302-318)
+
+Specifies administrative, physical, and technical safeguards for ePHI:
+
+| Safeguard Category | Description | IAM Relevance |
+|-------------------|-------------|---------------|
+| **Administrative safeguards** | Policies, procedures, risk analysis, workforce training | Access authorization policy, security awareness training |
+| **Physical safeguards** | Facility access controls, workstation security | Physical access controls for systems with ePHI |
+| **Technical safeguards** | Technology-based controls for ePHI access | **Access controls, audit controls, authentication, integrity** |
+
+### HIPAA Breach Notification Rule (45 CFR §164.400-414)
+
+Requires notification following a breach of unsecured PHI:
+
+- **Less than 500 individuals**: Notify HHS annually
+- **500+ individuals**: Notify HHS, affected individuals, and major media outlets within 60 days
+- **Business associates** must also notify covered entities
+
+## Technical Safeguards for IAM
+
+### 45 CFR §164.312(a)(1) — Access Control
+
+| Standard | Implementation Specification | IAM Implementation |
+|----------|-----------------------------|-------------------|
+| **Unique user identification** | Required (addressable) | Unique user IDs for every person accessing ePHI — no shared accounts |
+| **Emergency access procedure** | Required (addressable) | Break-glass accounts with documented procedure and post-access review |
+| **Automatic logoff** | Required (addressable) | Session timeout enforcement (e.g., 15 minutes of inactivity) |
+| **Encryption and decryption** | Addressable | Encryption of ePHI at rest, TLS for in-transit ePHI access |
+
+### Emergency Access (Break-Glass) for HIPAA
+
+HIPAA is unique among regulations in specifically requiring an emergency access procedure for ePHI:
+
+<Steps>
+1. **Define emergency scenarios** — Identify situations where normal access controls would prevent timely treatment (e.g., system outage, provider unavailable to approve access, clinical emergency)
+2. **Establish break-glass accounts** — Create dedicated emergency access accounts with elevated privileges, stored in a sealed envelope or secure password vault
+3. **Implement dual custody** — Require two authorised individuals to be present when break-glass credentials are accessed (when operationally feasible)
+4. **Document every use** — Each break-glass access event must be documented with: date/time, individual accessing, reason for emergency, ePHI accessed, and actions performed
+5. **Post-event review** — Within 24-48 hours of break-glass access, conduct a review with the privacy officer, security officer, and the individual who initiated the break-glass
+6. **Audit and improve** — Analyse break-glass events quarterly to identify patterns and reduce reliance on emergency procedures through process improvements
+</Steps>
+
+<Aside variant="caution">
+The most common HIPAA audit finding related to IAM is the absence of a documented and tested emergency access procedure. Having break-glass accounts is not enough — the procedure must be documented, personnel must be trained, and break-glass usage must be reviewed and logged. Test the procedure at least annually and document the test results.
+</Aside>
+
+### 45 CFR §164.312(b) — Audit Controls
+
+| Requirement | Implementation |
+|-------------|----------------|
+| Record ePHI access | Log all access to ePHI including user ID, timestamp, action, and ePHI identifier |
+| Hardware, software, and procedural mechanisms | IAM audit logs, database audit logs, file access audit logs |
+| Review audit logs | Designated security official reviews audit logs periodically |
+| Protect audit logs | Audit logs must be protected from modification and unauthorized access |
+
+### 45 CFR §164.312(d) — Person or Entity Authentication
+
+Requires procedures to verify that a person or entity seeking access to ePHI is the one claimed:
+
+| Authentication Method | HIPAA Acceptability | Common Deployment |
+|----------------------|---------------------|-------------------|
+| **Something you know** (password, PIN) | ✓ | Password with complexity requirements |
+| **Something you have** (token, smart card) | ✓ | OTP, hardware token, mobile authenticator |
+| **Something you are** (biometric) | ✓ | Fingerprint, facial recognition |
+| **Two-factor** | ✓ | MFA for any remote or privileged ePHI access |
+
+## Business Associate Agreements
+
+### HIPAA Business Associates and IAM
+
+A business associate is a person or entity that performs functions or activities on behalf of a covered entity involving the use or disclosure of PHI. IAM service providers (IGA platforms, PAM vendors, identity providers) are business associates if they process ePHI.
+
+| Business Associate Type | IAM Implications |
+|------------------------|------------------|
+| **IAM/PAM SaaS provider** | Must sign BAA, must control access to PHI in their systems |
+| **Identity provider (IdP)** | Must secure authentication data, logs, and metadata containing PHI |
+| **IGA platform** | Must secure access certification data containing user identity linked to healthcare roles |
+| **SSO provider** | Must prevent PHI exposure through SSO tokens or session data |
+
+### BAA Requirements for IAM
+
+| BAA Requirement | IAM Implementation |
+|-----------------|-------------------|
+| **Permitted uses** | Define what IAM systems can do with PHI (e.g., authentication, access control, logging) |
+| **Security safeguards** | IAM provider must implement appropriate administrative, physical, and technical safeguards |
+| **Reporting obligations** | Breach notification, audit log access for the covered entity |
+| **Subcontractor obligations** | IAM provider's subcontractors (e.g., cloud infrastructure) must also comply |
+| **Termination** | Return or destroy PHI on contract termination — identity data archival or deletion |
+
+## Minimum Necessary Standard
+
+The HIPAA Privacy Rule requires that covered entities take reasonable steps to limit the use or disclosure of PHI to the minimum necessary to accomplish the intended purpose.
+
+**IAM implementation of minimum necessary:**
+
+```
+Role: Physician treating patient in Emergency Department
+  └── Access to: Current visit records, medication history, allergies
+  └── No access to: Billing data, HR records, non-patient applications
+
+Role: Insurance billing specialist
+  └── Access to: Claim data, insurance verification, payment history
+  └── No access to: Clinical notes, treatment plans, lab results
+```
+
+### Attribute-Based Access Control for Minimum Necessary
+
+ABAC is ideal for implementing the minimum necessary standard because access decisions can incorporate context:
+
+- **User attributes**: Role, department, care unit, relationship to patient
+- **Resource attributes**: ePHI type, sensitivity classification, date of creation
+- **Environment attributes**: Time of day, location, device security posture
+- **Action attributes**: Read, write, modify, delete, disclose
+
+## HIPAA Penalties and Enforcement
+
+| Violation Tier | Culpability | Minimum Penalty | Maximum Penalty |
+|---------------|-------------|----------------|-----------------|
+| **Tier 1** | Did not know (and reasonable diligence) | $100 per violation | $50,000 |
+| **Tier 2** | Reasonable cause | $1,000 per violation | $100,000 |
+| **Tier 3** | Willful neglect — corrected | $10,000 per violation | $250,000 |
+| **Tier 4** | Willful neglect — not corrected | $50,000 per violation | $1.5 million |
+
+**Annual cap per violation category**: $1.5 million
+**Criminal penalties**: Up to $250,000 and 10 years imprisonment
+
+## Key Takeaways
+
+- HIPAA requires three categories of safeguards: administrative (policies, risk analysis), physical (facility controls), and technical (access controls, audit controls, authentication) — IAM primarily addresses the technical and administrative safeguards
+- The Security Rule's access control standard (45 CFR §164.312(a)) uniquely requires an emergency access procedure — break-glass accounts with documented procedure, dual custody, post-event review within 24-48 hours, and annual testing
+- Unique user identification is required for every person accessing ePHI — no shared accounts are permitted in healthcare environments
+- The minimum necessary standard requires that access to ePHI is limited to the minimum needed to accomplish the intended purpose — ABAC is the ideal access control model for implementing this
+- IAM service providers (IdP, PAM, IGA) that process ePHI are HIPAA business associates and must sign Business Associate Agreements (BAAs) with security safeguard requirements
+- The automatic logoff specification requires enforcement of session timeouts (typically 15 minutes of inactivity) for systems that access ePHI
+- Audit controls (164.312(b)) require recording all ePHI access including user ID, timestamp, action, and ePHI identifier, with regular log review by the designated security official
+- HIPAA penalties range from $100 to $1.5 million per violation category annually, with criminal penalties up to 10 years imprisonment for willful neglect

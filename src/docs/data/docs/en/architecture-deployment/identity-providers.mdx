@@ -1,0 +1,183 @@
+---
+title: "Identity Providers"
+description: "Identity provider architecture — SAML/OIDC flow infrastructure, token handling, session management, IdP brokering, and enterprise IdP deployment patterns."
+sidebar:
+  order: 5
+  label: "Identity Providers"
+---
+
+The Identity Provider (IdP) is the central authentication authority in modern IAM architecture. The IdP authenticates users, issues tokens, and manages sessions. Choosing and deploying an IdP is one of the most consequential infrastructure decisions in an identity program.
+
+## IdP Deployments
+
+| IdP | Type | Protocol Support | Deployment Model | Key Strength |
+|-----|------|-----------------|-----------------|--------------|
+| **Okta** | Cloud IdP | SAML, OIDC, SCIM, LDAP, RADIUS | SaaS | Largest integration network, workflow engine |
+| **Azure AD / Entra ID** | Cloud IdP | SAML, OIDC, WS-Fed, Kerberos | SaaS | Deep Microsoft integration, conditional access |
+| **Ping Identity** | IdP + Directory | SAML, OIDC, LDAP, SCIM, WS-Fed, RADIUS | SaaS + On-prem | Multi-protocol support, enterprise directory |
+| **Keycloak** | Open Source IdP | SAML, OIDC, LDAP | Self-hosted | Open source, customisable, community |
+| **ForgeRock** | IdP + IG | SAML, OIDC, LDAP, RADIUS | Self-hosted + SaaS | Full IAM platform, IoT support |
+| **OneLogin** | Cloud IdP | SAML, OIDC, SCIM, LDAP | SaaS | Simplicity, ease of setup |
+| **Amazon Cognito** | Cloud IdP | OIDC, SAML | AWS SaaS | AWS integration, cost-effective for B2C |
+| **Auth0** | Cloud IdP | OIDC, SAML, WS-Fed | SaaS | Developer experience, extensibility |
+
+## IdP Architecture Components
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                      IDENTITY PROVIDER                         │
+│                                                                │
+│  ┌────────────┐   ┌────────────┐   ┌──────────────────┐     │
+│  │Auth Service│   │Token Svc   │   │User Store / Dir  │     │
+│  ├────────────┤   ├────────────┤   ├──────────────────┤     │
+│  │MFA Engine  │   │Session Mgt │   │Policy Provider   │     │
+│  ├────────────┤   ├────────────┤   ├──────────────────┤     │
+│  │Auth Flows  │   │Token Store │   │Attribute Store   │     │
+│  │(SAML/OIDC) │   │(Sessions)  │   │(Directory/LDAP)  │     │
+│  └────────────┘   └────────────┘   └──────────────────┘     │
+│                    │                                         │
+│  ┌────────────────┴────────────────────────────────────┐     │
+│  │              Integration Layer                        │     │
+│  │  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐      │     │
+│  │  │REST  │ │SCIM  │ │LDAP  │ │SAML  │ │OIDC  │      │     │
+│  │  │API   │ │Prov. │ │Lookup│ │IdP   │ │RP    │      │     │
+│  │  └──────┘ └──────┘ └──────┘ └──────┘ └──────┘      │     │
+│  └────────────────────────────────────────────────────┘     │
+└──────────────────────────────────────────────────────────────┘
+```
+
+## SAML 2.0 IdP Architecture
+
+### Flow Infrastructure
+
+| Component | Function | Deployment Consideration |
+|-----------|----------|--------------------------|
+| **IdP endpoint** | Receives SAML AuthnRequest, initiates authentication | High-availability URL, TLS termination |
+| **Assertion Consumer Service (ACS)** | SP endpoint that receives SAML assertions | URL must be registered with SP, TLS protected |
+| **Metadata endpoint** | Publishes IdP metadata (certificate, endpoints) | Publicly accessible, signed metadata |
+| **Single Logout (SLO)** | Terminates session across all SPs | Complex timing, SP compatibility issues |
+| **Certificate store** | Holds signing and encryption certificates | HSM-backed, rotation policy, key management |
+
+### Token Handling
+
+| Token Type | Purpose | Lifetime | Security Considerations |
+|------------|---------|----------|------------------------|
+| **SAML assertion** | Authentication and attribute statement | Short (5-30 minutes) | Signed, optionally encrypted; replay protection via NotBefore/NotOnOrAfter |
+| **SAML session cookie** | IdP-initiated session persistence | Hours to days | HttpOnly, Secure, SameSite attributes |
+| **OIDC ID token** | User identity information | Short (1-60 minutes) | JWT format, signed with RS256/ES256 |
+| **OIDC access token** | API authorisation | Minutes to hours | Bearer token, opaque or JWT format |
+| **OIDC refresh token** | Obtain new access tokens without user interaction | Hours to days | Secure storage, rotation on use, single-use |
+| **Session token (IdP)** | Authenticated session at the IdP | Hours to days | Server-side, tied to user agent fingerprint |
+
+## Session Management
+
+### IdP Session Architecture
+
+```
+User Browser ──> IdP Auth ──> IdP Session Created ──> SP Token Issued
+                                                         │
+                      ┌──────────────────────────────────┘
+                      │
+                      v
+               User Access App ──> SP Checks Token ──> Valid
+                      │                                    │
+               Token Expires         ┌─────────────────────┘
+                      │              │
+                      v              v
+               User Re-auth        IdP Session Valid?
+                      │              │
+                      │         Yes ──┴── No
+                      │          │         │
+                      v          v         v
+                 Re-authenticate  Silent    Re-login
+                 (if IdP sess.    Token
+                  expired)        Refresh
+```
+
+### Session Management Best Practices
+
+| Practice | Rationale | Implementation |
+|----------|-----------|----------------|
+| **Set appropriate session TTL** | Balance security and user experience | Idle session: 15-60 minutes; max session: 8-24 hours |
+| **Session binding** | Prevent session hijacking | Bind session to IP, user-agent, device fingerprint |
+| **Single session enforcement** | Limit concurrent sessions | Configure in IdP (e.g., Okta concurrent session limit) |
+| **Session revocation** | Immediate logout capability | Support admin-initiated session revocation |
+| **Remember me / persistent sessions** | Reduce authentication frequency | Trusted device with cryptographic token, conditional |
+| **Conditional session duration** | Longer for trusted devices, shorter for suspicious | Sign-in risk, device compliance, location |
+
+## IdP Brokering / Federation Hub
+
+### When to Use an IdP Broker
+
+| Scenario | Broker Architecture | Benefit |
+|----------|-------------------|---------|
+| **Merger/Acquisition** | Broker between multiple IdPs | Users authenticate at their home IdP, broker translates |
+| **Multi-cloud** | Broker between cloud and on-prem IdPs | Consistent authentication experience |
+| **Partner federation** | Broker for B2B federated partners | Manage hundreds of partner IdP connections |
+| **Migration** | Broker during IdP migration | Phased migration with transparent user experience |
+
+### Broker Architecture
+
+```
+┌────────────────────────────────────────────────────────────┐
+│                      IdP BROKER                              │
+│                                                               │
+│  ┌──────────┐    ┌──────────┐    ┌──────────┐              │
+│  │ Internal │───>│  Broker  │───>│  Cloud   │              │
+│  │ IdP (AD) │    │  Engine  │    │  IdP     │              │
+│  └──────────┘    └────┬─────┘    └──────────┘              │
+│                        │                                     │
+│        ┌───────────────┼───────────────┐                    │
+│        │               │               │                    │
+│   ┌────┴────┐   ┌──────┴──────┐  ┌────┴────┐              │
+│   │  App    │   │   SaaS     │   │  Cloud  │              │
+│   │  On-prem│   │  App       │   │ Console │              │
+│   └─────────┘   └────────────┘   └─────────┘              │
+└────────────────────────────────────────────────────────────┘
+```
+
+## IdP High Availability
+
+### IdP HA Architecture
+
+| Component | HA Strategy | Failure Mode |
+|-----------|-------------|--------------|
+| **IdP service** | Active-active across regions | Failover to secondary region via DNS routing |
+| **Token store** | Replicated database (SQL/NoSQL) | Automatic failover, read replicas |
+| **Session store** | Distributed cache (Redis/Memcached) | Replica promotion, cache warming |
+| **User store / directory** | Multi-master replication | Automatic DC failover |
+| **Certificate store / HSM** | HSM cluster with key replication | Automatic HSM failover |
+| **Load balancer** | Active-passive (HAProxy/NLB) | Automatic health check failover |
+
+### IdP Availability Formula
+
+| IdP Type | Typical SLA | Annual Downtime | User Impact of 1 Hour Downtime |
+|----------|-------------|-----------------|-------------------------------|
+| **Cloud IdP (Okta/Azure)** | 99.99% | 52 minutes | All apps requiring SSO unavailable |
+| **Self-hosted (Keycloak)** | 99.9% (with HA) | 8.76 hours | Same as above + no federated access |
+| **Self-hosted (single node)** | 99% | 87.6 hours | Complete authentication failure |
+
+<Aside variant="warning">
+IdP downtime means ALL applications that rely on SSO authentication become unavailable. Users cannot access any federated application, including email, CRM, cloud infrastructure, and collaboration tools. IdP HA is not optional — it is a business-critical requirement that should be designed with multi-region active-active deployment, automatic failover, and regular DR testing.
+</Aside>
+
+## IdP Deployment Patterns
+
+| Pattern | Description | When to Use |
+|---------|-------------|-------------|
+| **Cloud IdP as primary** | Cloud IdP is the authoritative identity source | Cloud-first, SaaS-heavy organisations |
+| **On-prem IdP with cloud federation** | On-prem AD/LDAP federated to cloud IdP | Mature AD deployment, hybrid infrastructure |
+| **IdP brokering** | Central broker arbitrates between IdPs | Post-M&A, multi-IdP environments |
+| **Custom IdP (Keycloak)** | Self-hosted, customised IdP | Custom authentication flows, air-gapped environments |
+| **B2C IdP (Auth0/Cognito)** | Customer-facing authentication | Consumer applications, social login |
+| **Regional IdP** | Separate IdP per region | Data residency, compliance requirements |
+
+## Key Takeaways
+
+- The Identity Provider (IdP) is the central authentication authority — an IdP outage means ALL SSO-authenticated applications become unavailable, making HA design business-critical
+- Major IdP options include Okta (integration network), Azure AD/Entra ID (Microsoft ecosystem), Ping Identity (multi-protocol), Keycloak (open source), Auth0 (developer-focused), and AWS Cognito (B2C)
+- IdP architecture components include authentication service, MFA engine, token service (issuing SAML assertions and OIDC tokens), session management, user store/directory, and integration layer (REST, SCIM, LDAP, SAML, OIDC)
+- Token handling requires careful lifetime management — SAML assertions (5-30 minutes), OIDC ID tokens (1-60 minutes), access tokens (minutes to hours), refresh tokens (hours to days), and session cookies (hours to days)
+- Session management best practices include appropriate TTL, session binding (IP, user-agent), single-session enforcement for sensitive apps, immediate revocation capability, and conditional session duration based on risk
+- IdP brokering (federation hub) is essential in M&A, multi-cloud, B2B partner federation, and migration scenarios — the broker mediates between multiple IdPs for a consistent user experience
+- IdP HA requires active-active multi-region deployment, replicated token/session stores, distributed caching, and automatic failover — cloud IdPs typically offer 99.99% SLA, self-hosted HA targets 99.9%, and single-node is unacceptable for production

@@ -1,0 +1,131 @@
+---
+title: "Authentification Multi-Facteurs (MFA)"
+description: "Authentification multi-facteurs en entreprise — méthodes MFA (TOTP, push, SMS, WebAuthn), architectures de déploiement, Risk-Based Authentication (RBA), attaques de contournement MFA et stratégies d'atténuation avancées."
+sidebar:
+  order: 3
+  label: "MFA"
+---
+
+L'authentification multi-facteurs (MFA) est l'une des mesures de sécurité les plus efficaces disponibles. Selon Microsoft, la MFA bloque 99,9 % des attaques de compromission de comptes. Pourtant, son déploiement en entreprise présente des défis significatifs d'expérience utilisateur, de support et de gestion des exceptions.
+
+## Méthodes MFA
+
+| Méthode | Facteur | Sécurité | UX | Coût | Déploiement en Entreprise |
+|---------|---------|----------|----|------|-------------------------|
+| **TOTP (Application Authenticator)** | Possession | Élevée | Bonne | Gratuit | Très répandu — Google/Microsoft/Authy Authenticator |
+| **Notification Push** | Possession | Élevée | Excellente | Faible (licence IdP) | Okta Verify, Microsoft Authenticator, Duo Push |
+| **WebAuthn/FIDO2** | Possession + Inhérence | Très élevée | Excellente | Modéré (clés) | SSO d'entreprise, postes de travail sensibles |
+| **SMS OTP** | Possession | Faible-Moyenne | Bonne | Faible | Dépannage, utilisateurs sans smartphone |
+| **Code de récupération** | Connaissance | Faible | Bonne | Gratuit | Contournement d'urgence |
+| **Email OTP** | Possession | Faible | Bonne | Gratuit | Utilisateurs sans téléphone |
+| **Carte à puce / PIV** | Possession | Très élevée | Moyenne | Élevé | Gouvernement, installations classifiées |
+
+## Architecture de Déploiement MFA
+
+### MFA au niveau du fournisseur d'identité (IdP)
+
+L'approche la plus courante et la plus évolutive. La MFA est déclenchée par l'IdP avant d'émettre des jetons :
+
+```
+Utilisateur → IdP → Nom d'utilisateur/mot de passe → MFA Challenge → Jeton émis
+                              │
+                    ┌─────────┴─────────┐
+                    │                   │
+              Notification Push    TOTP / WebAuthn
+                    │                   │
+                    v                   v
+              ✅ Approuvé          ❌ Refusé
+```
+
+**Avantages :** Appliqué une fois pour toutes les applications utilisant l'IdP, gestion centralisée des politiques.
+**Inconvénients :** Nécessite la fédération des applications via l'IdP.
+
+### MFA au niveau de l'application
+
+MFA gérée individuellement par chaque application :
+
+**Avantages :** Indépendant du fournisseur d'identité.
+**Inconvénients :** Expérience utilisateur incohérente, coût de mise en œuvre élevé pour chaque application, gestion complexe des politiques.
+
+## Risk-Based Authentication (RBA)
+
+La RBA adapte les exigences MFA en fonction du niveau de risque évalué de chaque tentative d'authentification :
+
+| Niveau de Risque | Déclencheurs | Exigence MFA | Expérience Utilisateur |
+|-----------------|--------------|-------------|----------------------|
+| **Faible** | Appareil connu, emplacement habituel, réseau d'entreprise | Aucune (mot de passe uniquement) | Transparente |
+| **Moyen** | Nouvel appareil, nouvel emplacement, heure inhabituelle | MFA standard (push, TOTP) | Légère friction |
+| **Élevé** | Connexion depuis un pays à risque, VPN suspect, nouveau navigateur | MFA avancée (WebAuthn, approbation renforcée) | Friction modérée |
+| **Critique** | Compte administrateur depuis emplacement inconnu, comportement anormal | MFA obligatoire + vérification supplémentaire | Friction élevée |
+
+### Facteurs de notation des risques
+
+| Facteur | Signal | Pondération |
+|---------|--------|-------------|
+| **Emplacement** | Géolocalisation IP, distance du dernier emplacement connu | Élevée |
+| **Appareil** | Connu/nouveau, conforme/non conforme, empreinte du navigateur | Élevée |
+| **Comportement** | Temps de frappe, schémas de navigation, vitesse de défilement | Moyenne |
+| **Réseau** | IP d'entreprise, VPN, IP résidentielle, plage cloud publique | Moyenne |
+| **Compte** | Niveau de privilège, âge du compte, échecs d'authentification récents | Élevée |
+| **Menace** | Fuite de mot de passe connue, indicateurs de menace, listes noires | Très élevée |
+
+<Aside variant="tip">
+La RBA est le compromis optimal entre sécurité et expérience utilisateur. Les utilisateurs sur des appareils de confiance depuis des emplacements familiers ne sont pas interrogés pour la MFA, tandis que les connexions à risque élevé nécessitent une vérification supplémentaire. La plupart des fournisseurs d'IdP (Okta, Azure AD, Ping) offrent des capacités RBA natives. Commencez par un mode "audit uniquement" pour comprendre votre trafic avant d'appliquer les politiques de blocage.
+</Aside>
+
+## Attaques de Contournement MFA
+
+| Attaque | Description | Efficacité | Mitigation |
+|---------|-------------|------------|------------|
+| **Fatigue MFA / MFA Bombing** | Envoi répété de notifications push jusqu'à ce que l'utilisateur approuve par frustration | Très élevée | Limiter les tentatives push, exiger la saisie d'un numéro, géolocalisation de l'approbation |
+| **Échange de SIM** | Portabilité du numéro de téléphone vers une carte SIM contrôlée par l'attaquant | Élevée (contre SMS) | Ne pas utiliser SMS comme MFA, alerter sur les changements SIM |
+| **Proxy Adversaire au Milieu (AiTM)** | Proxy en temps réel capturant le cookie de session et les identifiants MFA | Élevée | FIDO2/WebAuthn (résistant au hameçonnage), liaison de session |
+| **Hameçonnage MFA** | Fausse page de connexion avec capture du code TOTP | Moyenne | FIDO2, authentification liée au domaine |
+| **Rejeu de code TOTP** | Capture et réutilisation d'un code TOTP dans la fenêtre de validité | Faible (fenêtre de 30s) | Codes TOTP à usage unique, horloge synchronisée |
+| **Vol de cookie de session** | Vol du cookie de session POST-MFA | Très élevée | Liaison de session (IP, empreinte de l'appareil), durée de session courte |
+| **Ingénierie Sociale Help Desk** | Contournement de la MFA en réinitialisant l'enregistrement MFA via le support | Élevée | Vérification d'identité robuste pour les changements MFA |
+
+## Stratégies de Déploiement MFA
+
+### Approche par phases
+
+```
+Phase 1 : Applications critiques (Email, VPN, Cloud)
+    └── MFA obligatoire, exceptions limitées
+    └── Durée : 4-6 semaines
+
+Phase 2 : Administrateurs et accès privilégiés
+    └── MFA obligatoire pour tout accès admin
+    └── Durée : 2-4 semaines
+
+Phase 3 : Accès externe (partenaires, fournisseurs)
+    └── MFA obligatoire pour tout accès externe
+    └── Durée : 4-6 semaines
+
+Phase 4 : Applications internes (reste de l'organisation)
+    └── MFA progressive avec RBA
+    └── Durée : 8-16 semaines
+
+Phase 5 : Tous les accès (MFA complète)
+    └── MFA pour 100% des accès, FIDO2 pour les utilisateurs privilégiés
+    └── Durée : Continu (amélioration continue)
+```
+
+### Gestion des exceptions MFA
+
+| Type d'exception | Exemple | Atténuation |
+|-----------------|---------|-------------|
+| **Utilisateur sans smartphone** | Employé sur le terrain sans téléphone portable | Jetons matériels (YubiKey) ou codes de récupération |
+| **Application sans support MFA** | Application legacy ne supportant pas la fédération | Proxy d'authentification (PingAccess, Azure AD App Proxy) |
+| **Compte de service** | Application à application sans intervention humaine | Certificat machine, gestion des identités de charge de travail |
+| **Urgence** | Indisponibilité du fournisseur MFA | Codes de contournement d'urgence (jetons à usage unique, imprimés et scellés) |
+
+## Points Clés à Retenir
+
+- La MFA bloque 99,9 % des attaques de compromission de comptes selon Microsoft — c'est l'unique mesure de sécurité la plus efficace pour protéger les comptes utilisateurs
+- Les méthodes MFA se comparent sur quatre dimensions : sécurité, expérience utilisateur, coût et facilité de déploiement — les notifications push offrent le meilleur équilibre pour la plupart des déploiements d'entreprise
+- Le déploiement de la MFA doit être progressif par phase : applications critiques → administrateurs → accès externes → applications internes → couverture complète
+- La Risk-Based Authentication (RBA) adapte les exigences MFA en fonction du niveau de risque — les utilisateurs de confiance ne sont pas interrogés, les connexions à risque élevé nécessitent une vérification supplémentaire
+- Les attaques de fatigue MFA (MFA bombing) et les proxies AiTM sont les menaces les plus récentes et les plus efficaces contre la MFA — FIDO2/WebAuthn est la seule méthode résistante au hameçonnage car les identifiants sont liés au domaine
+- Les exceptions MFA doivent être gérées avec des atténuations spécifiques : jetons matériels pour les utilisateurs sans smartphone, proxy d'authentification pour les applications legacy, codes de contournement d'urgence scellés pour les indisponibilités
+- Ne JAMAIS utiliser le SMS comme méthode MFA principale — il est vulnérable à l'échange de SIM et aux interceptions SS7. Réservez le SMS uniquement pour les scénarios de dépannage ou de récupération

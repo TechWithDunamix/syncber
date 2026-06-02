@@ -1,0 +1,262 @@
+---
+title: "Identity Directories & Data Stores"
+description: "How identity directories work — Active Directory, LDAP, cloud directories, and the data store patterns that underpin enterprise IAM."
+sidebar:
+  order: 5
+  label: "Identity Directories"
+---
+
+Identity directories are the authoritative repositories for identity data. They store, organise, and serve identity attributes to applications, authentication systems, and policy engines. Every IAM function — authentication, authorization, provisioning, governance — ultimately depends on the directory layer to provide accurate and timely identity information.
+
+Understanding directory architecture is critical because the directory is the **system of record** for identity. If the directory is compromised, inconsistent, or poorly designed, every IAM control built on top of it is undermined.
+
+## What Is a Directory Service?
+
+A directory service is a specialised database optimised for **read-heavy, attribute-oriented lookup operations**. Unlike relational databases, directories are hierarchical, heavily indexed for search, and designed for rapid retrieval of identity data — typically returning results in milliseconds even in directories with millions of entries.
+
+### Key Characteristics — Directory vs Relational Database
+
+| Feature | Directory Service | Relational Database |
+|---------|------------------|-------------------|
+| **Data model** | Hierarchical (tree structure — DIT) | Tabular (normalised tables) |
+| **Query pattern** | Read-heavy (90%+ reads), attribute-oriented search | Read/write balanced, transaction-oriented |
+| **Schema** | Extensible, attribute-based, class inheritance | Fixed schema, table-based, strict typing |
+| **Protocol** | LDAP (Lightweight Directory Access Protocol) | SQL (Structured Query Language) |
+| **Replication** | Multi-master (any DC can accept writes) | Master-slave or cluster |
+| **Transactions** | Limited atomicity (eventual consistency) | ACID-compliant transactions |
+| **Indexing** | Automatically indexed for attribute search | Indexes defined per query pattern |
+| **Performance** | Optimised for search (fast reads) | Optimised for joins and complex queries |
+
+### The Directory Information Tree (DIT)
+
+LDAP directories organise entries in a tree structure called the Directory Information Tree. The tree reflects organisational or network hierarchy:
+
+```
+dc=acmecorp,dc=local
+├── ou=Users
+│   ├── cn=John Doe
+│   ├── cn=Jane Smith
+│   └── cn=Service Accounts
+├── ou=Groups
+│   ├── cn=Domain Admins
+│   ├── cn=Sales Team
+│   └── cn=Engineering
+├── ou=Computers
+│   ├── cn=WS-001 (workstation)
+│   ├── cn=SRV-001 (server)
+│   └── cn=PRT-001 (printer)
+└── ou=Resources
+    ├── cn=Shared Mailbox
+    └── cn=Distribution Group
+```
+
+Each entry is uniquely identified by its **Distinguished Name (DN)** — the full path from the entry to the root. For example, `cn=John Doe,ou=Users,dc=acmecorp,dc=local` uniquely identifies John Doe in the directory.
+
+## Active Directory (AD) Deep Dive
+
+Microsoft Active Directory is the most widely deployed directory service in enterprise environments. Over 90% of Fortune 500 organisations use Active Directory as their primary identity store.
+
+### Core AD Services
+
+| Service | Purpose |
+|---------|---------|
+| **Active Directory Domain Services (AD DS)** | Centralised authentication and authorisation for Windows environments. Stores user, group, computer, and policy objects. |
+| **Active Directory Certificate Services (AD CS)** | Public Key Infrastructure (PKI) — issues and manages digital certificates for domain-joined devices and users. |
+| **Active Directory Federation Services (AD FS)** | SSO and federation — enables cross-organisation and cloud application access using SAML/OIDC. |
+| **Active Directory Rights Management Services (AD RMS)** | Information protection — controls access to documents and emails through persistent policies. |
+| **Group Policy** | Centralised configuration management for Windows clients and servers — over 3000 configurable policy settings. |
+
+### AD Structure and Components
+
+```
+Forest: acmecorp.local (root domain)
+├── Domain: acmecorp.local
+│   ├── Organisational Units (OUs)
+│   │   ├── Users (containers for user objects)
+│   │   ├── Groups (security and distribution groups)
+│   │   ├── Computers (workstations, servers)
+│   │   ├── Service Accounts (managed service accounts)
+│   │   └── Infrastructure (domain controllers, DNS servers)
+│   ├── Domain Controllers
+│   │   ├── DC-01 (Primary — PDC Emulator role)
+│   │   ├── DC-02 (Replica — all FSMO roles)
+│   │   └── DC-03 (Read-Only DC for remote site)
+│   ├── DNS Zones
+│   │   ├── Forward lookup zone: acmecorp.local
+│   │   └── Reverse lookup zone: 10.0.0.x
+│   └── Group Policies
+│       ├── Default Domain Policy (password policy, account lockout)
+│       └── OU-specific policies (software deployment, security settings)
+└── Trust Relationships
+    ├── acmecorp-dev.local (forest trust)
+    └── partner-xyz.com (external trust)
+```
+
+### Key AD Concepts
+
+- **Domain** — Administrative boundary. All objects in a domain share a common database and policy.
+- **Forest** — Security boundary. One or more domains sharing a common schema, configuration, and global catalog.
+- **OU (Organisational Unit)** — Container for organising objects (users, groups, computers) for delegation and Group Policy application.
+- **Global Catalog** — A searchable index of all objects in a forest, used for authentication and resource discovery.
+- **FSMO Roles** — Five special roles held by specific domain controllers (Schema Master, Domain Naming Master, PDC Emulator, RID Master, Infrastructure Master).
+
+<Aside variant="tip">
+AD's schema is extensible — organisations can add custom attributes to store additional identity data such as employee ID, cost centre, clearance level, or security classification. Schema extensions should be carefully planned and documented, as they cannot be deleted — only deactivated.
+</Aside>
+
+## LDAP Directory Protocol
+
+Lightweight Directory Access Protocol (LDAP) is the open standard for accessing directory services. Defined in RFC 4511, LDAP provides a platform-independent protocol for querying and modifying directory data.
+
+### LDAP Operations
+
+| Operation | Function | Use Case |
+|-----------|----------|----------|
+| **Bind** | Authenticate to the directory | User login, application authentication |
+| **Search** | Query for entries matching a filter | Finding users, groups, or devices |
+| **Compare** | Check if an entry has a specific attribute value | Password verification, group membership check |
+| **Add** | Create a new entry | New user creation, new group |
+| **Delete** | Remove an entry | Account removal |
+| **Modify** | Change attributes of an entry | Updating phone number, department |
+| **Modify DN** | Move or rename an entry within the DIT | Restructuring OUs |
+| **Unbind** | Close the connection | Clean logout |
+
+### LDAP Filter Syntax
+
+LDAP filters are used to search for entries matching specific criteria:
+
+| Filter | Matches | Example |
+|--------|---------|---------|
+| `(objectClass=user)` | All user objects | Simple type filter |
+| `(&(objectClass=user)(department=Engineering))` | Users in Engineering | AND condition |
+| `(\|(department=Engineering)(department=Sales))` | Users in Engineering OR Sales | OR condition |
+| `(!(objectClass=computer))` | Everything except computers | NOT condition |
+| `(cn=John*)` | Names starting with "John" | Wildcard search |
+| `(&(objectClass=user)(memberOf=cn=Domain Admins,cn=Users,dc=domain,dc=com))` | All domain admin users | Nested attribute search |
+
+### LDAP Security
+
+- **LDAPS (LDAP over SSL/TLS)** — Encrypts the entire LDAP session using TLS on port 636 (or STARTTLS on port 389)
+- **SASL Authentication** — Supports Kerberos, NTLM, Digest-MD5, and EXTERNAL (certificate-based) authentication
+- **ACLs** — Access control lists on directory entries control which users or applications can read or write specific attributes
+
+### LDAP Entry Example (LDIF Format)
+
+```
+dn: cn=John Doe,ou=Users,dc=acmecorp,dc=local
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: user
+cn: John Doe
+sn: Doe
+givenName: John
+displayName: Doe, John
+mail: jdoe@acmecorp.com
+telephoneNumber: +1-555-0123
+title: Senior Security Engineer
+department: Information Security
+company: Acme Corp
+employeeID: EMP-00421
+manager: cn=Jane Smith,ou=Users,dc=acmecorp,dc=local
+memberOf: cn=Security Team,ou=Groups,dc=acmecorp,dc=local
+memberOf: cn=Domain Admins,ou=Groups,dc=acmecorp,dc=local
+whenCreated: 2024-01-15 08:00:00 UTC
+whenChanged: 2024-06-01 14:30:00 UTC
+userAccountControl: 512 (normal account enabled)
+pwdLastSet: 133456789012345678
+```
+
+## Cloud Directories
+
+Modern IAM platforms provide cloud-hosted directory services that extend — and in many cases replace — traditional on-premises directories:
+
+| Directory | Provider | Key Features | Best For |
+|-----------|----------|-------------|----------|
+| **Azure AD / Entra ID** | Microsoft | OIDC, SAML, SCIM, Conditional Access, Identity Protection, PIM | Microsoft-centric organisations, hybrid AD environments |
+| **Okta Universal Directory** | Okta | Lifecycle management, attribute mapping, profile sourcing from multiple authorities | Multi-cloud, heterogeneous environments |
+| **Google Cloud Identity** | Google | Chrome integration, Workspace sync, context-aware access, BeyondCorp Zero Trust | Google Workspace organisations |
+| **Amazon Cognito** | AWS | Customer identity pools, social login, app integration, security token service | Customer-facing apps on AWS |
+| **JumpCloud** | Independent | Cloud LDAP, cloud RADIUS, MDM, cross-platform (Mac, Windows, Linux) | SMB, organisations without Microsoft infrastructure |
+| **PingDirectory** | Ping Identity | Cloud LDAP, high-performance directory, data synchronisation | Mission-critical directory deployments |
+
+### Cloud Directory Advantages vs On-Premises
+
+| Aspect | On-Premises AD | Cloud Directory |
+|--------|----------------|----------------|
+| **Deployment** | Weeks to months, requires server infrastructure | Minutes to hours, no infrastructure |
+| **Scalability** | Hardware-limited, requires capacity planning | Elastic, auto-scaling |
+| **Maintenance** | Patching, upgrades, backup, DR — all self-managed | Vendor-managed, SLA-backed |
+| **Global reach** | Complex multi-site replication | Native multi-region with CDN |
+| **Integration** | LDAP/Kerberos/NTLM — Windows-centric | REST APIs, SCIM, OIDC — API-first |
+| **Cost model** | CAPEX (servers, licenses) + OPEX (admin time) | OPEX (per-user/month subscription) |
+
+## Directory Integration Patterns
+
+### Pattern 1: Authoritative Source + Downstream Sync
+
+```
+HR System (Workday) ──> Identity Directory ──> Target Applications
+    (authoritative)       (core identity)        (consumers)
+```
+
+The HR system is the authoritative source. Changes flow from HR → identity directory → applications. This is the most common pattern for employee identity management.
+
+### Pattern 2: Hub-and-Spoke (Centralised Authentication)
+
+```
+               ┌──> App A (SAML/OIDC)
+               │
+    Identity ──┼──> App B (LDAP bind)
+    Directory  │
+               ├──> App C (Kerberos)
+               └──> App D (RADIUS)
+```
+
+Each application authenticates against the central directory rather than maintaining its own identity store. This pattern simplifies credential management and enables single sign-on.
+
+### Pattern 3: Virtual Directory (Aggregation)
+
+```
+    Application
+         │
+    Virtual Directory (aggregation layer)
+     ┌────┼────┐
+     │    │    │
+    AD  LDAP  HR Database
+```
+
+A virtual directory presents a unified, LDAP-accessible view of multiple underlying data stores without synchronising data between them. Useful for mergers and acquisitions where identity data lives in multiple directories.
+
+### Pattern 4: Cloud Identity Provider with On-Premises Sync
+
+```
+    Azure AD / Okta (cloud IdP)
+         ↑
+    Azure AD Connect / Okta LDAP Agent
+         ↑
+    On-Premises Active Directory
+```
+
+The cloud IdP synchronises identities from on-premises AD, extending on-premises identities to cloud and SaaS applications. This is the dominant pattern for hybrid IAM.
+
+## Directory Migration Patterns
+
+When organisations migrate from one directory to another (e.g., on-premises AD → Azure AD, or legacy LDAP → cloud directory), common migration strategies include:
+
+| Strategy | Description | Downtime | Complexity |
+|----------|-------------|----------|------------|
+| **Big bang** | Cut over all systems at once | Full outage during migration | Low |
+| **Staged** | Migrate applications in waves | Per-wave outage | Medium |
+| **Coexistence** | Run both directories with sync | None | High |
+| **Phased with rollback** | Migrate groups of users, test, repeat | Per-group outage | Medium-High |
+
+## Key Takeaways
+
+- Directory services are read-optimised hierarchical databases (DIT) that are fundamentally different from relational databases
+- Active Directory provides domain services, Group Policy, Kerberos authentication, and LDAP access — it remains the dominant on-premises directory
+- LDAP defines the protocol for directory access: operations (Bind, Search, Modify), filter syntax, and security (LDAPS, SASL)
+- Cloud directories (Azure AD, Okta, Google Cloud Identity) extend directory capabilities with SaaS-native features, auto-scaling, and API-first design
+- Directory integration follows four main patterns: authoritative source sync, hub-and-spoke, virtual directory, and cloud IdP with on-premises sync
+- Schema extensibility allows organisations to tailor directories to their specific needs, but schema changes are permanent and must be carefully planned
+- Directory migration requires careful strategy selection based on downtime tolerance and complexity appetite

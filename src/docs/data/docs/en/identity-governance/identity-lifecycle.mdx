@@ -1,0 +1,142 @@
+---
+title: "Identity Lifecycle Management"
+description: "Managing digital identities through the joiner/mover/leaver lifecycle — HR-driven provisioning, automated lifecycle events, entitlement lifecycle, and lifecycle governance."
+sidebar:
+  order: 2
+  label: "Identity Lifecycle Management"
+---
+
+Identity Lifecycle Management (ILM) governs how digital identities are created, maintained, and ultimately removed across an organisation's technology ecosystem. It is the operational foundation of IGA — without effective lifecycle management, identity data becomes stale, access accumulates, and compliance gaps emerge.
+
+The lifecycle is often summarised as **Joiner / Mover / Leaver** (JML), describing the three major identity events that trigger provisioning and deprovisioning actions.
+
+## The Joiner / Mover / Leaver Model
+
+### Joiner — Identity Creation
+
+When a new employee, contractor, or partner joins the organisation, their digital identity must be created across multiple systems.
+
+| Joiner Process | Automation Level | Description |
+|----------------|-----------------|-------------|
+| **HR system trigger** | Fully automated | HR system (Workday, SAP SuccessFactors) creates employee record |
+| **Account provisioning** | Automated | IGA platform detects HR event, creates accounts in AD, SaaS apps, directories |
+| **Role assignment** | Rule-based | Base roles assigned based on department, location, job code |
+| **Access provisioning** | Automated | SCIM provisioning pushes entitlements to target systems |
+| **Credential issuance** | Semi-automated | Temporary password generated, MFA enrollment initiated |
+| **Welcome communication** | Automated | New hire email with access instructions, training links, policies |
+
+**Joiner SLA targets**:
+- Account creation: Within 1 hour of HR record creation (automated)
+- Base role assignment: Within 4 hours (rule-based)
+- Application-specific access: Within 24 hours (may require approval)
+- Full access ready: Before employee's first day
+
+### Mover — Identity Changes
+
+When an employee changes roles, departments, or locations, their access must be updated to reflect their new responsibilities.
+
+| Mover Event | Actions Required | Risk If Not Done |
+|-------------|-----------------|------------------|
+| **Department transfer** | Revoke old department access, grant new department access | Employee retains access to old department data (unnecessary access) |
+| **Promotion** | Grant additional roles/permissions | Employee lacks tools to perform new role |
+| **Location change** | Update based on new location (legal entity, data residency) | Compliance violation (data access from unauthorised location) |
+| **Contractor extension** | Extend account expiry date | Account disabled prematurely |
+| **Status change (full-time → part-time)** | Adjust role assignments to reflect reduced scope | Excessive access for reduced role |
+
+**Mover complexity**: Department transfers are the most complex mover event because they require coordinated revocations AND new grants. The revocation gap (time between old access removed and new access granted) must be minimised.
+
+### Leaver — Identity Removal
+
+When an employee leaves the organisation, all access must be promptly and completely removed.
+
+| Leaver Type | Account Action | Access Action | Data Action |
+|-------------|---------------|---------------|-------------|
+| **Voluntary resignation** | Disable at end of notice period | Revoke access immediately or at departure date | Archive data, forward email, transfer files |
+| **Involuntary termination** | Disable immediately | Revoke access immediately, rotate any known credentials | Preserve data for legal hold, initiate handover |
+| **Retirement** | Disable, convert to alumni status | Revoke most access, retain limited alumni access | Archive personal data per retention policy |
+| **Contractor end** | Disable on contract end date | Revoke all access | Remove data per contract terms |
+
+**Leaver SLA targets**:
+- Involuntary termination: Account disabled within 5 minutes (automated)
+- Voluntary resignation: Account disabled at end-of-day on departure date
+- Access removal: Within 1 hour of account disablement (propagation across all systems)
+- Credential rotation: Immediately (especially for privileged accounts)
+
+<Aside variant="danger">
+The leaver process is the most critical lifecycle event. An analysis of data breach reports shows that **former employee accounts are involved in 30% of insider threat incidents**, and accounts that should have been deactivated are often used months or years after departure. Automate leaver deprovisioning — never rely on manual processes.
+</Aside>
+
+## Lifecycle Automation Architecture
+
+```
+HR System (System of Record)
+    │
+    │ Employee record changes (hire, transfer, termination)
+    ▼
+IGA Platform
+    │
+    ├── Policy Engine: Determine required actions based on role model
+    ├── Workflow Engine: Execute provisioning/deprovisioning sequences
+    └── Reconciliation: Verify actions completed successfully
+        │
+        ├── AD / Azure AD (identity store)
+        ├── SaaS Apps (SCIM provisioning)
+        ├── On-prem Apps (agent-based provisioning)
+        ├── PAM System (privileged account lifecycle)
+        └── CMDB (update configuration records)
+```
+
+### Key Integration Points
+
+| Integration | Protocol | Purpose | Criticality |
+|-------------|----------|---------|-------------|
+| **HR → IGA** | API, SFTP, JDBC | Identity feed — employee records | Critical |
+| **IGA → AD** | LDAP, PowerShell, SCIM | Account creation, group membership | Critical |
+| **IGA → SaaS** | SCIM 2.0 | User provisioning in cloud apps | High |
+| **IGA → PAM** | REST API | Automated privileged account lifecycle | Medium |
+| **IGA → CMDB** | REST API, webhook | Update asset records with identity data | Low |
+
+## Entitlement Lifecycle
+
+Entitlements — the specific permissions assigned to users — also have a lifecycle that must be governed:
+
+| Lifecycle Stage | Description | Governance Control |
+|-----------------|-------------|-------------------|
+| **Request** | User requests entitlement through self-service portal | Business justification, manager approval |
+| **Approval** | Entitlement request is approved or denied | Approval workflow, policy evaluation |
+| **Provisioning** | Entitlement is granted in target system | Automated provisioning (SCIM, agents) |
+| **Active** | User has and uses the entitlement | Periodic review, usage monitoring |
+| **Review** | Entitlement is reviewed during access certification | Manager certifies or revokes |
+| **Revocation** | Entitlement is removed | Automated deprovisioning, verification |
+| **Archive** | Historical record retained for audit | Immutable audit log |
+
+## Lifecycle Challenges and Solutions
+
+| Challenge | Impact | Solution |
+|-----------|--------|----------|
+| **Incomplete HR data** | Manual processing, delayed provisioning | HR data validation rules, data quality dashboards |
+| **Delayed HR feeds** | Stale identities, access before systems are ready | Real-time API integration (not batch files) |
+| **SaaS application proliferation** | Unmanaged shadow IT applications | Cloud discovery, SCIM where available, agent-based for others |
+| **Leaver detection failure** | Orphan accounts persist | Regular reconciliation, manager-attested account lists |
+| **Complex mover rules** | Inconsistent access changes | Rule-based provisioning with clear if-this-then-that logic |
+| **Rehire handling** | Accumulated old permissions | Rehire policy — treat as new joiner with a fresh identity |
+
+## Lifecycle Metrics and KPIs
+
+| Metric | Target | What It Measures |
+|--------|--------|-----------------|
+| **Joiner provisioning time** | < 1 hour for base access | Speed of access grant for new employees |
+| **Termination deprovisioning time** | < 5 minutes for involuntary | Speed of access removal for terminated employees |
+| **Orphan account rate** | < 1% of total accounts | % of accounts with no associated active employee |
+| **Provisioning accuracy** | > 99% | % of provisioning actions completed without error |
+| **Automation rate** | > 90% | % of lifecycle events handled automatically versus manually |
+| **Reconciliation frequency** | Daily | How often actual access is compared to intended access |
+
+## Key Takeaways
+
+- Identity Lifecycle Management governs the joiner/mover/leaver (JML) process — how digital identities are created, updated, and removed across the enterprise
+- The joiner process should be fully automated from HR system trigger through account creation and role assignment, with base access ready before the employee's first day
+- The mover process is the most complex lifecycle event, requiring coordinated revocations and grants — especially during department transfers
+- The leaver process is the most critical — automate immediate account disablement for involuntary terminations and ensure complete deprovisioning within 1 hour
+- Entitlement lifecycle governs permissions from request through provisioning, active use, review, and revocation — each stage requires specific governance controls
+- Lifecycle automation depends on well-integrated systems (HR → IGA → AD → SaaS → target systems) with real-time API integration preferred over batch files

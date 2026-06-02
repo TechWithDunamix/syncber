@@ -1,0 +1,180 @@
+---
+title: "High Availability & Disaster Recovery"
+description: "HA/DR architecture for IAM and PAM systems — clustering, failover, multi-region deployment, RTO/RPO targets, backup and restore, DR testing, and business continuity planning."
+sidebar:
+  order: 6
+  label: "HA & DR"
+---
+
+IAM and PAM systems are critical infrastructure. When the IdP is unavailable, users cannot access any application. When the PAM platform is unavailable, administrators cannot manage servers. HA/DR design for IAM/PAM is not optional — it is a business continuity requirement.
+
+## Availability Requirements
+
+### Defining Availability Targets
+
+| System | Recommended SLA | Max Annual Downtime | Recovery Priority |
+|--------|----------------|---------------------|-------------------|
+| **Identity Provider (IdP)** | 99.99% | 52 minutes | Critical — all SSO apps depend on IdP |
+| **PAM platform** | 99.99% | 52 minutes | Critical — admin access to all systems blocked |
+| **IGA platform** | 99.9% | 8.76 hours | High — certification and provisioning can tolerate brief outages |
+| **Directory (AD/LDAP)** | 99.99% | 52 minutes | Critical — authentication and authorisation dependency |
+| **MFA system** | 99.99% | 52 minutes | Critical — second factor required for authentication |
+
+## HA Architecture Patterns
+
+### Active-Passive (Cold Standby)
+
+```
+┌─────────────────┐          ┌─────────────────┐
+│   Primary Site   │          │   DR Site        │
+│                   │          │                   │
+│  ┌─────────────┐ │          │  ┌─────────────┐ │
+│  │  IdP Primary │ │          │  │  IdP Standby │ │
+│  │  (Active)    │ │          │  │  (Inactive)  │ │
+│  └──────┬──────┘ │          │  └──────┬──────┘ │
+│         │         │          │         │         │
+│  ┌──────┴──────┐ │          │  ┌──────┴──────┐ │
+│  │  DB Primary  │─┼─-repl────┼─>│  DB Standby  │ │
+│  │  (Read/Write)│ │          │  │  (Read-only) │ │
+│  └─────────────┘ │          │  └─────────────┘ │
+│                   │          │                   │
+│  Health check ────┤          │  Health check ────┤
+└─────────────────┘          └─────────────────┘
+         │                          │
+         └────────── DNS ───────────┘
+                        │
+                  Traffic routed to active site
+```
+
+**RTO**: 15-60 minutes
+**RPO**: 5-15 minutes (database replication)
+**Cost**: Low (standby infrastructure cost)
+**Complexity**: Low
+
+### Active-Passive (Warm Standby)
+
+```
+┌─────────────────┐          ┌─────────────────┐
+│   Primary Site   │          │   DR Site        │
+│                   │          │                   │
+│  ┌─────────────┐ │          │  ┌─────────────┐ │
+│  │  IdP Primary │ │          │  │  IdP Standby │ │
+│  │  (Active)    │ │          │  │  (Running)   │ │
+│  └──────┬──────┘ │          │  └──────┬──────┘ │
+│         │         │          │         │         │
+│  ┌──────┴──────┐ │          │  ┌──────┴──────┐ │
+│  │  DB Primary  │─┼-async-repl┼─>│  DB Standby  │ │
+│  │  (Read/Write)│ │          │  │  (Read-only) │ │
+│  └─────────────┘ │          │  └─────────────┘ │
+│                   │          │                   │
+│  Session Cache ───┤          │  Session Cache ──┤
+│  (Redis Primary)  │          │  (Redis Replica) │
+└─────────────────┘          └─────────────────┘
+         │                          │
+         └────────── DNS ───────────┘
+                        │
+                  Traffic routed to active site
+```
+
+**RTO**: 1-5 minutes
+**RPO**: < 1 minute (near-synchronous DB replication)
+**Cost**: Medium (running standby + DB replication)
+**Complexity**: Medium
+
+### Active-Active (Multi-Region)
+
+```
+┌─────────────────┐          ┌─────────────────┐
+│   Region 1       │          │   Region 2       │
+│                   │          │                   │
+│  ┌─────────────┐ │          │  ┌─────────────┐ │
+│  │  IdP Node    │ │          │  │  IdP Node    │ │
+│  │  (Active)    │ │          │  │  (Active)    │ │
+│  └──────┬──────┘ │          │  └──────┬──────┘ │
+│         │         │          │         │         │
+│  ┌──────┴──────┐ │          │  ┌──────┴──────┐ │
+│  │  DB (Multi- │─┼─-sync────┼─>│  DB (Multi- │ │
+│  │  master)    │ │          │  │  master)    │ │
+│  └─────────────┘ │          │  └─────────────┘ │
+│         │         │          │         │         │
+│  ┌──────┴──────┐ │          │  ┌──────┴──────┐ │
+│  │  Cache (Rgn)│ │          │  │  Cache (Rgn)│ │
+│  │  (Local)    │ │          │  │  (Local)    │ │
+│  └─────────────┘ │          │  └─────────────┘ │
+└─────────────────┘          └─────────────────┘
+         │                          │
+         └─── Global Load Balancer ──┘
+         (GeoDNS / Traffic Manager)
+                        │
+            Traffic routed to nearest region
+```
+
+**RTO**: Near-zero (automatic failover via global LB)
+**RPO**: Near-zero (synchronous multi-master replication)
+**Cost**: High (full infrastructure in each region)
+**Complexity**: High (data consistency, conflict resolution)
+
+## HA Design for Specific Components
+
+### IdP HA
+
+| Component | HA Strategy | Implementation |
+|-----------|-------------|----------------|
+| **IdP service** | Active-active, stateless | Multiple containers/VMs behind load balancer |
+| **Session store** | Distributed cache (Redis cluster) | Redis with sentinel or cluster mode for automatic failover |
+| **Token signing keys** | HSM cluster or key replication | AWS CloudHSM, Azure Dedicated HSM, on-prem HSM cluster |
+| **User directory** | Multi-master replication | AD multi-DC, Entra ID is inherently HA |
+| **Certificate management** | Automated rotation with overlap | Cert-manager for internal certs, automated IdP metadata update |
+
+### PAM HA
+
+| Component | HA Strategy | Implementation |
+|-----------|-------------|----------------|
+| **PAM gateway/proxy** | Active-active, stateless | Multiple PAM proxy nodes behind load balancer |
+| **Credential vault** | Active-passive with synchronous replication | PAM vault cluster with DB replication |
+| **Session recording storage** | Distributed file system or object storage | S3/NFS with replication, WORM-enabled for compliance |
+| **Activity database** | Active-passive SQL cluster | SQL Always On, Oracle Data Guard |
+| **Connectors / agents** | Dual-connected (primary + secondary) | Two connector nodes per target system |
+
+## Disaster Recovery Planning
+
+### RTO and RPO Targets
+
+| Scenario | RTO Target | RPO Target | DR Strategy |
+|----------|------------|------------|-------------|
+| **Single system failure** | < 5 minutes | Zero | Automatic failover within cluster |
+| **Data centre outage** | < 60 minutes | < 15 minutes | Warm standby at DR site |
+| **Regional outage** | < 4 hours | < 30 minutes | Cross-region DR (cold/warm) |
+| **Catastrophic failure** | < 24 hours | < 1 hour | Manual restore from backups |
+| **Ransomware / data corruption** | < 24 hours | < 4 hours | Immutable backups, point-in-time restore |
+
+### Backup Strategy
+
+| Data Type | Backup Method | Frequency | Retention | Restore Target |
+|-----------|--------------|-----------|-----------|----------------|
+| **IdP configuration** | Configuration export | After every change + daily | 90 days | 1 hour |
+| **Directory (AD/LDAP)** | System state backup | Daily | 60 days | 4 hours |
+| **PAM vault database** | Encrypted database backup | Daily + transaction log (15 min) | 90 days | 4 hours |
+| **PAM session recordings** | Immutable object storage | Continuous (write-once) | Compliance-defined + 1 year | 2 hours |
+| **Certificate / key store** | HSM backup | Weekly | 1 year | 1 hour |
+| **IGA database** | Database backup | Daily | 90 days | 4 hours |
+| **Access certification evidence** | Document store backup | Daily | 7 years (compliance) | 4 hours |
+
+### DR Testing
+
+| Test Type | Frequency | Scope | Success Criteria |
+|-----------|-----------|-------|-----------------|
+| **Component failover test** | Monthly | Single component failover (IdP, PAM, directory) | Automatic failover in < 5 minutes |
+| **Tabletop exercise** | Quarterly | Walk through DR scenarios with team | All team members know their roles |
+| **Site failover test** | Semi-annual | Full failover from primary to DR site | RTO/RPO met, all systems operational |
+| **End-to-end DR test** | Annual | Full DR with business applications testing | All critical apps functional at DR site |
+
+## Key Takeaways
+
+- IAM/PAM systems are critical infrastructure — IdP outage means ALL SSO apps are unavailable, PAM outage blocks all admin access, and directory outage prevents all authentication; 99.99% availability is the recommended target
+- Three HA patterns exist: active-passive cold standby (RTO 15-60 min, lowest cost), active-passive warm standby (RTO 1-5 min, medium cost), and active-active multi-region (near-zero RTO, highest cost) — the appropriate pattern depends on business criticality and budget
+- IdP HA requires stateless application tier with load balancing, distributed session cache (Redis cluster), replicated token signing keys (HSM cluster), and multi-master directory replication
+- PAM HA requires active-passive vault cluster with synchronous replication, active-active proxy nodes, distributed session recording storage (object storage), and dual-connected connectors per target system
+- DR planning requires defined RTO/RPO targets for each failure scenario: component failure (5 min / 0 data loss), data centre outage (60 min / 15 min), regional outage (4 hours / 30 min), and catastrophic failure (24 hours / 1 hour)
+- Backup strategy covers configuration exports, directory backups, encrypted database backups, immutable session recordings, HSM key backups, and IGA database backups with defined frequency, retention, and restore targets
+- DR testing at four levels: monthly component failover, quarterly tabletop, semi-annual site failover, and annual end-to-end DR with business applications — untested DR plans are not reliable

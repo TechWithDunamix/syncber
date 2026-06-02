@@ -1,0 +1,158 @@
+---
+title: "Identity Analytics"
+description: "Identity analytics and user behaviour analytics — anomaly detection, privilege creep identification, identity risk scoring, peer group analysis, and UEBA for identity security."
+sidebar:
+  order: 6
+  label: "Identity Analytics"
+---
+
+Identity Analytics applies data science and machine learning to identity data to detect anomalies, assess risk, and identify patterns that would be invisible to manual review. It transforms identity governance from a reactive compliance function into a proactive security capability.
+
+## The Data Sources of Identity Analytics
+
+Identity analytics draws from multiple data sources to build a comprehensive view of identity behaviour:
+
+| Data Source | What It Provides | Use Case |
+|-------------|------------------|----------|
+| **IGA platform** | User entitlements, role assignments, access history | Entitlement creep detection, role optimisation |
+| **Authentication logs** | Login timestamps, locations, devices, MFA status | Anomalous login detection |
+| **Application logs** | Application access patterns, feature usage | Usage-based access optimisation |
+| **HR data** | Department, manager, location, employment status | Entitlement baseline modelling |
+| **PAM logs** | Privileged session activity, command history | Privileged behaviour analytics |
+| **SIEM / UEBA** | Security events, threat intelligence | Correlated threat detection |
+| **Network logs** | Network access patterns, VPN usage | Context-aware risk assessment |
+
+## Identity Analytics Use Cases
+
+### Entitlement Creep Detection
+
+Analytics identifies users whose access has gradually expanded beyond what their role requires:
+
+| Metric | How It's Calculated | Alert Threshold |
+|--------|---------------------|-----------------|
+| **Entitlement count vs. peer median** | User's entitlement count compared to peers in same role/department | > 2x peer median |
+| **Entitlement growth rate** | % change in entitlement count over 90 days | > 30% increase |
+| **Unique system count** | Number of distinct systems accessed | > 3x peer median |
+| **Out-of-role entitlements** | Entitlements not typically held by users in the same role | Any occurrence |
+| **Dormant entitlements** | Entitlements not used in > 90 days | > 20% of user's entitlements |
+
+### Peer Group Analysis
+
+Users are compared against their peer group — other users in the same role, department, or location:
+
+```python
+# Simplified peer group analysis logic
+user_entitlements = get_user_entitlements(user_id)
+peer_group = find_peer_group(user_id, dimension="role")
+
+# Calculate peer baseline
+peer_median = median([len(get_user_entitlements(p)) for p in peer_group])
+peer_std = std_dev([len(get_user_entitlements(p)) for p in peer_group])
+
+# Flag outliers
+if len(user_entitlements) > peer_median + (3 * peer_std):
+    flag_anomaly(user_id, "entitlement_count_outlier")
+```
+
+### Anomalous Authentication Detection
+
+| Anomaly | Detection Method | Risk Level |
+|---------|-----------------|------------|
+| **Impossible travel** | Login from geographically distant locations within impossible timeframe | Critical |
+| **Off-hours access** | Login outside user's normal working hours | Medium |
+| **New device** | First-time access from unknown device | Medium |
+| **Failed login spike** | > 5 failed logins within 5 minutes | High |
+| **New location** | Login from never-before-seen geographic location | Medium |
+| **Credential stuffing pattern** | Multiple rapid login attempts with different usernames from same IP | High |
+
+### Privilege Creep Detection
+
+Privilege creep occurs when users accumulate privileges over time beyond what their current role requires:
+
+```
+Timeline of privilege escalation:
+Month 1: Joined as Junior Developer (base role, read-only)
+Month 6: Added to project team (project role, write)
+Month 12: Promoted to Developer (elevated role, modify)
+Month 18: Given temporary admin access (admin, 30-day — but not revoked)
+Month 24: Added to on-call rotation (admin access made permanent)
+Month 30: Domain admin for "emergency" (never revoked)
+Result: Junior Developer → Effective Domain Admin in 2.5 years
+```
+
+**Analytics detection**: The system would flag this user at Month 24 when the temporary admin access was not revoked, and escalate at Month 30 when domain admin was granted without proper approval.
+
+### Identity Risk Scoring
+
+A composite risk score combines multiple risk factors into a single metric:
+
+| Risk Factor | Weight | Example |
+|-------------|--------|---------|
+| **Privilege level** | 30% | High (admin), Medium (power user), Low (standard) |
+| **Entitlement count** | 20% | Percentile vs. peer group |
+| **SoD violations** | 20% | Count of unresolved violations |
+| **Access recency** | 15% | Time since last access review |
+| **Authentication risk** | 10% | Failed logins, MFA presence |
+| **Data sensitivity** | 5% | Classification of data accessible |
+
+**Example score calculation**:
+```
+Risk Score = (0.30 × privilege_level_score) + (0.20 × entitlement_score) 
+           + (0.20 × sod_score) + (0.15 × recency_score) 
+           + (0.10 × auth_score) + (0.05 × data_sensitivity_score)
+
+User A: 0.30(100) + 0.20(80) + 0.20(60) + 0.15(50) + 0.10(20) + 0.05(40) = 68/100 (HIGH)
+User B: 0.30(20) + 0.20(30) + 0.20(10) + 0.15(20) + 0.10(10) + 0.05(20) = 18/100 (LOW)
+```
+
+## User and Entity Behaviour Analytics (UEBA)
+
+UEBA extends identity analytics to detect behavioural anomalies that may indicate compromised accounts or insider threats:
+
+| Behavioural Signal | UEBA Detection | Potential Threat |
+|--------------------|----------------|------------------|
+| **Unusual data access volume** | Bulk download of documents outside normal pattern | Data exfiltration |
+| **Unusual login time** | First-time login at 3 AM | Compromised account |
+| **Unusual application sequence** | Accessing systems in an order never seen before | Lateral movement |
+| **Unusual peer interaction** | Accessing files from a department the user has never interacted with | Privilege escalation |
+| **Unusual credential use** | Same credential used from multiple IPs simultaneously | Credential sharing or theft |
+| **Unusual command pattern** | Running commands never used before in privileged session | Attacker activity |
+
+## Building an Identity Analytics Program
+
+<Steps>
+### Establish Baseline
+Collect 3-6 months of identity and access data to establish normal behaviour patterns. Define peer groups (role, department, location). Calculate baseline metrics for each peer group.
+
+### Define Anomaly Thresholds
+Set thresholds for each analytics use case. Thresholds should be calibrated to balance false positives (too low = alert fatigue) and false negatives (too high = missed detections).
+
+### Implement Detection
+Deploy analytics engine (SIEM UEBA module, dedicated identity analytics platform, or custom ML models). Connect to data sources: IGA, authentication logs, application logs, HR system.
+
+### Establish Response Playbooks
+For each alert type, define a response playbook: Who is notified? What investigation is performed? What remediation actions are taken? What is the escalation path?
+
+### Continuous Tuning
+Review alert effectiveness regularly. Tune thresholds based on false positive/negative rates. Add new data sources as they become available. Update peer group definitions as the organisation changes.
+</Steps>
+
+## Identity Analytics Tools and Platforms
+
+| Tool/Platform | Type | Key Capabilities |
+|--------------|------|------------------|
+| **SailPoint Predictive Identity** | IGA + Analytics | Risk scoring, peer group analysis, certification recommendations |
+| **Saviynt** | IGA + Analytics | SoD analytics, user risk scoring, access certification |
+| **Microsoft Identity Protection** | Cloud | Risky sign-in detection, compromised user detection, MFA prompts |
+| **Splunk UEBA** | SIEM + UEBA | Behavioural analytics, peer group analysis, threat detection |
+| **Varonis** | Data Security Analytics | File access monitoring, data classification, anomaly detection |
+| **Rapid7 InsightIDR** | SIEM + UEBA | User behaviour analytics, attacker behaviour detection |
+
+## Key Takeaways
+
+- Identity Analytics applies data science and ML to identity data to detect anomalies, assess risk, and identify patterns invisible to manual review — transforming governance from reactive to proactive
+- Key use cases include entitlement creep detection, peer group analysis, anomalous authentication, privilege creep detection, and identity risk scoring
+- Peer group analysis compares each user against similar users (same role, department) — users with significantly more entitlements than their peers are flagged for review
+- Identity risk scoring combines privilege level, entitlement count, SoD violations, access recency, authentication risk, and data sensitivity into a composite score
+- UEBA extends analytics to behavioural signals (unusual data access, login times, application sequences) that may indicate compromised accounts or insider threats
+- Building an identity analytics program requires: baseline establishment → threshold definition → detection implementation → response playbooks → continuous tuning

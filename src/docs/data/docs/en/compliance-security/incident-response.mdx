@@ -1,0 +1,170 @@
+---
+title: "Incident Response & Forensics"
+description: "IAM's role in security incident response — identity forensics, user attribution, access analysis during breach investigation, credential compromise response, and post-incident access review."
+sidebar:
+  order: 9
+  label: "Incident Response"
+---
+
+When a security incident occurs, IAM systems are both a critical source of forensic evidence and a key tool for containment and remediation. Understanding how to leverage IAM during incident response is essential for security operations, compliance, and forensic investigation.
+
+## IAM's Role in Incident Response
+
+### Identity-Centric Incident Response Framework
+
+```
+┌────────────────────────────────────────────────────────────┐
+│               IDENTITY-CENTRIC INCIDENT RESPONSE             │
+├──────────┬──────────┬──────────┬──────────┬────────────────┤
+│  Detect  │  Triage  │ Contain  │Investigate│  Remediate     │
+│  ┌────┐  │  ┌────┐  │ ┌────┐  │ ┌────┐   │  ┌────┐        │
+│  │Auth │  │  │Who │  │ │Freeze│ │ │Who  │   │  │Rotate│     │
+│  │Anom.│  │  │?   │  │ │Account│ │ │Else │   │  │Creds │     │
+│  └────┘  │  └────┘  │ └────┘  │ │Was  │   │  │      │     │
+│          │          │         │  │Affect│   │  │Reset  │     │
+│  ┌────┐  │  ┌────┐  │ ┌────┐  │ └────┘   │  │Policy │     │
+│  │Priv.│  │  │What │  │ │Blk │  │         │  └────┘        │
+│  │Escal│  │  │Done?│  │ │Acct│  │ ┌────┐  │               │
+│  └────┘  │  └────┘  │ └────┘  │ │Sess.│  │               │
+│          │          │         │  │Recrd│  │               │
+│  ┌────┐  │          │         │  └────┘  │               │
+│  │Auth │  │          │         │         │               │
+│  │Fail │  │          │         │         │               │
+│  └────┘  │          │         │         │               │
+└──────────┴──────────┴──────────┴──────────┴────────────────┘
+```
+
+### Phase 1 — Detection
+
+IAM systems generate signals that can detect incidents in progress:
+
+| Detection Signal | IAM Data Source | What It Indicates |
+|-----------------|-----------------|-------------------|
+| **Brute-force authentication attempts** | IdP / PAM auth logs | Password guessing, credential stuffing |
+| **Privilege escalation outside normal pattern** | PAM elevation events | Account compromise, insider threat |
+| **Access from unusual geolocation** | IdP risk scoring, conditional access | Stolen credentials, account takeover |
+| **MFA fatigue / MFA bombing** | MFA system logs, push notification failures | Targeted account compromise |
+| **Unusual session behaviour** | PAM session recording, session analytics | Insider threat, credential sharing |
+| **Off-hours privileged access** | PAM session logs, time-based policies | Potential misuse, compromised account |
+| **New account creation** | IGA provisioning logs, HR system | Unauthorised account creation |
+| **Group membership change** | Directory service logs, IGA | Privilege escalation, lateral movement |
+
+### Phase 2 — Triage
+
+During triage, IAM provides critical context:
+
+| Question | IAM Data to Answer | Source |
+|----------|-------------------|--------|
+| **Who was involved?** | User identity, role, department, manager | IGA, HR system, directory |
+| **What did they do?** | Access events, commands executed, data accessed | PAM session recording, IdP logs, SIEM |
+| **When did it start?** | First anomalous event timestamp | Chronological analysis of auth and access logs |
+| **Where did they connect from?** | Source IP, device, geolocation, VPN status | IdP / PAM connection logs |
+| **How did they authenticate?** | Auth method, MFA status, credential type | IdP authentication logs |
+| **Is this ongoing?** | Current session status, active connections | PAM active sessions, IdP session status |
+
+### Phase 3 — Containment
+
+IAM containment actions to stop an active incident:
+
+| Containment Action | IAM Implementation | Timeframe | Impact |
+|-------------------|-------------------|-----------|--------|
+| **Disable user account** | Immediate account disablement in IdP, directory, IGA | Seconds | Prevents further authentication |
+| **Revoke active sessions** | Session termination, token revocation | Seconds | Logs out active sessions |
+| **Reset credentials** | Password reset, API key rotation | Minutes | Invalidates existing credentials |
+| **MFA reset** | Remove registered MFA devices, re-enforce MFA | Minutes | Forces re-registration |
+| **Isolate privileged access** | Remove from privileged groups, revoke PAM access | Minutes | Prevents privilege escalation |
+| **Block network access** | Firewall rule, NAC enforcement | Minutes | Network-level containment |
+| **Initiate credential rotation** | PAM auto-rotation of affected credentials | Minutes | Service account credential refresh |
+
+<Aside variant="danger">
+When a compromise is suspected, act on containment first and investigate second. Every minute that an attacker maintains access increases the potential for lateral movement, privilege escalation, and data exfiltration. IAM containment — account disablement, session revocation, and credential rotation — should be the first actions taken.
+</Aside>
+
+### Phase 4 — Investigation
+
+IAM forensics for post-incident investigation:
+
+| Forensic Question | IAM Evidence | Analysis Method |
+|------------------|-------------|-----------------|
+| **What accounts were compromised?** | Auth logs showing login anomalies | Correlate anomalous auth events across IdP, applications, and infrastructure |
+| **What was the initial entry point?** | First anomalous auth event | Trace back time chain of auth events to find first event |
+| **How long was the attacker present?** | First to last anomalous event | Time-based analysis of all events attributed to the compromise |
+| **What data was accessed?** | Application access logs, file access logs | Cross-reference auth events with data access events |
+| **Was lateral movement involved?** | Privilege elevation events, new account creations, group changes | Map account, privilege, and resource access changes over time |
+| **What commands were executed?** | PAM session recording, command logs | Review session recordings, shell history, command audit logs |
+| **Were credentials exfiltrated?** | Credential access events, unusual credential use | Check for credential dumping events, off-hours credential use |
+
+### User Attribution in Forensics
+
+In complex environments (shared service accounts, application accounts), user attribution requires correlation across multiple data sources:
+
+```
+Example: Suspicious database query at 2:00 AM via application service account
+
+   2:00 AM  ── DB query (user: app_svc_acct)
+               └── No direct user attribution (service account)
+               
+   Correlation:
+   1. Which application uses app_svc_acct? → Payment processing app
+   2. Which user session was active on the app server at 2:00 AM? → Server session for jdoe
+   3. How did jdoe authenticate? → SSH + MFA through PAM
+   4. Was jdoe's access approved for this activity? → JIT request for "production maintenance"
+
+   Conclusion: jdoe performed the database query using delegated service account credentials
+```
+
+### Forensic Evidence Preservation
+
+| Evidence Type | Preservation Method | Retention |
+|--------------|-------------------|-----------|
+| **Authentication logs** | Immutable log storage, SIEM ingestion | Duration of investigation + legal hold |
+| **PAM session recordings** | Encrypted archive, chain of custody | Until investigation closes + legal hold |
+| **Access certification history** | Snapshot of certification state at incident time | Until investigation closes |
+| **User attribute snapshot** | Point-in-time directory export | Until investigation closes |
+| **Group membership history** | Directory change log, IGA entitlement history | Until investigation closes |
+| **Credential history** | Last N password changes, credential age at incident | Until investigation closes |
+
+### Phase 5 — Remediation
+
+Post-incident IAM remediation to prevent recurrence:
+
+| Remediation Action | Purpose | Example |
+|-------------------|---------|---------|
+| **Credential rotation** | Invalidate compromised credentials | Rotate all credentials the attacker may have accessed |
+| **Policy review** | Address gaps exploited in the incident | Implement MFA for the service that lacked it |
+| **Access review** | Audit all access granted during the compromise window | Review group memberships, application access, privileged roles |
+| **User education** | Train users on the attack vector | Phishing awareness if the incident started with credential phishing |
+| **Control enhancement** | Strengthen the controls that failed | Implement conditional access policy for anomalous geolocation |
+| **Detection improvement** | Add detection rules for the attack pattern | Create SIEM rule for the specific anomaly chain |
+
+## Regulatory Reporting Requirements
+
+| Regulation | Breach Reporting Requirement | IAM Data Needed |
+|------------|------------------------------|-----------------|
+| **GDPR (Art. 33)** | 72 hours to supervisory authority | Affected data subjects identified through IAM records |
+| **PCI DSS (Req. 12.10)** | Incident response plan with annual testing | Access reconstruction for CDE systems |
+| **HIPAA Breach Notification** | 60 days for 500+ individuals | Affected individuals identified through user records |
+| **SOX (Section 409)** | Real-time material change disclosure | Impact assessment on financial controls |
+| **State breach notification** | Typically 30-60 days | Notification list from system access records |
+
+## Post-Incident Access Review
+
+After an incident is resolved, conduct a formal post-incident access review:
+
+| Review Item | Who Reviews | Frequency |
+|-------------|-------------|-----------|
+| Account membership changes during incident window | IAM team + Security team | Within 7 days of resolution |
+| Privileged access grants during incident | PAM administrator | Within 7 days of resolution |
+| Certification completeness for affected systems | Data owners | Within 14 days of resolution |
+| Policy exception validity | Compliance team | Within 14 days of resolution |
+| Incident-related credential rotation completion | IAM team | Within 7 days of resolution |
+
+## Key Takeaways
+
+- IAM's role in incident response spans all phases: detection (auth anomalies, privilege escalation, unusual geolocation), triage (user attribution, timeline reconstruction), containment (account disablement, session revocation, credential rotation), investigation (forensic analysis, lateral movement mapping), and remediation (policy improvement, control enhancement)
+- Containment should always precede investigation — every minute of delay increases potential damage from lateral movement and data exfiltration
+- User attribution in complex environments requires correlation across IdP, PAM, application, and infrastructure logs — especially for shared service accounts where direct user-to-account mapping is unavailable
+- Forensic evidence from IAM systems (auth logs, session recordings, entitlement history, group membership changes) must be preserved in immutable storage with chain of custody for the duration of investigation plus legal hold
+- Regulatory breach reporting (GDPR 72 hours, HIPAA 60 days for 500+ records, PCI DSS incident response plan) depends on IAM data for affected-subject identification and access reconstruction
+- Post-incident remediation must include credential rotation for all potentially compromised accounts, policy review and enhancement to address exploited gaps, and formal post-incident access review within 7-14 days
+- The identity-centric incident response framework (Detect → Triage → Contain → Investigate → Remediate) provides a structured approach to leveraging IAM capabilities throughout the incident lifecycle

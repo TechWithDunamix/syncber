@@ -1,0 +1,158 @@
+---
+title: "Governance & Policies"
+description: "Identity governance and access policies — policy lifecycle, policy frameworks, policy enforcement automation, exception management, and linking policies to compliance requirements."
+sidebar:
+  order: 8
+  label: "Governance & Policies"
+---
+
+Governance policies translate regulatory requirements, security principles, and business rules into enforceable access controls. A well-defined policy framework provides the foundation for consistent, auditable identity governance across the enterprise.
+
+Policies answer the question: "What are the rules governing access to our systems and data?" Without clear policies, identity governance is ad hoc, inconsistent, and un-auditable.
+
+## The Governance Policy Framework
+
+### Policy Hierarchy
+
+```
+Regulatory Requirements (SOX, GDPR, PCI, HIPAA)
+         │
+         ▼
+Enterprise Security Policies
+         │
+         ├── Access Control Policy
+         ├── Identity Management Policy
+         ├── Password Policy
+         ├── Remote Access Policy
+         │
+         ▼
+IAM-Specific Policies
+         │
+         ├── User Provisioning Policy
+         ├── Access Certification Policy
+         ├── Role Management Policy
+         ├── SoD Policy
+         ├── Privileged Access Policy
+         │
+         ▼
+Technical Implementation (IGA rules, RBAC, JIT, PAM)
+```
+
+### Policy Components
+
+| Component | Description | Example |
+|-----------|-------------|---------|
+| **Policy title** | Unique name | "Privileged Access Request Policy" |
+| **Purpose** | Why the policy exists | "To ensure all privileged access is approved, time-limited, and audited" |
+| **Scope** | Who/what the policy applies to | "All employees, contractors, and third parties with privileged access" |
+| **Policy statements** | Specific, enforceable rules | "All privileged access requests must be approved by the system owner" |
+| **Enforcement mechanism** | How the policy is enforced | "IGA platform enforces approval workflow; PAM system enforces JIT elevation" |
+| **Exceptions** | When and how exceptions are granted | "Emergency break-glass with post-hoc review" |
+| **Compliance reference** | Which regulation the policy supports | "Maps to SOX Section 404 and PCI DSS Requirement 7" |
+
+## Key IAM Governance Policies
+
+### Access Control Policy
+
+Defines who can grant, modify, and revoke access:
+
+| Policy Statement | Enforcement | Compliance Mapping |
+|-----------------|-------------|-------------------|
+| Access requests must be authorised by the requestor's manager | IGA approval workflow | SOX 404, ISO 27001 A.9.2.1 |
+| Access must be provisioned within 24 hours of approval | Automated provisioning | Internal SLA |
+| Access must be reviewed at least annually | Certification campaign | PCI DSS 7.2, HIPAA §164.308 |
+| Terminated employees' access must be removed within 1 hour | Automated deprovisioning | SOX 404, GDPR Art. 17 |
+
+### Password Policy
+
+Defines password requirements and authentication controls:
+
+| Policy Statement | Enforcement | Compliance Mapping |
+|-----------------|-------------|-------------------|
+| Passwords must be at least 12 characters | IdP policy, password filter | NIST SP 800-63B, PCI DSS 8.3.6 |
+| Passwords must be checked against breach databases | Azure AD Password Protection, Pwned Passwords API | NIST SP 800-63B |
+| MFA must be enabled for all administrative access | Conditional Access policy | PCI DSS 8.4.2, CISA BOD 24-02 |
+| Passwords must not contain common patterns or keyboard walks | Password strength validation | Industry best practice |
+
+### Access Certification Policy
+
+Defines the access review program:
+
+| Policy Statement | Enforcement | Compliance Mapping |
+|-----------------|-------------|-------------------|
+| All user access must be certified at least annually | IGA certification campaign | SOX 404, PCI DSS 7.2, HIPAA |
+| Manager is the default certifier for direct reports | IGA reviewer assignment | Industry best practice |
+| Uncertified access must be revoked within 30 days | Automated revocation after campaign | PCI DSS 10.3 |
+| Privileged access must be certified quarterly | Monthly privileged access review | NIST SP 800-53 AC-2 |
+
+## Policy Lifecycle
+
+```
+Create ──→ Approve ──→ Publish ──→ Enforce ──→ Monitor ──→ Review ──→ Update
+                                                                            │
+                                                                            ▼
+                                                                        Retire
+```
+
+| Phase | Activity | Owner |
+|-------|----------|-------|
+| **Create** | Draft policy text, define scope, identify enforcement mechanism | Policy owner (e.g., CISO, IAM architect) |
+| **Approve** | Review and approve policy | Policy committee, legal, compliance |
+| **Publish** | Communicate to affected users, update documentation | Communications, IAM team |
+| **Enforce** | Implement enforcement in IGA/PAM systems | IAM operations |
+| **Monitor** | Track compliance with policy, identify gaps | IAM operations, compliance |
+| **Review** | Assess policy effectiveness, incorporate lessons learned | Policy owner |
+| **Update** | Modify policy based on review findings | Policy owner |
+| **Retire** | Decommission obsolete policy | Policy owner, compliance |
+
+## Exception Management
+
+Not every scenario fits within standard policies. Exception management governs when and how policies can be temporarily set aside.
+
+### Exception Types
+
+| Exception Type | Duration | Approval Required | Review Frequency |
+|----------------|----------|-------------------|-----------------|
+| **Temporary exception** | < 30 days | Manager + policy owner | At exception expiry |
+| **Extended exception** | 30-90 days | Manager + policy owner + compliance | Monthly |
+| **Permanent exception** | Indefinite | CISO or delegate (rare) | Quarterly |
+| **Emergency bypass** | < 24 hours | Post-hoc review required | Within 5 days of incident |
+
+### Exception Workflow
+
+```
+Exception Request → Risk Assessment → Approval Decision → Grant Exception → Monitor → Expire/Renew
+```
+
+| Phase | Description |
+|-------|-------------|
+| **Exception request** | User submits exception with business justification, duration, and proposed compensating controls |
+| **Risk assessment** | Security team assesses the risk of granting the exception and the adequacy of compensating controls |
+| **Approval decision** | Policy owner approves or denies based on risk assessment |
+| **Grant exception** | Exception recorded in IGA system, time-limited access granted |
+| **Monitor** | Compensating controls monitored for effectiveness; exception reviewed at defined intervals |
+| **Expire/Renew** | Exception expires automatically; renewal requires re-approval |
+
+<Aside variant="caution">
+Exceptions are the leading cause of policy erosion. Without strict exception management — documented justification, limited duration, executive approval, and regular review — exceptions become permanent, and the policy becomes meaningless. If more than 5% of access is under exception, the policy is likely too restrictive and should be revised.
+</Aside>
+
+## Policy Compliance Monitoring
+
+| Monitoring Method | Frequency | What It Detects |
+|-------------------|-----------|-----------------|
+| **Automated policy check** | Real-time or daily | Entitlements that violate policy rules |
+| **Reconciliation** | Daily | Differences between intended and actual access |
+| **SoD scan** | Weekly | New SoD violations |
+| **Access certification** | Quarterly or annually | Access not validated by managers |
+| **Audit log review** | Continuous | Suspicious access patterns |
+| **Policy attestation** | Annual | Formal confirmation that policies are still accurate |
+
+## Key Takeaways
+
+- Governance policies translate regulatory requirements and business rules into enforceable access controls — they form the foundation of consistent, auditable identity governance
+- The policy hierarchy spans regulatory requirements → enterprise security policies → IAM-specific policies → technical implementation rules
+- Key IAM governance policies include access control, password, and access certification — each with specific policy statements, enforcement mechanisms, and compliance mappings
+- The policy lifecycle (create → approve → publish → enforce → monitor → review → update → retire) ensures policies remain current and effective
+- Exception management governs when policies can be temporarily set aside — strict controls (documented justification, limited duration, executive approval, regular review) prevent policy erosion
+- If more than 5% of access is under exception, the policy is likely too restrictive and should be revised rather than accumulating exceptions

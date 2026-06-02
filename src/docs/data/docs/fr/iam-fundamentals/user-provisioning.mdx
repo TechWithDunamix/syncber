@@ -1,0 +1,80 @@
+---
+title: "Provisionnement & Déprovisionnement des Utilisateurs"
+description: "Comment les systèmes IAM automatisent la création, la modification et la suppression des comptes utilisateurs dans les applications d'entreprise."
+sidebar:
+  order: 6
+  label: "Provisionnement Utilisateurs"
+---
+
+Le provisionnement des utilisateurs est le processus de création, mise à jour et suppression des comptes utilisateurs et des droits dans les systèmes cibles. C'est le cœur opérationnel de l'IAM — le mécanisme qui transforme la politique d'identité en réalité.
+
+## Le Défi du Provisionnement
+
+Les grandes entreprises gèrent des centaines d'applications, chacune avec son propre stockage d'utilisateurs. Sans provisionnement automatisé, les administrateurs IT doivent créer manuellement des comptes dans chaque système — une approche sujette aux erreurs, chronophage et peu sécurisée.
+
+<Aside variant="caution">
+Le provisionnement manuel est la première cause de comptes orphelins, d'utilisateurs sur-privilégiés et de déprovisionnement retardé. L'automatisation n'est pas optionnelle.
+</Aside>
+
+## Modèles de Provisionnement
+
+### Provisionnement Juste-à-Temps (JIT)
+
+Le provisionnement JIT crée les comptes **lors de la première authentification réussie**. L'utilisateur n'existe pas dans le système cible jusqu'à ce qu'il tente d'y accéder.
+
+**Avantages :**
+- Aucun frais de pré-provisionnement
+- Licence consommée uniquement pour les utilisateurs actifs
+- Surface d'attaque réduite
+
+**Inconvénients :**
+- Première tentative d'accès légèrement retardée
+- Nécessite le support JIT de l'application cible (SAML/OIDC)
+
+### Provisionnement par Synchronisation
+
+Les comptes sont créés dans les systèmes cibles en fonction des changements détectés dans la source autorisée (généralement le système RH).
+
+**Avantages :**
+- Prévisible — les comptes existent avant que l'utilisateur en ait besoin
+- Supporte les transformations d'attributs complexes
+- Fonctionne avec les applications legacy
+
+**Inconvénients :**
+- Consomme des licences même pour les utilisateurs inactifs
+- Plus complexe à configurer
+- Propagation plus lente
+
+## SCIM — Le Standard de Provisionnement
+
+**System for Cross-domain Identity Management (SCIM)** est le standard ouvert pour l'automatisation du provisionnement (RFC 7642–7644).
+
+### Opérations SCIM
+
+| Opération | Méthode HTTP | Endpoint |
+|-----------|-------------|----------|
+| Création | POST | `/Users` |
+| Lecture | GET | `/Users/{id}` |
+| Mise à jour | PATCH | `/Users/{id}` |
+| Remplacement | PUT | `/Users/{id}` |
+| Suppression | DELETE | `/Users/{id}` |
+
+## Déprovisionnement
+
+Le déprovisionnement est le processus de suppression des accès lorsqu'ils ne sont plus nécessaires. C'est sans doute **plus important** que le provisionnement du point de vue de la sécurité.
+
+| Action | Moment | Description |
+|--------|--------|-------------|
+| **Désactivation** | Immédiat | Empêche la connexion mais préserve les données |
+| **Suppression des groupes** | Immédiat | Révoque l'accès via la suppression des groupes |
+| **Réinitialisation des identifiants** | Immédiat | Invalide mot de passe, révoque jetons |
+| **Archivage** | 30 jours | Compte désactivé pour période de rétention |
+| **Suppression** | 90 jours | Suppression permanente après période légale |
+
+## Points Clés
+
+- Le provisionnement automatise la création, modification et suppression des comptes
+- Le provisionnement JIT crée les comptes à la demande ; la synchronisation suit les événements RH
+- SCIM est le standard REST ouvert pour le provisionnement (RFC 7642–7644)
+- Le déprovisionnement doit être immédiat pour la désactivation et la révocation
+- Un flux de déprovisionnement structuré sépare les actions de sécurité immédiates du nettoyage

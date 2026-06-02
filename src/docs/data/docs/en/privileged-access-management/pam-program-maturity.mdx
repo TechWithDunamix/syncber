@@ -1,0 +1,214 @@
+---
+title: "PAM Program Maturity"
+description: "Assessing PAM maturity — the PAM maturity model, building a PAM roadmap, measuring success with KPIs, sustaining program momentum, and common pitfalls to avoid."
+sidebar:
+  order: 10
+  label: "PAM Program Maturity"
+---
+
+PAM is not a one-time project — it is an ongoing program that must evolve as the organisation grows, technology changes, and threats advance. A mature PAM program is integrated into every IT and security process, continuously discovers and manages new privileged accounts, and provides measurable security outcomes.
+
+This page provides a framework for assessing your current PAM maturity, building a roadmap to advance it, and sustaining the program over time.
+
+## The PAM Maturity Model
+
+### Level 1: Initial (Ad Hoc)
+
+Privileged access is unmanaged or managed in an ad-hoc manner with no standardised processes.
+
+**Characteristics**:
+- Shared admin passwords stored in spreadsheets or shared documents
+- No credential rotation or rotation is manual and inconsistent
+- No session monitoring or recording
+- No discovery — don't know all privileged accounts
+- Multiple people share the same admin credentials
+- No separation of duty between admin and audit roles
+- No documented procedures for privileged access
+- Compliance is reactive — prepare for audits only
+
+**Risk posture**: Critical — breach of any privileged account likely goes undetected.
+
+**Estimated breach cost multiplier**: 3x (compared to baseline)
+
+### Level 2: Defined (Foundational)
+
+Basic PAM controls are implemented and documented. The organisation has acknowledged that privileged access must be managed.
+
+**Characteristics**:
+- Centralised credential vault deployed for some systems
+- Basic password rotation — scheduled, not on-checkout
+- Session recording for some critical systems
+- Privileged account discovery completed (one-time)
+- Roles and responsibilities defined for PAM administration
+- Basic approval workflows for credential access
+- Documented PAM procedures exist
+- Compliance requirements are identified and mapped
+
+**Risk posture**: High — many blind spots remain, but critical controls exist.
+
+**Estimated breach cost multiplier**: 2x
+
+### Level 3: Managed (Comprehensive)
+
+PAM controls are consistently applied across most systems, with monitoring and reporting.
+
+**Characteristics**:
+- Centralised vault covers 80%+ of privileged accounts
+- On-checkout password rotation implemented
+- Session recording and monitoring for all privileged sessions
+- Continuous privileged account discovery
+- JIT access implemented for critical systems
+- Approval workflows integrated with ITSM
+- PAM integrated with SIEM for alerting
+- Regular PAM reporting and metrics
+- Quarterly access certifications
+
+**Risk posture**: Moderate — controls are in place but may not be fully effective against sophisticated attackers.
+
+**Estimated breach cost multiplier**: 1x (baseline)
+
+### Level 4: Optimised (Zero Trust)
+
+Privileged access follows Zero Trust principles — no standing privileges, continuous verification, and full lifecycle automation.
+
+**Characteristics**:
+- Zero standing privileges — all access is JIT with automatic expiry
+- Phishing-resistant MFA (FIDO2) for all privileged access
+- Full session isolation — no direct network connectivity to targets
+- Continuous discovery with automatic onboarding of new privileged accounts
+- Policy-as-code for PAM access policies
+- AI/ML-based anomaly detection for privileged session behaviour
+- Automated compliance reporting with real-time evidence
+- Regular penetration testing against PAM controls
+- Break-glass procedures tested quarterly
+- PAM integrated with SOAR for automated incident response
+
+**Risk posture**: Low — privileged access is effectively controlled, monitored, and continuously verified.
+
+**Estimated breach cost multiplier**: 0.3x (drastically reduced blast radius)
+
+## PAM Assessment Framework
+
+### Assessment Dimensions
+
+| Dimension | What to Measure | Level 1 | Level 2 | Level 3 | Level 4 |
+|-----------|-----------------|---------|---------|---------|---------|
+| **Coverage** | % of privileged accounts managed | <20% | 20-50% | 50-80% | 80-100% |
+| **Vaulting** | % of privileged credentials in vault | None | Manual vaulting | 80%+ vaulted | 100% vaulted |
+| **Rotation** | Rotation frequency | Never | Scheduled (90 days) | On-checkout | Continuous / dynamic |
+| **Session recording** | % of sessions recorded | None | Critical systems | All privileged | All + real-time analysis |
+| **JIT access** | % of access that is JIT | None | Some critical | 50%+ | 100% (zero standing) |
+| **MFA** | MFA for privileged access | None | Some | 80%+ | 100% + FIDO2 |
+| **Discovery** | Discovery frequency | Never | One-time | Continuous | Continuous + auto-onboard |
+| **Certification** | Access review cadence | None | Annual | Quarterly | Monthly + automated |
+| **SIEM integration** | Event forwarding | None | Manual logs | Automated | Real-time + automated response |
+
+## Building a PAM Roadmap
+
+### Phase 1: Foundation (Months 1-3)
+
+| Activity | Outcome | Success Criteria |
+|----------|---------|-----------------|
+| **Privileged account discovery** | Complete inventory of all privileged accounts | 95%+ of privileged accounts identified |
+| **Critical system identification** | Risk-ranked list of systems requiring immediate PAM coverage | All systems classified by criticality |
+| **Vendor selection** | PAM platform chosen based on requirements | Signed procurement |
+| **Quick-win deployment** | Vault deployed for top 20 critical systems | 20 critical system credentials vaulted |
+
+### Phase 2: Deployment (Months 3-9)
+
+| Activity | Outcome | Success Criteria |
+|----------|---------|-----------------|
+| **Full vault deployment** | All privileged account credentials vaulted | 100% of discovered accounts in vault |
+| **Password rotation policy** | Automated rotation for all vaulted accounts | All accounts rotating on schedule |
+| **Session proxy deployment** | Proxy for RDP and SSH sessions | All privileged sessions routed through proxy |
+| **Session recording enabled** | Recording for all proxied sessions | 100% of sessions recorded |
+| **MFA enforcement** | MFA required for all privileged access | 100% of privileged access requires MFA |
+
+### Phase 3: Optimisation (Months 9-18)
+
+| Activity | Outcome | Success Criteria |
+|---------|---------|------------------|
+| **JIT access implementation** | JIT for all critical and high-risk systems | 50% reduction in standing privileged access |
+| **Approval workflows** | ITSM-integrated approval for all elevation requests | 100% of elevations referenced to change tickets |
+| **SIEM integration** | Real-time PAM event forwarding to SIEM | All PAM events available in SIEM dashboard |
+| **Continuous discovery** | Automated discovery scanning | New privileged accounts vaulted within 24 hours |
+
+### Phase 4: Zero Trust (Months 18-36)
+
+| Activity | Outcome | Success Criteria |
+|----------|---------|------------------|
+| **Zero standing privileges** | All privileged access is JIT | No permanent privileged account memberships |
+| **Phishing-resistant MFA** | FIDO2 for all privileged access | 100% FIDO2 deployment |
+| **Policy-as-code** | PAM policies managed as code with CI/CD | Policy changes deployed through automated pipeline |
+| **Automated compliance** | Real-time compliance evidence collection | Audit-ready reports available on demand |
+
+## PAM KPIs and Metrics
+
+### Leading Indicators (Predictive)
+
+| Metric | Target | What It Measures |
+|--------|--------|-----------------|
+| **% vault coverage** | >95% | How many privileged accounts are managed |
+| **% rotation compliance** | >99% | Are credentials being rotated per policy |
+| **% MFA compliance** | 100% | Is MFA enforced for all privileged access |
+| **% session recording** | 100% | Are all privileged sessions recorded |
+| **% JIT adoption** | Increasing | Are users adopting JIT over standing access |
+| **Mean time to onboard** | <24 hours | How fast new privileged accounts get vaulted |
+
+### Lagging Indicators (Outcome)
+
+| Metric | Target | What It Measures |
+|--------|--------|-----------------|
+| **Privilege-related incidents** | 0 trending down | Incidents involving privileged access abuse |
+| **Mean time to detect (MTTD)** | Decreasing | Time to detect suspicious privileged activity |
+| **Mean time to contain (MTTC)** | Decreasing | Time to contain a privileged access incident |
+| **Audit findings (privilege-related)** | 0 trending down | Compliance audit findings related to PAM |
+| **Credential theft incidents** | 0 | Incidents involving stolen privileged credentials |
+
+## Common PAM Pitfalls
+
+| Pitfall | Why It Happens | How to Avoid |
+|---------|---------------|--------------|
+| **PAM is treated as a project, not a program** | Leadership sees PAM as a one-time deploy | Build a 3-year roadmap with ongoing operational budget |
+| **Stalled at vault deployment** | Organisation deploys vault but never adds session monitoring or JIT | Plan all phases upfront; each phase should be a hard gate |
+| **Service accounts ignored** | Discovery doesn't find all service accounts | Dedicated service account discovery campaign with automated scanning |
+| **Admin resistance / workarounds** | Administrators resist vaulting because it adds friction | Engage admins in workflow design; demonstrate benefits; enforce policy |
+| **Orphaned PAM program** | No dedicated owner after initial deployment | Assign a PAM program owner with ongoing responsibility |
+| **Break-glass never tested** | Procedure documented but never validated | Quarterly tabletop + bi-annual functional test |
+| **PAM not integrated** | PAM operates in isolation from IAM, SIEM, ITSM | Plan integrations from the start; include in requirements |
+| **False sense of security** | Organisation has a vault and assumes PAM is complete | Continuous assessment against maturity model; penetration testing |
+
+## Sustaining PAM Momentum
+
+### Year 1: Establish
+
+- Deploy core PAM capabilities (vault + session management)
+- Document procedures and train administrators
+- Achieve PAM maturity Level 2
+
+### Year 2: Expand
+
+- Extend coverage to all privileged accounts
+- Implement JIT and approval workflows
+- Integrate with SIEM and ITSM
+- Move to PAM maturity Level 3
+
+### Year 3: Optimise
+
+- Eliminate standing privileges (Zero Trust)
+- Implement policy-as-code
+- Automate compliance reporting
+- Target PAM maturity Level 4
+
+<Aside variant="tip">
+The most common PAM failure mode is **stalling at Level 2**. The organisation deploys a vault, satisfies the immediate compliance checkbox, and never invests further. To avoid this, embed PAM improvement into annual security planning, include PAM KPIs in executive reporting, and maintain a visible roadmap for advancing maturity.
+</Aside>
+
+## Key Takeaways
+
+- The PAM maturity model has four levels: Initial (ad hoc, critical risk), Defined (basic vaulting, high risk), Managed (comprehensive controls, moderate risk), and Optimised (Zero Trust, low risk)
+- A PAM roadmap should span 18-36 months across four phases: Foundation (months 1-3), Deployment (months 3-9), Optimisation (months 9-18), and Zero Trust (months 18-36)
+- PAM KPIs divide into leading indicators (% vault coverage, rotation compliance, MFA compliance) and lagging indicators (incident count, MTTD, MTTC, audit findings)
+- Common pitfalls include treating PAM as a one-time project, ignoring service accounts, admin resistance, orphaned programs, and untested break-glass procedures
+- The most common failure mode is stalling at Level 2 (vault deployment only) — sustain momentum by embedding PAM into annual planning, reporting KPIs to executives, and maintaining a visible maturity roadmap
+- PAM maturity is a journey, not a destination — the threat landscape evolves, and PAM programs must continuously adapt

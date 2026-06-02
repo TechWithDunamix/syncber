@@ -1,0 +1,60 @@
+---
+title: "Annuaires d'Identités & Stockage de Données"
+description: "Comment fonctionnent les annuaires d'identités — Active Directory, LDAP, annuaires cloud et les modèles de stockage qui sous-tendent l'IAM en entreprise."
+sidebar:
+  order: 5
+  label: "Annuaires d'Identités"
+---
+
+Les annuaires d'identités sont les référentiels faisant autorité pour les données d'identité. Ils stockent, organisent et servent les attributs d'identité aux applications, systèmes d'authentification et moteurs de politiques.
+
+## Qu'est-ce qu'un Service d'Annuaire ?
+
+Un service d'annuaire est une base de données spécialisée, optimisée pour les opérations de **lecture intensive et de recherche par attributs**. Contrairement aux bases de données relationnelles, les annuaires sont hiérarchiques, fortement indexés pour la recherche et conçus pour une récupération rapide des données d'identité.
+
+## Active Directory (AD)
+
+Microsoft Active Directory est le service d'annuaire le plus déployé dans les environnements d'entreprise :
+
+- **Services de domaine** — Authentification et autorisation centralisées
+- **Stratégie de groupe** — Gestion centralisée de la configuration
+- **Authentification Kerberos** — Authentification par tickets
+- **Interface LDAP** — Accès standardisé pour les systèmes non-Windows
+
+### Structure AD
+
+```
+Domaine (acmecorp.local)
+├── Unités d'Organisation (OU)
+│   ├── Utilisateurs
+│   ├── Groupes
+│   ├── Ordinateurs
+│   └── Comptes de service
+├── Contrôleurs de Domaine
+│   ├── DC-Primaire (accessible en écriture)
+│   └── DC-Secondaire (lecture seule)
+└── Forêts de confiance
+```
+
+## Protocole LDAP
+
+LDAP (Lightweight Directory Access Protocol) est le standard ouvert pour l'accès aux services d'annuaire :
+
+- **Modèle de données** — Entrées organisées en arbre DIT
+- **Syntaxe de requête** — Filtres LDAP (ex: `(&(objectClass=user)(department=Engineering))`)
+- **Opérations** — Bind, Search, Compare, Add, Delete, Modify
+
+## Annuaires Cloud
+
+| Annuaire | Fournisseur | Fonctionnalités Clés |
+|----------|-------------|---------------------|
+| **Azure AD / Entra ID** | Microsoft | OIDC, SAML, SCIM, Accès Conditionnel |
+| **Okta Universal Directory** | Okta | Gestion du cycle de vie, mapping d'attributs |
+| **Google Cloud Identity** | Google | Intégration Chrome, Workspace |
+
+## Points Clés
+
+- Les services d'annuaire sont des bases de données hiérarchiques optimisées pour la lecture
+- Active Directory domine sur site, LDAP est le standard ouvert
+- Les annuaires cloud (Azure AD, Okta) étendent les capacités aux SaaS
+- L'intégration suit les modèles de source autoritaire et hub-and-spoke

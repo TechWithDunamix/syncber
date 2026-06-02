@@ -1,0 +1,65 @@
+---
+title: "Le Cycle de Vie des Identités"
+description: "Une plongée approfondie dans le modèle arrivée-mobilité-départ — comment les identités sont créées, modifiées et supprimées tout au long de leur cycle de vie."
+sidebar:
+  order: 4
+  label: "Cycle de Vie des Identités"
+---
+
+Chaque identité numérique suit un cycle de vie prévisible, de la création à la suppression. Le modèle **Arrivée-Mobilité-Départ (JML)** est le cadre standard de l'industrie pour la gestion des cycles de vie des identités dans l'IAM en entreprise.
+
+## Le Modèle JML
+
+### Arrivée (Joiner)
+
+Lorsqu'une personne rejoint une organisation, les systèmes IAM doivent :
+
+1. **Créer les enregistrements d'identité** dans les annuaires (RH, AD, IdP cloud)
+2. **Assigner les droits initiaux** basés sur le rôle, le département et le lieu
+3. **Provisionner les comptes** dans les systèmes cibles (email, VPN, CRM, ERP)
+4. **Émettre les identifiants** — mot de passe initial, token, carte à puce
+5. **Notifier les parties prenantes** — responsable, IT, sécurité
+
+<Aside variant="caution">
+Un point de défaillance courant : les nouveaux employés reçoivent un accès excessif « temporairement » qui n'est jamais revu. Commencez toujours par le moindre privilège.
+</Aside>
+
+### Mobilité (Mover)
+
+Lorsqu'un utilisateur change de rôle ou de département, ses accès doivent évoluer :
+
+- **Transfert de département** — Supprimer les droits de l'ancien département, ajouter ceux du nouveau
+- **Promotion** — Ajouter des permissions élevées, avec une supervision supplémentaire
+- **Changement de lieu** — Mettre à jour les attributs de conformité et les politiques géographiques
+
+### Départ (Leaver)
+
+Lorsqu'un utilisateur quitte l'organisation, les identités doivent être déprovisionnées :
+
+| Action | Description | Urgence |
+|--------|-------------|---------|
+| **Désactivation du compte** | Suspension immédiate de tous les comptes | Immédiate |
+| **Révocation des identifiants** | Réinitialiser mots de passe, révoquer sessions et jetons | Immédiate |
+| **Suppression des accès** | Retirer les appartenances aux groupes et rôles | Immédiate |
+| **Suppression du compte** | Suppression permanente après période de rétention | 30–90 jours |
+
+<Aside variant="danger">
+Le déprovisionnement retardé est l'une des constatations les plus courantes dans les audits de sécurité. Les flux de travail automatisés sont essentiels.
+</Aside>
+
+## Automatisation du Cycle de Vie
+
+Les programmes IAM matures automatisent le cycle de vie JML :
+
+1. **Intégration RH** — Connecter l'IAM au SIRH comme source autorisée
+2. **Provisionnement basé sur des règles** — Déterminer automatiquement les comptes et droits nécessaires
+3. **Flux d'approbation** — Acheminer les demandes d'accès non standard via des approbations
+4. **Reconciliation périodique** — Comparer les accès réels aux accès approuvés
+
+## Points Clés
+
+- Le modèle JML régit la gestion du cycle de vie des identités
+- Les processus d'arrivée doivent commencer par le moindre privilège
+- Les scénarios de mobilité nécessitent une recertification des accès
+- Le déprovisionnement de départ doit être automatisé et immédiat
+- L'intégration RH est le fondement de l'automatisation du cycle de vie

@@ -1,0 +1,176 @@
+---
+title: "Single Sign-On"
+description: "Comprehensive coverage of single sign-on — SSO protocols, SP-initiated vs IdP-initiated flows, session management, enterprise deployment patterns, and security considerations."
+sidebar:
+  order: 4
+  label: "Single Sign-On"
+---
+
+Single sign-on (SSO) enables users to authenticate once and access multiple applications without re-entering credentials. SSO is one of the most impactful IAM capabilities — it reduces password fatigue, eliminates credential sprawl, decreases IT helpdesk password-reset volume by 30-50%, and provides a centralised authentication audit trail.
+
+However, SSO also introduces a single point of failure: if the SSO provider is unavailable or compromised, all federated applications are affected.
+
+## How SSO Works — The Core Flow
+
+SSO relies on a trust relationship between the **Service Provider (SP)** — the application the user wants to access — and the **Identity Provider (IdP)** — the system that authenticates the user and asserts their identity.
+
+```
+User → Service Provider (SP) → Redirect to Identity Provider (IdP) → User authenticates → IdP issues assertion → Redirect to SP → SP grants access
+```
+
+### SP-Initiated SSO (Unsolicited)
+
+The user attempts to access a protected resource at the SP. The SP redirects the user to the IdP for authentication. After successful authentication, the IdP redirects the user back to the SP with an authentication assertion.
+
+**Common for**: Enterprise applications where users navigate directly to the application URL.
+
+### IdP-Initiated SSO
+
+The user authenticates at the IdP portal and then clicks on an application tile to launch the application. The IdP generates an assertion and sends it (typically via HTTP POST or redirect) to the SP.
+
+**Common for**: Employee portal dashboards (Okta dashboard, Microsoft My Apps, Google Workspace).
+
+## SSO Protocols — Detailed Comparison
+
+<Aside variant="info">
+The choice of SSO protocol is often determined by the applications being integrated and the existing identity infrastructure. Most enterprise IdPs support multiple protocols simultaneously.
+</Aside>
+
+| Feature | SAML 2.0 | OpenID Connect (OIDC) | Kerberos | CAS |
+|---------|----------|----------------------|----------|-----|
+| **Standard** | OASIS | OpenID Foundation | IETF | Open source (Apereo) |
+| **Message format** | XML | JSON | Binary | XML |
+| **Transport** | HTTP Redirect/POST, SOAP | HTTP Redirect, POST, AJAX | Network protocol | HTTP |
+| **Token format** | SAML assertion (XML) | JWT (ID Token + Access Token) | Ticket-granting ticket | Service ticket |
+| **Session management** | Artifact binding, HTTP POST | Single logout (SLO), RP-initiated logout | TGT lifetime | CAS logout |
+| **Encryption** | XML Signature + XML Encryption | JWS (signature), JWE (encryption) | Kerberos protocol encryption | SSL/TLS |
+| **Mobile support** | Poor (no native support) | Excellent (native SDKs) | None | Limited |
+| **API/SPA support** | Poor | Excellent (PKCE) | None | Limited |
+| **Deployment era** | 2000s — enterprise | 2010s — modern, mobile | 1990s — Windows domain | 2000s — higher education |
+| **Current adoption** | Government, higher ed, legacy | SaaS, mobile, modern web | Windows AD environments | Diminishing |
+
+## SAML 2.0 — Deep Dive
+
+SAML 2.0 (Security Assertion Markup Language) is the dominant enterprise SSO protocol. It uses XML-based assertions to communicate authentication and authorization data between the IdP and SP.
+
+### SAML Assertions
+
+A SAML assertion is an XML document that contains statements about a user:
+
+- **Authentication statement** — When and how the user authenticated (method, timestamp, session index)
+- **Attribute statement** — User attributes (email, roles, department, manager)
+- **Authorization decision statement** — Whether the user is permitted to access a specific resource
+
+### SAML Binding Types
+
+| Binding | Direction | Use Case |
+|---------|-----------|----------|
+| **HTTP Redirect** | SP → IdP | Initiation — user redirected to IdP |
+| **HTTP POST** | IdP → SP | Response — SAML assertion posted to SP ACS URL |
+| **Artifact** | IdP → SP | Enhanced security — artifact exchanged for assertion via SOAP back-channel |
+| **SOAP** | Server ↔ Server | IdP-as-service — SP directly requests user authentication from IdP |
+
+### SAML Key Concepts
+
+**Entity ID** — A globally unique identifier for the SP or IdP (typically a URI).
+**ACS (Assertion Consumer Service) URL** — The SP endpoint that receives and processes SAML assertions.
+**Audience restriction** — The SAML assertion includes an audience field that limits which SP can consume it.
+**Name ID** — The identifier that the SP uses to recognise the user (email, persistent ID, transient ID).
+**SessionNotOnOrAfter** — The timestamp after which the SAML assertion expires.
+
+## OpenID Connect (OIDC) — Deep Dive
+
+OIDC is a modern authentication protocol built on OAuth 2.0. It adds an identity layer that enables the client application to verify the user's identity and obtain basic profile information.
+
+### OIDC Flow — Authorization Code with PKCE
+
+<Steps>
+### OIDC Authentication Flow
+1. User clicks "Login with Google" in the application (RP — Relying Party)
+2. RP constructs an authorization request with response_type=code, client_id, redirect_uri, scope=openid, and code_challenge (PKCE)
+3. User is redirected to the IdP (OP — OpenID Provider) login page
+4. User authenticates and consents to requested scopes
+5. IdP redirects user back to RP's redirect_uri with an authorization code
+6. RP sends the authorization code + code_verifier to the IdP's token endpoint
+7. IdP returns an ID Token (JWT) and Access Token
+8. RP validates the ID Token signature, issuer, and audience
+9. RP extracts the user's identity from the ID Token claims (sub, email, name)
+10. **Result**: RP has verified user identity via the ID Token and can use the Access Token to call APIs
+</Steps>
+
+### OIDC Token Types
+
+| Token | Format | Purpose | Lifetime |
+|-------|--------|---------|----------|
+| **ID Token** | JWT | Identity assertion — proves the user authenticated | Short (minutes) |
+| **Access Token** | Opaque or JWT | API authorization — grants access to resources | Variable (minutes to hours) |
+| **Refresh Token** | Opaque | Obtain new access tokens without user re-authentication | Longer (hours to days) |
+
+### OIDC Claims
+
+The ID Token contains standard and custom claims in its JSON payload:
+
+```json
+{
+  "iss": "https://accounts.example.com",
+  "sub": "984751234567890",
+  "aud": "client-app-123",
+  "exp": 1718234567,
+  "iat": 1718230967,
+  "nonce": "n-0S6_WzA2Mj",
+  "email": "user@example.com",
+  "email_verified": true,
+  "name": "Jane Doe",
+  "preferred_username": "jane.doe"
+}
+```
+
+## Enterprise SSO Deployment Patterns
+
+### Hub-and-Spoke (IdP-Centric)
+
+All applications connect to a central IdP. The IdP handles authentication for all applications.
+
+**Pros**: Centralised control, consistent policy enforcement, single audit trail.
+**Cons**: Single point of failure, IdP vendor lock-in, all traffic routed through IdP.
+**Best for**: Organisations with a single primary IdP (Okta, Azure AD, Ping).
+
+### Federated Mesh
+
+Applications connect to multiple IdPs with established trust relationships. An authentication event at one IdP can be accepted by applications connected to other IdPs.
+
+**Pros**: Flexibility, supports M&A scenarios, no single dependency.
+**Cons**: Complex trust management, inconsistent policy enforcement.
+**Best for**: Large enterprises, post-merger identity integration, multi-cloud environments.
+
+### Gateway-Based SSO
+
+An SSO gateway/reverse proxy sits in front of applications and handles authentication centrally. Applications behind the gateway receive authenticated requests with identity headers.
+
+**Pros**: No application changes required, consistent for legacy apps.
+**Cons**: Gateway is a bottleneck, header-based auth can be spoofed if misconfigured.
+**Best for**: Legacy applications that cannot support SAML or OIDC natively.
+
+## SSO Security Considerations
+
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| **IdP compromise** | All federated applications are accessible | Hardware security module (HSM) for IdP signing keys, privileged access controls |
+| **Assertion injection** | Attacker forges SAML assertion or OIDC token | Validate assertion signature, audience, timestamps; use signed assertions |
+| **Session hijacking** | Post-authentication session cookie theft | Short session lifetimes, device binding, HTTP-only cookies |
+| **SSO outage** | All federated applications inaccessible | HA IdP deployment, failover IdP, local application fallback authentication |
+| **Shadow SSO** | Unauthorised SSO connections created by departments | SSO discovery and governance, periodic audit of all SSO integrations |
+
+<Aside variant="caution">
+SSO reduces password fatigue but introduces a **critical single point of failure**. An IdP outage can render every federated application inaccessible. Deploy a highly available IdP architecture with geographic redundancy and have offline fallback procedures for critical applications.
+</Aside>
+
+## Key Takeaways
+
+- SSO enables users to authenticate once and access multiple applications, reducing password fatigue and helpdesk volume by 30-50%
+- SAML 2.0 (XML-based, enterprise-focused) and OpenID Connect (JSON-based, modern) are the dominant SSO protocols — OIDC is preferred for mobile/SPA and greenfield deployments
+- SP-initiated SSO (user goes to app first) and IdP-initiated SSO (user starts at IdP portal) serve different use cases
+- OIDC adds identity assertion via the ID Token (JWT) on top of OAuth 2.0's delegated authorization, with the Authorization Code + PKCE flow as the recommended pattern
+- Enterprise SSO deployment patterns include hub-and-spoke (centralised), federated mesh (flexible), and gateway-based (legacy app support)
+- SSO introduces a critical single point of failure — the IdP must be deployed for high availability with geographic redundancy
+- Security risks include IdP compromise, assertion injection, session hijacking, SSO outages, and shadow SSO — each requires specific mitigations

@@ -1,0 +1,157 @@
+---
+title: "Access Certifications"
+description: "Access certification campaigns — designing certification campaigns, reviewer workflows, certification types, remediation enforcement, and certifying access across applications, infrastructure, and cloud."
+sidebar:
+  order: 3
+  label: "Access Certifications"
+---
+
+Access certification (also called access review or recertification) is the process of periodically reviewing and validating whether users still need their current access entitlements. It is the primary mechanism for detecting and remediating privilege creep, orphan accounts, and excessive permissions.
+
+Certifications are the most visible governance activity for business managers — and often the most disliked. A well-designed certification program minimises reviewer burden while maximising security and compliance value.
+
+## Why Certifications Matter
+
+Without periodic access certification, access entitlements accumulate indefinitely:
+
+```
+New Hire (Day 1): 5 entitlements
+After 1 year: 12 entitlements (role changes, project access, temporary grants)
+After 3 years: 23 entitlements (accumulated but never reviewed)
+After 5 years: 31 entitlements (many no longer relevant)
+```
+
+This accumulation — **entitlement creep** — is the primary source of excessive access risk. Certifications are the mechanism that reverses this trend.
+
+| Benefit | Description |
+|---------|-------------|
+| **Risk reduction** | Identify and remove excessive access before it is abused |
+| **Compliance** | Satisfy regulatory requirements for periodic access review (SOX, PCI, HIPAA) |
+| **Cost savings** | Reduce licence costs by deprovisioning unnecessary access |
+| **Audit readiness** | Provide evidence that access is regularly reviewed and controlled |
+| **Clean-up** | Remediate orphan accounts, unused entitlements, SoD violations |
+
+## Certification Types
+
+### User Access Review (UAR)
+
+The most common certification type. Managers review their direct reports' access entitlements.
+
+**Scope**: All entitlements for each user in the reviewer's team.
+**Reviewer**: Direct manager.
+**Frequency**: Quarterly (high-risk), bi-annually (medium-risk), annually (low-risk).
+
+### Application Access Review
+
+Application or resource owners review who has access to their application or system.
+
+**Scope**: All users with access to a specific application or group of applications.
+**Reviewer**: Application owner, data owner, or delegated security contact.
+**Frequency**: Annually (standard apps), quarterly (critical apps).
+
+### Role Certification
+
+Review role definitions and memberships to ensure roles remain aligned with business functions.
+
+**Scope**: Role definitions, role membership lists.
+**Reviewer**: Role owner, business process owner.
+**Frequency**: Annually.
+
+### Privileged Access Review
+
+Review privileged account memberships and usage.
+
+**Scope**: Domain admin groups, local admin groups, privileged cloud roles, service accounts.
+**Reviewer**: Security team, PAM administrators.
+**Frequency**: Monthly or quarterly.
+
+## Certification Campaign Design
+
+### Campaign Lifecycle
+
+<Steps>
+### Campaign Planning
+Define campaign scope: which users, which entitlements, which systems. Identify reviewers (managers for UAR, application owners for app access). Set deadlines and escalation rules. Configure policy rules (auto-approve low-risk, auto-certify unchanged from last review).
+
+### Campaign Initiation
+Launch the campaign through the IGA platform. Notifications sent to all reviewers with instructions, deadlines, and links to their review queues.
+
+### Reviewer Completion
+Reviewers log into the certification portal, review their assigned users/applications, and make decisions (certify, revoke, or modify). Reviewers can be passive (review lists) or active (augmented with access usage data, SoD violation flags, and risk scores).
+
+### Escalation and Reminders
+Automated reminders sent to reviewers approaching deadlines. Escalate to reviewer's manager if deadline is missed. Escalation chain: reviewer → manager → compliance team.
+
+### Remediation
+Decisions are enforced: revocations are executed, modifications are applied, certified access is confirmed. Remediation actions are automated where possible (SCIM deprovisioning, group membership changes).
+
+### Campaign Close and Reporting
+Campaign results are compiled: certification rate, revocation rate, overdue items, exception reports. Generate compliance evidence package for auditors.
+</Steps>
+
+### Reviewer Decision Options
+
+| Decision | Description | Default? | Effect |
+|----------|-------------|----------|--------|
+| **Certify** | Access is confirmed as appropriate | Optional | No action |
+| **Revoke** | Access should be removed | Optional | Entitlement deprovisioned |
+| **Modify** | Access should be changed | Optional | Entitlement modified |
+| **Not Applicable** | Reviewer cannot assess this user/entitlement | Optional | Escalated to next reviewer |
+| **Defer** | Decision postponed (with reason and timeframe) | Optional | Re-presented in next review cycle |
+
+### Reducing Reviewer Fatigue
+
+Reviewer fatigue is the #1 challenge in certification programs. When reviewers are overloaded, they certify everything without proper scrutiny — defeating the purpose of the review.
+
+| Technique | How It Works | Impact |
+|-----------|-------------|--------|
+| **Risk-based review** | Only high-risk or changed access requires active review; low-risk is auto-certified | 60-80% reduction in review items |
+| **Usage data augmentation** | Show last-used date for each entitlement | Reviewers make informed decisions (revoke unused access) |
+| **Access history** | Show which entitlements are new since last review | Reviewers focus attention on changes |
+| **SoD flagging** | Highlight toxic permission combinations | Reviewers prioritise high-risk items |
+| **Smart grouping** | Group similar entitlements so reviewers certify a logical bundle | Fewer decisions required |
+| **Self-certification first** | Users certify their own access statements, managers only review exceptions | Manager burden reduced by 50%+ |
+
+<Aside variant="tip">
+The single most impactful technique for improving certification quality is **augmenting reviews with access usage data**. When a manager sees that an employee has not used a system in 6 months, they are far more likely to revoke access than when faced with a bare list of entitlements.
+</Aside>
+
+## Certification Automation
+
+### Rules-Based Auto-Certification
+
+| Rule | Logic | Outcome |
+|------|-------|---------|
+| **No change since last certified** | If entitlement was certified in previous campaign and is unchanged | Auto-certified (skip review) |
+| **Low-risk entitlement** | If entitlement is read-only or on a non-critical system | Auto-certified |
+| **Never used** | If entitlement has not been used in > 90 days | Flag for revocation (pre-certify as revoke) |
+| **Manager certified** | If manager has already certified the user's entire access | Auto-certify all entitlements for that campaign |
+
+### Remediation Automation
+
+| Remediation Action | Automation | Verification |
+|--------------------|------------|--------------|
+| **Account disable** | Automated via SCIM or API | Re-run reconciliation to confirm removal |
+| **Group membership removal** | Automated via directory API | Verify user no longer in group |
+| **Role removal** | Automated via IGA role management | Update role assignment in IGA |
+| **SSO session termination** | Automated via IdP API | Verify session terminated |
+| **Data archive** | Manual (requires data owner) | Confirm data archived before account removal |
+
+## Certification Compliance Requirements
+
+| Standard | Review Frequency | Evidence Requirements |
+|----------|-----------------|----------------------|
+| **SOX** | At least annually for financial systems | Certification reports, remediation evidence |
+| **PCI DSS v4.0** | Every 6 months for cardholder data environments | Access review documentation, remedy action records |
+| **HIPAA** | Periodically (no fixed frequency) for ePHI access | Review records, policy documentation |
+| **ISO 27001** | At planned intervals (typically annual) for user access | Review records, management approval |
+| **NIST SP 800-53** | At least annually or more frequently as needed | AC-2 account review documentation |
+
+## Key Takeaways
+
+- Access certifications are the primary mechanism for detecting and remediating privilege creep, orphan accounts, and excessive permissions — they reverse the natural accumulation of entitlements over time
+- Certification types include user access reviews (manager reviews team), application access reviews (owner reviews app access), role certifications, and privileged access reviews
+- The campaign lifecycle spans planning, initiation, reviewer completion, escalation, remediation, and close — each phase requires specific automation and governance
+- Reviewer fatigue is the #1 challenge — mitigate with risk-based review filtering, usage data augmentation, SoD flagging, and smart entitlement grouping
+- Automation rules (auto-certify unchanged items, flag unused access) reduce reviewer burden while maintaining control effectiveness
+- Compliance frameworks (SOX, PCI DSS, HIPAA, ISO 27001, NIST) mandate periodic access certification with specific review frequencies and evidence requirements

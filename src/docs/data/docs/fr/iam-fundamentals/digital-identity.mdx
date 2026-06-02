@@ -1,0 +1,63 @@
+---
+title: "Identité Numérique & Preuve d'Identité"
+description: "Comprendre les identités numériques, les attributs d'identité, les niveaux de preuve d'identité et comment les organisations établissent des identités numériques de confiance."
+sidebar:
+  order: 3
+  label: "Identité Numérique & Preuve"
+---
+
+Une **identité numérique** est un ensemble d'attributs qui représente une personne, un service ou un appareil dans un système numérique. C'est la représentation électronique d'une entité — l'ensemble des affirmations concernant cette entité qu'un système juge dignes de confiance.
+
+## Types d'Identités Numériques
+
+Toutes les identités ne sont pas humaines. Les systèmes IAM modernes gèrent plusieurs types d'identités :
+
+| Type d'Identité | Exemple | Caractéristiques |
+|-----------------|---------|------------------|
+| **Identité utilisateur** | Employé, prestataire, client | Humaine, possède généralement des identifiants (mot de passe, biométrie) |
+| **Identité de service** | Client API, microservice | Non-humaine, utilise des comptes de service ou des certificats |
+| **Identité d'appareil** | Ordinateur, serveur, capteur IoT | Identité machine, utilise des certificats ou TPM |
+| **Identité de charge de travail** | Pod Kubernetes, fonction cloud | Éphémère, jetons de courte durée |
+
+## Attributs d'Identité
+
+Chaque identité numérique est composée d'attributs qui la décrivent :
+
+<Aside variant="tip">
+La qualité de votre système IAM dépend de la qualité et de la précision de vos attributs d'identité.
+</Aside>
+
+- **Identifiants** — Nom d'utilisateur, numéro d'employé, email, UUID
+- **Attributs démographiques** — Nom, département, lieu, titre
+- **Attributs de rôle** — Fonction, responsable, centre de coût
+- **Attributs de compte** — Date de création, dernière connexion, statut MFA
+- **Attributs de droits** — Rôles assignés, appartenances aux groupes
+
+## Preuve d'Identité (Identity Proofing)
+
+Avant qu'une identité numérique puisse être trusted, l'entité réelle derrière elle doit être vérifiée. La **preuve d'identité** est le processus de collecte et de vérification des preuves concernant une identité.
+
+### Niveaux d'Assurance d'Identité (IAL) NIST 800-63
+
+<Steps>
+### IAL1 — Auto-déclaré
+Aucune preuve requise. L'utilisateur fournit des attributs (nom, email) sans vérification. Pour les applications publiques à faible risque.
+
+### IAL2 — Preuve à distance ou en personne
+Vérification des preuves d'identité fournies. Pièce d'identité gouvernementale, questions de vérification (KBV) ou vérification en personne.
+
+### IAL3 — Preuve physique en personne
+Vérification face à face par un agent autorisé avec comparaison biométrique. Pour les accès à haut risque comme les comptes administratifs privilégiés.
+</Steps>
+
+## Fédération d'Identité
+
+La fédération permet à une identité créée dans un domaine d'être trusted dans un autre. C'est le fondement du SSO inter-organisationnel.
+
+## Points Clés
+
+- Les identités numériques représentent les utilisateurs, services, appareils et charges de travail
+- Les attributs d'identité sont les éléments de base des décisions de politique IAM
+- La preuve d'identité établit la confiance via la vérification des preuves
+- Les niveaux IAL1–IAL3 du NIST fournissent un cadre de maturité
+- La fédération étend la confiance au-delà des frontières organisationnelles

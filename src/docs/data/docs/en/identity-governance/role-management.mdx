@@ -1,0 +1,171 @@
+---
+title: "Role Management & Mining"
+description: "Role engineering methodologies — top-down and bottom-up role design, role mining algorithms, role lifecycle management, role certification, and role governance best practices."
+sidebar:
+  order: 5
+  label: "Role Management & Mining"
+---
+
+Role Management is the discipline of designing, maintaining, and governing the role model that forms the backbone of enterprise access control. Roles define collections of permissions aligned with business functions, providing a logical abstraction that simplifies access administration and certification.
+
+Role Mining discovers natural role groupings by analysing existing user-to-permission assignments — turning real-world access patterns into candidate roles for formal role design.
+
+## Role Engineering Methodologies
+
+### Top-Down Role Engineering
+
+Analyses business processes and job functions to define roles, then maps permissions to those roles.
+
+**Process**:
+1. Analyse business processes and identify job functions
+2. Define role candidates based on job functions and organisational structure
+3. Map required permissions to each role candidate
+4. Validate role definitions with business stakeholders
+5. Refine and document role definitions
+
+**Strengths**: Aligns with business needs, clean role definitions, strong stakeholder buy-in.
+**Weaknesses**: Time-consuming, may miss edge cases, assumes business processes are well-defined.
+
+### Bottom-Up Role Mining
+
+Analyses existing user-permission data to discover natural role groupings algorithmically.
+
+**Process**:
+1. Collect user-permission assignments from target systems
+2. Clean and normalise access data
+3. Apply role mining algorithms to identify clusters
+4. Review candidate roles with business stakeholders
+5. Refine and ratify candidate roles
+
+**Strengths**: Data-driven, reveals actual access patterns, faster than top-down.
+**Weaknesses**: May produce roles without business meaning, can entrench existing privilege creep.
+
+### Hybrid Approach
+
+Combines both methodologies: bottom-up mining generates candidates, top-down business validation refines and ratifies.
+
+```
+Bottom-up mining → Candidate roles → Top-down refinement → Validated formal roles
+                                                              │
+                                                         Role owners
+                                                         Stakeholders
+                                                         Compliance
+```
+
+## Role Mining Algorithms
+
+| Algorithm | Approach | Strengths | Limitations |
+|-----------|----------|-----------|-------------|
+| **Simple cluster** | Group users by common permissions | Fast, easy to understand | Produces many coarse roles |
+| **k-means clustering** | Partition users into k clusters | Scalable to millions of users | Must specify k, sensitive to outliers |
+| **Hierarchical clustering** | Build role tree from bottom up | Reveals natural role hierarchy | Cannot handle very large datasets |
+| **Frequent itemset mining** | Find permission sets that occur together | Effective for complex permission patterns | Computationally expensive |
+| **Non-negative matrix factorisation** | Factor user-permission matrix into roles and user-role assignments | Good for overlapping roles | Abstract, hard to interpret |
+| **Graph-based mining** | Build user-permission graph, detect communities | Visual, intuitive | Computationally intensive |
+
+## Role Types
+
+| Role Type | Description | Example | Review Frequency |
+|-----------|-------------|---------|-----------------|
+| **Job function role** | Aligned with job title or department | "Software Engineer", "HR Manager" | Annual |
+| **Application role** | Access to a specific application | "Salesforce Admin", "Jira Developer" | Annual |
+| **Project role** | Time-limited access for a project | "Project Phoenix — AWS Access" | Per project lifecycle |
+| **Entitlement bundle** | Group of permissions for a specific function | "Data Analyst — Read-only reporting" | Annual |
+| **Privileged role** | Elevated access with additional controls | "Domain Admin", "AWS Break-Glass" | Quarterly |
+
+## Role Lifecycle
+
+```
+Create ──→ Validate ──→ Publish ──→ Maintain ──→ Retire
+  │           │            │           │            │
+  │     Stakeholder   Policy    Role        Orphan
+  │     review        engine   membership    role
+  │     (business)    checks   changes       detection
+```
+
+### Role Creation
+- Define role purpose, scope, and boundaries
+- Map permissions based on business requirements
+- Check for role conflict with existing roles (avoid overlapping roles)
+- Define role owner and risk classification
+
+### Role Validation
+- Validate with business stakeholders
+- Check SoD compliance (role does not contain toxic combinations)
+- Test with sample user population
+- Approved by role owner
+
+### Role Publication
+- Role published in IGA platform
+- Users can be assigned to the role
+- Provisioning engine can grant role-based permissions
+
+### Role Maintenance
+- Periodic role certification (annual minimum)
+- Permission changes reviewed and approved
+- Role membership changes monitored
+- Role usage metrics tracked
+
+### Role Retirement
+- Role no longer used (no active members)
+- Role owner confirms retirement
+- Historical role data preserved for audit
+- Role disabled in IGA platform
+
+## Role Governance Best Practices
+
+| Practice | Description | Priority |
+|----------|-------------|----------|
+| **Naming convention** | Consistent naming (e.g., `{System}_{Function}_{Scope}`) | High |
+| **Role ownership** | Every role has a named business owner | High |
+| **Role certification** | Annual role definition and membership review | High |
+| **Permission baseline** | Define allowed permission sources per role | High |
+| **Segregation of duties** | Roles are checked against SoD policies | High |
+| **Role cardinality** | Limit roles per user (recommended 10-15 max) | Medium |
+| **Role risk scoring** | Score roles by privilege level | Medium |
+| **Usage tracking** | Track which roles are actively used | Medium |
+| **Orphan role detection** | Regular scanning for unowned, unused roles | Medium |
+
+## Common Role Management Pitfalls
+
+| Pitfall | Description | Mitigation |
+|---------|-------------|------------|
+| **Role explosion** | Too many roles (1000+) defeats RBAC purpose | Consolidate similar roles; aim for 50-200 per business unit |
+| **Overlapping roles** | Multiple roles grant the same permissions | Merge similar roles; enforce permission uniqueness |
+| **Orphan roles** | Roles with no active members and no owner | Quarterly orphan role scan; mandatory role owner |
+| **Stale permissions** | Role includes permissions for retired systems | Role permission audit during certification |
+| **Over-privileged roles** | Role has more permissions than needed | Apply least privilege during role design; role risk scoring |
+
+<Aside variant="tip">
+A healthy enterprise role model has **50-200 roles per business unit** with less than 10% overlap in permissions. If you have 1000+ roles or more than 30% overlap, invest in role rationalisation before expanding the role model further.
+</Aside>
+
+## Role Mining Output Example
+
+```json
+{
+  "candidateRole": "HR_Benefits_Admin",
+  "confidence": 0.87,
+  "members": ["user1", "user2", "user5", "user8", "user12"],
+  "permissions": [
+    "SAP:HR:Benefits_Read",
+    "SAP:HR:Benefits_Write",
+    "AD:HR_Team_Group",
+    "Workday:Benefits_Admin_Role"
+  ],
+  "overlapWithExistingRoles": {
+    "HR_Generalist": 0.45,
+    "HR_Manager": 0.22
+  },
+  "recommendation": "CREATE — new role with unique permission profile"
+}
+```
+
+## Key Takeaways
+
+- Role management designs and governs the role model that underpins enterprise access control — top-down (business-driven), bottom-up (data-driven), or hybrid are the three engineering approaches
+- Role mining algorithms (clustering, frequent itemset mining, matrix factorisation) discover natural role groupings from existing user-permission data — hybrid approaches combine data-driven discovery with business validation
+- Role types include job function, application, project, entitlement bundle, and privileged roles — each with different review frequencies and governance requirements
+- The role lifecycle spans creation → validation → publication → maintenance → retirement, with role certification as the key governance control
+- Common pitfalls include role explosion (too many roles), overlapping roles, orphan roles, stale permissions, and over-privileged roles
+- Best practices include naming conventions, role ownership, certification, permission baselines, SoD checks, and cardinality limits

@@ -1,0 +1,230 @@
+---
+title: "ABAC & Policy-Based Access"
+description: "Attribute-Based Access Control, Policy-Based Access Control, XACML, OPA/Rego, ReBAC, and policy-as-code approaches for fine-grained authorization in modern architectures."
+sidebar:
+  order: 8
+  label: "ABAC & Policy-Based Access"
+---
+
+When RBAC's role-based abstraction is not granular enough — when access decisions depend on user attributes, resource characteristics, environmental context, or dynamic conditions — Attribute-Based Access Control (ABAC) and Policy-Based Access Control (PBAC) provide the necessary flexibility.
+
+These models evaluate access requests against policies that consider multiple attributes from the user, resource, action, and environment, enabling fine-grained, context-aware authorization that scales across heterogeneous systems.
+
+## Attribute-Based Access Control (ABAC)
+
+ABAC evaluates access based on attributes of four categories, combined through Boolean policies:
+
+### The Four Attribute Categories
+
+| Category | Description | Examples |
+|----------|-------------|----------|
+| **Subject attributes** | Attributes of the requesting entity | role, department, clearance level, location, manager, employment type, training certifications |
+| **Resource attributes** | Attributes of the target resource | classification (confidential, public), owner, department, project, data sensitivity, retention period |
+| **Action attributes** | Attributes of the requested operation | read, write, delete, approve, transfer, execute |
+| **Environment attributes** | Contextual attributes of the access request | time of day, network location, device compliance, threat intelligence level, regulatory regime |
+
+### ABAC Policy Example
+
+A typical ABAC policy might look like:
+
+```
+GRANT access IF:
+  subject.department = resource.department
+  AND subject.clearance_level >= resource.classification
+  AND action IN ["read", "write"]
+  AND environment.time BETWEEN "09:00" AND "17:00"
+  AND environment.device_compliant = true
+```
+
+### ABAC vs RBAC
+
+| Aspect | RBAC | ABAC |
+|--------|------|------|
+| **Granularity** | Role-level (coarse) | Attribute-level (fine) |
+| **Policy change** | Update role definitions | Update policy rules |
+| **Scalability** | Does not scale to large attribute combinations | Designed for attribute combinatorics |
+| **Administration** | Role engineering (moderate) | Policy engineering (complex) |
+| **Flexibility** | Low — rigid role structure | High — dynamic attribute evaluation |
+| **Performance** | Fast (pre-computed role-permission mapping) | Slower (real-time policy evaluation) |
+| **Auditability** | Simple — role assignments are clear | Complex — need to log attribute values at decision time |
+| **Best for** | Stable environments, well-defined jobs | Dynamic environments, cloud, microservices |
+
+<Aside variant="info">
+RBAC and ABAC are complementary, not competing. The recommended approach is **RBAC for coarse-grained access** (job-level permissions) with **ABAC for fine-grained constraints** (project-specific, context-aware policies). This is often called "RBAC with ABAC constraints" or "Dynamic RBAC."
+</Aside>
+
+## Policy-Based Access Control (PBAC)
+
+PBAC builds on ABAC by separating policy logic from application code. Policies are defined in a policy language, stored in a policy engine, and evaluated independently of the applications that enforce them.
+
+### XACML — The OASIS Standard
+
+eXtensible Access Control Markup Language (XACML) is the OASIS standard for ABAC/PBAC. It defines a complete architecture for policy-based access control:
+
+**XACML Architecture**:
+
+```
+                    ┌──────────────┐
+                    │     PAP      │
+                    │ (Policy Admin)│
+                    └──────┬───────┘
+                           │ Writes policies
+                           ▼
+┌────────┐    ┌──────────────────────┐    ┌────────┐
+│  PEP   │───→│         PDP          │───→│  PIP   │
+│(Enforce)│   │   (Policy Decision)  │   │(Attribute│
+│        │    │                      │    │ Source) │
+└───┬────┘    └──────────────────────┘    └────────┘
+    │                   ▲
+    │ Requests          │ Policy evaluation
+    ▼                   │
+┌────────┐              │
+│ Subject │─────────────┘
+│ (User)  │  Attributes from PIP
+└────────┘
+```
+
+| Component | Function | Example |
+|-----------|----------|---------|
+| **PAP** (Policy Administration Point) | Interface for creating and managing policies | Policy editor UI, CI/CD pipeline for policy-as-code |
+| **PDP** (Policy Decision Point) | Evaluates access requests against policies and returns decisions (Permit, Deny, NotApplicable, Indeterminate) | OpenOPDP, AuthZForce |
+| **PEP** (Policy Enforcement Point) | Intercepts access requests, asks PDP for decision, and enforces the decision | API gateway middleware, application guard |
+| **PIP** (Policy Information Point) | Provides attribute values for policy evaluation | LDAP directory, HR system API, threat intelligence feed |
+
+### XACML Policy Structure
+
+```xml
+<Policy PolicyId="doc-access-policy" RuleCombiningAlg="deny-overrides">
+  <Target>
+    <Subjects><Subject>Any</Subject></Subjects>
+    <Resources><Resource>doc://*</Resource></Resources>
+    <Actions><Action>read</Action></Actions>
+  </Target>
+  <Rule RuleId="allow-own-doc" Effect="Permit">
+    <Condition>
+      <Apply FunctionId="string-equal">
+        <AttributeValue>subject.userId</AttributeValue>
+        <AttributeValue>resource.ownerId</AttributeValue>
+      </Apply>
+    </Condition>
+  </Rule>
+  <Rule RuleId="deny-classified" Effect="Deny">
+    <Condition>
+      <Apply FunctionId="greater-than">
+        <AttributeValue>resource.classification</AttributeValue>
+        <AttributeValue>subject.clearance</AttributeValue>
+      </Apply>
+    </Condition>
+  </Rule>
+</Policy>
+```
+
+## Policy-as-Code — OPA and Rego
+
+Open Policy Agent (OPA) is a modern, open-source policy engine that implements policy-as-code principles. It decouples policy decision-making from application logic, enabling consistent policy enforcement across microservices, Kubernetes, APIs, and more.
+
+### Why Policy-as-Code?
+
+| Benefit | Description |
+|---------|-------------|
+| **Version control** | Policies live in Git alongside application code — full history, review, and rollback |
+| **CI/CD integration** | Policies are tested, validated, and deployed through the same pipeline |
+| **Testing** | Policy unit tests can be automated (e.g., `opa test` for Rego policies) |
+| **Consistency** | Same policy engine evaluates across all services — no logic duplication |
+| **Auditability** | Every policy decision is logged with full context |
+| **Agility** | Policy changes can be deployed without application code changes |
+
+### Rego — OPA's Policy Language
+
+Rego is a declarative policy language designed for OPA. It uses a rule-based approach where policies define Boolean conditions:
+
+```rego
+package app.rbac
+
+# Rules
+default allow = false
+
+# Allow if user has admin role
+allow {
+    input.user.roles[_] == "admin"
+}
+
+# Allow if user owns the resource
+allow {
+    input.action == "read"
+    input.user.id == input.resource.owner_id
+}
+
+# Allow if user is in same department as resource
+allow {
+    input.action == "read"
+    input.user.department == input.resource.department
+}
+
+# Allow during business hours with MFA
+allow {
+    input.action == "write"
+    input.env.mfa_enabled == true
+    input.env.time >= "09:00"
+    input.env.time <= "17:00"
+}
+```
+
+### OPA Deployment Patterns
+
+| Pattern | Description | Use Case |
+|---------|-------------|----------|
+| **Sidecar** | OPA runs as a sidecar container alongside the application | Kubernetes service mesh, microservices |
+| **External service** | OPA runs as a standalone service, called via REST API | Centralised policy enforcement |
+| **Embedded** | OPA library embedded directly in the application | Go applications (OPA is written in Go) |
+| **API gateway** | OPA integrated into the API gateway for unified policy enforcement | Kong, Envoy, NGINX with OPA plugins |
+
+## Relationship-Based Access Control (ReBAC)
+
+ReBAC evaluates access based on the relationships between entities in a graph. It is most commonly associated with Google's **Zanzibar** system, which powers authorization for Google Drive, YouTube, and Google Calendar.
+
+**ReBAC policy example (Google Zanzibar model)**:
+```
+object: "doc:financial-report"
+relation: "viewer"
+user: "user:alice"
+→ GRANTED because doc:financial-report has a viewer relation that includes user:alice
+
+object: "folder:finance"
+relation: "member"
+user: "user:alice"
+→ GRANTED because doc:financial-report is in folder:finance, and user:alice is a member of folder:finance
+```
+
+| Feature | RBAC | ABAC | ReBAC |
+|---------|------|------|-------|
+| **Basis** | Job roles | Attributes | Relationships |
+| **Granularity** | Coarse | Fine | Very fine |
+| **Expressiveness** | Low | High (Boolean logic) | High (graph traversal) |
+| **Performance** | Fast | Moderate | Varies (graph depth) |
+| **Admin overhead** | Moderate | High (attribute management) | Moderate (relationship management) |
+| **Best for** | Enterprise apps | Cloud/microservices | Content sharing, social, collaboration |
+
+## Choosing the Right Model
+
+| If you need... | Choose... |
+|---------------|-----------|
+| Simple role-based access for enterprise apps | **RBAC** |
+| RBAC with some contextual constraints | **RBAC + ABAC constraints** |
+| Fine-grained, context-rich policies across many services | **PBAC with OPA/Rego** |
+| Hierarchical permission models (folders, orgs, projects) | **ReBAC** |
+| Maximum flexibility with centralised policy management | **XACML or OPA** |
+| Cloud-native authorization for microservices | **OPA/Rego or Cedar (AWS)** |
+
+<Aside variant="tip">
+Start with RBAC — it covers ~80% of use cases. When RBAC becomes insufficient (too many roles, context-dependent decisions, or cross-cutting policies), introduce ABAC constraints on top of RBAC. Only adopt full PBAC or ReBAC when the complexity of attribute-based policies justifies the operational overhead.
+</Aside>
+
+## Key Takeaways
+
+- ABAC evaluates access using four attribute categories (subject, resource, action, environment) combined through Boolean policy rules, enabling fine-grained, context-aware authorization
+- PBAC separates policy logic from application code using the XACML architecture (PAP, PDP, PEP, PIP) — policies live in a policy engine, not in application code
+- Policy-as-code with OPA/Rego brings Git versioning, CI/CD testing, and consistent enforcement across microservices, Kubernetes, and APIs
+- ReBAC (Zanzibar model) evaluates access through entity relationships in a graph — ideal for content-sharing and collaboration platforms
+- RBAC, ABAC, and ReBAC are complementary — the recommended approach is RBAC for coarse access with ABAC for fine-grained constraints, using OPA for centralised policy management
+- Choosing the right model requires balancing granularity, performance, administration overhead, and operational complexity — start with the simplest model that meets requirements

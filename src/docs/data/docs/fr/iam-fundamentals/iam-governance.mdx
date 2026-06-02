@@ -1,0 +1,80 @@
+---
+title: "Gouvernance IAM & Conformité"
+description: "Comment la gouvernance IAM assure la responsabilité — certifications d'accès, séparation des tâches, audit et cadres de conformité."
+sidebar:
+  order: 9
+  label: "Gouvernance IAM & Conformité"
+---
+
+La gouvernance IAM est le cadre de politiques, processus et contrôles qui garantit que la gestion des identités et des accès fonctionne efficacement et en conformité avec les exigences réglementaires.
+
+## Pourquoi la Gouvernance IAM est Importante
+
+<Aside variant="caution">
+Les régulateurs n'acceptent pas « nous faisons confiance à nos administrateurs » comme un contrôle. La gouvernance fournit des preuves vérifiables et auditées que les contrôles d'accès fonctionnent.
+</Aside>
+
+## Processus de Gouvernance Essentiels
+
+### Certification des Accès
+
+Revue périodique des droits des utilisateurs par les responsables et propriétaires de ressources.
+
+**Meilleures Pratiques :**
+
+| Pratique | Raison |
+|----------|--------|
+| **Fréquence basée sur le risque** | Accès à haut risque revu trimestriellement ; standard annuellement |
+| **Rappels automatisés** | Escalade après 7 jours, puis à l'équipe conformité |
+| **Remédiation en boucle fermée** | Vérifier que les accès révoqués sont réellement supprimés |
+
+### Séparation des Tâches (SoD)
+
+La SoD garantit qu'aucune personne unique n'a suffisamment d'accès pour commettre une fraude.
+
+**Conflits SoD Courants :**
+
+| Rôle A | Rôle B | Risque |
+|--------|--------|--------|
+| Créateur de demande d'achat | Approbateur de commande | Créer et approuver ses propres achats |
+| Comptable fournisseurs | Administrateur fournisseurs | Créer un fournisseur et se payer |
+| Administrateur réseau | Auditeur sécurité | Modifier les logs |
+
+### Audit et Reporting
+
+| Exigence d'Audit | Preuve IAM |
+|------------------|------------|
+| Qui a accès à quoi ? | Rapports de droits, listes de rôles |
+| Qui a accordé l'accès ? | Pistes d'audit des flux d'approbation |
+| Quand l'accès a-t-il été révisé ? | Enregistrements de certification |
+
+## Cadres de Conformité
+
+| Cadre | Exigences IAM |
+|-------|---------------|
+| **SOX** | Contrôles d'accès aux systèmes financiers, pistes d'audit |
+| **RGPD** | Droit à l'effacement, contrôles d'accès aux données |
+| **HIPAA** | Contrôles d'accès aux PHI, identification unique |
+| **PCI DSS** | Identifiants uniques, MFA pour accès admin |
+| **ISO 27001** | Politique de contrôle d'accès (A.9) |
+| **NIST SP 800-53** | Gestion des comptes (AC-2), application des accès (AC-3) |
+
+## Modèle de Maturité IAM
+
+1. **Initial** — Ad-hoc, manuel
+2. **Défini** — Politiques documentées
+3. **Géré** — Certification automatisée, détection SoD
+4. **Mesuré** — Surveillance continue, SoD en temps réel
+5. **Optimisé** — Analyse prédictive, IA/ML
+
+<Aside variant="tip">
+La plupart des entreprises opèrent au niveau 2 ou 3. Passer au niveau 4 nécessite des outils IGA.
+</Aside>
+
+## Points Clés
+
+- La gouvernance IAM fournit des preuves auditées que les contrôles fonctionnent
+- La certification des accès doit être basée sur le risque, automatisée et en boucle fermée
+- La SoD prévient la fraude en identifiant les accès conflictuels
+- De nombreux cadres de conformité (SOX, RGPD, PCI) imposent des contrôles IAM
+- La maturité IAM progresse de niveau 1 à 5

@@ -1,0 +1,132 @@
+---
+title: "Authentification Unique (SSO)"
+description: "Single Sign-On en entreprise — SAML 2.0 vs OIDC, flux SP-idP, types de jetons, modèles de déploiement, sécurité SSO, et SSO pour applications legacy."
+sidebar:
+  order: 4
+  label: "Authentification Unique (SSO)"
+---
+
+L'authentification unique (SSO) permet aux utilisateurs de s'authentifier une seule fois et d'accéder à plusieurs applications sans ressaisir leurs identifiants. Le SSO améliore à la fois la sécurité (moins de mots de passe, moins de fatigue de connexion) et l'expérience utilisateur (un clic pour accéder aux applications).
+
+## Protocoles SSO
+
+### SAML 2.0 vs OIDC vs Kerberos
+
+| Caractéristique | SAML 2.0 | OIDC (OpenID Connect) | Kerberos |
+|----------------|----------|----------------------|----------|
+| **Année** | 2005 | 2014 | 1980 (révisé en 2005) |
+| **Format** | XML (assertion) | JSON (JWT) | Binaire (ticket) |
+| **Transport** | HTTP POST, Redirect, Artifact | HTTP GET/POST | UDP/TCP (ports 88, 464) |
+| **Cas d'usage** | SSO d'entreprise, fédération B2B | SSO moderne, mobile, API | SSO Windows natif, réseau |
+| **Gestion de session** | Basée sur cookie IdP | Basée sur jeton (JWT) | Basée sur ticket TGT |
+| **Propriétés** | Lourd, complexe, mature | Léger, moderne, simple | Rapide, domaine uniquement |
+| **Déconnexion unique (SLO)** | Complexe (plusieurs profils) | Simple (RP-initiated, session management) | Basée sur renouvellement TGT |
+| **Support mobile** | Limité | Natif | Non |
+
+### Flux SSO SAML 2.0
+
+#### Flux initié par le fournisseur de service (SP)
+
+```
+1. Utilisateur tente d'accéder à l'application (SP)
+2. SP génère une AuthnRequest SAML
+3. SP redirige le navigateur vers l'IdP avec AuthnRequest
+4. IdP authentifie l'utilisateur (nom/mot de passe + MFA si requis)
+5. IdP génère une assertion SAML (signée, optionnellement chiffrée)
+6. IdP redirige le navigateur vers l'ACS (Assertion Consumer Service) du SP
+7. SP valide l'assertion (signature, horodatage, audience)
+8. SP crée une session locale et donne accès à l'utilisateur
+```
+
+#### Flux initié par le fournisseur d'identité (IdP)
+
+```
+1. L'utilisateur se connecte d'abord au portail IdP (Okta/Azure AD)
+2. IdP affiche les applications disponibles
+3. L'utilisateur clique sur une application
+4. IdP génère une assertion SAML et la POSTe vers l'ACS du SP
+5. SP valide l'assertion et crée une session
+6. L'utilisateur accède à l'application
+```
+
+### Flux SSO OIDC
+
+```
+1. Application (RP - Relying Party) redirige vers l'IdP (OP - OpenID Provider)
+2. OP authentifie l'utilisateur
+3. OP redirige vers le RP avec un code d'autorisation
+4. RP échange le code contre un ID Token (JWT) et un Access Token
+5. RP valide l'ID Token (signature, nonce, aud, exp)
+6. RP extrait les claims utilisateur (sub, email, name) de l'ID Token
+7. RP crée une session locale
+```
+
+## Types de Jetons SSO
+
+| Type | Contenu | Durée de Vie | Sécurité |
+|------|---------|-------------|----------|
+| **Assertion SAML** | Identité, attributs, conditions d'authentification | 5-30 minutes | Signée, optionnellement chiffrée, horodatage |
+| **ID Token (OIDC)** | Identité utilisateur (sub, email, name, etc.) | 1-60 minutes | JWT signé, vérification de l'audience et du nonce |
+| **Access Token (OAuth)** | Permissions d'accès (scopes, audiences) | 15-60 minutes | JWT opaque, validé par l'API ressource |
+| **Refresh Token (OAuth)** | Obtention de nouveaux access tokens | Heures à jours | Usage unique, stockage côté serveur |
+| **Session IdP** | Session utilisateur au niveau de l'IdP | Heures à jours | Cookie HttpOnly, Secure, SameSite |
+
+## Modèles de Déploiement SSO
+
+### IdP Cloud comme point central
+
+Architecture la plus courante pour les organisations modernes :
+
+```
+                    ┌──────────────────┐
+                    │   IdP Cloud       │
+                    │  (Okta/Azure AD)  │
+                    └────┬──────┬──────┘
+                         │      │
+              ┌──────────┘      └──────────┐
+              │                             │
+         ┌────┴────┐                  ┌────┴────┐
+         │  Apps   │                  │  Apps   │
+         │  Cloud  │                  │  Sur    │
+         │  SaaS   │                  │  Site   │
+         └─────────┘                  └─────────┘
+```
+
+| Avantage | Inconvénient |
+|----------|-------------|
+| Gestion centralisée des politiques SSO | Dépendance à la disponibilité du cloud IdP |
+| Provisionnement SCIM intégré | Latence réseau pour l'authentification |
+| Catalogue d'applications pré-intégré | Coût par utilisateur |
+| MFA et conditional access intégrés | Défis de conformité pour données résidentes |
+
+### SSO pour applications Legacy
+
+Les applications legacy sans support SAML/OIDC nécessitent des adaptateurs :
+
+| Approche | Mécanisme | Complexité |
+|----------|-----------|------------|
+| **Proxy d'authentification** | PingAccess, Azure AD App Proxy, Apache mod_auth_oidc | Faible-Moyenne |
+| **En-tête HTTP (Header)** | IdP écrit l'identité dans un en-tête HTTP après authentification | Faible (mais moins sécurisé) |
+| **Plugin / Agent** | Plugin installé sur le serveur d'applications (IIS, Tomcat) | Moyenne |
+| **Adaptateur LDAP** | Le proxy SSO s'authentifie via LDAP et injecte l'identité | Moyenne |
+| **Réécriture (Kerberos)** | Pont entre Kerberos et SAML/OIDC via ADFS ou equivalent | Élevée |
+
+## Risques de Sécurité SSO
+
+| Risque | Description | Mitigation |
+|--------|-------------|------------|
+| **Défaillance unique (SPOF)** | Si l'IdP tombe, TOUTES les applications SSO sont indisponibles | IdP HA avec basculement multi-région |
+| **Vol de session IdP** | Vol de cookie de session IdP = accès à toutes les apps | Liaison de session (IP, empreinte), durée de session limitée |
+| **Déconnexion unique incomplète** | L'utilisateur se déconnecte d'une app mais pas des autres | Implémentation SLO complète, session management OIDC |
+| **Confusion SP-IdP** | Configuration incorrecte du SP acceptant des assertions non signées | Valider TOUJOURS la signature, ne jamais accepter d'assertions non signées |
+| **Attaque de rejeu** | Réutilisation d'une assertion SAML capturée | Assertion with NotBefore/NotOnOrAfter, OneTimeUse |
+| **Provisionnement non synchronisé** | Utilisateur supprimé dans l'annuaire mais session SSO toujours active | Réduction de la durée de session, vérification périodique de l'appartenance aux groupes |
+
+## Points Clés à Retenir
+
+- Les trois protocoles SSO principaux sont SAML 2.0 (XML, entreprise, fédération B2B), OIDC (JSON/JWT, moderne, mobile, API) et Kerberos (binaire, Windows natif, réseau) — le choix dépend du type d'applications et de l'infrastructure existante
+- Les flux SSO SAML 2.0 incluent le flux initié par le SP (l'utilisateur accède d'abord à l'application) et le flux initié par l'IdP (l'utilisateur part du portail IdP) — le flux initié par le SP est le plus courant
+- OIDC est le protocole SSO moderne recommandé pour les nouvelles applications — plus simple que SAML, meilleur support mobile et API, et compatible avec les architectures microservices
+- Les applications legacy sans support SAML/OIDC nécessitent des proxies d'authentification (PingAccess, Azure AD App Proxy) ou des agents/plugins pour intégrer le SSO
+- Le SSO concentre le risque : la compromission de la session IdP donne accès à toutes les applications — la liaison de session, les durées de session courtes et la MFA renforcée sont des mitigations essentielles
+- La déconnexion unique (SLO) est notoirement difficile à implémenter correctement — testez rigoureusement tous les scénarios de déconnexion, en particulier dans les architectures SAML complexes avec de multiples SP

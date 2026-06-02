@@ -1,0 +1,164 @@
+---
+title: "Audit Readiness"
+description: "Building an audit-ready IAM program — evidence management, auditor workflows, pre-audit preparation, managing audit findings, and continuous audit readiness."
+sidebar:
+  order: 7
+  label: "Audit Readiness"
+---
+
+An "audit-ready" IAM program maintains continuous compliance evidence rather than scrambling to produce reports when an auditor arrives. The goal is to make audit preparation a predictable, low-effort process because evidence is being collected, reviewed, and maintained continuously.
+
+## The Audit Lifecycle
+
+```
+┌────────────────────────────────────────────────────────┐
+│                    AUDIT LIFECYCLE                       │
+│                                                          │
+│  ┌──────────┐   ┌──────────┐   ┌──────────┐            │
+│  │  Audit   │   │ Evidence │   │  Audit   │            │
+│  │ Planning │──>│Collection │──>│Execution │──>         │
+│  └──────────┘   └──────────┘   └──────────┘            │
+│                                       │                 │
+│  ┌──────────┐   ┌──────────┐   ┌──────┘                │
+│  │Continuous│   │Remediation│   │  ┌──────────┐        │
+│  │Readiness │<──│  & Close  │<──│  │  Audit   │        │
+│  │          │   │           │   │  │ Reporting│        │
+│  └──────────┘   └──────────┘   │  └──────────┘        │
+│                                └─────────────────────────│
+└────────────────────────────────────────────────────────┘
+```
+
+### Phase 1 — Audit Planning (3-6 Months Before)
+
+| Activity | IAM Action | Responsible |
+|----------|------------|-------------|
+| **Scope definition** | Identify which IAM controls are in scope based on applicable regulations | Compliance Officer, IAM Lead |
+| **Control matrix** | Map IAM controls to regulatory requirements | Compliance Officer |
+| **Evidence inventory** | Identify evidence required for each control | IAM operations, Internal Audit |
+| **Gap assessment** | Identify control weaknesses before the auditor does | Internal Audit |
+| **Timeline planning** | Schedule evidence collection, certifications, and interviews | IAM Lead |
+
+### Phase 2 — Evidence Collection (1-3 Months Before)
+
+Evidence is the foundation of any audit. The IAM team must be able to produce:
+
+| Control Area | Required Evidence | Typical Source |
+|-------------|-------------------|----------------|
+| **User access provisioning** | Provisioning requests with approval, provisioning records | IGA platform, ticketing system |
+| **User access termination** | Termination records, deprovisioning completion evidence | IGA platform, HR system integration logs |
+| **Access certification** | Completed certification reports, reviewer responses, remediation records | IGA platform |
+| **SoD controls** | SoD analysis reports, conflict remediation plans | SoD platform |
+| **Privileged access** | PAM policies, JIT access requests, session recordings, credential rotation logs | PAM platform |
+| **MFA / authentication** | MFA enrolment records, authentication policy, exception list | Identity provider |
+| **Change management** | Access change requests, approvals, implementation records | IGA platform, change management system |
+| **Security incident** | Incident reports involving identity and access | SIEM, incident response system |
+
+### Evidence Quality Requirements
+
+| Quality Dimension | Requirement | Auditor Expectation |
+|-------------------|-------------|-------------------|
+| **Completeness** | All users, systems, and time periods in scope | Full population, not sampling (unless agreed) |
+| **Accuracy** | Data matches the actual state of controls | Independent validation, no self-reported evidence |
+| **Timeliness** | Evidence covers the audit period with no gaps | Date-stamped records, continuous coverage |
+| **Integrity** | Evidence cannot be modified after creation | Immutable audit logs, digital signatures |
+| **Accessibility** | Evidence can be retrieved and presented efficiently | Searchable repository, indexed by control |
+| **Retention** | Evidence retained for the entire retention period | Retention policy aligned with regulatory requirements |
+
+### Phase 3 — Audit Execution (Weeks 1-4)
+
+| Activity | IAM Action | Tips |
+|----------|------------|------|
+| **Opening meeting** | Present IAM program overview, scope, control inventory | Be transparent about known weaknesses |
+| **Control walkthrough** | Demonstrate how each IAM control operates | Show the control in action, not just documentation |
+| **Evidence review** | Provide requested evidence to auditor | Organise evidence by control number for easy reference |
+| **Control testing** | Auditor tests control effectiveness | Let the auditor test independently — do not interfere |
+| **Interim findings** | Address preliminary findings during the audit | Faster resolution reduces final report impact |
+| **Closing meeting** | Review all findings, confirm next steps | Do not dispute findings on the spot — discuss constructively |
+
+### Phase 4 — Audit Reporting (Weeks 4-8)
+
+| Report Element | Description | IAM Action |
+|----------------|-------------|------------|
+| **Control deficiencies** | Specific control failures identified | Accept or dispute with evidence |
+| **Severity rating** | High, medium, low based on impact and likelihood | Prioritise high-severity remediation |
+| **Remediation recommendation** | Auditor's recommended corrective action | Evaluate cost and feasibility |
+| **Management response** | Organisation's planned remediation and timeline | Draft realistic remediation plans |
+
+### Phase 5 — Remediation (Weeks 8-24)
+
+| Remediation Phase | Activities | Target Duration |
+|-------------------|------------|-----------------|
+| **1. Prioritise** | Classify findings by severity, assign owners | 2 weeks |
+| **2. Plan** | Develop remediation plans with timelines | 2 weeks |
+| **3. Implement** | Execute control improvements | 4-12 weeks |
+| **4. Verify** | Internal validation of remediation effectiveness | 2 weeks |
+| **5. Report** | Document closure to auditor | 1 week |
+
+### Phase 6 — Continuous Readiness
+
+The goal is to move from a periodic audit scramble to continuous readiness:
+
+```
+Traditional Approach:
+  Audit comes ──> Panic ──> Request evidence ──> Scramble ──> Remediation
+
+Continuous Readiness Approach:
+  Controls operate ──> Evidence auto-collected ──> Dashboard ──> Always audit-ready
+```
+
+## Building an Audit-Ready IAM Program
+
+### 1. Control Documentation
+
+Every IAM control should have a standardised control document:
+
+```
+Control ID: IAM-AC-001
+Control Name: User Account Provisioning
+Control Type: Preventive
+Regulatory Mapping: SOX 404, PCI DSS 7.2.1, ISO 27001 A.5.18
+Control Owner: Identity Management Team Lead
+Control Description: All user accounts are provisioned based on an authorised request
+Control Frequency: Continuous
+Evidence Source: IGA platform provisioning records
+Key Reports: Access Provisioning Report, Unauthorised Provisioning Alert
+Last Test Date: [Date]
+Test Result: Pass / Fail
+Last Remediation: [Date if applicable]
+```
+
+### 2. Evidence Management Platform
+
+| Feature | Purpose | Example Tools |
+|---------|---------|---------------|
+| **Automated evidence collection** | Schedule and collect evidence on a recurring basis | OneTrust, ServiceNow GRC, RSA Archer |
+| **Evidence repository** | Centralised, indexed, audit-ready storage | SharePoint, dedicated GRC tool |
+| **Control testing scheduling** | Track when each control was last tested | GRC platform, internal audit tool |
+| **Finding management** | Track audit findings through remediation | GRC platform, Jira |
+| **Dashboard and reporting** | Real-time compliance status | GRC platform dashboard |
+
+### 3. Pre-Audit Checklist
+
+Three months before any scheduled audit:
+
+| Check | Task | Status |
+|-------|------|--------|
+| ☐ | Review last audit's findings and verify all remediation is complete |
+| ☐ | Run IAM control tests and document results |
+| ☐ | Complete all outstanding access certifications |
+| ☐ | Verify SoD analysis is current |
+| ☐ | Test break-glass / emergency access procedures |
+| ☐ | Update control documentation for any changes |
+| ☐ | Prepare evidence binder organised by control |
+| ☐ | Conduct internal pre-audit walkthrough |
+| ☐ | Train IAM team on audit procedures and interview preparation |
+| ☐ | Prepare executive summary of IAM control status |
+
+## Key Takeaways
+
+- The audit lifecycle spans six phases: planning (3-6 months before), evidence collection (1-3 months before), execution (weeks 1-4), reporting (weeks 4-8), remediation (weeks 8-24), and continuous readiness
+- Evidence quality must be complete, accurate, timely, immutable, accessible, and retained per policy — automated collection from IGA/PAM/IdP platforms is essential for efficiency
+- The goal is continuous readiness — evidence is collected and validated constantly rather than produced reactively when an auditor requests it
+- Every IAM control should have a standardised control document with ID, type, regulatory mapping, owner, description, testing history, and evidence source
+- Pre-audit preparation three months before the audit should include control testing, certification completion, SoD review, break-glass testing, documentation updates, and evidence organisation
+- Traditional audit preparation is reactive panic — the mature approach is continuous compliance where controls are always running, evidence is always being collected, and dashboards show real-time compliance status

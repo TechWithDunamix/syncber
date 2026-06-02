@@ -1,0 +1,57 @@
+---
+title: "Modèles d'Autorisation"
+description: "Guide complet des modèles d'autorisation — DAC, MAC, RBAC, ABAC, PBAC et ReBAC — et leur application dans l'IAM moderne."
+sidebar:
+  order: 8
+  label: "Modèles d'Autorisation"
+---
+
+Si l'authentification répond à la question *« Qui êtes-vous ? »*, l'autorisation répond à *« Qu'avez-vous le droit de faire ? »*. L'autorisation est le processus d'application des politiques d'accès.
+
+## Présentation des Modèles
+
+| Modèle | Nom | Granularité |
+|--------|-----|-------------|
+| **DAC** | Contrôle d'accès discrétionnaire | Par objet |
+| **MAC** | Contrôle d'accès obligatoire | Par étiquette |
+| **RBAC** | Contrôle d'accès basé sur les rôles | Par rôle |
+| **ABAC** | Contrôle d'accès basé sur les attributs | Par attribut |
+| **ReBAC** | Contrôle d'accès basé sur les relations | Par relation |
+
+## RBAC — Contrôle d'Accès Basé sur les Rôles
+
+Le RBAC attribue des permissions à des **rôles**, et des rôles aux utilisateurs.
+
+### Règles RBAC (NIST)
+
+1. **Attribution de rôle** — Un sujet doit avoir un rôle assigné
+2. **Autorisation de rôle** — Le rôle actif doit être autorisé pour le sujet
+3. **Autorisation de permission** — La permission doit être autorisée pour le rôle actif
+
+<Aside variant="tip">
+Le RBAC est le modèle d'autorisation le plus déployé dans l'IAM en entreprise car il équilibre efficacité administrative et contrôle de sécurité.
+</Aside>
+
+## ABAC — Contrôle d'Accès Basé sur les Attributs
+
+L'ABAC évalue les décisions d'accès en fonction des **attributs** de l'utilisateur, de la ressource, de l'action et de l'environnement.
+
+### RBAC vs ABAC
+
+| Aspect | RBAC | ABAC |
+|--------|------|------|
+| **Granularité** | Large-moyenne | Fine |
+| **Impact des changements** | Redéfinition des rôles | Mise à jour des règles |
+| **Idéal pour** | Fonctions stables | Accès contextuels dynamiques |
+
+## ReBAC — Contrôle d'Accès Basé sur les Relations
+
+Le ReBAC modélise l'accès comme des **relations entre entités** dans un graphe. Popularisé par Google Zanzibar (Google Drive, YouTube, Gmail).
+
+## Points Clés
+
+- L'autorisation détermine ce qu'un utilisateur authentifié est autorisé à faire
+- Le RBAC est le standard de l'industrie — permissions aux rôles, rôles aux utilisateurs
+- L'ABAC ajoute une évaluation contextuelle fine basée sur les attributs
+- Le ReBAC modélise l'accès comme des relations (modèle Google Zanzibar)
+- Choisir le modèle selon l'échelle, la complexité et les besoins réglementaires

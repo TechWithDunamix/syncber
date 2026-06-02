@@ -1,0 +1,30 @@
+---
+title: "Authentication & Authorization Flashcards"
+description: "Test your knowledge with interactive flashcards — one deck, all cards. Flip to reveal the answer and swipe through the deck."
+sidebar:
+  order: 11
+  label: "Flashcards"
+---
+
+Test your understanding of the Authentication & Authorization module. Click a card to flip it between question and answer. Use the arrows, keyboard (&larr; &rarr;), or swipe on mobile to move through the deck.
+
+<FlashCardDeck>
+  <FlashCard question="What is the difference between authentication and authorization?" answer="Authentication verifies identity (&quot;Who are you?&quot;). Authorization determines permissions (&quot;What are you allowed to do?&quot;). Authorization is meaningless without prior authentication, but authentication alone grants no access rights." />
+  <FlashCard question="What are the three main authentication factor types?" answer="Knowledge (something you know), Possession (something you have), Inherence (something you are). True MFA requires factors from at least two different categories." />
+  <FlashCard question="What makes FIDO2/WebAuthn phishing-resistant?" answer="FIDO2 uses public-key cryptography where the private key never leaves the user's device. The key is cryptographically bound to the origin domain, so phishing sites cannot use stolen credentials." />
+  <FlashCard question="What is the difference between SAML 2.0 and OpenID Connect?" answer="SAML 2.0 is XML-based, enterprise-focused, strongest in government and higher education. OpenID Connect (OIDC) is modern JSON-based, built on OAuth 2.0, and dominant in SaaS and consumer applications." />
+  <FlashCard question="What is OAuth 2.0 used for?" answer="OAuth 2.0 is a delegated authorization framework for APIs. It allows applications to obtain limited access to user accounts without exposing passwords. It is NOT an authentication protocol." />
+  <FlashCard question="What are the six major authorization models?" answer="DAC (Discretionary), MAC (Mandatory), RBAC (Role-Based), ABAC (Attribute-Based), PBAC (Policy-Based), and ReBAC (Relationship-Based). RBAC covers approximately 80% of enterprise use cases." />
+  <FlashCard question="What is the PDP/PEP/PIP architecture?" answer="PEP (Policy Enforcement Point) intercepts access requests. PDP (Policy Decision Point) evaluates policies and makes decisions. PIP (Policy Information Point) provides attribute data used in policy evaluation." />
+  <FlashCard question="What percentage of breaches involve compromised credentials?" answer="According to the Verizon DBIR, 49% of breaches involve stolen or compromised credentials, making credential theft the most common initial attack vector." />
+  <FlashCard question="What is the industry trend in authentication methods?" answer="The industry is moving decisively toward phishing-resistant, passwordless authentication using FIDO2/WebAuthn, driven by mandates like the US Executive Order 14028 requiring phishing-resistant MFA across federal agencies." />
+  <FlashCard question="What is the difference between RBAC and ABAC?" answer="RBAC grants access based on assigned roles (e.g., manager role = specific permissions). ABAC uses attributes of the user, resource, action, and environment to make fine-grained, context-aware access decisions." />
+  <FlashCard question="What protocols are used for federation and delegated authorization?" answer="SAML 2.0 and OpenID Connect for federation (cross-domain SSO). OAuth 2.0 for delegated API authorization. XACML and OPA/Rego for policy-based authorization." />
+  <FlashCard question="What is MFA fatigue and how can it be mitigated?" answer="MFA fatigue is an attack where the adversary repeatedly sends push notification MFA requests until the user eventually accepts one. Mitigations include number-matching MFA, FIDO2 passkeys, and risk-based adaptive authentication." />
+</FlashCardDeck>
+
+---
+
+<Aside variant="tip">
+Review any cards you got wrong by navigating to the corresponding module page for a deeper explanation.
+</Aside>

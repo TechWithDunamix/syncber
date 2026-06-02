@@ -1,0 +1,51 @@
+---
+interface Props {
+  question: string;
+  answer: string;
+}
+
+const { question, answer } = Astro.props;
+---
+
+<div
+  class="flashcard not-content relative w-full max-w-sm mx-auto cursor-pointer select-none"
+  data-question={question}
+  data-answer={answer}
+  data-flipped="false"
+>
+  <div
+    class="flashcard-inner relative w-full rounded-xl border shadow-lg [transform-style:preserve-3d] aspect-[5/7]"
+  >
+    <!-- Front: Question -->
+    <div
+      class="flashcard-face flashcard-front absolute inset-0 flex flex-col items-center justify-center rounded-xl bg-card p-6 text-center [backface-visibility:hidden]"
+    >
+      <span class="flashcard-label mb-3 inline-flex items-center rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground select-none">
+        Question
+      </span>
+      <p class="flashcard-text text-balance text-lg font-semibold leading-relaxed md:text-xl">
+        {question}
+      </p>
+      <p class="mt-auto text-xs text-muted-foreground select-none">Click to reveal answer</p>
+    </div>
+
+    <!-- Back: Answer -->
+    <div
+      class="flashcard-face flashcard-back absolute inset-0 flex flex-col items-center justify-center rounded-xl bg-card p-6 text-center [backface-visibility:hidden] [transform:rotateY(180deg)]"
+    >
+      <span class="mb-3 inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary select-none">
+        Answer
+      </span>
+      <p class="flashcard-text text-balance text-base leading-relaxed md:text-lg">
+        {answer}
+      </p>
+      <p class="mt-auto text-xs text-muted-foreground select-none">Click to see question</p>
+    </div>
+  </div>
+</div>
+
+<style is:global>
+  .flashcard[data-flipped="true"] .flashcard-inner {
+    transform: rotateY(180deg);
+  }
+</style>

@@ -1,0 +1,141 @@
+---
+title: "Comptes Privilégiés"
+description: "Taxonomie complète des comptes privilégiés — comptes locaux, domaine, service (gMSA vs legacy), A2A, clés SSH, rôles cloud IAM, break-glass, découverte de comptes et classification."
+sidebar:
+  order: 3
+  label: "Comptes Privilégiés"
+---
+
+La première étape d'un programme PAM est la découverte et la classification de tous les comptes privilégiés. On ne peut pas protéger ce que l'on ne voit pas.
+
+## Taxonomie des Comptes Privilégiés
+
+| Type de Compte | Description | Risque | Priorité PAM |
+|---------------|-------------|--------|-------------|
+| **Administrateur local** | Compte administrateur intégré sur chaque serveur/workstation | Élevé | Haute |
+| **Administrateur de domaine** | Compte avec privilèges d'administration Active Directory | Critique | Très haute |
+| **Administrateur d'application** | Compte avec droits élevés dans une application métier | Élevé | Haute |
+| **Compte de service** | Compte utilisé par un service Windows ou un démon Linux | Moyen-Élevé | Haute |
+| **Compte A2A** | Compte utilisé par une application pour communiquer avec une autre application | Moyen-Élevé | Haute |
+| **Clé SSH** | Paire de clés pour l'authentification sur les serveurs Linux/Unix | Élevé | Très haute |
+| **Rôle cloud IAM** | Rôle avec privilèges élevés dans AWS/Azure/GCP | Critique | Très haute |
+| **Compte break-glass** | Compte d'urgence pour accès de secours | Élevé | Haute |
+| **Compte de base de données** | Compte administrateur SQL/Oracle/MySQL | Critique | Très haute |
+| **Compte réseau** | Compte administrateur sur équipements réseau (routeurs, pare-feux) | Élevé | Haute |
+
+## Comptes Administrateurs
+
+### Comptes Locaux vs Domaine
+
+| Caractéristique | Administrateur Local | Administrateur de Domaine |
+|----------------|---------------------|--------------------------|
+| **Périmètre** | Un seul serveur/workstation | Tout le domaine |
+| **Création** | Automatique (intégré au système d'exploitation) | Manuel via Active Directory |
+| **Mots de passe** | Souvent identiques sur tous les serveurs (LAPS résout ce problème) | Unique, mais partagé entre les admins |
+| **Détection** | Difficile — chaque machine a son propre compte local | Facile — liste dans le groupe Domain Admins |
+| **Rotation** | Manuelle sans outil (LAPS automatise) | Manuelle sans PAM |
+
+### Comptes de Service
+
+| Type de Compte de Service | Windows | Linux |
+|--------------------------|---------|-------|
+| **Compte de service local** | NetworkService, LocalSystem | Compte système standard |
+| **Compte de service géré (gMSA)** | gMSA (géré par AD, rotation auto) | N/A (equivalent partiel avec systemd DynamicUser) |
+| **Compte de service virtuel** | vSA (Windows 2012+) | N/A |
+| **Compte de service standard** | Compte utilisateur avec LogonAsService | Compte utilisateur dans /etc/passwd |
+
+**gMSA (Group Managed Service Account) :**
+
+| Avantage | Description |
+|----------|-------------|
+| **Rotation automatique** | Mot de passe changé automatiquement tous les 30 jours par AD |
+| **SPN géré** | Service Principal Name automatiquement géré |
+| **Pas d'intervention humaine** | Aucun administrateur ne connaît le mot de passe |
+| **Délégation** | Prise en charge de la délégation Kerberos |
+
+## Comptes Application-à-Application (A2A)
+
+Les comptes A2A sont utilisés par des applications pour s'authentifier auprès d'autres applications ou bases de données :
+
+```
+Application A (API) ──> Compte A2A ──> Base de données
+                              │
+                    Identifiants stockés dans :
+                    - Fichier de configuration (RISQUÉ)
+                    - Variable d'environnement
+                    - Coffre-fort PAM (RECOMMANDÉ)
+                    - Service de secrets cloud
+```
+
+| Méthode de Gestion A2A | Sécurité | Opérationnel | Recommandé |
+|------------------------|----------|--------------|------------|
+| **Fichier de configuration** | Très faible | Simple | Non |
+| **Variable d'environnement** | Faible | Simple | Non |
+| **Registre Windows** | Faible | Simple | Non |
+| **Service de secrets cloud** | Élevée | Moyen | Oui (cloud) |
+| **Coffre-fort PAM** | Très élevée | Intégration SDK | Oui (sur site + cloud) |
+
+## Clés SSH
+
+### Cycle de Vie des Clés SSH
+
+```
+1. GÉNÉRATION : ssh-keygen -t ed25519 -a 100
+   └── Clé privée (NE JAMAIS partager) + Clé publique (déployée)
+
+2. DÉPLOIEMENT : Clé publique ajoutée à ~/.ssh/authorized_keys
+   └── Manuel (ssh-copy-id) ou automatisé (Ansible, Puppet)
+
+3. UTILISATION : Authentification SSH par paire de clés
+   └── Optionnellement avec passphrase ou agent SSH
+
+4. ROTATION : Remplacement périodique des paires de clés
+   └── Automatisé par PAM (rotation après chaque utilisation)
+
+5. RÉVOCATION : Retrait des clés compromises
+   └── Retrait de authorized_keys, mise à jour de la CRL SSH
+```
+
+### Gestion des Clés SSH par PAM
+
+| Fonctionnalité PAM | Clé SSH | Avantage |
+|-------------------|---------|----------|
+| **Coffre-fort de clés** | Stockage chiffré des clés privées | Élimination des fichiers de clés non sécurisés |
+| **Rotation automatique** | Nouvelle paire de clés après chaque connexion | Limitation de la fenêtre de compromission |
+| **Déploiement automatisé** | Déploiement de la clé publique sur les serveurs cibles | Gestion centralisée des authorized_keys |
+| **Enregistrement de session** | Session SSH via proxy PAM | Traçabilité des commandes exécutées |
+
+## Découverte de Comptes Privilégiés
+
+### Méthodes de Découverte
+
+| Méthode | Périmètre | Précision | Effort |
+|---------|-----------|-----------|--------|
+| **Scan réseau** | Tous les systèmes joignables | Faible (comptes identifiés) | Faible |
+| **Analyse Active Directory** | Domaine entier | Haute (groupes, ACL) | Faible |
+| **Analyse de base de données** | Serveurs SQL, Oracle, MySQL | Haute (users, roles) | Moyenne |
+| **Analyse de configuration** | Fichiers de config, scripts | Très élevée (mots de passe codés en dur) | Élevée |
+| **Analyse de code source** | Dépôts Git, code legacy | Très élevée (secrets dans le code) | Élevée |
+| **Déclaratif (inventaire)** | Déclaration manuelle des administrateurs | Variable | Faible |
+
+### Classification des Comptes Découverts
+
+```
+Compte découvert ──> Critères de classification :
+    │
+    ├── Type de compte (local, domaine, service, A2A, SSH)
+    ├── Niveau de privilège (root, admin, user, read-only)
+    ├── Système cible (Windows, Linux, DB, cloud, réseau)
+    ├── Environnement (production, développement, test, DR)
+    ├── Propriétaire (équipe, application, responsable)
+    └── Risque (critique, élevé, moyen, faible)
+```
+
+## Points Clés à Retenir
+
+- La taxonomie des comptes privilégiés inclut 10 types principaux : administrateur local, domaine, application, service, A2A, clé SSH, rôle cloud, break-glass, base de données et réseau — chaque type a un niveau de risque et une priorité PAM spécifiques
+- Les comptes de service gérés (gMSA) offrent une rotation automatique des mots de passe via AD — privilégiez les gMSA aux comptes de service standards pour les applications Windows
+- Les comptes A2A (Application-à-Application) sont souvent négligés mais contiennent les identifiants les plus critiques — stockez-les dans un coffre-fort PAM plutôt que dans des fichiers de configuration ou des variables d'environnement
+- La gestion des clés SSH par PAM inclut le stockage sécurisé des clés privées, la rotation automatique après chaque connexion, le déploiement automatisé des clés publiques et l'enregistrement des sessions
+- La découverte de comptes est la première étape de tout programme PAM — utilisez le scan réseau, l'analyse AD, l'analyse de base de données, l'analyse de configuration et l'analyse de code source pour une couverture complète
+- La classification des comptes découverts (type, niveau de privilège, système, environnement, propriétaire, risque) permet de prioriser l'intégration PAM et d'appliquer des politiques différenciées

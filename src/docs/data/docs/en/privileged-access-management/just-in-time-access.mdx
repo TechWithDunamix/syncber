@@ -1,0 +1,162 @@
+---
+title: "Just-In-Time Access"
+description: "Just-in-time privileged access — ephemeral privilege elevation, JIT architecture, approval workflows, integration with ITSM/ITOM tools, and eliminating standing administrative rights."
+sidebar:
+  order: 5
+  label: "Just-In-Time Access"
+---
+
+Just-in-Time (JIT) access is the practice of granting elevated privileges only for the duration of a specific task, then automatically revoking those privileges when the task completes. JIT is a cornerstone of modern PAM because it eliminates **standing administrative rights** — the primary attack vector for privilege escalation.
+
+Instead of "Who has admin rights?" (the RBAC question), JIT asks "Who needs admin rights **right now**, for what specific task, and for how long?"
+
+## The Problem with Standing Privileges
+
+Standing privileges are administrative rights that persist indefinitely — a user who was granted domain admin access three years ago for a server migration project still has that access today.
+
+| Risk | Impact | JIT Mitigation |
+|------|--------|----------------|
+| **Credential theft** | Attacker steals standing admin credentials from any compromised user | No standing credentials to steal |
+| **Privilege creep** | Users accumulate admin rights over time without review | JIT expires automatically — no accumulation |
+| **Insider threat** | Disgruntled employee abuses existing admin rights | JIT requires approval for each elevation |
+| **Cleanup failure** | Admin rights not removed when no longer needed | JIT rights self-expire — no manual cleanup |
+| **Attack surface** | Every standing admin account is an attack target | JIT exposes privileges only when needed |
+
+### The Math of JIT Risk Reduction
+
+- **Without JIT**: 500 users × each having standing admin access = 500 potential attack targets at any moment
+- **With JIT**: 500 users, but only 5 have elevated access at any given moment = 90% reduction in admin attack surface
+
+## JIT Access Architecture
+
+```
+┌─────────┐    ┌──────────────┐    ┌────────────────┐
+│  User   │───→│  PAM Portal  │───→│  Approval      │
+│         │    │  (Request)   │    │  Workflow      │
+└─────────┘    └──────────────┘    └───────┬────────┘
+                                           │ Approved
+                                           ▼
+┌─────────┐    ┌──────────────┐    ┌────────────────┐
+│  Target │←───│  PAM Proxy   │←───│  Elevation     │
+│  System │    │  (Session)   │    │  Engine        │
+└─────────┘    └──────────────┘    └────────────────┘
+                                           │
+                                           ▼
+                                    ┌────────────────┐
+                                    │  De-Elevation  │
+                                    │  (Auto-expiry) │
+                                    └────────────────┘
+```
+
+### JIT Access Flow
+
+<Steps>
+### User Requests Elevation
+User identifies the need for elevated access to a specific system or resource. They submit a request through the PAM portal, specifying: target system, required privilege level, duration of access, and business justification (ticket number, task description).
+
+### Policy Evaluation
+The PAM system evaluates the request against policies:
+- Does the user have a valid business need?
+- Is the requested privilege level appropriate for the task?
+- Is the requested duration reasonable?
+- Does the request conflict with SOD policies?
+- Is the request within approved hours?
+
+### Approval (If Required)
+For high-risk elevations, the request is routed to one or more approvers (manager, system owner, security team). The approver reviews the justification and approves or denies the request.
+
+### Privilege Elevation
+Upon approval, the PAM system temporarily grants the requested privileges. This may involve:
+- Adding user to a temporary security group in AD
+- Assuming a cloud IAM role for a defined duration
+- Issuing a time-limited sudoers entry on Linux
+- Creating a temporary local admin account on Windows
+
+### Task Execution
+The user performs the required task using the elevated privileges. Session activity is monitored and recorded.
+
+### De-Elevation
+After the requested duration expires (or when the user signals task completion), the PAM system automatically revokes the elevated privileges. The user returns to their standard privilege level.
+</Steps>
+
+## JIT Elevation Methods
+
+| Method | How It Works | Response Time | Use Case |
+|--------|-------------|---------------|----------|
+| **Temporary group membership** | User is added to an AD security group for a defined duration | Minutes | AD-based systems, file servers |
+| **Time-limited role assumption** | User assumes a cloud IAM role with time-bound credentials | Seconds | AWS, Azure, GCP |
+| **Ephemeral sudo access** | Temporary sudoers rule added and removed | Seconds | Linux systems |
+| **Temporary local admin** | User added to local Administrators group for a period | Minutes | Windows servers |
+| **Just-enough admin (JEA)** | Pre-defined admin commands available for limited use | Instant | PowerShell-based Windows management |
+| **Privileged access workstation (PAW)** | Temporary access from a dedicated secure workstation | Hours (provisioning) | High-security environments |
+
+### Just-Enough Administration (JEA)
+
+JEA is a Microsoft approach to JIT that restricts what administrators can do rather than granting full admin rights. Instead of "admin or not admin," JEA defines specific commands and parameters that each admin role can execute.
+
+```
+Standard JEA roles:
+- DNS Administrator: Can only manage DNS records
+- AD User Administrator: Can only create/modify users
+- Exchange Administrator: Can only manage mailboxes
+- Security Operator: Can only view security logs
+```
+
+**Benefits**: Granular control, no standing admin rights, constrained execution environment.
+**Limitations**: Requires up-front role definition, only available for PowerShell-accessible systems.
+
+## Approval Workflows
+
+### Workflow Models
+
+| Model | Description | Best For |
+|-------|-------------|----------|
+| **Self-service (no approval)** | Any authorised user can elevate | Low-risk systems, standard maintenance |
+| **Single approval** | One approver required (typically manager) | Medium-risk systems, change requests |
+| **Dual approval** | Two approvers required (manager + system owner) | High-risk systems, production access |
+| **Emergency bypass** | User can self-approve in emergencies, with post-hoc review | Break-glass scenarios, critical incidents |
+
+### Workflow Configuration Best Practices
+
+| Setting | Recommended Value | Rationale |
+|---------|-------------------|-----------|
+| **Maximum elevation duration** | 4-8 hours (production), 24 hours (non-production) | Long enough for task completion, short enough to limit exposure |
+| **Maximum simultaneous elevations** | 1-3 per user | Precludes batch abuse |
+| **Auto-approval threshold** | 15 minutes (low-risk), no auto-approval (high-risk) | Reduces friction for low-risk tasks |
+| **Approval escalation** | Escalate to supervisor if no response in 30 minutes | Ensures approvals don't block critical work |
+| **Post-elevation review** | Required for all emergency approvals | Ensures accountability for bypassed controls |
+
+## JIT Integration with ITSM
+
+JIT is most effective when integrated with IT Service Management (ITSM) tools:
+
+| Integration | Purpose | Example |
+|-------------|---------|---------|
+| **Ticket validation** | Elevation request must reference a valid ticket | JIT checks ServiceNow ticket status |
+| **Ticket auto-creation** | Elevation creates a change record automatically | Every elevation creates a change request |
+| **Post-elevation update** | Elevation result updates the ticket | "Access granted, session recorded" appended to ticket |
+| **Change window validation** | Elevation only allowed during approved change windows | Production changes only during maintenance windows |
+
+## JIT Implementation Challenges
+
+| Challenge | Mitigation |
+|-----------|------------|
+| **Legacy application compatibility** | Deploy JIT alongside standing access for legacy systems, migrate gradually |
+| **Automation scripts that need admin** | Replace hardcoded admin credentials with JIT elevation in CI/CD pipelines |
+| **Approval delays blocking critical work** | Set auto-approval thresholds, escalation paths, and emergency bypass procedures |
+| **Admin resistance / culture change** | Communicate security benefits, demonstrate ease of use, involve admins in workflow design |
+| **Complexity of JIT in heterogeneous environments** | Start with one platform (AD or cloud), expand incrementally |
+| **Monitoring and debugging** | Maintain read-only access to system logs for diagnostics without elevation |
+
+<Aside variant="tip">
+Start JIT deployment with non-production environments where the impact of workflow friction is lower. Once the process is refined, extend to production. This builds user confidence and allows you to tune approval workflows before they impact critical systems.
+</Aside>
+
+## Key Takeaways
+
+- JIT access eliminates standing administrative rights by granting privileges only for the duration of a specific task — reducing the admin attack surface by 90% or more
+- The JIT flow consists of: request → policy evaluation → approval → elevation → task execution → de-elevation, with automatic expiry as the key control
+- JIT elevation methods include temporary group membership, time-limited IAM role assumption, ephemeral sudo access, and just-enough administration (JEA)
+- Approval workflows range from self-service (no approval) to dual-approval with emergency bypass — configure thresholds based on risk level
+- JIT is most effective when integrated with ITSM tools (ticket validation, auto-creation, change window validation)
+- Implementation challenges include legacy application compatibility, admin culture change, and workflow friction — start with non-production, refine, then extend to production

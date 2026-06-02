@@ -1,0 +1,110 @@
+---
+title: "Regulatory Frameworks"
+description: "Overview of major regulatory frameworks governing IAM — SOX, GDPR, PCI DSS, HIPAA, ISO 27001, NIST SP 800-53 — their scope, requirements, and IAM control mappings."
+sidebar:
+  order: 2
+  label: "Regulatory Frameworks"
+---
+
+Regulatory frameworks establish the legal and contractual obligations that govern how organisations manage access to systems and data. While the specific requirements vary by framework, they share common themes: controlling who can access what, monitoring and logging access, and regularly verifying that controls are operating effectively.
+
+This page provides a comprehensive comparison of the major frameworks that drive IAM compliance.
+
+## Framework Comparison
+
+| Framework | Year | Jurisdiction | Applies To | Enforcement | IAM Focus |
+|-----------|------|-------------|------------|-------------|-----------|
+| **SOX** | 2002 | US | Public companies | SEC, PCAOB | Internal controls over financial reporting |
+| **GDPR** | 2018 | EU/EEA | Any org processing EU personal data | Data Protection Authorities | Personal data protection, privacy rights |
+| **PCI DSS** | 2004 (v4.0: 2024) | Global | Any org handling cardholder data | Payment brands, acquirers | Cardholder data security |
+| **HIPAA** | 1996 (Omnibus: 2013) | US | Healthcare providers, insurers, business associates | OCR (HHS) | Protected health information (PHI) |
+| **ISO 27001** | 2005 (2022 revision) | Global | Any org seeking certification | Accredited certification bodies | ISMS (Information Security Management System) |
+| **NIST SP 800-53** | 2005 (r5: 2020) | US | Federal agencies (mandatory), private sector (voluntary) | OMB, FISMA | Comprehensive security and privacy controls |
+| **CCPA/CPRA** | 2020/2023 | California | Businesses processing CA resident data | California Privacy Protection Agency | Consumer data privacy |
+
+## Common IAM Requirements Across Frameworks
+
+While each framework has unique requirements, there are significant commonalities:
+
+| IAM Requirement | SOX | GDPR | PCI DSS | HIPAA | ISO 27001 | NIST |
+|----------------|-----|------|---------|-------|-----------|------|
+| **Unique user IDs** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **Access control policy** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **Least privilege** | ✓ | Implied | ✓ | ✓ | ✓ | ✓ |
+| **Access reviews / certification** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **Segregation of duties** | ✓ | ✓ | ✓ | Implied | ✓ | ✓ |
+| **Privileged access management** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **MFA** | Implied | Implied | ✓ | ✓ | ✓ | ✓ |
+| **Audit trail / logging** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **Timely account removal** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **Incident response** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+
+## Framework-Specific IAM Requirements
+
+### SOX-Specific
+
+- **Section 302**: Corporate responsibility for financial reports — CEOs/CFOs must certify internal controls
+- **Section 404**: Management assessment of internal controls — documented controls, testing, remediation
+- **Section 409**: Real-time disclosure — rapid disclosure of material changes
+
+**IAM implications**: Access controls over financial reporting systems (ERP, GL, AP, AR), SoD in financial processes, certification of user access to financial systems, audit trails for all financial transactions and admin actions.
+
+### GDPR-Specific
+
+- **Article 5**: Lawfulness, fairness, transparency — purpose limitation, data minimisation, accuracy, storage limitation, integrity, confidentiality, accountability
+- **Article 17**: Right to erasure ("right to be forgotten") — complete deletion of personal data and access records
+- **Article 30**: Records of processing activities — who processes what data, who has access
+- **Article 32**: Security of processing — technical and organisational measures including access controls
+- **Article 33**: Breach notification — notification to supervisory authority within 72 hours
+
+**IAM implications**: Consent management, data subject access request (DSAR) workflows, identity deletion/archival processes, access logging for personal data processing, breach notification with user identification.
+
+### PCI DSS v4.0-Specific
+
+- **Requirement 7**: Restrict access to cardholder data by business need-to-know
+- **Requirement 8**: Identify users and authenticate access to system components
+- **Requirement 9**: Restrict physical access to cardholder data
+- **Requirement 10**: Log and monitor all access to network resources and cardholder data
+
+**IAM implications**: Unique IDs for every user (no shared service accounts in CDE), MFA for all non-console admin access, automated access reviews every 6 months, session recording for privileged access, file integrity monitoring.
+
+### HIPAA-Specific
+
+- **45 CFR §164.312(a)(1)**: Access control — unique user identification, emergency access, automatic logoff, encryption
+- **45 CFR §164.312(b)**: Audit controls — hardware, software, and procedural mechanisms to record ePHI access
+- **45 CFR §164.308(a)(4)(ii)(B)**: Information access management — access authorization and establishment
+
+**IAM implications**: Role-based access for ePHI, break-glass emergency access procedure, automatic session timeout, comprehensive audit logging of all ePHI access, business associate agreements for third-party IAM providers.
+
+### ISO 27001:2022 (Annex A)
+
+| Control | Description | IAM Implementation |
+|---------|-------------|-------------------|
+| **A.5.15** | Access control | Access control policy, RBAC, need-to-know |
+| **A.5.16** | Identity management | Unique IDs, identity lifecycle management |
+| **A.5.17** | Authentication | MFA, passwordless, authentication policy |
+| **A.5.18** | Access rights | Provisioning, access reviews, privilege management |
+| **A.8.1** | User endpoint devices | Device compliance check for access |
+| **A.8.24** | Use of cryptography | Encryption for credential storage |
+
+## Mapping Controls Across Frameworks
+
+A single IAM control can satisfy requirements from multiple frameworks:
+
+```
+Control: "Quarterly access certification for financial systems"
+  └── SOX 404: Management assessment of internal controls
+  └── PCI DSS Req. 7.2: Access control review every 6 months
+  └── ISO 27001 A.5.18: Regular review of user access rights
+  └── NIST AC-2: Account management review
+```
+
+This is the key to building an efficient compliance program — design controls that satisfy multiple frameworks simultaneously rather than managing separate compliance programs for each regulation.
+
+## Key Takeaways
+
+- Major regulatory frameworks (SOX, GDPR, PCI DSS, HIPAA, ISO 27001, NIST) share common IAM requirements: unique user IDs, access control, least privilege, certification, SoD, PAM, MFA, audit trails, and timely account removal
+- Each framework has unique requirements — SOX focuses on financial controls, GDPR on privacy and consent, PCI DSS on cardholder data security, HIPAA on health information, ISO 27001 on ISMS, and NIST on comprehensive security
+- A single well-designed IAM control can satisfy requirements from multiple frameworks simultaneously — design for overlap to reduce compliance burden
+- The most common IAM requirement across ALL frameworks is "regular access review" — build a strong certification program as the foundation of your compliance strategy
+- Identify which frameworks apply to your organisation and build a unified control framework that addresses all applicable requirements rather than managing separate programs
