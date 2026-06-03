@@ -1,9 +1,9 @@
 import type { DocsSiteData } from "../types/configDataTypes";
 
 const docsSiteData: DocsSiteData = {
-  title: "IAM & PAM Professional",
+  title: "Tech Courses Platform",
   description:
-    "Master Identity and Access Management and Privileged Access Management. A comprehensive course covering IAM fundamentals, authentication, authorization, PAM, governance, compliance, and deployment.",
+    "A comprehensive learning platform covering IAM & PAM, full stack development, Python, cloud engineering, cybersecurity, data science, DevOps, and mobile app development.",
   navSocials: [
     // {
     //   social: "GitHub",
@@ -36,7 +36,7 @@ const docsSiteData: DocsSiteData = {
   // default image for meta tags if the page doesn't have an image already
   defaultImage: {
     src: "/images/solstice.jpg",
-    alt: "IAM & PAM Professional",
+    alt: "Tech Courses Platform",
   },
   // Your information for SEO purposes
   author: {

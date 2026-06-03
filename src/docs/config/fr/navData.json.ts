@@ -7,17 +7,41 @@ import { type navItem } from "../types/configDataTypes";
 
 const navConfig: navItem[] = [
   {
-    text: "Aperçu du Cours",
-    link: "/learn/iam-pam-professional/",
-  },
-  {
-    text: "Modules",
-    link: "/learn/iam-fundamentals/",
-  },
-  {
-    text: "Obtenir Solstice",
-    link: "https://cosmicthemes.com/themes/solstice",
-    newTab: true,
+    text: "Cours",
+    items: [
+      {
+        text: "IAM & PAM Professional",
+        link: "/learn/iam-pam-professional/",
+      },
+      {
+        text: "Développement Web Full Stack",
+        link: "/learn/full-stack-development/",
+      },
+      {
+        text: "Programmation Python",
+        link: "/learn/python-programming/",
+      },
+      {
+        text: "Ingénierie Cloud",
+        link: "/learn/cloud-engineering/",
+      },
+      {
+        text: "Cybersécurité",
+        link: "/learn/cybersecurity/",
+      },
+      {
+        text: "Science des Données & ML",
+        link: "/learn/data-science-ml/",
+      },
+      {
+        text: "DevOps & CI/CD",
+        link: "/learn/devops-cicd/",
+      },
+      {
+        text: "Développement Mobile",
+        link: "/learn/mobile-app-development/",
+      },
+    ],
   },
 ];
 

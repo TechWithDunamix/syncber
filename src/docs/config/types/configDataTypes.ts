@@ -30,7 +30,15 @@ export interface navLinkItem {
   newTab?: boolean; // adds target="_blank" rel="noopener noreferrer" to link
 }
 
-export type navItem = navLinkItem;
+export interface navDropdownItem {
+  text: string;
+  /** Array of dropdown link items */
+  items: navLinkItem[];
+  /** Optional icon name for the dropdown trigger */
+  icon?: string;
+}
+
+export type navItem = navLinkItem | navDropdownItem;
 
 // --------------------------------------------------------
 // site settings types

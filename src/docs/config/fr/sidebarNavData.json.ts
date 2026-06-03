@@ -1,12 +1,9 @@
 import type { DocsSidebarNavData } from "../types/configDataTypes";
 
-/**
- * Combined sidebar navigation data for the French locale
- */
 const sidebarNavData: DocsSidebarNavData = {
   tabs: [
     {
-      id: "main",
+      id: "iam-pam-professional",
       title: "IAM & PAM Professional",
       description: "Modules du cours",
       icon: "tabler/file-text",
@@ -38,6 +35,174 @@ const sidebarNavData: DocsSidebarNavData = {
         {
           id: "architecture-deployment",
           title: "Architecture & Déploiement",
+        },
+      ],
+    },
+    {
+      id: "full-stack-development",
+      title: "Développement Web Full Stack",
+      description: "Construisez des applications web modernes",
+      icon: "tabler/code",
+      sections: [
+        {
+          id: "full-stack-development",
+          title: "Aperçu du Cours",
+        },
+        {
+          id: "frontend-basics",
+          title: "Bases du Frontend",
+        },
+        {
+          id: "backend-development",
+          title: "Développement Backend",
+        },
+        {
+          id: "databases",
+          title: "Bases de Données & API",
+        },
+      ],
+    },
+    {
+      id: "python-programming",
+      title: "Programmation Python",
+      description: "Maîtrisez Python du débutant à l'avancé",
+      icon: "tabler/brand-python",
+      sections: [
+        {
+          id: "python-programming",
+          title: "Aperçu du Cours",
+        },
+        {
+          id: "python-basics",
+          title: "Bases de Python",
+        },
+        {
+          id: "python-intermediate",
+          title: "Python Intermédiaire",
+        },
+        {
+          id: "python-advanced",
+          title: "Python Avancé",
+        },
+      ],
+    },
+    {
+      id: "cloud-engineering",
+      title: "Ingénierie Cloud",
+      description: "Concevez et gérez l'infrastructure cloud",
+      icon: "tabler/cloud",
+      sections: [
+        {
+          id: "cloud-engineering",
+          title: "Aperçu du Cours",
+        },
+        {
+          id: "cloud-fundamentals",
+          title: "Fondamentaux du Cloud",
+        },
+        {
+          id: "aws-services",
+          title: "Services AWS",
+        },
+        {
+          id: "azure-gcp",
+          title: "Azure & GCP",
+        },
+      ],
+    },
+    {
+      id: "cybersecurity",
+      title: "Cybersécurité",
+      description: "Protégez les systèmes et les données",
+      icon: "tabler/shield",
+      sections: [
+        {
+          id: "cybersecurity",
+          title: "Aperçu du Cours",
+        },
+        {
+          id: "security-fundamentals",
+          title: "Fondamentaux de la Sécurité",
+        },
+        {
+          id: "threat-detection",
+          title: "Détection & Réponse aux Menaces",
+        },
+        {
+          id: "security-tools",
+          title: "Outils et Pratiques de Sécurité",
+        },
+      ],
+    },
+    {
+      id: "data-science-ml",
+      title: "Science des Données & ML",
+      description: "Apprenez l'analyse de données et le machine learning",
+      icon: "tabler/chart-bar",
+      sections: [
+        {
+          id: "data-science-ml",
+          title: "Aperçu du Cours",
+        },
+        {
+          id: "data-analysis",
+          title: "Analyse de Données",
+        },
+        {
+          id: "machine-learning",
+          title: "Machine Learning",
+        },
+        {
+          id: "deep-learning",
+          title: "Deep Learning",
+        },
+      ],
+    },
+    {
+      id: "devops-cicd",
+      title: "DevOps & CI/CD",
+      description: "Automatisez et optimisez les pipelines de livraison",
+      icon: "tabler/infinity",
+      sections: [
+        {
+          id: "devops-cicd",
+          title: "Aperçu du Cours",
+        },
+        {
+          id: "devops-fundamentals",
+          title: "Fondamentaux DevOps",
+        },
+        {
+          id: "cicd-pipelines",
+          title: "Pipelines CI/CD",
+        },
+        {
+          id: "containerization",
+          title: "Conteneurisation & Orchestration",
+        },
+      ],
+    },
+    {
+      id: "mobile-app-development",
+      title: "Développement Mobile",
+      description: "Créez des applications iOS et Android",
+      icon: "tabler/device-mobile",
+      sections: [
+        {
+          id: "mobile-app-development",
+          title: "Aperçu du Cours",
+        },
+        {
+          id: "mobile-fundamentals",
+          title: "Fondamentaux du Mobile",
+        },
+        {
+          id: "cross-platform",
+          title: "Développement Cross-Platform",
+        },
+        {
+          id: "native-development",
+          title: "Développement Natif",
         },
       ],
     },

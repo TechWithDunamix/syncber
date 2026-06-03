@@ -7,6 +7,7 @@ import { defineConfig } from "astro/config";
 import AutoImport from "astro-auto-import";
 import expressiveCode, { createInlineSvgUrl } from "astro-expressive-code";
 import icon from "astro-icon";
+import remarkMermaid from "./src/docs/plugins/remark-mermaid.mjs";
 
 // tabler icons "clipboard-check"
 const copySvg = createInlineSvgUrl(
@@ -15,6 +16,9 @@ const copySvg = createInlineSvgUrl(
 
 // https://astro.build/config
 export default defineConfig({
+  markdown: {
+    remarkPlugins: [remarkMermaid],
+  },
   site: "https://solstice.cosmicthemes.com",
   // i18n configuration must match src/docs/config/translationData.json.ts
   i18n: {
@@ -39,6 +43,7 @@ export default defineConfig({
         "@/docs/components/mdx-components/TabsContent.astro",
         "@/docs/components/mdx-components/TabsList.astro",
         "@/docs/components/mdx-components/TabsTrigger.astro",
+        "@/docs/components/mdx-components/Mermaid.astro",
       ],
     }),
     expressiveCode({

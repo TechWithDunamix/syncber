@@ -33,6 +33,7 @@
     "astro-expressive-code": "0.41.3",
     "astro-icon": "1.1.5",
     "astro-seo": "0.8.4",
+    "mermaid": "^11.15.0",
     "motion": "12.23.9",
     "motion-on-scroll": "^1.0.0",
     "swiper": "11.2.10",

@@ -3,15 +3,12 @@
  * * This is both the mobile and desktop nav
  */
 import { getCollection } from "astro:content";
-import { Icon } from "astro-icon/components";
 
-import { getSectionTitle, processDocsBySection, processTabsContent } from "@/docs/js/docsUtils";
+import { getSectionTitle, processDocsBySection } from "@/docs/js/docsUtils";
 import { filterCollectionByLanguage } from "@/docs/js/localeUtils";
 import { getLocaleFromUrl } from "@/docs/js/localeUtils";
-import { slugify } from "@/docs/js/textUtils";
 import { getTranslatedData } from "@/docs/js/translationUtils";
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./sidebar-nav-tabs";
 import SidebarLink from "./SidebarLink.astro";
 
 interface Props {
@@ -20,22 +17,15 @@ interface Props {
 
 const { tabId = "main" } = Astro.props;
 const currLocale = getLocaleFromUrl(Astro.url);
-const sidebarData = getTranslatedData("sidebarNavData", currLocale);
-
-// Get localized documentation tabs based on current locale
-const sidebarTabs = sidebarData.tabs;
 
 // Get all non-draft docs
 const allDocs = await getCollection("docs", ({ data }) => {
   return data.draft !== true;
 });
 
-// Filter docs by locale and section
+// Filter docs by locale and the current tab (course)
 const filteredDocs = filterCollectionByLanguage(allDocs, currLocale);
 const tabFilteredDocs = filteredDocs.filter((doc) => doc.data.tab === tabId);
-
-// Process tab content using utility function
-const tabsContent = await processTabsContent(sidebarTabs, filteredDocs, currLocale);
 
 // Process documents by section for the current tab
 const { docsBySection, sections } = processDocsBySection(tabFilteredDocs, currLocale, tabId);
@@ -44,203 +34,26 @@ const { docsBySection, sections } = processDocsBySection(tabFilteredDocs, currLo
 <nav class="sidebar-nav space-y-8">
   <slot name="before-links" />
 
-  {/* Documentation Tabs Selector */}
-  {
-    sidebarTabs && sidebarTabs.length > 1 ? (
-      // syncKey="sidebar-nav"
-      <Tabs defaultValue={tabId} class="mr-4 mb-6">
-        <div class="relative rounded-lg border p-2">
-          <TabsList
-            aria-label="Documentation Sections"
-            class="flex flex-col space-y-1 bg-transparent p-0"
-          >
-            {sidebarTabs.map((section) => (
-              <TabsTrigger
-                value={section.id}
-                class="text-muted-foreground data-[state=inactive]:hover:text-foreground relative z-10 flex w-full justify-start gap-2 px-2 py-1.5 text-sm font-medium"
-              >
-                {section.icon && (
-                  <Icon name={section.icon} class="size-4 shrink-0" aria-hidden="true" />
-                )}
-                <span class="font-heading font-medium tracking-wide">{section.title}</span>
-                {section.description && <span class="sr-only">: {section.description}</span>}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-
-          {/* Animated tab indicator */}
-          <div
-            class="tab-indicator bg-accent/10 absolute top-0 left-0 rounded-sm transition-all duration-0 will-change-transform"
-            aria-hidden="true"
-          />
-        </div>
-
-        {/* Section Content */}
-        {tabsContent.map(({ id, sections, tabSections }) => (
-          <TabsContent value={id} class="mt-6">
-            {sections.map(
-              (section) =>
-                tabSections[section] &&
-                tabSections[section].length > 0 && (
-                  <details class="sidebar-section group" open>
-                    <summary class="font-heading mb-2 flex cursor-pointer items-center text-lg font-medium tracking-wide md:text-base">
-                      {getSectionTitle(section, id, currLocale)}
-                    </summary>
-                    <ul class="space-y-2 border-l">
-                      {tabSections[section].map((doc) => (
-                        <SidebarLink link={doc.link} text={doc.text} badge={doc.badge} />
-                      ))}
-                    </ul>
-                  </details>
-                ),
-            )}
-          </TabsContent>
-        ))}
-      </Tabs>
-    ) : (
-      <div>
-        {sections.map((section) => (
-          <details class="sidebar-section group" open>
-            <summary class="font-heading mb-2 flex cursor-pointer items-center text-lg font-medium tracking-wide md:text-base">
-              {getSectionTitle(section, tabId, currLocale)}
-            </summary>
-            <ul class="space-y-2 border-l">
-              {docsBySection[section].map((doc) => (
-                <SidebarLink link={doc.link} text={doc.text} badge={doc.badge} />
-              ))}
-            </ul>
-          </details>
-        ))}
-      </div>
-    )
-  }
+  {/* Course Sidebar Content (no tab selector - each course has its own URL) */}
+  <div>
+    {sections.map((section) => (
+      <details class="sidebar-section group" open>
+        <summary class="font-heading mb-2 flex cursor-pointer items-center text-lg font-medium tracking-wide md:text-base">
+          {getSectionTitle(section, tabId, currLocale)}
+        </summary>
+        <ul class="space-y-2 border-l">
+          {docsBySection[section].map((doc) => (
+            <SidebarLink link={doc.link} text={doc.text} badge={doc.badge} />
+          ))}
+        </ul>
+      </details>
+    ))}
+  </div>
 
   <slot name="after-links" />
 </nav>
 
-<script>
-  function setupSidebarTabIndicators() {
-    // Find all sidebar nav instances
-    const sidebarNavs = document.querySelectorAll(".sidebar-nav");
 
-    if (!sidebarNavs.length) return;
-
-    // Set up each sidebar nav instance independently
-    sidebarNavs.forEach((nav) => {
-      const tabTriggers = nav.querySelectorAll("[data-tabs-trigger]");
-      const indicator = nav.querySelector(".tab-indicator") as HTMLElement;
-
-      if (!indicator || tabTriggers.length === 0) return;
-
-      // Check if this nav is inside a dialog
-      const parentDialog = nav.closest("dialog");
-      const isInDialog = !!parentDialog;
-
-      /**
-       * Moves the indicator behind the provided tab trigger with animation.
-       */
-      function positionIndicator(activeTab: Element) {
-        if (!activeTab || !indicator) return;
-
-        const rect = activeTab.getBoundingClientRect();
-        const parentRect = indicator.parentElement?.getBoundingClientRect();
-
-        if (!parentRect) return;
-
-        // Ensure we have valid dimensions (Safari fix)
-        if (rect.width === 0 || rect.height === 0) {
-          // Element not yet rendered, try again later
-          setTimeout(() => positionIndicator(activeTab), 10);
-          return;
-        }
-
-        // Set the indicator position and size - for vertical tabs
-        indicator.style.width = `${rect.width}px`;
-        indicator.style.height = `${rect.height}px`;
-        indicator.style.left = `${rect.left - parentRect.left}px`;
-        indicator.style.top = `${rect.top - parentRect.top}px`;
-      }
-
-      /**
-       * Initialize the indicator for the active tab
-       */
-      function initializeIndicator() {
-        const initiallySelected = Array.from(tabTriggers).find(
-          (trigger) => trigger.getAttribute("data-state") === "active",
-        );
-
-        if (initiallySelected) {
-          positionIndicator(initiallySelected);
-          // Enable animation after positioning (another 10ms delay)
-          setTimeout(() => {
-            indicator.classList.remove("duration-0");
-            indicator.classList.add("duration-300");
-          }, 10);
-        }
-      }
-
-      // For navs in dialogs, wait until dialog is opened
-      if (isInDialog) {
-        // Watch for dialog[open] attribute
-        const dialogObserver = new MutationObserver((mutations) => {
-          mutations.forEach((mutation) => {
-            if (
-              mutation.type === "attributes" &&
-              mutation.attributeName === "open" &&
-              (parentDialog as HTMLDialogElement).open
-            ) {
-              initializeIndicator();
-            }
-          });
-        });
-
-        dialogObserver.observe(parentDialog, { attributes: true });
-
-        // Also initialize on dialog show event as a backup
-        parentDialog.addEventListener("show", initializeIndicator);
-      } else {
-        // Regular initialization for navs not in dialogs
-        // Delay positioning to ensure layout is stable in Safari
-        setTimeout(() => {
-          initializeIndicator();
-        }, 10);
-      }
-
-      // Set up a MutationObserver to detect data-state changes
-      const tabStateObserver = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-          if (
-            mutation.type === "attributes" &&
-            mutation.attributeName === "data-state" &&
-            (mutation.target as Element).getAttribute("data-state") === "active"
-          ) {
-            positionIndicator(mutation.target as Element);
-            // Ensure animation is enabled for state changes
-            if (indicator.classList.contains("duration-0")) {
-              indicator.classList.remove("duration-0");
-              indicator.classList.add("duration-300");
-            }
-          }
-        });
-      });
-
-      // Observe all tab triggers for data-state attribute changes
-      tabTriggers.forEach((trigger) => {
-        tabStateObserver.observe(trigger, { attributes: true, attributeFilter: ["data-state"] });
-      });
-
-      // Handle window resize for this specific nav instance
-      window.addEventListener("resize", () => {
-        const currentActive = nav.querySelector('[data-tabs-trigger][data-state="active"]');
-        if (currentActive) positionIndicator(currentActive);
-      });
-    });
-  }
-
-  // Initialize on page load and after Astro view transitions
-  window.addEventListener("load", setupSidebarTabIndicators);
-  document.addEventListener("astro:after-swap", setupSidebarTabIndicators);
-</script>
 
 <style>
   /* Sidebar section dropdown styles */
