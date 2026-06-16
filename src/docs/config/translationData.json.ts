@@ -52,14 +52,14 @@ export const dataTranslations = {
  */
 export const textTranslations = {
   en: {
-    hero_title: "IAM & PAM Professional",
-    hero_description: `Master Identity and Access Management and Privileged Access Management. A comprehensive course covering IAM fundamentals, authentication, authorization, PAM, governance, compliance, and deployment.`,
+    hero_title: "Skill Up with Skillber",
+    hero_description: `Master in-demand tech skills with expert-led courses in cybersecurity, cloud engineering, full stack development, Python, DevOps, and more. Hands-on labs, real-world projects, and career-focused learning.`,
     back_to_all_posts: "Back to all posts",
   },
   fr: {
-    hero_title: "IAM & PAM Professional",
+    hero_title: "Skill Up with Skillber",
     hero_description:
-      "Maîtrisez la Gestion des Identités et des Accès et la Gestion des Accès Privilégiés. Un cours complet couvrant les fondamentaux de l'IAM, l'authentification, l'autorisation, le PAM, la gouvernance, la conformité et le déploiement.",
+      "Maîtrisez les compétences tech les plus demandées avec des cours conçus par des experts en cybersécurité, cloud computing, développement full stack, Python, DevOps et plus. Labs pratiques, projets concrets et formation orientée carrière.",
     back_to_all_posts: "Retour à tous les articles",
   },
 } as const;

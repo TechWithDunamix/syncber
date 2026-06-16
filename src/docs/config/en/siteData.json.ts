@@ -1,9 +1,9 @@
 import type { DocsSiteData } from "../types/configDataTypes";
 
 const docsSiteData: DocsSiteData = {
-  title: "Tech Courses Platform",
+  title: "Skillber",
   description:
-    "A comprehensive learning platform covering IAM & PAM, full stack development, Python, cloud engineering, cybersecurity, data science, DevOps, and mobile app development.",
+    "A comprehensive skill-building platform covering IAM & PAM, cybersecurity, full stack development, Python, cloud engineering, data science, DevOps, and mobile app development.",
   navSocials: [
     // {
     //   social: "GitHub",
@@ -35,8 +35,8 @@ const docsSiteData: DocsSiteData = {
   ],
   // default image for meta tags if the page doesn't have an image already
   defaultImage: {
-    src: "/images/solstice.jpg",
-    alt: "Tech Courses Platform",
+    src: "/images/skillber.jpg",
+    alt: "Skillber",
   },
   // Your information for SEO purposes
   author: {

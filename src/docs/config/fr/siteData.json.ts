@@ -1,7 +1,7 @@
 import type { DocsSiteData } from "../types/configDataTypes";
 
 const docsSiteData: DocsSiteData = {
-  title: "IAM & PAM Professional",
+  title: "Skillber",
   description:
     "Maîtrisez la Gestion des Identités et des Accès et la Gestion des Accès Privilégiés. Un cours complet couvrant les fondamentaux de l'IAM, l'authentification, l'autorisation, le PAM, la gouvernance, la conformité et le déploiement.",
   navSocials: [
@@ -34,8 +34,8 @@ const docsSiteData: DocsSiteData = {
     },
   ],
   defaultImage: {
-    src: "/images/solstice.jpg",
-    alt: "IAM & PAM Professional",
+    src: "/images/skillber.jpg",
+    alt: "Skillber",
   },
   author: {
     name: "Cosmic Themes",

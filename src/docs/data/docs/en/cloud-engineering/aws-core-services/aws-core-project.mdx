@@ -183,7 +183,7 @@ variable "aws_region" {
 variable "project_name" {
   description = "Project name used for resource naming"
   type        = string
-  default     = "solstice-webapp"
+  default     = "skillber-webapp"
 }
 
 variable "instance_type" {
@@ -215,9 +215,9 @@ aws s3 sync s3://${s3_bucket}/ /var/www/html/
 cat > /var/www/html/index.html << EOF
 <!DOCTYPE html>
 <html>
-<head><title>Solstice Web App</title></head>
+<head><title>Skillber Web App</title></head>
 <body>
-<h1>Welcome to Solstice</h1>
+<h1>Welcome to Skillber</h1>
 <p>Deployed via Terraform with EC2 + S3 + IAM</p>
 <p>Server: $(hostname -f)</p>
 </body>
