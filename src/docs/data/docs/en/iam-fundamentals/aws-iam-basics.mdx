@@ -1,0 +1,829 @@
+---
+title: "AWS IAM — Hands-On Practical Guide"
+description: "Complete hands-on guide to AWS Identity and Access Management. Covers AWS free tier setup, IAM users/groups/roles/policies, policy JSON structure, CLI configuration, least privilege enforcement, and production best practices."
+sidebar:
+  order: 9
+  label: "AWS IAM Practical"
+tab: "iam-pam-professional"
+---
+
+AWS IAM (Identity and Access Management) is the most widely deployed IAM system in the world. Every AWS resource — from a simple S3 bucket to a global Kubernetes cluster — is secured through IAM. As an IAM professional, you **must** understand IAM policy syntax, role trust relationships, and least privilege patterns. This is not optional.
+
+This guide gives you a real AWS IAM environment to practise with. You will create users, groups, policies, and roles in a live AWS account using the free tier.
+
+<Aside variant="info" title="Prerequisites">
+No prior AWS experience needed. You need:
+- A credit card for AWS account verification (you will not be charged if you stay within free tier limits)
+- A web browser
+- 2-3 hours for the full guide
+</Aside>
+
+## What You Will Build
+
+```
+AWS Account (Root)
+│
+├── IAM User: admin (your admin user — MFA enabled)
+│   └── Group: Admins
+│       └── Policy: AdministratorAccess (attached to group)
+│
+├── IAM User: alice (developer)
+│   └── Group: Developers
+│       └── Policy: custom-dev-policy (S3 + EC2 read-only)
+│
+├── IAM User: bob (ops)
+│   └── Group: Operators
+│       └── Policy: custom-ops-policy (EC2 full + S3 read-only)
+│
+├── IAM Role: EC2-S3-ReadOnly (for EC2 instances to read S3)
+│   └── Trust Policy: ec2.amazonaws.com
+│   └── Permissions: AmazonS3ReadOnlyAccess
+│
+└── IAM Role: CrossAccount-Audit (for trusted account)
+    └── Trust Policy: {Account ID of trusted account}
+    └── Permissions: AWSCloudTrailReadOnlyAccess
+```
+
+## Step 1: Create an AWS Account
+
+<Steps>
+
+### Sign Up for AWS
+
+1. Open a browser and go to **https://aws.amazon.com/free**
+2. Click **Create a Free Account**
+3. Fill in:
+   - **Email address**: Use a personal email (not work)
+   - **AWS account name**: `iam-lab-<your-initials>` (e.g., `iam-lab-aj`)
+   - **Root user email**: Same as above
+4. Click **Verify email address** — AWS will send a verification code
+5. Enter the verification code
+6. Create a strong password for the root account
+7. Choose **Business** account type (even for personal — required for some features)
+8. Fill in your contact information
+9. Enter payment information — AWS requires a credit card for verification
+   - You will **not be charged** if you stay within free tier limits
+   - A temporary $1 hold may appear for verification
+10. Verify your identity via SMS or phone call
+11. Choose the **Free Tier** support plan
+12. Click **Complete sign-up**
+
+<Aside variant="tip" title="AWS Free Tier Limits">
+The AWS Free Tier includes:
+- 5 GB S3 storage (12 months)
+- 750 hours EC2 t2.micro per month (12 months)
+- 1 million IAM requests per month (no time limit)
+- 10 CloudWatch alarms (no time limit)
+The IAM operations in this guide are **completely free** and do not count toward any limit.
+</Aside>
+
+### Secure the Root Account
+
+The root user has unrestricted access to everything. **You will never use the root user for daily work**, but you need it for initial setup.
+
+1. After login, go to the **IAM Dashboard**: https://console.aws.amazon.com/iam/
+2. You should see a security alert: **"Activate MFA on your root account"**
+3. Click **Add MFA** → **Activate**
+4. Choose **Authenticator app**
+5. Scan the QR code with Google Authenticator, Authy, or 1Password
+6. Enter two consecutive OTP codes to verify
+7. Click **Assign**
+
+<Aside variant="danger" title="Root Account Security">
+The root user has **unrestricted access** to every AWS resource and billing. Follow these rules:
+1. Enable MFA on the root account immediately (done above)
+2. Never create access keys for the root user
+3. Never use the root user for daily operations
+4. Store the root account email and password in a secure password manager
+5. Only use the root user for: account-level settings, billing, IAM admin user creation, and AWS support cases
+</Aside>
+
+### Create Your Admin User
+
+You need a day-to-day admin user with MFA. You will create this as the first IAM user.
+
+1. In the IAM Console, click **Users** in the left sidebar
+2. Click **Create user**
+3. **User name**: `admin`
+4. ☑ **Provide user access to the AWS Management Console**
+5. ☑ **I want to create an IAM user**
+6. **Console password**: ☑ **Custom password** → enter a strong password (e.g., `Admin!AWS2026`)
+7. ☑ **Users must create a new password at next sign-in** (recommended)
+8. Click **Next**
+
+9. **Permissions options**: ☑ **Add user to group**
+10. Click **Create group**
+11. **Group name**: `Admins`
+12. In the policy search box, type **AdministratorAccess**
+13. ☑ Check **AdministratorAccess**
+14. Click **Create group**
+15. Click **Next**
+
+16. **Review**: Verify the user has `AdministratorAccess` via the `Admins` group
+17. Click **Create user**
+
+18. **Success!** Copy the **Console sign-in URL** — it looks like:
+    `https://<your-account-id>.signin.aws.amazon.com/console`
+    Save this URL — you will use it to log in as `admin` instead of root.
+
+19. **Download the CSV** with credentials (optional) or note the password
+20. Click **Return to users list**
+
+21. Click on the **admin** user
+22. Go to the **Security credentials** tab
+23. Under **Assign MFA device** → **Assign MFA**
+24. Choose **Authenticator app** → scan QR code → enter two codes → **Add**
+25. Sign out of the root account
+
+### Test Admin Access
+
+1. Open a private/incognito browser window
+2. Go to the sign-in URL you saved earlier: `https://<your-account-id>.signin.aws.amazon.com/console`
+3. Sign in as:
+   - **Account ID**: Your 12-digit AWS account number
+   - **Username**: `admin`
+   - **Password**: The password you set
+4. You will be prompted to set a new password — do so
+5. You will be prompted for MFA — scan the QR code with your authenticator app again (different from root's MFA)
+6. You should now be in the AWS Console as **admin** user
+7. To verify: click the top-right menu — it should say **admin @ `account-id`**
+
+</Steps>
+
+## Step 2: Understand the IAM Policy Language
+
+IAM policies are JSON documents that define permissions. Every AWS permission decision starts with a policy evaluation. This is the single most important skill to learn in AWS IAM.
+
+### Policy Structure
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["s3:ListBucket", "s3:GetObject"],
+      "Resource": "arn:aws:s3:::my-bucket/*",
+      "Condition": {
+        "IpAddress": {
+          "aws:SourceIp": "203.0.113.0/24"
+        }
+      }
+    }
+  ]
+}
+```
+
+| Element | Purpose | Required | Example |
+|---------|---------|----------|---------|
+| **Version** | Policy language version | Yes | `"2012-10-17"` (always use this) |
+| **Statement** | Array of permission statements | Yes | `[{ ... }, { ... }]` |
+| **Effect** | Allow or Deny | Yes | `"Allow"` or `"Deny"` |
+| **Action** | AWS API actions to permit/deny | Yes | `"s3:ListBucket"`, `"ec2:*"` |
+| **Resource** | Which resources the action applies to | Yes | `"arn:aws:s3:::my-bucket/*"` |
+| **Condition** | When the policy applies (context) | No | IP range, time, MFA status, tags |
+
+### Action Patterns
+
+Actions follow the format: `service:Operation`
+
+```json
+{
+  "Effect": "Allow",
+  "Action": [
+    "s3:ListAllMyBuckets",     // Single specific action
+    "s3:ListBucket",           // Another single action
+    "s3:GetObject",            // Another single action
+    "ec2:Describe*",           // Wildcard — all Describe actions for EC2
+    "s3:*",                    // Wildcard — ALL S3 actions
+    "*"                        // Wildcard — ALL AWS actions (dangerous)
+  ],
+  "Resource": "*"
+}
+```
+
+### Resource ARN Patterns
+
+ARNs (Amazon Resource Names) uniquely identify AWS resources:
+
+```
+arn:partition:service:region:account-id:resource-type/resource-id
+arn:aws:s3:::my-bucket                    # S3 bucket (no region, no account needed)
+arn:aws:s3:::my-bucket/*                  # All objects in a bucket
+arn:aws:ec2:us-east-1:123456789012:instance/*  # All EC2 instances in us-east-1
+arn:aws:iam::123456789012:user/alice      # Specific IAM user
+arn:aws:*                                 # Everything (wildcard)
+```
+
+### Condition Keys
+
+Conditions add context to permissions:
+
+```json
+{
+  "Effect": "Deny",
+  "Action": "s3:*",
+  "Resource": "*",
+  "Condition": {
+    "Bool": { "aws:MultiFactorAuthPresent": "false" }
+  }
+}
+```
+
+This denies ALL S3 actions if the user did not authenticate with MFA.
+
+Common condition keys:
+
+| Condition Key | Purpose | Example |
+|--------------|---------|---------|
+| `aws:SourceIp` | Restrict to IP range | `"IpAddress": { "aws:SourceIp": "10.0.0.0/8" }` |
+| `aws:MultiFactorAuthPresent` | Require MFA | `"Bool": { "aws:MultiFactorAuthPresent": "true" }` |
+| `aws:RequestedRegion` | Restrict to regions | `"StringEquals": { "aws:RequestedRegion": "us-east-1" }` |
+| `aws:PrincipalOrgId` | Restrict to AWS Org | `"StringEquals": { "aws:PrincipalOrgID": "o-xxxxxxx" }` |
+| `iam:PassedToService` | Limit role trust | `"StringEquals": { "iam:PassedToService": "ec2.amazonaws.com" }` |
+| `s3:prefix` | Limit S3 path | `"StringLike": { "s3:prefix": "project-a/*" }` |
+
+## Step 3: Create IAM Groups and Attach Policies
+
+Groups are the primary mechanism for managing permissions at scale. You assign policies to groups, and add users to groups.
+
+<Steps>
+
+### Create the Developers Group
+
+1. In the IAM Console, click **User groups** → **Create group**
+2. **Group name**: `Developers`
+3. **Attach policies** — search for and check:
+   - `AmazonS3ReadOnlyAccess` (read S3 buckets and objects)
+   - `AmazonEC2ReadOnlyAccess` (list and describe EC2 resources)
+4. Click **Create group**
+
+### Create the Operators Group
+
+1. Click **Create group** again
+2. **Group name**: `Operators`
+3. **Attach policies**:
+   - `AmazonEC2FullAccess` (full control of EC2)
+   - `AmazonS3ReadOnlyAccess` (read S3 — operators can view logs)
+4. Click **Create group**
+
+### Create a Custom Policy
+
+AWS managed policies are generic. You will often need custom policies tailored to your environment.
+
+1. Click **Policies** → **Create policy**
+2. Switch to the **JSON** tab
+3. Paste this policy:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "S3ReadWriteSpecificBucket",
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListBucket",
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::iam-lab-bucket-<your-initials>",
+        "arn:aws:s3:::iam-lab-bucket-<your-initials>/*"
+      ]
+    },
+    {
+      "Sid": "DenyOutsideBusinessHours",
+      "Effect": "Deny",
+      "Action": "s3:*",
+      "Resource": "*",
+      "Condition": {
+        "DateGreaterThanIfExists": {
+          "aws:CurrentTime": "2026-12-31T18:00:00Z"
+        }
+      }
+    }
+  ]
+}
+```
+
+4. Click **Next**
+5. **Policy name**: `Lab-S3-Bucket-Access`
+6. **Description**: `Read/write access to lab bucket only`
+7. Click **Create policy**
+
+### Create Users and Assign to Groups
+
+1. Go to **Users** → **Create user**
+2. **User name**: `alice`
+3. ☑ **Provide user access to the AWS Management Console**
+4. ☑ **I want to create an IAM user**
+5. Set a password (e.g., `Alice!IAM2026`)
+6. Click **Next**
+7. **Permissions**: ☑ **Add user to group**
+8. Check the **Developers** group
+9. Click **Next** → **Create user**
+
+10. Repeat for `bob`:
+    - Username: `bob`
+    - Password: `Bob!IAM2026`
+    - Group: **Operators**
+
+11. Note: Download or record the sign-in URLs for both users.
+
+</Steps>
+
+## Step 4: Create and Assume IAM Roles
+
+Roles are the most powerful and most misunderstood IAM concept. Unlike users (which are permanent identities), roles are **assumed** temporarily. Roles enable:
+- EC2 instances to access S3 without stored credentials
+- Lambda functions to access DynamoDB
+- Cross-account access
+- Federated user access (SSO)
+
+### How Roles Work
+
+```
+User/Service                    AWS STS                        Target Resource
+     │                            │                                │
+     │  1. Call AssumeRole        │                                │
+     │──────────────────────────►│                                │
+     │                            │                                │
+     │  2. Validate trust policy  │                                │
+     │  3. Generate temp          │                                │
+     │     credentials            │                                │
+     │◄──────────────────────────│                                │
+     │                            │                                │
+     │  4. Use temp credentials   │                                │
+     │  5. Access resource        │                                │
+     │──────────────────────────────────────────────────────────►│
+     │                            │                                │
+     │  6. Credentials expire     │                                │
+     │     (15min - 12hr)         │                                │
+```
+
+### Create an EC2 Role for S3 Access
+
+1. Go to **Roles** → **Create role**
+2. **Trusted entity type**: ☑ **AWS service**
+3. **Use case**: **EC2** (EC2 will assume this role)
+4. Click **Next**
+5. **Permissions**: Search for `AmazonS3ReadOnlyAccess` → check it
+6. Click **Next**
+7. **Role name**: `EC2-S3-ReadOnly`
+8. **Description**: `Grants EC2 instances read-only access to S3`
+9. Click **Create role**
+
+### Examine the Trust Policy
+
+Click on the `EC2-S3-ReadOnly` role and go to the **Trust relationships** tab:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "ec2.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+```
+
+<Aside variant="tip" title="Understanding Trust Policies">
+The trust policy defines **who can assume the role**. In this case, the EC2 service (`ec2.amazonaws.com`) is allowed to call `sts:AssumeRole`. The permissions policy defines **what they can do after assuming it** (S3 read-only). These are two separate documents that together define the role's full access.
+
+If you delete the trust policy, the role becomes unusable — no one can assume it, even though the permissions policy still exists.
+</Aside>
+
+### Create a Cross-Account Audit Role
+
+This role allows a trusted external account to read CloudTrail logs (common for auditors).
+
+1. Click **Create role**
+2. **Trusted entity type**: ☑ **Another AWS account**
+3. **Account ID**: Enter your own account ID (for testing) — in production, this would be the auditor's account ID
+4. ☑ **Require MFA** (best practice for cross-account roles)
+5. Click **Next**
+6. **Permissions**: Search for `AWSCloudTrailReadOnlyAccess` → check it
+7. Click **Next**
+8. **Role name**: `CrossAccount-Audit`
+9. Click **Create role**
+
+## Step 5: Set Up the AWS CLI
+
+The AWS CLI is how you (and automated systems) interact with AWS programmatically. Understanding CLI configuration and credential management is essential.
+
+<Steps>
+
+### Install the AWS CLI
+
+```bash
+# Linux (Ubuntu/Debian)
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+
+# macOS
+curl "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "AWSCLIV2.pkg"
+sudo installer -pkg AWSCLIV2.pkg -target /
+
+# Windows (PowerShell as Administrator)
+msiexec.exe /i https://awscli.amazonaws.com/AWSCLIV2.msi
+
+# Verify installation
+aws --version
+# Expected: aws-cli/2.x.x ...
+```
+
+### Create an Access Key for CLI
+
+1. In the IAM Console, go to **Users** → **admin** → **Security credentials** tab
+2. Under **Access keys**, click **Create access key**
+3. Use case: **Command Line Interface (CLI)**
+4. ☑ **I understand the above recommendation and want to proceed**
+5. Click **Next** → **Create access key**
+6. **IMPORTANT**: Copy the **Access Key ID** and **Secret Access Key**
+   - Store them in a password manager or download the CSV
+   - **You will not see the secret key again**
+
+<Aside variant="danger" title="Access Key Security">
+Access keys are **permanent credentials** — treat them like passwords:
+- Never share them
+- Never commit them to source code (use environment variables or AWS Secrets Manager)
+- Rotate them regularly (every 90 days maximum)
+- Delete unused access keys
+- Use `aws:SourceIp` conditions to restrict where keys can be used
+- Monitor for key usage in CloudTrail
+</Aside>
+
+### Configure the CLI
+
+```bash
+# Configure the default profile
+aws configure
+
+# AWS Access Key ID [None]: <paste your access key ID>
+# AWS Secret Access Key [None]: <paste your secret access key>
+# Default region name [None]: us-east-1
+# Default output format [None]: json
+
+# Verify the configuration
+aws sts get-caller-identity
+# Expected:
+# {
+#     "UserId": "AIDAxxxxxxxxxxxx",
+#     "Account": "123456789012",
+#     "Arn": "arn:aws:iam::123456789012:user/admin"
+# }
+```
+
+### Create Named Profiles for Other Users
+
+```bash
+# Configure alice's profile
+aws configure --profile alice
+# Enter alice's access key and secret key
+# Region: us-east-1
+# Output: json
+
+# Configure bob's profile
+aws configure --profile bob
+# Enter bob's access key and secret key
+# Region: us-east-1
+# Output: json
+
+# Test each profile
+aws sts get-caller-identity --profile alice
+aws sts get-caller-identity --profile bob
+```
+
+</Steps>
+
+## Step 6: Test Permissions End-to-End
+
+Now test what each user can and cannot do.
+
+### Test as Alice (Developer — S3 + EC2 read-only)
+
+```bash
+# Alice can list S3 buckets (allowed by S3ReadOnlyAccess)
+aws s3 ls --profile alice
+# Expected: Lists buckets (may be empty — that is OK)
+
+# Alice can describe EC2 instances (allowed by EC2ReadOnlyAccess)
+aws ec2 describe-instances --profile alice
+# Expected: Returns empty list (no instances running) — not an error
+
+# Alice CANNOT create an EC2 instance (not allowed)
+aws ec2 run-instances --image-id ami-xxx --instance-type t2.micro --profile alice
+# Expected: AccessDenied — "User is not authorized to perform this action"
+```
+
+### Test as Bob (Operator — EC2 full + S3 read-only)
+
+```bash
+# Bob can list S3 buckets (S3ReadOnlyAccess)
+aws s3 ls --profile bob
+# Expected: Lists buckets
+
+# Bob CAN create an EC2 instance (EC2FullAccess)
+aws ec2 run-instances \
+  --image-id resolve:ssm:/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2 \
+  --instance-type t2.micro \
+  --profile bob
+# Expected: Instance launches successfully (Bob has EC2FullAccess)
+
+# Note the InstanceId from the output, e.g., i-0123456789abcdef0
+INSTANCE_ID="i-0123456789abcdef0"  # Replace with your actual instance ID
+
+# Bob can terminate the instance
+aws ec2 terminate-instances --instance-ids $INSTANCE_ID --profile bob
+# Expected: Instance is terminating
+
+# Bob CANNOT create an S3 bucket (not in S3ReadOnlyAccess)
+aws s3 mb s3://bob-test-bucket-$(date +%s) --profile bob
+# Expected: AccessDenied
+```
+
+### Test the Custom Policy
+
+Create an S3 bucket and test Alice's access:
+
+```bash
+# As admin, create a bucket
+BUCKET="iam-lab-bucket-$(echo $RANDOM | md5sum | head -c 8)"
+aws s3 mb s3://$BUCKET
+
+# As admin, upload a test file
+echo "Hello AWS IAM" > test-file.txt
+aws s3 cp test-file.txt s3://$BUCKET/
+
+# Attach the custom Lab policy to Developers group
+# In the console: Policies → Lab-S3-Bucket-Access → Attach → Developers
+# OR via CLI:
+# But first we need the policy ARN:
+
+POLICY_ARN=$(aws iam list-policies --query 'Policies[?PolicyName==`Lab-S3-Bucket-Access`].Arn' --output text)
+aws iam attach-group-policy --group-name Developers --policy-arn $POLICY_ARN
+```
+
+```bash
+# Test as Alice — can she access the specific bucket?
+aws s3 ls s3://$BUCKET --profile alice
+# Expected: Lists the file (Lab policy grants access to this specific bucket)
+
+# Test as Alice — can she access ANY other bucket?
+aws s3 ls --profile alice
+# Expected: Still works (she still has AmazonS3ReadOnlyAccess from the group)
+```
+
+## Step 7: Test IAM Role Assumption
+
+<Steps>
+
+### Create an IAM User that Can Assume Roles
+
+1. Go to **Users** → **Create user**
+2. **User name**: `role-test`
+3. Provide console access with a password
+4. Attach the `IAMFullAccess` policy directly (so they can manage roles too)
+5. Create the user
+
+### Add AssumeRole Permission to the User
+
+The user needs permission to call `sts:AssumeRole`. Attach an inline policy:
+
+1. Go to **Users** → **role-test** → **Permissions** → **Add permissions** → **Create inline policy**
+2. Switch to JSON and paste:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "sts:AssumeRole",
+      "Resource": "arn:aws:iam::*:role/EC2-S3-ReadOnly"
+    }
+  ]
+}
+```
+
+3. **Policy name**: `Assume-EC2-S3-Role`
+4. Click **Create policy**
+
+### Assume the Role
+
+```bash
+# Configure the role-test user's CLI profile (create access key first)
+aws configure --profile role-test
+
+# Try to list S3 buckets WITHOUT the role (should fail if role-test has no S3 perms)
+aws s3 ls --profile role-test
+# Expected: AccessDenied
+
+# Assume the EC2-S3-ReadOnly role
+ROLE_ARN="arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):role/EC2-S3-ReadOnly"
+ASSUMED_ROLE=$(aws sts assume-role \
+  --role-arn $ROLE_ARN \
+  --role-session-name "test-session" \
+  --profile role-test)
+
+# Extract temporary credentials
+export AWS_ACCESS_KEY_ID=$(echo $ASSUMED_ROLE | jq -r '.Credentials.AccessKeyId')
+export AWS_SECRET_ACCESS_KEY=$(echo $ASSUMED_ROLE | jq -r '.Credentials.SecretAccessKey')
+export AWS_SESSION_TOKEN=$(echo $ASSUMED_ROLE | jq -r '.Credentials.SessionToken')
+
+# Now list S3 buckets using the TEMPORARY role credentials
+aws sts get-caller-identity
+# Expected:
+# {
+#     "UserId": "AROAxxxxxxxxx:test-session",    <-- note: role, not user!
+#     "Account": "123456789012",
+#     "Arn": "arn:aws:sts::123456789012:assumed-role/EC2-S3-ReadOnly/test-session"
+# }
+
+aws s3 ls
+# Expected: Lists buckets (S3 read-only via the role)
+
+# The credentials expire (default: 1 hour)
+# After expiry, you need to call assume-role again
+```
+
+</Steps>
+
+<Aside variant="tip" title="When to Use Roles vs Users">
+| Scenario | Use | Reason |
+|----------|-----|--------|
+| Human admins | **User** (with MFA) | Persistent identity, audit trail tied to person |
+| Application on EC2 | **EC2 Role** | No hardcoded credentials, automatic rotation |
+| Lambda function | **Lambda Role** | Same — temporary credentials per invocation |
+| Cross-account access | **Role** | Trust policy controls who can assume |
+| CI/CD pipeline | **Role** (with OIDC provider) | No long-lived access keys |
+| Mobile app | **Cognito Identity Pool roles** | Temporary, scoped, federated identities |
+</Aside>
+
+## Step 8: IAM Best Practices
+
+### The Least Privilege Mindset
+
+Every IAM decision should start with: **"What is the minimum permission needed for this task?"**
+
+```json
+// BAD — too permissive
+{
+  "Effect": "Allow",
+  "Action": "s3:*",
+  "Resource": "*"
+}
+
+// GOOD — scoped
+{
+  "Effect": "Allow",
+  "Action": ["s3:GetObject", "s3:ListBucket"],
+  "Resource": "arn:aws:s3:::specific-bucket/*"
+}
+```
+
+### Use IAM Access Analyzer
+
+AWS IAM Access Analyzer helps identify resources shared with external entities:
+
+```bash
+aws accessanalyzer create-analyzer --analyzer-name lab-analyzer --type ACCOUNT
+aws accessanalyzer list-findings --analyzer-arn arn:aws:access-analyzer:...
+```
+
+### Enable CloudTrail
+
+AWS CloudTrail records every API call for auditing:
+
+```bash
+aws cloudtrail create-trail --name iam-lab-trail --s3-bucket-name $BUCKET
+aws cloudtrail start-logging --name iam-lab-trail
+
+# View recent IAM events
+aws cloudtrail lookup-events --lookup-attributes AttributeKey=EventSource,AttributeValue=iam.amazonaws.com
+```
+
+### Implement a Permission Boundary
+
+Permission boundaries limit the maximum permissions a user/role can have — even if they are in a group with broader policies:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "*",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": ["us-east-1", "us-west-2"]
+        }
+      }
+    }
+  ]
+}
+```
+
+Attach this as a **permissions boundary** to restrict users to only US regions, even if their group policy says `"Action": "*"`.
+
+### Password Policy
+
+Set a strong account-wide password policy:
+
+```bash
+aws iam update-account-password-policy \
+  --minimum-password-length 16 \
+  --require-symbols \
+  --require-numbers \
+  --require-uppercase-characters \
+  --require-lowercase-characters \
+  --allow-users-to-change-password \
+  --max-password-age 90 \
+  --password-reuse-prevention 24
+```
+
+## Step 9: Clean Up
+
+To avoid any future costs, delete the lab resources:
+
+```bash
+# Delete users (must remove from groups first)
+aws iam remove-user-from-group --user-name alice --group-name Developers
+aws iam delete-user --user-name alice
+
+aws iam remove-user-from-group --user-name bob --group-name Operators
+aws iam delete-user --user-name bob
+
+aws iam delete-user --user-name role-test
+
+# Delete groups
+aws iam delete-group --group-name Developers
+aws iam delete-group --group-name Operators
+aws iam delete-group --group-name Admins
+
+# Detach and delete custom policy
+aws iam detach-group-policy --group-name Developers --policy-arn $POLICY_ARN 2>/dev/null
+aws iam delete-policy --policy-arn $POLICY_ARN 2>/dev/null
+
+# Delete roles
+aws iam delete-role --role-name EC2-S3-ReadOnly
+aws iam delete-role --role-name CrossAccount-Audit
+
+# Delete bucket and contents
+aws s3 rm s3://$BUCKET --recursive
+aws s3 rb s3://$BUCKET
+
+# Disable and delete CloudTrail
+aws cloudtrail stop-logging --name iam-lab-trail
+aws cloudtrail delete-trail --name iam-lab-trail
+```
+
+## Troubleshooting
+
+| Symptom | Cause | Solution |
+|---------|-------|----------|
+| `AccessDenied` when trying to access a service | User/group does not have the required policy | Check the policy attached to the user's groups. Use IAM Access Advisor to see which services the user has accessed |
+| `AssumeRole` returns `AccessDenied` | User lacks `sts:AssumeRole` permission OR trust policy does not include the user | Check both: the user's permissions (must allow `sts:AssumeRole`) AND the role's trust policy (must list the user/account as Principal) |
+| `InvalidClientTokenId` | Access key is wrong or disabled | Check the access key status in IAM Console. Re-create if necessary |
+| `SignatureDoesNotMatch` | Wrong secret key or clock skew | Verify the secret key. Ensure system clock is synchronised (NTP) |
+| CLI command works but console shows different | Session credentials vs console credentials | CLI uses access keys; console uses password + MFA. Check both sets of permissions |
+| Role assumed but `AccessDenied` on resources | Permissions policy on the role is insufficient | Check the role's permissions policy (not the user's). The role has its own separate permissions |
+
+## Verification Checklist
+
+| # | Task | Status | Verification |
+|---|------|--------|-------------|
+| 1 | AWS account created and root MFA enabled | ☐ | Root user has MFA device assigned |
+| 2 | Admin IAM user created with MFA | ☐ | Can log in as admin via sign-in URL |
+| 3 | IAM groups created (Developers, Operators) | ☐ | Groups page lists both groups |
+| 4 | Custom IAM policy created (Lab-S3-Bucket-Access) | ☐ | Policy visible in Policies page |
+| 5 | IAM users created (alice, bob) | ☐ | Users can log in and have correct group membership |
+| 6 | IAM role created (EC2-S3-ReadOnly) | ☐ | Role visible with S3 read-only policy + EC2 trust policy |
+| 7 | AWS CLI configured with admin profile | ☐ | `aws sts get-caller-identity` returns user ARN |
+| 8 | Tested permissions — Alice denied EC2 run-instances | ☐ | `AccessDenied` error received |
+| 9 | Tested permissions — Bob can launch EC2 | ☐ | Instance launches successfully |
+| 10 | Tested role assumption | ☐ | `aws sts get-caller-identity` shows assumed-role ARN |
+| 11 | Cleaned up resources | ☐ | All users, groups, policies, roles, and buckets deleted |
+
+## Key Takeaways
+
+- **AWS IAM is the most widely deployed IAM system** — understanding it is essential for any IAM professional. The policy language (JSON) and resource-based access model are the foundation.
+- **The root user should only be used for initial setup** — enable MFA immediately and create an admin IAM user for daily work. Never create access keys for the root user.
+- **Groups are the primary permission management mechanism** — assign policies to groups, add users to groups. Avoid attaching policies directly to users — it becomes unmanageable at scale.
+- **IAM policies have four core elements**: Effect (Allow/Deny), Action (API operations), Resource (ARNs), and Condition (context). Deny always overrides Allow.
+- **Roles provide temporary credentials** — use roles for EC2 instances, Lambda functions, cross-account access, and federated users. Roles eliminate the need for long-lived access keys.
+- **Least privilege is a continuous process** — start broad, then narrow permissions based on actual usage. Use IAM Access Advisor, CloudTrail, and Access Analyzer to identify and remove unused permissions.
+- **Permission boundaries provide guardrails** — they limit the maximum permissions an IAM entity can have, even if attached policies grant more.
+
+<Aside variant="info" title="Next Steps">
+You now have hands-on experience with the most important IAM system in the world. Apply the same patterns — users, groups, policies, roles — to other cloud IAM systems (Azure RBAC, GCP IAM). The concepts transfer; only the syntax changes.
+</Aside>

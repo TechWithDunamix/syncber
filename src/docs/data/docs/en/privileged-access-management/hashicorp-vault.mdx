@@ -1,0 +1,1106 @@
+---
+title: "HashiCorp Vault — Hands-On Practical Guide"
+description: "Complete hands-on guide to HashiCorp Vault — dev setup, auth methods, KV secrets engine, dynamic database secrets, ACL policies, PKI certificates, production deployment with Raft HA, auto-unseal, audit devices, and application integration."
+sidebar:
+  order: 5
+  label: "HashiCorp Vault Lab"
+tab: "iam-pam-professional"
+---
+
+HashiCorp Vault is the most widely deployed open-source secrets management platform. Unlike PAM vaults (CyberArk, Delinea) that focus on human credential checkout, Vault is purpose-built for **machine-to-machine secrets** — API tokens, database passwords, TLS certificates, and cloud credentials consumed by applications, CI/CD pipelines, and Kubernetes workloads.
+
+<Aside variant="info" title="Vault vs PAM Vaults">
+PAM vaults and HashiCorp Vault serve different but complementary roles:
+- **PAM vaults** (CyberArk, BeyondTrust) manage human administrator passwords with session recording, approval workflows, and break-glass procedures
+- **HashiCorp Vault** manages application secrets with short-lived dynamic credentials, API-driven access, and cloud-native integrations
+- **Typical enterprise**: Run both — PAM vault for human privileged access, Vault for application secrets and automation
+</Aside>
+
+This guide takes you from zero to a production-capable Vault deployment with real workflows.
+
+## Prerequisites
+
+| Resource | Requirement |
+|----------|-------------|
+| **Docker & Docker Compose** | Installed (for dev + production setups) |
+| **PostgreSQL** | Docker image (for dynamic secrets demo) |
+| **curl / jq** | For API examples |
+| **Terminal** | Linux, macOS, or WSL2 on Windows |
+
+## Architecture Overview
+
+Vault has a clean component model:
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                        VAULT                               │
+│                                                           │
+│  ┌──────────┐  ┌──────────┐  ┌────────────────────────┐ │
+│  │   Auth    │  │ Secrets  │  │      Audit Device       │ │
+│  │  Methods  │  │ Engines  │  │  (syslog, file, socket)  │ │
+│  ├──────────┤  ├──────────┤  ├────────────────────────┤ │
+│  │ token     │  │   kv v2  │  │  Every request logged   │ │
+│  │ userpass  │  │ database │  │  to audit trail         │ │
+│  │ approle   │  │   pki    │  │                         │ │
+│  │ ldap      │  │ transit  │  └────────────────────────┘ │
+│  │ kubernetes│  │   aws    │                             │
+│  └────┬─────┘  └────┬─────┘                             │
+│       │              │                                    │
+│       └──────┬───────┘                                   │
+│              │ ACL Policy Engine                         │
+│              │ (path-based authorization)                 │
+│              │                                            │
+│  ┌──────────┐│┌──────────────────┐                       │
+│  │ Storage  │││   Seal / Unseal   │                       │
+│  │ Backend  │││  (auto-unseal)    │                       │
+│  │ (Raft)   ││└──────────────────┘                       │
+│  └──────────┘                                            │
+└──────────────────────────────────────────────────────────┘
+```
+
+Key concepts you'll use throughout:
+
+| Concept | Description |
+|---------|-------------|
+| **Auth method** | How a client proves identity (token, userpass, AppRole, LDAP, Kubernetes) |
+| **Secrets engine** | What type of secret is being managed (KV, database, PKI, transit, AWS) |
+| **Path** | Every operation in Vault is a URL path — `secret/data/my-app`, `database/creds/my-role` |
+| **Policy** | ACL rules that grant or deny access to paths — `path "secret/data/*" { capabilities = ["read"] }` |
+| **Lease** | Dynamic secrets have a Time-To-Live (TTL) — after expiry, the credential is revoked |
+| **Seal/Unseal** | Vault starts sealed (encrypted in memory) and must be unsealed to serve requests |
+
+## Step 1: Dev Mode Quick Start
+
+Dev mode runs an in-memory, pre-unsealed Vault server. Perfect for learning the API and workflows.
+
+### 1.1 Start Vault in Dev Mode
+
+```bash
+docker run --rm -it --cap-add=IPC_LOCK \
+  -p 8200:8200 \
+  --name vault-dev \
+  hashicorp/vault:1.18 server -dev -dev-root-token-id=root
+```
+
+**What this does**:
+- Starts Vault with in-memory storage (data lost on restart)
+- Automatically unsealed — root token is `root`
+- Listens on `http://localhost:8200`
+- The `--cap-add=IPC_LOCK` flag enables memory locking to prevent swap to disk
+
+Keep this terminal open. In a second terminal, set up the environment:
+
+```bash
+export VAULT_ADDR='http://localhost:8200'
+export VAULT_TOKEN='root'
+```
+
+### 1.2 Verify Vault Status
+
+```bash
+vault status
+```
+
+Expected output:
+```
+Key             Value
+---             -----
+Seal Type       shamir
+Initialized     true
+Sealed          false
+Total Shares    1
+Threshold       1
+Version         1.18.x
+Storage Type    inmemory
+Cluster Name    vault-cluster-xxxx
+HA Enabled      false
+```
+
+### 1.3 Write and Read Your First Secret
+
+```bash
+# Write a secret
+vault kv put secret/my-app/database \
+  username="app_user" \
+  password="P@ssw0rd!2026" \
+  host="postgres.internal" \
+  port="5432"
+
+# Read it back
+vault kv get secret/my-app/database
+
+# Read a specific field
+vault kv get -field=password secret/my-app/database
+```
+
+Expected output from `vault kv get`:
+```
+======= Data =======
+Key         Value
+---         -----
+host        postgres.internal
+password    P@ssw0rd!2026
+port        5432
+username    app_user
+```
+
+### 1.4 Understand Metadata and Versions
+
+Vault KV v2 tracks versions automatically:
+
+```bash
+# Check metadata (versions, created time, deletion time)
+vault kv metadata get secret/my-app/database
+
+# List versions
+vault kv list secret/my-app/database
+```
+
+Try versioning:
+
+```bash
+# Update the secret — this creates version 2
+vault kv put secret/my-app/database password="NewP@ss!2026"
+
+# Read specific version
+vault kv get -version=1 secret/my-app/database
+vault kv get -version=2 secret/my-app/database
+
+# Undelete a deleted version
+vault kv undelete -versions=1 secret/my-app/database
+```
+
+<Aside variant="tip">
+Vault KV v2 stores 10 versions by default (configurable with `max_versions`). This means you can always roll back to a previous version — critical for incident response when a rotated credential breaks a service.
+</Aside>
+
+## Step 2: Auth Methods
+
+Vault supports many authentication methods. You'll configure three common ones.
+
+### 2.1 Token Auth (Default)
+
+Already working — every Vault request requires a token. The root token has unrestricted access.
+
+```bash
+# Create a child token with a TTL
+vault token create -ttl=24h -policy=default
+
+# Use the child token
+export VAULT_TOKEN="hvs.CAES..."
+vault kv get secret/my-app/database
+
+# Revoke the token when done
+vault token revoke "hvs.CAES..."
+```
+
+### 2.2 Userpass Auth
+
+Userpass allows humans to authenticate with username/password.
+
+```bash
+# Enable userpass auth
+vault auth enable userpass
+
+# Create a user
+vault write auth/userpass/users/alice \
+  password="Password123!" \
+  token_ttl="1h" \
+  token_max_ttl="24h"
+```
+
+Login as Alice:
+
+```bash
+# Login returns a client token
+vault login -method=userpass \
+  username=alice \
+  password=Password123!
+```
+
+The vault will return a token. Notice the token has limited access — Alice has no policies assigned yet, so she can't read secrets:
+
+```bash
+vault kv get secret/my-app/database
+# Error: 1 error occurred: permission denied
+```
+
+You'll fix this with policies in Step 4.
+
+### 2.3 AppRole Auth
+
+AppRole is the preferred auth method for machines and applications. It uses a `role_id` (like a username) and `secret_id` (like a password).
+
+```bash
+# Enable AppRole
+vault auth enable approle
+
+# Create a role
+vault write auth/approle/role/my-app \
+  secret_id_ttl="24h" \
+  token_ttl="1h" \
+  token_max_ttl="24h" \
+  policies="default"
+
+# Get the role_id and secret_id
+vault read auth/approle/role/my-app/role-id
+vault write -f auth/approle/role/my-app/secret-id
+```
+
+Login with AppRole:
+
+```bash
+# Using the role_id and secret_id from above
+vault write auth/approle/login \
+  role_id="<role_id>" \
+  secret_id="<secret_id>"
+```
+
+This returns a client token that applications use for subsequent Vault API calls.
+
+<Aside variant="tip">
+AppRole is the standard pattern for CI/CD pipelines, microservices, and Kubernetes workloads. Each application gets its own role with narrowly scoped policies — never share a secret_id across applications.
+</Aside>
+
+### 2.4 Auth Method Cheat Sheet
+
+| Method | Best For | Credential Type | Typical TTL |
+|--------|----------|-----------------|-------------|
+| **Token** | CLI, debugging, Vault-to-Vault | Bearer token | Hours–days |
+| **Userpass** | Human operators, training | Username/password | Hours |
+| **AppRole** | Applications, CI/CD, automation | role_id + secret_id | Hours–days |
+| **LDAP** | Enterprise users (SSO with AD) | AD credentials | Session |
+| **Kubernetes** | Pods in Kubernetes clusters | Service account JWT | Minutes–hours |
+| **JWT/OIDC** | Cloud-native, external IdP | JWT from IdP | Session |
+
+## Step 3: KV Secrets Engine (Deep Dive)
+
+The KV (Key-Value) secrets engine is the most commonly used. You already wrote your first secret — now go deeper.
+
+### 3.1 Mount Multiple KV Engines
+
+You can mount multiple KV engines at different paths — this is how you organise secrets by team or environment:
+
+```bash
+# Create separate KV engines
+vault secrets enable -path=team-alpha -version=2 kv
+vault secrets enable -path=team-beta -version=2 kv
+vault secrets enable -path=shared -version=2 kv
+
+# Write to each
+vault kv put team-alpha/api-key key="a1b2c3"
+vault kv put team-beta/api-key key="d4e5f6"
+vault kv put shared/ca-certificate cert="-----BEGIN CERTIFICATE-----..."
+
+# List all mounted engines
+vault secrets list
+```
+
+### 3.2 Secret Deletion and Recovery
+
+```bash
+# Soft delete (marks as deleted, keeps versions)
+vault kv metadata delete shared/ca-certificate
+
+# Restore soft-deleted secret
+vault kv undelete -versions=1 shared/ca-certificate
+
+# Permanent destroy (irrecoverable)
+vault kv destroy -versions=1 shared/ca-certificate
+
+# Hard destroy the entire secret (all versions)
+vault kv metadata delete shared/ca-certificate
+# You can still recover with: vault kv undelete
+# To fully destroy:
+vault kv metadata destroy shared/ca-certificate
+```
+
+### 3.3 CAS (Compare-And-Swap) Writes
+
+CAS prevents overwrites — the write succeeds only if the current version matches:
+
+```bash
+# Enable CAS on the engine
+vault secrets tune -cas-required=true team-alpha
+
+# First write always succeeds
+vault kv put team-alpha/config setting="value1"
+
+# Second write WITHOUT CAS fails
+vault kv put team-alpha/config setting="value2"
+# Error: check-and-set parameter required
+
+# Correct CAS write (must know current version)
+vault kv put -cas=1 team-alpha/config setting="value2"
+```
+
+CAS is critical for coordination when multiple automation systems write to the same path.
+
+## Step 4: ACL Policies
+
+Policies are the heart of Vault's authorization model. Every path-based access right is granted through policies.
+
+### 4.1 Policy Language Basics
+
+```hcl
+# Read everything under secret/data/team-alpha/
+path "secret/data/team-alpha/*" {
+  capabilities = ["read", "list"]
+}
+
+# Read and write specific paths (note: data/ and metadata/ sub-paths)
+path "secret/data/team-alpha/config" {
+  capabilities = ["create", "read", "update", "delete", "list"]
+}
+
+# Allow listing of secret paths
+path "secret/metadata/team-alpha/*" {
+  capabilities = ["list"]
+}
+```
+
+**Policy capabilities:**
+
+| Capability | What It Allows |
+|------------|----------------|
+| `read` | GET/READ on a path |
+| `create` | POST/PUT to create (no overwrite) |
+| `update` | POST/PUT to overwrite existing |
+| `delete` | DELETE on a path |
+| `list` | LIST on a path (directory listing) |
+| `sudo` | Root-level operations (requires root token) |
+| `deny` | Explicitly denies access (overrides all) |
+| `patch` | Partial update (KV v2 only) |
+
+### 4.2 Create Policies
+
+```bash
+# Write a policy file
+vault policy write team-alpha-admin - <<'EOF'
+path "team-alpha/*" {
+  capabilities = ["create", "read", "update", "delete", "list", "patch"]
+}
+
+path "team-alpha/metadata/*" {
+  capabilities = ["list", "read", "delete"]
+}
+
+# Allow reading auth configuration
+path "sys/auth" {
+  capabilities = ["read", "list"]
+}
+
+# Allow renewing own token
+path "auth/token/renew-self" {
+  capabilities = ["update"]
+}
+EOF
+
+# Write a read-only policy
+vault policy write team-alpha-reader - <<'EOF'
+path "team-alpha/data/*" {
+  capabilities = ["read", "list"]
+}
+
+path "team-alpha/metadata/*" {
+  capabilities = ["list", "read"]
+}
+
+# Allow looking up own token
+path "auth/token/lookup-self" {
+  capabilities = ["read"]
+}
+EOF
+
+# List all policies
+vault policy list
+
+# Read a policy
+vault policy read team-alpha-admin
+```
+
+### 4.3 Assign Policies to Auth Methods
+
+```bash
+# Assign to userpass user
+vault write auth/userpass/users/alice \
+  token_policies="team-alpha-reader"
+
+# Assign to AppRole
+vault write auth/approle/role/my-app \
+  policies="team-alpha-reader"
+
+# Login as Alice again and test
+vault login -method=userpass username=alice password=Password123!
+vault kv get team-alpha/api-key  # Should succeed
+vault kv get secret/my-app/database  # Should fail (different path)
+```
+
+### 4.4 Policy Best Practices
+
+| Principle | Why |
+|-----------|-----|
+| **Least privilege** | Grant only the capabilities needed — prefer `read` over `create,read,update,delete` |
+| **Path segmentation** | Use separate KV mount paths per team (`team-alpha/`, `team-beta/`) rather than one flat path |
+| **No wildcard in production** | `path "secret/*"` is too broad — scope to specific paths |
+| **Policy per app** | Each application or team gets its own policy — never reuse a "default app" policy |
+| **Deny before allow** | One explicit `deny` rule blocks all subsequent `allow` rules on the same path |
+| **Audit policy changes** | All policy writes are logged to the audit device — monitor them |
+
+## Step 5: Dynamic Database Secrets
+
+This is where Vault truly shines — instead of storing a static database password, Vault generates **short-lived, per-use credentials** on demand.
+
+### 5.1 Start a PostgreSQL Database
+
+```bash
+docker run -d --name postgres-vault \
+  -e POSTGRES_USER=admin \
+  -e POSTGRES_PASSWORD=admin123 \
+  -e POSTGRES_DB=myapp \
+  -p 5432:5432 \
+  postgres:16
+```
+
+### 5.2 Configure the Database Secrets Engine
+
+```bash
+# Enable the database secrets engine
+vault secrets enable database
+
+# Configure PostgreSQL connection
+vault write database/config/myapp-pg \
+  plugin_name="postgresql-database-plugin" \
+  allowed_roles="myapp-role" \
+  connection_url="postgresql://{{username}}:{{password}}@host.docker.internal:5432/myapp?sslmode=disable" \
+  username="admin" \
+  password="admin123"
+```
+
+### 5.3 Create a Dynamic Role
+
+```bash
+# Create a role that generates credentials with specific SQL
+vault write database/roles/myapp-role \
+  db_name="myapp-pg" \
+  creation_statements="CREATE USER \"{{name}}\" WITH PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'; GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA public TO \"{{name}}\";" \
+  default_ttl="1h" \
+  max_ttl="24h"
+```
+
+### 5.4 Request Dynamic Credentials
+
+```bash
+# Generate fresh database credentials
+vault read database/creds/myapp-role
+```
+
+Output:
+```
+Key                Value
+---                -----
+lease_id           database/creds/myapp-role/abc123...
+lease_duration     1h
+lease_renewable    true
+password           e4A... (randomly generated)
+username           v-myapp-role-xyz123...
+```
+
+Verify the credentials work:
+
+```bash
+# Test with the generated username/password
+docker exec -it postgres-vault psql \
+  -U "v-myapp-role-xyz123..." \
+  -d myapp \
+  -c "SELECT current_user, current_database();"
+```
+
+### 5.5 Automatic Credential Rotation
+
+The magic: Vault automatically **revokes** the database user when the lease expires (1 hour by default). No cleanup scripts needed.
+
+```bash
+# View lease info
+vault lease lookup database/creds/myapp-role/abc123...
+
+# Explicitly revoke (before TTL expiry)
+vault lease revoke database/creds/myapp-role/abc123...
+```
+
+After revocation, the database user no longer exists:
+
+```bash
+# This will fail
+docker exec -it postgres-vault psql -U "v-myapp-role-xyz123..." -d myapp -c "SELECT 1;"
+```
+
+<Aside variant="caution">
+Dynamic credentials eliminate the "static database password in config files" problem. Each application instance gets its own database user with exactly the permissions it needs, and the credential automatically expires. Never hardcode database passwords when Vault can generate them dynamically.
+</Aside>
+
+### 5.6 Dynamic Secrets Cheat Sheet
+
+| Engine | What It Generates | Typical Lease | Use Case |
+|--------|-------------------|---------------|----------|
+| **database** | Short-lived SQL user | 1 hour | App database access |
+| **AWS** | IAM user or STS token | 15 min–1 hour | Infrastructure automation |
+| **Azure** | Service principal | 1 hour | Azure resource management |
+| **GCP** | Service account key | 1 hour | GCP resource access |
+| **PKI** | TLS certificate | 24–720 hours | mTLS, ingress certificates |
+| **SSH** | One-time SSH key | Session-length | SSH access without key management |
+| **TOTP** | Time-based OTP secret | Per-use | MFA integration |
+
+## Step 6: PKI Secrets Engine
+
+Vault can act as an internal Certificate Authority (CA), issuing short-lived TLS certificates.
+
+### 6.1 Enable and Configure PKI
+
+```bash
+# Enable PKI engine
+vault secrets enable pki
+
+# Tune lease to short-lived (Vault-issued certs should be short!)
+vault secrets tune -max-lease-ttl=87600h pki  # 10 years for root CA
+
+# Generate root CA certificate (self-signed)
+vault write pki/root/generate/internal \
+  common_name="mycompany.internal" \
+  ttl=87600h
+
+# Configure CRL and issuing endpoints
+vault write pki/config/urls \
+  issuing_certificates="http://localhost:8200/v1/pki/ca" \
+  crl_distribution_points="http://localhost:8200/v1/pki/crl"
+```
+
+### 6.2 Create a Role and Issue Certificates
+
+```bash
+# Create a role for server certificates
+vault write pki/roles/my-server \
+  allowed_domains="mycompany.internal" \
+  allow_subdomains=true \
+  max_ttl="72h"
+
+# Issue a certificate
+vault write pki/issue/my-server \
+  common_name="api.mycompany.internal" \
+  ttl="24h"
+```
+
+Output includes:
+```
+Key                 Value
+---                 -----
+certificate         -----BEGIN CERTIFICATE-----...
+issuing_ca          -----BEGIN CERTIFICATE-----...
+private_key         -----BEGIN RSA PRIVATE KEY-----...
+private_key_type    rsa
+serial_number       12:ab:34:cd...
+```
+
+### 6.3 Why Short-Lived Certs Matter
+
+Traditional PKI issues certificates valid for 1-3 years. Vault PKI issues certificates valid for **hours or days**. This means:
+
+- **No CRL checking needed** — by the time a cert needs revoking, it's already expired
+- **Automated rotation** — applications get new certs from Vault before expiry
+- **No cert management** — no calendar reminders, no manual renewal processes
+- **Compromise containment** — a leaked cert is valid for hours, not years
+
+## Step 7: Production Deployment with Docker Compose
+
+Dev mode is for learning only. Production Vault requires:
+- **High availability** (multiple Vault nodes)
+- **Integrated storage** (Raft for HA without external dependencies)
+- **Auto-unseal** (Vault unseals automatically on restart)
+- **Audit logging** (every request recorded)
+
+### 7.1 Production Docker Compose Setup
+
+```yaml
+# vault-docker-compose.yml
+version: '3.8'
+
+services:
+  vault-1:
+    image: hashicorp/vault:1.18
+    container_name: vault-1
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_LOCAL_CONFIG: |
+        ui = true
+        listener "tcp" {
+          address     = "0.0.0.0:8200"
+          tls_disable = true
+        }
+        storage "raft" {
+          path = "/vault/data"
+          node_id = "vault-1"
+        }
+        seal "aesgcm" {
+          keys = ["Z3M5bnR0MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY="]
+        }
+        service_registration "consul" {
+          address = "consul:8500"
+        }
+    command: server
+    ports:
+      - "8201:8200"
+    volumes:
+      - vault-1-data:/vault/data
+    networks:
+      - vault-network
+
+  vault-2:
+    image: hashicorp/vault:1.18
+    container_name: vault-2
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_LOCAL_CONFIG: |
+        ui = true
+        listener "tcp" {
+          address     = "0.0.0.0:8200"
+          tls_disable = true
+        }
+        storage "raft" {
+          path = "/vault/data"
+          node_id = "vault-2"
+        }
+        seal "aesgcm" {
+          keys = ["Z3M5bnR0MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY="]
+        }
+        service_registration "consul" {
+          address = "consul:8500"
+        }
+    command: server
+    ports:
+      - "8202:8200"
+    volumes:
+      - vault-2-data:/vault/data
+    networks:
+      - vault-network
+
+  vault-3:
+    image: hashicorp/vault:1.18
+    container_name: vault-3
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_LOCAL_CONFIG: |
+        ui = true
+        listener "tcp" {
+          address     = "0.0.0.0:8200"
+          tls_disable = true
+        }
+        storage "raft" {
+          path = "/vault/data"
+          node_id = "vault-3"
+        }
+        seal "aesgcm" {
+          keys = ["Z3M5bnR0MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY="]
+        }
+        service_registration "consul" {
+          address = "consul:8500"
+        }
+    command: server
+    ports:
+      - "8203:8200"
+    volumes:
+      - vault-3-data:/vault/data
+    networks:
+      - vault-network
+
+volumes:
+  vault-1-data:
+  vault-2-data:
+  vault-3-data:
+
+networks:
+  vault-network:
+    driver: bridge
+```
+
+### 7.2 Initialize and Unseal the Cluster
+
+```bash
+# Initialize Vault (only on first node)
+docker exec -it vault-1 vault operator init \
+  -key-shares=5 \
+  -key-threshold=3
+
+# Output:
+# Unseal Key 1: abc123...
+# Unseal Key 2: def456...
+# Unseal Key 3: ghi789...
+# Unseal Key 4: jkl012...
+# Unseal Key 5: mno345...
+# Initial Root Token: hvs.xxxx...
+
+# Unseal vault-1 (need 3 of 5 keys)
+docker exec -it vault-1 vault operator unseal
+# Enter Key 1
+docker exec -it vault-1 vault operator unseal
+# Enter Key 2
+docker exec -it vault-1 vault operator unseal
+# Enter Key 3
+
+# Join vault-2 and vault-3 to the Raft cluster
+docker exec -it vault-2 vault operator raft join http://vault-1:8200
+docker exec -it vault-3 vault operator raft join http://vault-1:8200
+
+# Unseal vault-2 and vault-3
+docker exec -it vault-2 vault operator unseal
+docker exec -it vault-2 vault operator unseal
+docker exec -it vault-2 vault operator unseal
+docker exec -it vault-3 vault operator unseal
+docker exec -it vault-3 vault operator unseal
+docker exec -it vault-3 vault operator unseal
+
+# Verify cluster status
+docker exec -it vault-1 vault operator raft list-peers
+```
+
+<Aside variant="danger">
+In production, NEVER distribute unseal keys via plaintext. Use Shamir key splitting (already done above with 5 keys, threshold 3) and distribute each key to a different trusted individual. Better yet, use auto-unseal with a cloud KMS (AWS KMS, Azure Key Vault, GCP Cloud KMS).
+</Aside>
+
+### 7.3 Enable Audit Devices
+
+```bash
+# Enable file audit
+vault audit enable file file_path=/vault/logs/audit.log
+
+# Enable syslog audit (for SIEM integration)
+vault audit enable syslog \
+  facility="AUTH" \
+  tag="vault" \
+  format="json"
+
+# List audit devices
+vault audit list
+
+# View audit log (JSON lines — every request is logged)
+docker exec vault-1 tail -f /vault/logs/audit.log | head -5
+```
+
+Audit log entry format:
+```json
+{
+  "time": "2026-06-16T04:33:01Z",
+  "type": "response",
+  "auth": {
+    "client_token": "hmac-sha256:abc123...",
+    "policies": ["team-alpha-admin", "default"]
+  },
+  "request": {
+    "path": "team-alpha/data/api-key",
+    "operation": "read"
+  },
+  "response": {
+    "data": {
+      "key": "hmac-sha256:def456..."
+    }
+  }
+}
+```
+
+<Aside variant="tip">
+Audit logs are HMAC'd — actual secret values are replaced with HMAC hashes. The HMAC key is stored in Vault's seal, so only Vault administrators with unseal access can correlate audit entries to actual values. This prevents auditors from seeing secrets while still providing a tamper-proof audit trail.
+</Aside>
+
+## Step 8: Application Integration Patterns
+
+Here are the three most common patterns for applications consuming Vault secrets.
+
+### 8.1 Pattern 1: Sidecar / Init Container (Kubernetes)
+
+The application never talks to Vault directly. An init container authenticates to Vault, fetches secrets, and writes them to a shared volume:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  template:
+    spec:
+      serviceAccountName: my-app-sa
+      initContainers:
+      - name: vault-init
+        image: hashicorp/vault:1.18
+        command:
+          - sh
+          - -c
+          - |
+            vault login -method=kubernetes role=my-app-role \
+              jwt=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+            vault kv get -field=password secret/my-app/database > /secrets/db-password
+            vault kv get -field=api-key secret/my-app/api-key > /secrets/api-key
+        volumeMounts:
+        - name: secrets
+          mountPath: /secrets
+      containers:
+      - name: my-app
+        image: my-app:latest
+        env:
+        - name: DB_PASSWORD_FILE
+          value: /secrets/db-password
+        - name: API_KEY_FILE
+          value: /secrets/api-key
+        volumeMounts:
+        - name: secrets
+          mountPath: /secrets
+      volumes:
+      - name: secrets
+        emptyDir: {}
+```
+
+### 8.2 Pattern 2: Vault Agent (Sidecar)
+
+Vault Agent handles authentication and secret renewal automatically:
+
+```yaml
+vault {
+  address = "http://vault-cluster:8200"
+}
+
+auto_auth {
+  method "kubernetes" {
+    mount_path = "auth/kubernetes"
+    config {
+      role = "my-app-role"
+    }
+  }
+
+  sink "file" {
+    config {
+      path = "/home/vault/.vault-token"
+    }
+  }
+}
+
+template {
+  source      = "/etc/vault-templates/database.tpl"
+  destination = "/secrets/database.conf"
+}
+
+template {
+  source      = "/etc/vault-templates/api-key.tpl"
+  destination = "/secrets/api-key.conf"
+}
+```
+
+### 8.3 Pattern 3: Vault API Direct (Best for Scripts)
+
+```bash
+#!/bin/bash
+# fetch-secret.sh — used in CI/CD pipelines
+
+# Step 1: Get a Vault token via AppRole
+VAULT_ADDR="http://vault.internal:8200"
+
+RESPONSE=$(curl -s --request POST \
+  --data "{\"role_id\":\"$ROLE_ID\",\"secret_id\":\"$SECRET_ID\"}" \
+  "$VAULT_ADDR/v1/auth/approle/login")
+
+VAULT_TOKEN=$(echo "$RESPONSE" | jq -r '.auth.client_token')
+
+# Step 2: Fetch the secret
+SECRET=$(curl -s --header "X-Vault-Token: $VAULT_TOKEN" \
+  "$VAULT_ADDR/v1/secret/data/my-app/database")
+
+echo "$SECRET" | jq -r '.data.data.password'
+```
+
+## Step 9: End-to-End Workflow
+
+Let's tie everything together — a complete workflow where an application gets dynamic database credentials using AppRole authentication.
+
+```bash
+# 1. Enable and configure AppRole
+vault auth enable approle
+
+# 2. Enable database secrets
+vault secrets enable database
+
+# 3. Configure PostgreSQL
+vault write database/config/myapp-pg \
+  plugin_name="postgresql-database-plugin" \
+  allowed_roles="myapp-role" \
+  connection_url="postgresql://{{username}}:{{password}}@host.docker.internal:5432/myapp?sslmode=disable" \
+  username="admin" \
+  password="admin123"
+
+# 4. Create database role with 30-minute TTL
+vault write database/roles/myapp-role \
+  db_name="myapp-pg" \
+  creation_statements='CREATE USER "{{name}}" WITH PASSWORD '"'"'{{password}}'"'"' VALID UNTIL '"'"'{{expiration}}'"'"'; GRANT SELECT ON ALL TABLES IN SCHEMA public TO "{{name}}";' \
+  default_ttl="30m" \
+  max_ttl="1h"
+
+# 5. Create policy for the application
+vault policy write myapp-policy - <<'EOF'
+path "database/creds/myapp-role" {
+  capabilities = ["read"]
+}
+
+path "secret/data/myapp/config" {
+  capabilities = ["read"]
+}
+EOF
+
+# 6. Create AppRole with the policy
+vault write auth/approle/role/myapp-service \
+  secret_id_ttl="24h" \
+  token_ttl="1h" \
+  policies="myapp-policy"
+
+# 7. Get credentials for the application
+ROLE_ID=$(vault read -field=role_id auth/approle/role/myapp-service/role-id)
+SECRET_ID=$(vault write -f -field=secret_id auth/approle/role/myapp-service/secret-id)
+
+echo "ROLE_ID=$ROLE_ID"
+echo "SECRET_ID=$SECRET_ID"
+
+# 8. Application authenticates and gets dynamic DB creds
+APP_TOKEN=$(vault write -field=token auth/approle/login \
+  role_id="$ROLE_ID" secret_id="$SECRET_ID")
+
+vault read -address="$VAULT_ADDR" -token="$APP_TOKEN" database/creds/myapp-role
+```
+
+**What just happened:**
+1. Application authenticates to Vault via AppRole → receives a client token
+2. Application uses that token to request database credentials
+3. Vault connects to PostgreSQL and creates a new user with limited permissions
+4. Vault returns the generated username/password and a lease
+5. The Application uses the credentials for 30 minutes
+6. After 30 minutes (or on explicit revocation), Vault drops the database user
+
+## Step 10: Production Best Practices
+
+### 10.1 Auto-Unseal Configuration
+
+Manual unsealing doesn't scale to 3+ nodes. Configure auto-unseal with cloud KMS:
+
+```hcl
+# AWS KMS auto-unseal
+seal "awskms" {
+  region     = "us-east-1"
+  kms_key_id = "alias/vault-unseal"
+}
+
+# Azure Key Vault auto-unseal
+seal "azurekeyvault" {
+  tenant_id      = "abc123-..."
+  vault_name     = "vault-unseal-kv"
+  key_name       = "vault-unseal-key"
+}
+
+# GCP Cloud KMS auto-unseal
+seal "gcpckms" {
+  project     = "my-project"
+  region      = "global"
+  key_ring    = "vault"
+  crypto_key  = "vault-unseal"
+}
+```
+
+### 10.2 Storage Backend Selection
+
+| Backend | HA | External Deps | Best For |
+|---------|----|---------------|----------|
+| **Raft** | ✅ Built-in | None | Small–medium deployments, air-gapped |
+| **Consul** | ✅ | Consul cluster | Large deployments, already have Consul |
+| **DynamoDB** | ✅ | AWS DynamoDB | AWS-native, serverless |
+| **PostgreSQL** | ✅ | PostgreSQL | Database already in stack |
+| **File** | ❌ | None | Dev/test only |
+
+### 10.3 Security Checklist
+
+| Control | Implementation |
+|---------|----------------|
+| **Auto-unseal** | Cloud KMS (AWS KMS, Azure KV, GCP KMS) — never manual unseal in production |
+| **TLS everywhere** | Configure `tls_cert_file` and `tls_key_file` on all listeners |
+| **Audit logging** | At least one audit device, preferably streaming to SIEM (Splunk, Elastic) |
+| **Principle of least privilege** | Every application/team gets its own policy — no wildcard paths |
+| **Response wrapping** | Use `-wrap-ttl` for secret_id delivery — ensures only the intended recipient reads it |
+| **Token revocation** | Set short token TTLs — applications should re-authenticate regularly |
+| **Network segmentation** | Vault cluster on isolated network, only proxies/bastions have access |
+| **Regular DR testing** | Practice full cluster recovery from backup at least quarterly |
+| **Version upgrades** | Follow HashiCorp's upgrade path — never skip major versions |
+| **Backup Raft snapshots** | `vault operator raft snapshot save` to S3/GCS/blob storage |
+
+### 10.4 Monitoring and Alerting
+
+```bash
+# Vault health endpoints
+curl http://localhost:8200/v1/sys/health
+
+# Returns:
+# {
+#   "initialized": true,
+#   "sealed": false,
+#   "standby": false,
+#   "performance_standby": false,
+#   "cluster_name": "vault-cluster",
+#   "server_time_utc": 1718542381,
+#   "version": "1.18.0"
+# }
+
+# Monitor with Prometheus
+vault audit enable syslog tag="vault" facility="AUTH"
+# Or enable Prometheus metrics endpoint
+vault write sys/config/metrics enable=true
+```
+
+**Key metrics to monitor:**
+
+| Metric | What It Tells You | Alert Threshold |
+|--------|-------------------|-----------------|
+| `vault.core.unsealed` | Is vault running? | Alert on `0` |
+| `vault.audit.log_request_count` | Request volume | Spike = possible abuse |
+| `vault.token.count` | Active tokens | High count = potential leak |
+| `vault.expire.num_leases` | Active leases | Correlate with connected services |
+| `vault.raft.committed_index` | Raft replication health | Gap = replication lag |
+
+## Cleanup
+
+Stop and remove all resources:
+
+```bash
+# Stop dev mode (Ctrl+C in the dev terminal, or)
+docker stop vault-dev
+
+# Stop production cluster
+docker-compose -f vault-docker-compose.yml down -v
+
+# Stop PostgreSQL
+docker stop postgres-vault
+docker rm postgres-vault
+```
+
+## Troubleshooting
+
+| Symptom | Likely Cause | Fix |
+|---------|-------------|-----|
+| `permission denied` on read | No policy grants access to that path | Check `vault token lookup` for assigned policies, verify path in policy |
+| `vault is sealed` | Node restarted without auto-unseal | Run `vault operator unseal` with 3 unseal keys, or configure auto-unseal |
+| `lease not found or expired` | Dynamic credential TTL expired | Application should renew lease or request new credentials before expiry |
+| `Raft leader election` | Network partition or node failure | Check cluster connectivity: `vault operator raft list-peers` |
+| `audit log write failed` | Disk full or audit device misconfigured | Rotate audit logs, verify file path permissions |
+| `TLS handshake error` | Vault listener TLS not configured or mismatch | Verify `VAULT_CACERT` / `VAULT_SKIP_VERIFY` environment variable |
+
+## Key Takeaways
+
+- **Vault is for machines, not humans** — it manages application secrets (API keys, DB passwords, TLS certs) with short-lived dynamic credentials, not human password checkout workflows
+- **Dynamic secrets eliminate static credentials** — database passwords, cloud access keys, and TLS certificates are generated on demand and automatically revoked after use
+- **Path-based policies are the authorization model** — every capability is granted or denied at the path level, enabling fine-grained access control per application or team
+- **Production Vault needs HA, auto-unseal, and audit** — dev mode is for learning only; production deployments require Raft storage, cloud KMS auto-unseal, and streaming audit logs
+- **AppRole is the standard auth method for applications** — role_id + secret_id provides machine authentication without human intervention
+- **Vault complements PAM vaults** — use CyberArk/BeyondTrust for human privileged access management, and Vault for application secrets and automation workloads

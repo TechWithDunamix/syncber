@@ -1,0 +1,580 @@
+---
+title: "Keycloak Lab Deployment — IdP Setup Guide"
+description: "Complete hands-on guide to deploying Keycloak as an Identity Provider. Covers Docker deployment, admin console first login, realm configuration, user management, and production readiness considerations."
+sidebar:
+  order: 7
+  label: "Keycloak Lab Deployment"
+tab: "iam-pam-professional"
+---
+
+Keycloak is the leading open-source Identity Provider (IdP), providing authentication, SSO, user federation, and authorization services through industry-standard protocols — OpenID Connect, OAuth 2.0, and SAML 2.0. It is maintained by Red Hat and used by organisations worldwide as a cost-effective alternative to commercial IdPs like Okta and Azure AD.
+
+This guide walks you through deploying a complete Keycloak lab environment, creating your first realm and users, and understanding the IdP architecture — all using Docker on a single machine.
+
+<Aside variant="info" title="Before You Begin">
+Complete the **Single Sign-On** and **Federated Identity** pages first if you haven't already. This guide assumes you understand SAML 2.0, OpenID Connect, and IdP concepts from the course.
+</Aside>
+
+## What You Will Build
+
+```
+┌────────────────────────────────────────────────────────────┐
+│                    DOCKER HOST                               │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │                   Docker Network                        │   │
+│  │                                                         │   │
+│  │  ┌──────────────────────────┐  ┌────────────────────┐  │   │
+│  │  │       Keycloak            │  │   PostgreSQL        │  │   │
+│  │  │   Port: 8080 (HTTP)       │  │   Port: 5432        │  │   │
+│  │  │   Port: 8443 (HTTPS)      │  │   (Internal only)   │  │   │
+│  │  │   Admin: /admin           │  │                      │  │   │
+│  │  └──────────┬───────────────┘  └──────────┬───────────┘  │   │
+│  │             │                              │              │   │
+│  │             └──────────┬───────────────────┘              │   │
+│  │                        │                                  │   │
+│  │  ┌─────────────────────┴──────────────────────────────┐  │   │
+│  │  │           Test App (optional)                       │  │   │
+│  │  │   Keycloak provides a test OIDC app built-in       │  │   │
+│  │  └────────────────────────────────────────────────────┘  │   │
+│  └──────────────────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+| Component | Purpose | Access |
+|-----------|---------|--------|
+| **Keycloak** | Identity Provider — authentication, SSO, user management | http://localhost:8080 |
+| **PostgreSQL** | Database — stores realms, users, sessions, configuration | Internal (not exposed) |
+| **Admin Console** | Keycloak's web-based administration interface | http://localhost:8080/admin |
+| **Account Console** | End-user self-service (password reset, profile) | http://localhost:8080/realms/{realm}/account |
+
+## Prerequisites
+
+| Requirement | Version | Check Command |
+|-------------|---------|---------------|
+| **Docker Engine** | 24.x+ | `docker --version` |
+| **Docker Compose** | 2.x+ | `docker compose version` |
+| **Available RAM** | 4 GB minimum | `free -h` or Task Manager |
+| **Available Disk** | 10 GB free | `df -h` |
+| **OS** | Linux, macOS, or Windows (WSL2) | — |
+
+Keycloak runs on any OS with Docker. Windows users need WSL2 with Docker Desktop. Linux users can install Docker Engine directly.
+
+### Installing Docker (if needed)
+
+```bash
+# Linux (Ubuntu/Debian)
+sudo apt update && sudo apt install -y docker.io docker-compose-v2
+sudo systemctl enable --now docker
+
+# macOS — Install Docker Desktop from https://docker.com
+# Windows — Install Docker Desktop with WSL2 backend from https://docker.com
+
+# Verify Docker is working
+docker run hello-world
+```
+
+## Deploying Keycloak with Docker Compose
+
+<Steps>
+
+### Step 1: Create the Project Directory
+
+```bash
+# Create a directory for the Keycloak lab
+mkdir -p ~/keycloak-lab && cd ~/keycloak-lab
+```
+
+### Step 2: Create Docker Compose Configuration
+
+Create a file named `docker-compose.yml`:
+
+```yaml
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: keycloak-db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: kc_db_pass_2026
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - keycloak-network
+    restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.1.0
+    container_name: keycloak-server
+    command: start-dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      KC_HOSTNAME: localhost
+      KC_HTTP_PORT: 8080
+      KC_HTTPS_PORT: 8443
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: kc_db_pass_2026
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: Admin123!
+      KC_HOSTNAME_STRICT: false
+      KC_HTTP_ENABLED: true
+      KC_LOG_LEVEL: INFO
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+    networks:
+      - keycloak-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  keycloak_data:
+
+networks:
+  keycloak-network:
+    driver: bridge
+```
+
+<Aside variant="tip" title="Version Compatibility">
+Using the latest Keycloak version is generally safe, but if you encounter issues, pin a specific version. Keycloak 26.x is the latest stable release as of 2026. The `start-dev` command runs Keycloak in development mode (no TLS termination required locally). For production, use `start` with proper TLS certificates.
+</Aside>
+
+### Step 3: Start Keycloak
+
+```bash
+# From the ~/keycloak-lab directory
+docker compose up -d
+
+# Wait for both containers to start (30-60 seconds)
+docker compose ps
+
+# Watch the initialization logs
+docker compose logs -f keycloak
+```
+
+Wait for log output that shows:
+
+```
+keycloak-server  | 2026-06-16 10:30:00,123 INFO  [org.keycloak.services] (main) KC-SERVICES0050: Initializing Keycloak...
+keycloak-server  | 2026-06-16 10:30:15,456 INFO  [org.keycloak.services] (main) KC-SERVICES0050: Keycloak initialized in 15.234s
+keycloak-server  | 2026-06-16 10:30:16,789 INFO  [io.quarkus] (main) Keycloak started in 18.456s on http://localhost:8080
+```
+
+### Step 4: Verify Keycloak is Running
+
+```bash
+# Check that the HTTP endpoint responds
+curl -s -o /dev/null -w "%{http_code}" http://localhost:8080
+# Expected: 200 (or 302 redirect to /realms/master)
+
+# Check the health endpoint
+curl -s http://localhost:8080/health/ready
+# Expected: {"status":"UP"}
+
+# Verify PostgreSQL connection
+docker compose exec postgres pg_isready -U keycloak
+# Expected: /var/run/postgresql:5432 - accepting connections
+```
+
+### Step 5: First Login to Admin Console
+
+1. Open a browser and navigate to: **http://localhost:8080**
+2. Click **Administration Console** (or go directly to http://localhost:8080/admin)
+3. Log in with:
+   - **Username**: `admin`
+   - **Password**: `Admin123!`
+
+<Aside variant="caution" title="Default Credentials Warning">
+The credentials `admin` / `Admin123!` are for **local lab use only**. In any shared or production environment, change these immediately after installation. For production deployments, never use environment variable injection for admin credentials — use a secrets manager or Kubernetes secrets.
+</Aside>
+
+### Step 6: Explore the Admin Console
+
+After logging in, you will see the Keycloak Admin Console:
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  Keycloak Admin Console  │  master  ▼  │  admin  ▼  │  ☰ Menu      │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  ┌─── SIDEBAR ──────────────────────────────────────────────────┐    │
+│  │                                                                   │    │
+│  │  ◆  Realm Settings                                                │    │
+│  │  ◆  Clients                                                       │    │
+│  │  ◆  Client Scopes                                                 │    │
+│  │  ◆  Realm Roles                                                   │    │
+│  │  ◆  Users                                                         │    │
+│  │  ◆  Groups                                                        │    │
+│  │  ◆  Sessions                                                      │    │
+│  │  ◆  Events                                                        │    │
+│  │  ◆  Authentication                                                │    │
+│  │  ◆  Identity Providers                                            │    │
+│  │  ◆  User Federation                                               │    │
+│  │                                                                   │    │
+│  └───────────────────────────────────────────────────────────────┘    │
+│                                                                       │
+│  Master Realm Dashboard                                               │
+│  ┌─────────────────────────────────────────────────────────────────┐  │
+│  │  Realm: master                                                    │  │
+│  │  ┌─────────────┬──────────────┬──────────────┬────────────────┐  │  │
+│  │  │  0 Users    │  0 Clients   │  0 Roles     │  0 Groups      │  │  │
+│  │  └─────────────┴──────────────┴──────────────┴────────────────┘  │  │
+│  │                                                                    │  │
+│  │  Server Info:                                                      │  │
+│  │  ├─ Version: 26.1.0                                               │  │
+│  │  ├─ Database: postgres                                             │  │
+│  │  └─ Uptime: 2 minutes                                             │  │
+│  └─────────────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**Key navigation areas:**
+
+| Menu Item | Purpose | When to Use |
+|-----------|---------|-------------|
+| **Realm Settings** | Configure realm-level settings — themes, tokens, security | Initial realm setup |
+| **Clients** | Register applications that use Keycloak for authentication | **Every time you add an app** |
+| **Client Scopes** | Define what claims are included in tokens | Advanced OIDC configuration |
+| **Realm Roles** | Define roles for the realm (composite or basic) | Role-based access setup |
+| **Users** | Create and manage users, assign roles | User provisioning |
+| **Groups** | Create groups for bulk permission assignment | Organisational management |
+| **Sessions** | View active user sessions | Monitoring and troubleshooting |
+| **Events** | View login events, admin events | Auditing and forensics |
+| **Authentication** | Configure authentication flows, MFA, password policies | Security hardening |
+| **Identity Providers** | Configure social login or brokered IdPs | SSO with external IdPs |
+| **User Federation** | Sync users from LDAP/AD | Enterprise integration |
+
+</Steps>
+
+## Understanding Realms
+
+A **Realm** in Keycloak is a security domain — it manages a set of users, credentials, roles, and groups. A single Keycloak instance can host multiple realms, each completely isolated from the others. Realms are the top-level organisational unit in Keycloak.
+
+### Realm Architecture
+
+```
+Keycloak Server
+├── Realm: master
+│   ├── Users: admin (built-in)
+│   ├── Clients: admin-cli, security-admin-console (built-in)
+│   └── Purpose: Keycloak's own administration
+│
+├── Realm: mycompany (tenant A)
+│   ├── Users: 500 employees
+│   ├── Clients: CRM, ERP, Email, HR-portal
+│   ├── Identity Providers: Azure AD (brokered)
+│   └── User Federation: Active Directory (LDAP sync)
+│
+├── Realm: partner-portal (tenant B)
+│   ├── Users: 2000 external partners
+│   ├── Clients: Partner Dashboard, API Gateway
+│   ├── Identity Providers: Google, GitHub (social login)
+│   └── User Federation: None (self-registration)
+│
+└── Realm: dev-sandbox (tenant C)
+    ├── Users: 50 developers
+    ├── Clients: Various test applications
+    └── Purpose: Development and testing
+```
+
+### Master Realm
+
+The `master` realm is Keycloak's built-in administration realm. Only Keycloak administrators should be in this realm. **Do not create application users in the master realm** — always create a dedicated realm for your applications.
+
+<Aside variant="danger" title="Never Use Master Realm for Applications">
+The master realm has special privileges — users in the master realm can manage the entire Keycloak installation. Creating regular users or applications in the master realm is a security risk. Always create a separate realm for each tenant, application portfolio, or environment.
+</Aside>
+
+## Creating Your First Realm
+
+<Steps>
+
+### Navigate to Realm Management
+
+In the Admin Console:
+1. Hover over the realm name in the top-left corner (it says **master**)
+2. Click **Create Realm**
+
+### Configure Realm
+
+| Field | Value | Explanation |
+|-------|-------|-------------|
+| **Realm name** | `sandbox` | Short, lowercase, no spaces. This becomes part of URLs |
+| **Enabled** | ON | Realm is active immediately |
+| **Display name** | `Sandbox Environment` | Human-readable name shown on login pages |
+
+Click **Create**.
+
+### Verify Realm Creation
+
+After creation, you will be automatically switched to the `sandbox` realm. The URL changes to: `http://localhost:8080/admin/master/console/#/realms/sandbox`
+
+The realm dashboard shows:
+
+```
+Realm: sandbox
+┌─────────────┬──────────────┬──────────────┬────────────────┐
+│  0 Users    │  0 Clients   │  0 Roles     │  0 Groups      │
+└─────────────┴──────────────┴──────────────┴────────────────┘
+```
+
+</Steps>
+
+## Creating Test Users
+
+<Steps>
+
+### Navigate to User Management
+
+In the `sandbox` realm:
+1. Click **Users** in the sidebar
+2. Click **Add user**
+
+### Create an Admin User
+
+| Field | Value | Explanation |
+|-------|-------|-------------|
+| **Username** | `alice` | Unique login identifier |
+| **Email** | `alice@example.com` | For notifications, password reset |
+| **First Name** | `Alice` | Display name |
+| **Last Name** | `Johnson` | Display name |
+| **Email Verified** | ON | Skip email verification in lab |
+| **Groups** | (leave empty) | Will assign roles after creation |
+
+Click **Create**.
+
+### Set Password
+
+1. Go to the **Credentials** tab
+2. Set **Password**: `Alice@Lab2026`
+3. Set **Temporary**: OFF (password will not expire in the lab)
+4. Click **Set Password**
+
+### Create a Regular User
+
+Repeat the process for a second user:
+
+| Field | Value |
+|-------|-------|
+| **Username** | `bob` |
+| **Email** | `bob@example.com` |
+| **First Name** | `Bob` |
+| **Last Name** | `Smith` |
+| **Password** | `Bob@Lab2026` |
+
+### Create Realm Roles
+
+Roles define what users can do. Create two roles:
+
+1. Go to **Realm Roles** in the sidebar
+2. Click **Create role**
+3. Role Name: `app-user`
+4. Description: `Standard application user`
+5. Click **Save**
+
+Repeat for `app-admin`:
+- Role Name: `app-admin`
+- Description: `Application administrator`
+- Click **Save**
+
+### Assign Roles to Users
+
+Assign `app-admin` to Alice:
+1. Go to **Users** → click **alice**
+2. Go to **Role mapping** tab
+3. Click **Assign role**
+4. Select `app-admin` from the dropdown
+5. Click **Assign**
+
+Assign `app-user` to Bob:
+1. Go to **Users** → click **bob**
+2. Go to **Role mapping** tab
+3. Click **Assign role** → select `app-user` → **Assign**
+
+### Verify User Setup
+
+```bash
+# List users via Keycloak REST API (requires admin token)
+
+# Get an admin access token
+curl -s -X POST http://localhost:8080/realms/master/protocol/openid-connect/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=admin" \
+  -d "password=Admin123!" \
+  -d "grant_type=password" \
+  -d "client_id=admin-cli" | jq -r '.access_token'
+
+# Save the token and query users in the sandbox realm
+TOKEN="<token-from-above>"
+curl -s -X GET http://localhost:8080/admin/realms/sandbox/users \
+  -H "Authorization: Bearer $TOKEN" | jq '.[] | {username: .username, email: .email, roles: .realmRoles}'
+```
+
+</Steps>
+
+## Testing the Login Flow
+
+Before configuring applications, verify that Keycloak can authenticate users:
+
+### Direct test via the Account Console
+
+1. Open a browser: **http://localhost:8080/realms/sandbox/account/**
+2. Log in as `alice` with password `Alice@Lab2026`
+3. You will see the user account management page:
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Alice Johnson                                       │
+│  alice@example.com                                   │
+│                                                       │
+│  ┌─────────────────────────────────────────────────┐  │
+│  │  Personal Info                                   │  │
+│  │  ├─ Username: alice                              │  │
+│  │  ├─ Email: alice@example.com                     │  │
+│  │  └─ Email verified: Yes                          │  │
+│  │                                                   │  │
+│  │  Account Security                                 │  │
+│  │  ├─ Signing In (change password)                  │  │
+│  │  ├─ Multi-factor authentication                   │  │
+│  │  └─ Device Activity (active sessions)             │  │
+│  │                                                   │  │
+│  │  Applications                                     │  │
+│  │  └─ (list of apps user has logged into)           │  │
+│  └─────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────┘
+```
+
+### Testing via OpenID Connect token endpoint
+
+```bash
+# Direct grant test (Resource Owner Password Credentials flow)
+# This is for testing only — use Authorization Code flow for real apps
+
+curl -s -X POST http://localhost:8080/realms/sandbox/protocol/openid-connect/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=alice" \
+  -d "password=Alice@Lab2026" \
+  -d "grant_type=password" \
+  -d "client_id=admin-cli" | jq
+```
+
+Response:
+
+```json
+{
+  "access_token": "eyJhbGciOiJSUzI1NiIs...",
+  "expires_in": 300,
+  "refresh_token": "eyJhbGciOiJIUzI1NiIs...",
+  "refresh_expires_in": 1800,
+  "token_type": "Bearer",
+  "id_token": "eyJhbGciOiJSUzI1NiIs...",
+  "not-before-policy": 0,
+  "session_state": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "scope": "openid email profile"
+}
+```
+
+Success means:
+- Keycloak authenticated Alice correctly
+- Issued an access token (for API calls)
+- Issued an ID token (for user identity)
+- Issued a refresh token (for obtaining new tokens)
+
+## Environment Management
+
+### Stopping Keycloak
+
+```bash
+cd ~/keycloak-lab
+docker compose down
+# Containers stopped, network removed. Data persisted in volumes.
+```
+
+### Restarting Keycloak
+
+```bash
+cd ~/keycloak-lab
+docker compose start
+# Or if fully stopped:
+docker compose up -d
+```
+
+### Full Reset (delete everything)
+
+```bash
+cd ~/keycloak-lab
+docker compose down -v
+# WARNING: The -v flag deletes all volumes (users, realms, config).
+# The next `docker compose up -d` starts fresh.
+```
+
+### Backing Up Keycloak
+
+```bash
+# Export realm configuration (can be done while running)
+docker compose exec keycloak /opt/keycloak/bin/kc.sh export \
+  --dir /opt/keycloak/data/export \
+  --realm sandbox
+
+# Copy export to host
+docker cp keycloak-server:/opt/keycloak/data/export ./backup/
+
+# The export contains realm config, users, clients, roles as JSON files
+```
+
+<Aside variant="tip" title="Export Format">
+Keycloak exports can be in `keycloak` format (default) or `saml` format. The export includes realm settings, clients, users, and roles — but NOT sessions or offline tokens. Use database backups for full recovery.
+</Aside>
+
+## Production Readiness Checklist
+
+The lab deployment uses `start-dev` mode, which is not suitable for production. When moving to production:
+
+| Lab Setting | Production Requirement | Reason |
+|-------------|----------------------|--------|
+| `start-dev` | `start` with TLS | Dev mode disables security optimisations |
+| HTTP | HTTPS (port 443) | TLS is mandatory for production authentication |
+| Self-signed | Proper TLS certificate (Let's Encrypt, CA) | Browser trust, security |
+| Single instance | Clustered deployment (2+ nodes) | High availability |
+| Embedded H2/Postgres in Docker | Managed PostgreSQL (RDS, Cloud SQL) | Reliability, backups, monitoring |
+| Admin credentials in env vars | Secrets manager, Kubernetes secrets | Secure credential management |
+| Default password policies | Customised policies per organisation | Security compliance |
+| No backup | Automated database backups | Disaster recovery |
+
+## Troubleshooting
+
+| Symptom | Cause | Solution |
+|---------|-------|----------|
+| Container exits immediately | Port 8080 already in use | `lsof -i :8080` to find the process, stop it, or change Keycloak port in docker-compose |
+| Cannot log into admin console | Wrong realm selected | Make sure you are logging in against the `master` realm (top-left dropdown) |
+| "Failed to create realm" | Database connection issue | `docker compose logs postgres` to check PostgreSQL is healthy |
+| Users cannot log in | Realm or client not enabled | Check "Enabled" toggle in Realm Settings and Client configuration |
+| Token endpoint returns 401 | Invalid credentials or client | Verify client secret, user password, and grant type |
+| Keycloak is slow | Insufficient resources | Ensure at least 4 GB RAM allocated to Docker |
+
+## Key Takeaways
+
+- **Keycloak is an open-source IdP** supporting OIDC, OAuth 2.0, and SAML 2.0 — ideal for learning identity federation and SSO concepts hands-on
+- **Docker Compose deployment takes 5 minutes** — PostgreSQL for persistence, Keycloak for the IdP, both in containers
+- **Realms are isolated security domains** — the `master` realm is for administration only; always create separate realms for applications
+- **Users, roles, and groups are the building blocks** of Keycloak's access model — roles define permissions, groups organise users
+- **The admin console provides full management** — users, clients, roles, authentication policies, and identity federation are all configured through the web UI
+- **Export/import enables configuration as code** — Keycloak realms can be exported as JSON and version-controlled for reproducible deployments
+
+<Aside variant="info" title="Next Steps">
+Your Keycloak IdP is running with users and roles. Now proceed to **[Keycloak SSO Configuration](/learn/authentication-authorization/keycloak-sso-configuration/)** to register applications as OIDC and SAML clients, configure SSO login flows, set up user federation with LDAP, and enable multi-factor authentication.
+</Aside>

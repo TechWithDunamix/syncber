@@ -16,7 +16,7 @@ The Identity Provider (IdP) is the central authentication authority in modern IA
 | **Okta** | Cloud IdP | SAML, OIDC, SCIM, LDAP, RADIUS | SaaS | Largest integration network, workflow engine |
 | **Azure AD / Entra ID** | Cloud IdP | SAML, OIDC, WS-Fed, Kerberos | SaaS | Deep Microsoft integration, conditional access |
 | **Ping Identity** | IdP + Directory | SAML, OIDC, LDAP, SCIM, WS-Fed, RADIUS | SaaS + On-prem | Multi-protocol support, enterprise directory |
-| **Keycloak** | Open Source IdP | SAML, OIDC, LDAP | Self-hosted | Open source, customisable, community |
+| **Keycloak** | Open Source IdP | SAML, OIDC, LDAP | Self-hosted | Open source, customisable, community — [Lab Deployment Guide](/learn/authentication-authorization/keycloak-deployment/) ⚡ |
 | **ForgeRock** | IdP + IG | SAML, OIDC, LDAP, RADIUS | Self-hosted + SaaS | Full IAM platform, IoT support |
 | **OneLogin** | Cloud IdP | SAML, OIDC, SCIM, LDAP | SaaS | Simplicity, ease of setup |
 | **Amazon Cognito** | Cloud IdP | OIDC, SAML | AWS SaaS | AWS integration, cost-effective for B2C |
@@ -169,7 +169,7 @@ IdP downtime means ALL applications that rely on SSO authentication become unava
 | **Cloud IdP as primary** | Cloud IdP is the authoritative identity source | Cloud-first, SaaS-heavy organisations |
 | **On-prem IdP with cloud federation** | On-prem AD/LDAP federated to cloud IdP | Mature AD deployment, hybrid infrastructure |
 | **IdP brokering** | Central broker arbitrates between IdPs | Post-M&A, multi-IdP environments |
-| **Custom IdP (Keycloak)** | Self-hosted, customised IdP | Custom authentication flows, air-gapped environments |
+| **Custom IdP (Keycloak)** | Self-hosted, customised IdP — see the [hands-on guides](/learn/authentication-authorization/keycloak-deployment/) for full lab setup and SSO configuration | Custom authentication flows, air-gapped environments |
 | **B2C IdP (Auth0/Cognito)** | Customer-facing authentication | Consumer applications, social login |
 | **Regional IdP** | Separate IdP per region | Data residency, compliance requirements |
 
