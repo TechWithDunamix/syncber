@@ -1,0 +1,285 @@
+---
+title: "Node.js Fundamentals"
+description: "Node.js runtime overview, require vs import, NPM and package.json, global objects, the event loop, and running your first Node.js script."
+sidebar:
+  order: 1
+  label: "Node.js Fundamentals"
+tab: "full-stack-development"
+---
+
+Node.js brings JavaScript to the server. It's built on Chrome's V8 JavaScript engine and provides APIs for file system access, networking, HTTP servers, and more.
+
+## What is Node.js?
+
+- **Runtime**: Executes JavaScript outside the browser
+- **Event-driven**: Uses an event loop for non-blocking I/O
+- **Single-threaded**: One thread handles all requests (but uses background threads for I/O)
+- **NPM**: The largest package ecosystem in the world (2+ million packages)
+
+## Installing Node.js
+
+```bash
+# Check if Node.js is installed
+node --version  # v18 or v20 recommended
+npm --version
+
+# Download from https://nodejs.org (LTS version recommended)
+```
+
+## Your First Node.js Script
+
+```javascript
+// hello.js
+console.log("Hello from Node.js!");
+
+const os = require("os");
+console.log("Platform:", os.platform());
+console.log("CPU cores:", os.cpus().length);
+console.log("Free memory:", Math.round(os.freemem() / 1024 / 1024), "MB");
+```
+
+Run it:
+
+```bash
+node hello.js
+```
+
+## require vs import
+
+Node.js supports two module systems:
+
+### CommonJS (default)
+
+```javascript
+// math.js
+const add = (a, b) => a + b;
+const subtract = (a, b) => a - b;
+
+module.exports = { add, subtract };
+
+// app.js
+const math = require("./math.js");
+console.log(math.add(2, 3)); // 5
+```
+
+### ES Modules
+
+To use ES modules, add `"type": "module"` to your `package.json`:
+
+```json
+{
+  "type": "module"
+}
+```
+
+Then use `import`/`export`:
+
+```javascript
+// math.js
+export const add = (a, b) => a + b;
+export const subtract = (a, b) => a - b;
+
+// app.js
+import { add, subtract } from "./math.js";
+console.log(add(2, 3)); // 5
+```
+
+| Feature | CommonJS | ES Modules |
+|---------|----------|------------|
+| Extension | `.js` (default) | `.mjs` or `.js` with `"type": "module"` |
+| Import | `require()` | `import` |
+| Export | `module.exports` | `export` |
+| Dynamic import | `require()` (sync) | `import()` (async) |
+| Top-level await | ❌ | ✅ |
+
+## NPM and package.json
+
+```bash
+# Initialise a new project
+npm init -y  # creates package.json with defaults
+
+# Install a package
+npm install express
+
+# Install as dev dependency
+npm install --save-dev nodemon
+
+# Install globally
+npm install -g pm2
+```
+
+### package.json
+
+```json
+{
+  "name": "my-api",
+  "version": "1.0.0",
+  "description": "A REST API built with Express",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "test": "jest"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0",
+    "jest": "^29.0.0"
+  }
+}
+```
+
+### Semantic Versioning
+
+```
+^4.18.2  → Compatible with 4.x.x (allows minor/patch updates)
+~4.18.2  → Compatible with 4.18.x (allows patch updates only)
+4.18.2   → Exact version only
+*        → Any version (avoid — unpredictable)
+```
+
+## Global Objects
+
+Node.js provides several global objects:
+
+```javascript
+// __dirname — current directory path
+console.log(__dirname); // /home/project/src
+
+// __filename — current file path
+console.log(__filename); // /home/project/src/index.js
+
+// process — current Node.js process
+console.log(process.pid);       // process ID
+console.log(process.version);   // Node.js version
+console.log(process.argv);      // command-line arguments
+console.log(process.env.NODE_ENV); // environment variables
+
+// Buffer — handle binary data
+const buf = Buffer.from("Hello");
+console.log(buf.toString()); // "Hello"
+
+// setImmediate, setTimeout, setInterval
+setImmediate(() => console.log("Immediate"));
+setTimeout(() => console.log("Timeout"), 0);
+process.nextTick(() => console.log("Next tick"));
+// Order: nextTick → Immediate → Timeout
+```
+
+## The Event Loop
+
+Node.js uses an **event loop** to handle asynchronous operations on a single thread:
+
+```
+   ┌──────────┐
+   │   timers  │ ← setTimeout, setInterval callbacks
+   └────┬─────┘
+   ┌────┴─────┐
+   │  pending  │ ← I/O callbacks
+   └────┬─────┘
+   ┌────┴─────┐
+   │  idle,   │ ← internal operations
+   │ prepare  │
+   └────┬─────┘
+   ┌────┴─────┐
+   │   poll    │ ← retrieve new I/O events
+   └────┬─────┘
+   ┌────┴─────┐
+   │  check   │ ← setImmediate callbacks
+   └────┬─────┘
+   ┌────┴─────┐
+   │  close   │ ← close event callbacks
+   └──────────┘
+```
+
+**Key insight**: The event loop allows Node.js to handle thousands of concurrent connections without creating a thread per connection. While your code runs on one thread, I/O operations happen on background threads (libuv thread pool).
+
+```javascript
+console.log("1");
+
+setTimeout(() => console.log("2"), 0);
+
+Promise.resolve().then(() => console.log("3"));
+
+process.nextTick(() => console.log("4"));
+
+console.log("5");
+
+// Output: 1, 5, 4, 3, 2
+```
+
+## The fs Module
+
+```javascript
+const fs = require("fs");
+
+// Synchronous (blocks the event loop — avoid in production)
+const data = fs.readFileSync("./file.txt", "utf8");
+
+// Asynchronous with callbacks
+fs.readFile("./file.txt", "utf8", (err, data) => {
+  if (err) throw err;
+  console.log(data);
+});
+
+// Asynchronous with promises (preferred)
+const fsPromises = require("fs").promises;
+
+async function readFile() {
+  try {
+    const data = await fsPromises.readFile("./file.txt", "utf8");
+    console.log(data);
+  } catch (err) {
+    console.error("Failed to read:", err.message);
+  }
+}
+```
+
+## The path Module
+
+```javascript
+const path = require("path");
+
+console.log(path.join("/users", "alice", "docs"));  // /users/alice/docs
+console.log(path.resolve("src", "app.js"));         // /absolute/path/src/app.js
+console.log(path.basename("/a/b/file.txt"));        // file.txt
+console.log(path.extname("file.txt"));              // .txt
+console.log(path.parse("/a/b/file.txt"));
+// { root: '/', dir: '/a/b', base: 'file.txt', ext: '.txt', name: 'file' }
+```
+
+## Common Built-in Modules
+
+| Module | Purpose |
+|--------|---------|
+| `fs` | File system operations |
+| `path` | File path utilities |
+| `os` | Operating system info |
+| `http` | HTTP server/client |
+| `crypto` | Cryptographic functions |
+| `util` | Utility functions (promisify, etc.) |
+| `events` | Event emitter |
+| `stream` | Streaming data |
+| `child_process` | Running external commands |
+
+## Quick Reference
+
+```bash
+node script.js           # Run a script
+node --watch script.js   # Auto-restart on changes (Node 18+)
+npm init -y              # Create package.json
+npm install <pkg>        # Install a package
+npm install -D <pkg>     # Install as dev dependency
+npm run <script>         # Run package.json script
+npx <command>            # Run without installing
+```
+
+## Practice Exercises
+
+1. **File reader**: Write a script that reads a file and counts the number of lines, words, and characters. Handle the case where the file doesn't exist.
+
+2. **CLI tool**: Create a Node.js script that accepts command-line arguments (using `process.argv`) and prints a greeting. Example: `node greet.js Alice` → "Hello, Alice!".
+
+3. **Event loop order**: Write a script that uses `setTimeout`, `setImmediate`, `process.nextTick`, and `Promise.resolve()` and logs their order. Explain the output.

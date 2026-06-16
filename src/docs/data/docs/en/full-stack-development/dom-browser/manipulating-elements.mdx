@@ -1,0 +1,337 @@
+---
+title: "Manipulating DOM Elements"
+description: "Creating, reading, updating, and deleting DOM elements — textContent, innerHTML, classList, style, attributes, createElement, appendChild, remove, and document fragments."
+sidebar:
+  order: 3
+  label: "Manipulating Elements"
+tab: "full-stack-development"
+---
+
+Once you've selected an element, you can change its content, appearance, structure, and behaviour. This page covers all the ways to manipulate the DOM.
+
+## Reading and Changing Content
+
+### textContent
+
+Gets or sets the **text** content of an element (all child text, no HTML parsing):
+
+```html
+<p id="message">Hello, <strong>world</strong>!</p>
+```
+
+```js
+const p = document.getElementById("message");
+
+// Read
+console.log(p.textContent); // "Hello, world!" (no HTML tags)
+
+// Write
+p.textContent = "Goodbye!";
+// <p id="message">Goodbye!</p> — any HTML in the string is escaped
+```
+
+`textContent` is **safe** — it automatically escapes HTML tags, preventing XSS attacks.
+
+### innerHTML
+
+Gets or sets the **HTML content** inside an element:
+
+```js
+const div = document.querySelector(".content");
+
+// Read
+console.log(div.innerHTML); // includes all HTML tags inside
+
+// Write — parses HTML string
+div.innerHTML = "<p>New <strong>content</strong></p>";
+
+// Append
+div.innerHTML += "<p>Added paragraph</p>";
+```
+
+<Aside variant="danger">
+`innerHTML` with user-supplied data is a security risk. If a user types `<img src=x onerror=alert('XSS')>`, the script executes. Always use `textContent` for text, or sanitize input before using `innerHTML`.
+</Aside>
+
+### innerText (vs textContent)
+
+```html
+<p id="test" style="display: none;">Hidden text</p>
+```
+
+```js
+const p = document.getElementById("test");
+
+console.log(p.textContent); // "Hidden text" — includes hidden text
+console.log(p.innerText);   // "" — respects CSS visibility, triggers layout
+```
+
+Prefer `textContent` — it's faster and doesn't trigger layout recalculations.
+
+## Working with Attributes
+
+### Standard Attributes
+
+```html
+<a id="link" href="https://example.com" target="_blank" class="external">Link</a>
+```
+
+```js
+const link = document.getElementById("link");
+
+// Get attribute
+console.log(link.getAttribute("href")); // "https://example.com"
+console.log(link.href); // Full URL (property normalisation)
+
+// Set attribute
+link.setAttribute("target", "_self");
+link.href = "https://other.com";
+
+// Check existence
+console.log(link.hasAttribute("target")); // true
+
+// Remove attribute
+link.removeAttribute("target");
+```
+
+### Data Attributes
+
+```html
+<button data-user-id="123" data-role="admin" data-active="true">Edit</button>
+```
+
+```js
+const btn = document.querySelector("button");
+
+// Read via dataset (camelCase)
+console.log(btn.dataset.userId); // "123"
+console.log(btn.dataset.role);   // "admin"
+console.log(btn.dataset.active); // "true" (always string)
+
+// Write
+btn.dataset.userId = "456";
+btn.dataset.newAttr = "value"; // creates data-new-attr
+
+// Check
+console.log(btn.hasAttribute("data-user-id")); // true
+```
+
+## Manipulating Classes
+
+```html
+<div id="box" class="card large">Content</div>
+```
+
+```js
+const box = document.getElementById("box");
+
+// Add class
+box.classList.add("highlight");
+
+// Remove class
+box.classList.remove("large");
+
+// Toggle (add if missing, remove if present)
+box.classList.toggle("active");
+
+// Replace
+box.classList.replace("card", "panel");
+
+// Check
+console.log(box.classList.contains("highlight")); // true
+
+// Multiple classes
+box.classList.add("visible", "animated", "fade-in");
+```
+
+## Changing Styles
+
+### Inline Styles (style property)
+
+```js
+const el = document.querySelector(".element");
+
+// Individual properties (camelCase)
+el.style.backgroundColor = "blue";
+el.style.fontSize = "16px";
+el.style.marginTop = "20px";
+el.style.display = "flex";
+
+// CSS custom properties
+el.style.setProperty("--main-color", "red");
+
+// Remove inline style
+el.style.removeProperty("margin-top");
+
+// Read computed style
+const computed = getComputedStyle(el);
+console.log(computed.backgroundColor);
+```
+
+### Better: Use CSS Classes
+
+Instead of inline styles, toggle classes:
+
+```js
+// ❌ Avoid
+el.style.color = "red";
+el.style.fontWeight = "bold";
+
+// ✅ Prefer
+el.classList.add("error-state"); // defined in CSS
+```
+
+```css
+.error-state {
+  color: red;
+  font-weight: bold;
+}
+```
+
+## Creating and Inserting Elements
+
+### createElement + appendChild
+
+```js
+// Create elements
+const div = document.createElement("div");
+const p = document.createElement("p");
+const strong = document.createElement("strong");
+
+// Set content
+p.textContent = "This is a paragraph";
+strong.textContent = "bold text";
+
+// Build tree
+p.appendChild(strong);
+div.appendChild(p);
+
+// Insert into document
+document.body.appendChild(div);
+```
+
+### Modern Insertion Methods
+
+```js
+const parent = document.querySelector(".list");
+
+// Append at end
+parent.append(newElement); // can append multiple: parent.append(el1, el2)
+
+// Prepend at beginning
+parent.prepend(newElement);
+
+// Insert before a reference element
+parent.insertBefore(newElement, referenceElement);
+
+// Insert adjacent HTML
+const target = document.querySelector(".target");
+target.insertAdjacentHTML("beforebegin", "<p>Before</p>");
+target.insertAdjacentHTML("afterbegin", "<p>First child</p>");
+target.insertAdjacentHTML("beforeend", "<p>Last child</p>");
+target.insertAdjacentHTML("afterend", "<p>After</p>");
+```
+
+```html
+<!-- beforebegin -->
+<div class="target">
+  <!-- afterbegin -->
+  existing content...
+  <!-- beforeend -->
+</div>
+<!-- afterend -->
+```
+
+### Replace and Remove
+
+```js
+// Replace
+oldElement.replaceWith(newElement);
+
+// Remove
+element.remove(); // modern
+parent.removeChild(child); // legacy
+
+// Clear all children
+element.innerHTML = "";
+// or
+while (element.firstChild) {
+  element.removeChild(element.firstChild);
+}
+```
+
+## Document Fragments
+
+For bulk operations, use a `DocumentFragment` to avoid multiple reflows:
+
+```js
+// ❌ Bad — triggers reflow on each append
+const list = document.getElementById("list");
+for (let i = 0; i < 1000; i++) {
+  const li = document.createElement("li");
+  li.textContent = `Item ${i}`;
+  list.appendChild(li); // reflow every time!
+}
+
+// ✅ Good — single reflow
+const fragment = document.createDocumentFragment();
+for (let i = 0; i < 1000; i++) {
+  const li = document.createElement("li");
+  li.textContent = `Item ${i}`;
+  fragment.appendChild(li);
+}
+list.appendChild(fragment); // single reflow
+```
+
+## Clone Nodes
+
+```js
+const original = document.querySelector(".card");
+
+// Shallow clone — copies element but NOT children
+const shallow = original.cloneNode(false);
+
+// Deep clone — copies element AND all children
+const deep = original.cloneNode(true);
+```
+
+## Checking and Comparing Elements
+
+```js
+// Check if element is in the DOM
+console.log(document.contains(element)); // true/false
+
+// Check if element contains another
+console.log(parent.contains(child)); // true/false
+
+// Compare elements
+console.log(element1 === element2);
+console.log(element1.isEqualNode(element2)); // deep equality
+console.log(element1.isSameNode(element2));  // same reference
+```
+
+## Quick Reference
+
+| Operation | Method |
+|-----------|--------|
+| Get/Set text | `element.textContent` |
+| Get/Set HTML | `element.innerHTML` |
+| Add class | `element.classList.add("cls")` |
+| Remove class | `element.classList.remove("cls")` |
+| Toggle class | `element.classList.toggle("cls")` |
+| Set attribute | `element.setAttribute("k", "v")` |
+| Get attribute | `element.getAttribute("k")` |
+| Data attribute | `element.dataset.key` |
+| Set style | `element.style.prop = "value"` |
+| Create element | `document.createElement("tag")` |
+| Append child | `parent.append(child)` |
+| Remove | `element.remove()` |
+| Clone | `element.cloneNode(deep)` |
+
+## Practice Exercises
+
+1. **Build a list generator**: Create a page with a text input and a button. When clicked, add the input text as a new `<li>` to a `<ul>`. Include a "Clear All" button that removes all items.
+
+2. **Data attribute reader**: Create several `<div>` elements with `data-info` attributes. Write a script that reads all data attributes and displays them in a table.
+
+3. **Class toggle demo**: Create a `<div>` that changes appearance when a button toggles an `.active` class. Use `classList.toggle()` and define the styles in CSS.

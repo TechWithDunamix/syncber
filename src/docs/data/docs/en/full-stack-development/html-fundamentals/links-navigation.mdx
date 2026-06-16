@@ -1,0 +1,240 @@
+---
+title: "Links & Navigation"
+description: "Create hyperlinks with the anchor tag — absolute and relative URLs, opening links in new tabs, internal page navigation, email links, and accessible link practices."
+sidebar:
+  order: 4
+  label: "Links & Navigation"
+tab: "full-stack-development"
+---
+
+Links are what make the web the web. The `<a>` (anchor) element creates hyperlinks connecting pages, websites, and resources.
+
+## Basic Link Syntax
+
+```html
+<a href="https://example.com">Click here to visit Example</a>
+```
+
+The `href` attribute specifies the destination. The content between `<a>` and `</a>` is the visible, clickable text.
+
+## Absolute vs Relative URLs
+
+### Absolute URLs
+
+Absolute URLs include the full web address:
+
+```html
+<a href="https://www.google.com">Google</a>
+<a href="https://en.wikipedia.org/wiki/HTML">HTML on Wikipedia</a>
+<a href="https://example.com/images/photo.jpg">Download Photo</a>
+```
+
+Use absolute URLs when linking to **external websites** you don't control.
+
+### Relative URLs
+
+Relative URLs are paths within your own site:
+
+```html
+<!-- Same directory -->
+<a href="about.html">About Us</a>
+
+<!-- Subdirectory -->
+<a href="products/widget.html">Widget Product</a>
+
+<!-- Parent directory -->
+<a href="../index.html">Back to Home</a>
+
+<!-- Root-relative -->
+<a href="/products/index.html">Products</a>
+```
+
+Prefix | Meaning
+--------|---------
+`file.html` | Same directory
+`folder/file.html` | Subdirectory
+`../file.html` | Parent directory
+`/file.html` | Root of the site (starts from domain root)
+
+Use relative URLs for pages within your own website — they keep working if you change domains.
+
+<Aside variant="tip">
+Relative URLs are better for internal links because they work on localhost (`http://localhost:5500`) and in production (`https://yoursite.com`) without modification.
+</Aside>
+
+## Opening Links in a New Tab
+
+```html
+<a href="https://example.com" target="_blank" rel="noopener noreferrer">
+  Opens in new tab (secure)
+</a>
+```
+
+Always include `rel="noopener noreferrer"` when using `target="_blank"`:
+
+| Attribute | Purpose |
+|-----------|---------|
+| `target="_blank"` | Opens link in new tab/window |
+| `rel="noopener"` | Prevents the new page from accessing `window.opener` (security) |
+| `rel="noreferrer"` | Hides the referring page URL from the destination |
+
+```html
+<!-- ❌ Insecure — the target page can control your tab -->
+<a href="https://evil.com" target="_blank">Dangerous</a>
+
+<!-- ✅ Secure — always add rel="noopener noreferrer" -->
+<a href="https://example.com" target="_blank" rel="noopener noreferrer">Safe</a>
+```
+
+## Internal Page Links (Anchor Links)
+
+Link to a specific section within the same page using `id` attributes:
+
+```html
+<!-- Navigation -->
+<a href="#features">Features</a>
+<a href="#pricing">Pricing</a>
+<a href="#contact">Contact</a>
+
+<!-- Target sections -->
+<section id="features">
+  <h2>Features</h2>
+</section>
+
+<section id="pricing">
+  <h2>Pricing</h2>
+</section>
+
+<section id="contact">
+  <h2>Contact</h2>
+</section>
+```
+
+To link to a specific section on another page:
+
+```html
+<a href="about.html#team">View our team</a>
+```
+
+## Email and Phone Links
+
+```html
+<!-- Email link (opens default email client) -->
+<a href="mailto:hello@example.com">Email Us</a>
+
+<!-- With subject and body pre-filled -->
+<a href="mailto:hello@example.com?subject=Hello&body=I%20have%20a%20question">
+  Send Feedback
+</a>
+
+<!-- Phone link (mobile devices) -->
+<a href="tel:+1234567890">Call (123) 456-7890</a>
+```
+
+## Download Links
+
+```html
+<!-- Prompt download instead of navigating -->
+<a href="document.pdf" download>Download PDF</a>
+
+<!-- Suggest a filename -->
+<a href="report.pdf" download="quarterly-report.pdf">Download Q1 Report</a>
+```
+
+The `download` attribute tells the browser to download the file instead of opening it.
+
+## Link States (Styling)
+
+Links have four states that you can style with CSS:
+
+```html
+<style>
+  a:link { color: blue; }        /* Unvisited link */
+  a:visited { color: purple; }   /* Visited link */
+  a:hover { color: red; }        /* Mouse over */
+  a:active { color: orange; }    /* While clicking */
+</style>
+
+<a href="https://example.com">Styled Link</a>
+```
+
+Always define them in this order: **L**o**V**e **H**Ate — `:link`, `:visited`, `:hover`, `:active`.
+
+## Building a Navigation Bar
+
+A navigation bar is typically an unordered list of links:
+
+```html
+<nav>
+  <ul>
+    <li><a href="index.html">Home</a></li>
+    <li><a href="about.html">About</a></li>
+    <li><a href="services.html">Services</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+</nav>
+```
+
+With basic CSS, this becomes a horizontal navigation bar:
+
+```html
+<style>
+  nav ul {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    gap: 20px;
+  }
+  nav a {
+    text-decoration: none;
+    color: #333;
+    padding: 8px 16px;
+  }
+  nav a:hover {
+    background-color: #f0f0f0;
+  }
+</style>
+```
+
+## Accessibility Best Practices
+
+```html
+<!-- ✅ Good: descriptive link text -->
+<a href="pricing.html">View our pricing plans</a>
+
+<!-- ❌ Bad: vague link text -->
+<a href="pricing.html">Click here</a>
+
+<!-- ✅ Use aria-label when the visible text isn't descriptive enough -->
+<a href="report.pdf" aria-label="Download quarterly financial report PDF">
+  Download
+</a>
+
+<!-- ❌ Don't use full URLs as link text -->
+<a href="https://example.com">https://example.com</a>
+```
+
+Good link text:
+- Tells users where the link goes
+- Makes sense out of context (screen readers can list all links)
+- Avoids "click here" or "read more"
+
+## Try It Yourself
+
+Create a page with:
+
+1. A navigation bar with at least 4 internal links using relative URLs
+2. An external link to your favorite website (opens in new tab, secure)
+3. An anchor link that jumps to a section on the same page
+4. A mailto link with a pre-filled subject
+5. A download link to a placeholder file
+6. A link back to the top of the page from the bottom
+
+## Key Takeaways
+
+- Use absolute URLs for external sites, relative URLs for internal pages
+- Always add `rel="noopener noreferrer"` when using `target="_blank"`
+- Anchor links (`#id`) jump to sections within a page
+- The `download` attribute forces file download instead of navigation
+- Descriptive link text is critical for accessibility and SEO
+- Style links in LoVe HAte order: `:link`, `:visited`, `:hover`, `:active`

@@ -1,0 +1,831 @@
+---
+title: "Project: Responsive Landing Page"
+description: "Build a complete responsive SaaS landing page using all CSS techniques — Flexbox, Grid, media queries, custom properties, animations, and modern layout patterns."
+sidebar:
+  order: 10
+  label: "Responsive Project"
+tab: "full-stack-development"
+---
+
+This project applies everything you've learned about CSS to build a professional SaaS landing page — fully responsive, animated, and built with modern CSS.
+
+## Project Requirements
+
+Your landing page must include:
+
+- [ ] Responsive navigation (hamburger on mobile, horizontal on desktop)
+- [ ] Full-viewport hero section with CTA button
+- [ ] Features section (3-column responsive grid)
+- [ ] Testimonials carousel (horizontal scroll or grid)
+- [ ] Pricing cards with hover effects
+- [ ] Footer with links
+- [ ] CSS custom properties for theming
+- [ ] Mobile-first media queries
+- [ ] At least one animation/transition
+- [ ] Valid HTML and CSS
+
+## Project Setup
+
+```bash
+mkdir saas-landing
+cd saas-landing
+touch index.html style.css
+```
+
+Link your stylesheet in `index.html`:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Streamline — Modern project management for teams">
+  <title>Streamline — Project Management</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Content goes here -->
+</body>
+</html>
+```
+
+## CSS Custom Properties (style.css)
+
+Start with the design system:
+
+```css
+/* ========== CUSTOM PROPERTIES ========== */
+:root {
+  --color-primary: #4f46e5;
+  --color-primary-dark: #3730a3;
+  --color-secondary: #0ea5e9;
+  --color-accent: #f59e0b;
+  --color-bg: #ffffff;
+  --color-bg-alt: #f8fafc;
+  --color-text: #1e293b;
+  --color-text-light: #64748b;
+  --color-border: #e2e8f0;
+
+  --font-family: "Inter", system-ui, -apple-system, sans-serif;
+  --font-size-base: 16px;
+  --line-height: 1.6;
+
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 48px;
+  --spacing-2xl: 96px;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
+  --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.1);
+
+  --container-max: 1200px;
+}
+
+/* ========== RESET & BASE ========== */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 80px;
+}
+
+body {
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height);
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.container {
+  max-width: var(--container-max);
+  margin: 0 auto;
+  padding: 0 var(--spacing-lg);
+}
+```
+
+## Section 1: Navigation
+
+```html
+<header class="header">
+  <div class="container header-inner">
+    <div class="logo">
+      <span class="logo-icon">&#9670;</span>
+      <span class="logo-text">Streamline</span>
+    </div>
+
+    <button class="hamburger" aria-label="Toggle menu">☰</button>
+
+    <nav class="nav" aria-label="Main navigation">
+      <ul class="nav-links">
+        <li><a href="#features">Features</a></li>
+        <li><a href="#testimonials">Testimonials</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ul>
+    </nav>
+
+    <a href="#" class="btn btn-primary nav-cta">Get Started</a>
+  </div>
+</header>
+```
+
+```css
+/* ========== HEADER ========== */
+.header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--color-border);
+  z-index: 100;
+}
+
+.header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 72px;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-weight: 700;
+  font-size: 1.25rem;
+}
+
+.logo-icon {
+  color: var(--color-primary);
+  font-size: 1.5rem;
+}
+
+/* Navigation */
+.nav-links {
+  display: flex;
+  list-style: none;
+  gap: var(--spacing-lg);
+}
+
+.nav-links a {
+  color: var(--color-text-light);
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.nav-links a:hover {
+  color: var(--color-primary);
+}
+
+/* Hamburger (hidden on desktop) */
+.hamburger {
+  display: none;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+/* Mobile nav */
+@media (max-width: 767px) {
+  .hamburger {
+    display: block;
+  }
+
+  .nav {
+    position: fixed;
+    top: 72px;
+    left: 0;
+    width: 100%;
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+    padding: var(--spacing-lg);
+    display: none;
+  }
+
+  .nav.active {
+    display: block;
+  }
+
+  .nav-links {
+    flex-direction: column;
+    gap: var(--spacing-md);
+  }
+
+  .nav-cta {
+    display: none;
+  }
+}
+```
+
+## Section 2: Hero
+
+```html
+<section class="hero">
+  <div class="container hero-content">
+    <h1 class="hero-title">Project Management<br>That <span class="text-gradient">Actually Works</span></h1>
+    <p class="hero-subtitle">Streamline helps teams organize, track, and deliver projects — without the complexity. Join 10,000+ teams already shipping faster.</p>
+    <div class="hero-actions">
+      <a href="#" class="btn btn-primary btn-lg">Start Free Trial</a>
+      <a href="#" class="btn btn-secondary btn-lg">Watch Demo</a>
+    </div>
+    <div class="hero-stats">
+      <div class="stat">
+        <span class="stat-number">10K+</span>
+        <span class="stat-label">Teams</span>
+      </div>
+      <div class="stat">
+        <span class="stat-number">99.9%</span>
+        <span class="stat-label">Uptime</span>
+      </div>
+      <div class="stat">
+        <span class="stat-number">4.9★</span>
+        <span class="stat-label">Rating</span>
+      </div>
+    </div>
+  </div>
+</section>
+```
+
+```css
+/* ========== HERO ========== */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  text-align: center;
+  padding-top: 72px;
+  background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+}
+
+.hero-title {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  font-weight: 800;
+  line-height: 1.1;
+  margin-bottom: var(--spacing-lg);
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero-subtitle {
+  font-size: 1.125rem;
+  color: var(--color-text-light);
+  max-width: 600px;
+  margin: 0 auto var(--spacing-xl);
+}
+
+.hero-actions {
+  display: flex;
+  gap: var(--spacing-md);
+  justify-content: center;
+  margin-bottom: var(--spacing-2xl);
+}
+
+.hero-stats {
+  display: flex;
+  justify-content: center;
+  gap: var(--spacing-xl);
+}
+
+.stat {
+  text-align: center;
+}
+
+.stat-number {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.stat-label {
+  font-size: 0.875rem;
+  color: var(--color-text-light);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 12px 24px;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: white;
+}
+
+.btn-secondary {
+  background: white;
+  color: var(--color-primary);
+  border: 2px solid var(--color-primary);
+}
+
+.btn-lg {
+  padding: 16px 32px;
+  font-size: 1.125rem;
+}
+```
+
+## Section 3: Features Grid
+
+```html
+<section id="features" class="section">
+  <div class="container">
+    <h2 class="section-title">Everything You Need</h2>
+    <p class="section-subtitle">Powerful features that make project management effortless.</p>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">📋</div>
+        <h3>Task Management</h3>
+        <p>Organize tasks with boards, lists, and timelines. Drag-and-drop prioritization.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <h3>Analytics Dashboard</h3>
+        <p>Real-time insights into team velocity, bottlenecks, and project health.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔔</div>
+        <h3>Smart Notifications</h3>
+        <p>Get notified about what matters — deadlines, mentions, and status changes.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔗</div>
+        <h3>Integrations</h3>
+        <p>Connect with Slack, GitHub, Jira, and 200+ other tools.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📱</div>
+        <h3>Mobile App</h3>
+        <p>Full-featured mobile apps for iOS and Android. Work from anywhere.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔒</div>
+        <h3>Enterprise Security</h3>
+        <p>SOC 2, GDPR compliant. SSO, audit logs, and role-based access control.</p>
+      </div>
+    </div>
+  </div>
+</section>
+```
+
+```css
+/* ========== SECTIONS ========== */
+.section {
+  padding: var(--spacing-2xl) 0;
+}
+
+.section-title {
+  text-align: center;
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: var(--spacing-sm);
+}
+
+.section-subtitle {
+  text-align: center;
+  color: var(--color-text-light);
+  max-width: 500px;
+  margin: 0 auto var(--spacing-xl);
+}
+
+/* Features Grid */
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+.feature-card {
+  padding: var(--spacing-lg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.feature-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+
+.feature-icon {
+  font-size: 2rem;
+  margin-bottom: var(--spacing-md);
+}
+
+.feature-card h3 {
+  margin-bottom: var(--spacing-sm);
+  font-size: 1.125rem;
+}
+
+.feature-card p {
+  color: var(--color-text-light);
+  font-size: 0.9375rem;
+}
+```
+
+## Section 4: Testimonials
+
+```html
+<section id="testimonials" class="section section-alt">
+  <div class="container">
+    <h2 class="section-title">Loved by Teams</h2>
+    <p class="section-subtitle">Here's what our customers say about Streamline.</p>
+
+    <div class="testimonials-grid">
+      <blockquote class="testimonial">
+        <p>"Streamline transformed how our remote team collaborates. We ship 40% faster."</p>
+        <footer>
+          <strong>Sarah Chen</strong>
+          <span>CTO, TechFlow Inc.</span>
+        </footer>
+      </blockquote>
+      <blockquote class="testimonial">
+        <p>"The simplest project management tool we've ever used. No training needed."</p>
+        <footer>
+          <strong>Marcus Johnson</strong>
+          <span>Product Lead, DataVista</span>
+        </footer>
+      </blockquote>
+      <blockquote class="testimonial">
+        <p>"Finally, a tool that actually respects my time. The automation features are incredible."</p>
+        <footer>
+          <strong>Emily Rodriguez</strong>
+          <span>Engineering Manager, CloudScale</span>
+        </footer>
+      </blockquote>
+    </div>
+  </div>
+</section>
+```
+
+```css
+.section-alt {
+  background: var(--color-bg-alt);
+}
+
+.testimonials-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+.testimonial {
+  background: var(--color-bg);
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+}
+
+.testimonial p {
+  font-style: italic;
+  margin-bottom: var(--spacing-md);
+  color: var(--color-text);
+}
+
+.testimonial footer strong {
+  display: block;
+  color: var(--color-text);
+}
+
+.testimonial footer span {
+  font-size: 0.875rem;
+  color: var(--color-text-light);
+}
+```
+
+## Section 5: Pricing Cards
+
+```html
+<section id="pricing" class="section">
+  <div class="container">
+    <h2 class="section-title">Simple Pricing</h2>
+    <p class="section-subtitle">No hidden fees. No surprises. Start free, upgrade when you grow.</p>
+
+    <div class="pricing-grid">
+      <div class="pricing-card">
+        <h3>Starter</h3>
+        <p class="price">Free</p>
+        <p class="price-desc">For small teams getting started</p>
+        <ul class="features-list">
+          <li>Up to 5 team members</li>
+          <li>10 projects</li>
+          <li>Basic analytics</li>
+          <li>Community support</li>
+        </ul>
+        <a href="#" class="btn btn-secondary">Get Started</a>
+      </div>
+
+      <div class="pricing-card featured">
+        <div class="badge">Popular</div>
+        <h3>Pro</h3>
+        <p class="price">$29<span>/mo</span></p>
+        <p class="price-desc">For growing teams</p>
+        <ul class="features-list">
+          <li>Unlimited team members</li>
+          <li>Unlimited projects</li>
+          <li>Advanced analytics</li>
+          <li>Priority support</li>
+          <li>Integrations</li>
+          <li>API access</li>
+        </ul>
+        <a href="#" class="btn btn-primary">Start Free Trial</a>
+      </div>
+
+      <div class="pricing-card">
+        <h3>Enterprise</h3>
+        <p class="price">$99<span>/mo</span></p>
+        <p class="price-desc">For large organizations</p>
+        <ul class="features-list">
+          <li>Everything in Pro</li>
+          <li>SSO & SAML</li>
+          <li>Audit logs</li>
+          <li>Custom integrations</li>
+          <li>Dedicated support</li>
+          <li>SLA guarantee</li>
+        </ul>
+        <a href="#" class="btn btn-secondary">Contact Sales</a>
+      </div>
+    </div>
+  </div>
+</section>
+```
+
+```css
+/* ========== PRICING ========== */
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--spacing-lg);
+  align-items: start;
+}
+
+.pricing-card {
+  padding: var(--spacing-xl);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  position: relative;
+}
+
+.pricing-card.featured {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-lg);
+  transform: scale(1.05);
+}
+
+.badge {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-primary);
+  color: white;
+  padding: 4px 16px;
+  border-radius: var(--radius-full);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.price {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: var(--color-text);
+  margin: var(--spacing-md) 0;
+}
+
+.price span {
+  font-size: 1rem;
+  font-weight: 400;
+  color: var(--color-text-light);
+}
+
+.features-list {
+  list-style: none;
+  margin: var(--spacing-lg) 0;
+  text-align: left;
+}
+
+.features-list li {
+  padding: 8px 0;
+  color: var(--color-text-light);
+}
+
+.features-list li::before {
+  content: "✓";
+  color: var(--color-success, #22c55e);
+  margin-right: 8px;
+  font-weight: bold;
+}
+```
+
+## Section 6: Footer
+
+```html
+<footer class="footer">
+  <div class="container footer-content">
+    <div class="footer-brand">
+      <div class="logo">
+        <span class="logo-icon">&#9670;</span>
+        <span class="logo-text">Streamline</span>
+      </div>
+      <p>Modern project management for teams who ship.</p>
+    </div>
+    <div class="footer-links">
+      <div class="footer-col">
+        <h4>Product</h4>
+        <a href="#">Features</a>
+        <a href="#">Pricing</a>
+        <a href="#">Integrations</a>
+        <a href="#">Changelog</a>
+      </div>
+      <div class="footer-col">
+        <h4>Company</h4>
+        <a href="#">About</a>
+        <a href="#">Blog</a>
+        <a href="#">Careers</a>
+        <a href="#">Contact</a>
+      </div>
+      <div class="footer-col">
+        <h4>Legal</h4>
+        <a href="#">Privacy</a>
+        <a href="#">Terms</a>
+        <a href="#">Security</a>
+        <a href="#">Cookies</a>
+      </div>
+    </div>
+  </div>
+  <div class="container footer-bottom">
+    <p>&copy; 2026 Streamline. All rights reserved.</p>
+  </div>
+</footer>
+```
+
+```css
+/* ========== FOOTER ========== */
+.footer {
+  background: var(--color-text);
+  color: white;
+  padding: var(--spacing-2xl) 0 0;
+}
+
+.footer-content {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: var(--spacing-xl);
+  padding-bottom: var(--spacing-xl);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.footer-brand p {
+  color: rgba(255,255,255,0.6);
+  margin-top: var(--spacing-sm);
+}
+
+.footer-links {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-lg);
+}
+
+.footer-col h4 {
+  margin-bottom: var(--spacing-md);
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: rgba(255,255,255,0.5);
+}
+
+.footer-col a {
+  display: block;
+  color: rgba(255,255,255,0.7);
+  padding: 4px 0;
+  transition: color 0.2s;
+}
+
+.footer-col a:hover {
+  color: white;
+}
+
+.footer-bottom {
+  padding: var(--spacing-lg) 0;
+  text-align: center;
+  color: rgba(255,255,255,0.4);
+  font-size: 0.875rem;
+}
+
+@media (max-width: 768px) {
+  .footer-content {
+    grid-template-columns: 1fr;
+  }
+
+  .footer-links {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+```
+
+## Making It Responsive
+
+Add these media query adjustments:
+
+```css
+/* Mobile-first adjustments for tablet */
+@media (min-width: 768px) {
+  .hero-title {
+    font-size: 3rem;
+  }
+
+  .features-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Desktop */
+@media (min-width: 1024px) {
+  .features-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .pricing-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+```
+
+## Testing Your Landing Page
+
+1. Open with Live Server and test at 375px (iPhone), 768px (iPad), and 1440px (desktop)
+2. Verify the hamburger menu works on mobile
+3. Check that all hover effects work
+4. Test all anchor links scroll to the right sections
+5. Run Chrome Lighthouse audit (aim for 90+ accessibility)
+6. Validate your CSS with [jigsaw.w3.org/css-validator](https://jigsaw.w3.org/css-validator/)
+
+## Extension Ideas
+
+- Add a dark mode toggle using CSS custom properties
+- Implement a testimonials carousel with CSS scroll-snap
+- Add a fixed back-to-top button
+- Create an animated counter for the stats section
+- Add scroll-triggered reveal animations using Intersection Observer (CSS only with `animation-delay`)
+
+## Key Takeaways
+
+- CSS custom properties make theming and maintenance manageable
+- Grid with `auto-fit` + `minmax` creates responsive layouts without media queries
+- Mobile-first development: design for mobile first, add complexity at breakpoints
+- Fixed navigation needs `scroll-padding-top` to offset anchor links
+- Feature cards with hover transitions (translateY + shadow) add polish
+- Pricing cards with `scale(1.05)` draw attention to the featured plan
+- A complete, responsive landing page is achievable with just HTML and CSS

@@ -1,0 +1,249 @@
+---
+title: "Variables & Data Types"
+description: "JavaScript variables (let, const, var) and the seven primitive data types — strings, numbers, booleans, null, undefined, symbols, and BigInt with practical examples."
+sidebar:
+  order: 1
+  label: "Variables & Data Types"
+tab: "full-stack-development"
+---
+
+JavaScript is a **dynamically typed** language — variables can hold any type of value, and types are determined at runtime.
+
+## Running JavaScript
+
+You can run the examples in this module using Node.js:
+
+```bash
+node -e "console.log('Hello from Node!')"
+```
+
+Or create a `.js` file and run it:
+
+```bash
+node filename.js
+```
+
+## Variables
+
+Variables store data values. There are three ways to declare them:
+
+### let (Mutable — Preferred)
+
+```javascript
+let name = "Alice";
+console.log(name);    // => "Alice"
+
+name = "Bob";         // Reassigning is allowed
+console.log(name);    // => "Bob"
+```
+
+### const (Immutable — Use by Default)
+
+```javascript
+const birthYear = 1990;
+console.log(birthYear);  // => 1990
+
+// birthYear = 1991;     // ❌ TypeError: Assignment to constant variable
+
+// BUT: const objects/arrays CAN be mutated
+const person = { name: "Alice" };
+person.name = "Bob";     // ✅ This works — the object itself is not frozen
+person.age = 30;         // ✅ Adding properties is allowed
+console.log(person);     // => { name: "Bob", age: 30 }
+```
+
+### var (Legacy — Avoid)
+
+```javascript
+var oldWay = "avoid this";
+```
+
+`var` is function-scoped (not block-scoped) and can lead to confusing bugs. Always use `let` or `const`.
+
+<Aside variant="tip">
+Use `const` by default. Only use `let` when you know the variable's value will change. Never use `var` in modern JavaScript.
+</Aside>
+
+### Naming Rules
+
+```javascript
+// ✅ Valid names
+let userName = "Alice";         // camelCase (JavaScript convention)
+let $price = 9.99;             // $ is allowed
+let _count = 42;               // _ is allowed
+let tempInCelsius = 25;        // Descriptive names
+
+// ❌ Invalid names
+// let 1stPlace = "gold";      // Can't start with a digit
+// let my-var = "test";        // Hyphens not allowed
+// let class = "math";         // Reserved keyword
+
+// Case-sensitive
+let myVar = 1;
+let myvar = 2;                 // Different variable!
+```
+
+## Primitive Data Types
+
+JavaScript has 7 primitive types:
+
+```javascript
+// 1. String
+let greeting = "Hello";
+let name = 'Alice';
+let template = `Hello, ${name}!`;  // Template literal
+console.log(template);              // => "Hello, Alice!"
+
+// 2. Number (includes integers and decimals)
+let integer = 42;
+let decimal = 3.14;
+let negative = -10;
+let scientific = 1.5e6;            // 1,500,000
+
+// 3. Boolean
+let isActive = true;
+let isComplete = false;
+
+// 4. Undefined (variable declared but not assigned)
+let something;
+console.log(something);             // => undefined
+
+// 5. Null (intentional absence of value)
+let empty = null;
+
+// 6. Symbol (unique identifier, advanced)
+const id1 = Symbol("id");
+const id2 = Symbol("id");
+console.log(id1 === id2);           // => false (each Symbol is unique)
+
+// 7. BigInt (very large integers)
+const bigNumber = 9007199254740991n;
+const anotherBig = BigInt("12345678901234567890");
+```
+
+## The typeof Operator
+
+Check a value's type at runtime:
+
+```javascript
+console.log(typeof "hello");       // => "string"
+console.log(typeof 42);            // => "number"
+console.log(typeof true);          // => "boolean"
+console.log(typeof undefined);     // => "undefined"
+console.log(typeof null);          // => "object"  (this is a JS bug, null is primitive)
+console.log(typeof Symbol("id"));  // => "symbol"
+console.log(typeof 123n);          // => "bigint"
+console.log(typeof console.log);   // => "function"
+```
+
+## Dynamic Typing
+
+Variables can change type:
+
+```javascript
+let value = "Hello";
+console.log(typeof value);     // => "string"
+
+value = 42;
+console.log(typeof value);     // => "number"
+
+value = true;
+console.log(typeof value);     // => "boolean"
+```
+
+## Type Coercion
+
+JavaScript automatically converts types in certain contexts:
+
+```javascript
+// Implicit coercion
+console.log("5" + 3);      // => "53"     (number converted to string for +)
+console.log("5" - 3);      // => 2        (string converted to number for -)
+console.log("5" * "2");    // => 10       (both strings converted to numbers)
+console.log(5 + true);     // => 6        (true converted to 1)
+console.log(5 + false);    // => 5        (false converted to 0)
+
+// Loose equality (==) — uses coercion
+console.log(5 == "5");     // => true     (coerces string to number)
+
+// Strict equality (===) — no coercion (ALWAYS USE THIS)
+console.log(5 === "5");    // => false    (different types)
+console.log(5 === 5);      // => true
+```
+
+<Aside variant="caution">
+Always use `===` (strict equality) instead of `==` (loose equality). Loose equality's type coercion leads to unexpected results: `0 == false` is `true`, `"" == false` is `true`, `null == undefined` is `true`.
+</Aside>
+
+### Explicit Type Conversion
+
+```javascript
+// String to number
+console.log(Number("42"));          // => 42
+console.log(Number("hello"));       // => NaN (Not a Number)
+console.log(parseInt("42px"));      // => 42
+console.log(parseFloat("3.14em"));  // => 3.14
+
+// Number to string
+console.log(String(42));            // => "42"
+console.log((42).toString());       // => "42"
+
+// To boolean
+console.log(Boolean(1));            // => true
+console.log(Boolean(0));            // => false
+console.log(Boolean(""));           // => false
+console.log(Boolean("hello"));      // => true
+```
+
+## Template Literals
+
+Template literals use backticks (`) and support string interpolation and multi-line strings:
+
+```javascript
+const name = "Alice";
+const age = 30;
+
+// String interpolation
+console.log(`My name is ${name} and I am ${age} years old.`);
+// => "My name is Alice and I am 30 years old."
+
+// Expressions inside ${}
+console.log(`Next year I will be ${age + 1}.`);
+// => "Next year I will be 31."
+
+// Multi-line strings
+const message = `
+  Hello ${name},
+  Welcome to our platform.
+  We're glad to have you!
+`;
+```
+
+## Try It Yourself
+
+```javascript
+// 1. Declare a const with your name (string)
+// 2. Declare a let with your age (number)
+// 3. Create a const that stores whether you're a student (boolean)
+// 4. Log them all using template literals
+// 5. Check the type of each variable using typeof
+// 6. Try: what is '10' - 5? What is '10' + 5? Why are they different?
+
+const myName = "Your Name";
+let myAge = 25;
+const isStudent = true;
+
+console.log(`Name: ${myName}, Age: ${myAge}, Student: ${isStudent}`);
+console.log(typeof myName);   // => "string"
+console.log(typeof myAge);    // => "number"
+```
+
+## Key Takeaways
+
+- Use `const` by default, `let` when reassignment is needed, never `var`
+- JavaScript has 7 primitive types: string, number, boolean, undefined, null, symbol, bigint
+- `typeof` returns the type of a value as a string
+- JavaScript is dynamically typed — variables can hold any type and change type
+- Always use `===` and `!==` (strict equality) to avoid type coercion surprises
+- Template literals (backticks) provide string interpolation `${}` and multi-line support
+- `Number()`, `String()`, `Boolean()` explicitly convert between types

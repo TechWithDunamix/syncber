@@ -1,0 +1,307 @@
+---
+title: "Password Hashing with bcrypt"
+description: "Why hash passwords, bcrypt salt rounds, async hashing, comparing passwords, and secure password storage patterns."
+sidebar:
+  order: 2
+  label: "Password Hashing with bcrypt"
+tab: "full-stack-development"
+---
+
+Passwords must **never** be stored in plain text. If a database is breached, plain text passwords compromise every user's account — especially since most people reuse passwords across services.
+
+## Why bcrypt?
+
+Bcrypt is specifically designed for password hashing:
+
+- **Slow by design**: Configurable cost factor makes it resistant to brute force
+- **Includes salt**: Automatically generates a unique salt per password
+- **Future-proof**: Can increase cost factor as hardware improves
+- **Battle-tested**: Used in production for over 20 years
+
+```javascript
+// BAD — too fast (MD5, SHA1, SHA256)
+const crypto = require("crypto");
+const hash = crypto.createHash("sha256").update("password123").digest("hex");
+// A GPU can try billions of these per second
+
+// GOOD — bcrypt is intentionally slow
+const bcrypt = require("bcrypt");
+const hash = await bcrypt.hash("password123", 12);
+// Takes ~250ms — limits brute force to ~4 attempts/second
+```
+
+## Installation
+
+```bash
+npm install bcrypt
+```
+
+Note: `bcrypt` requires native compilation (C++). If you have trouble installing, use `bcryptjs` (pure JavaScript, slower but no compilation needed):
+
+```bash
+npm install bcryptjs
+```
+
+Both have the same API.
+
+## Basic Usage
+
+```javascript
+const bcrypt = require("bcrypt");
+const saltRounds = 12;
+
+async function hashPassword(plainPassword) {
+  const salt = await bcrypt.genSalt(saltRounds);
+  const hash = await bcrypt.hash(plainPassword, salt);
+  return hash;
+}
+
+async function verifyPassword(plainPassword, hash) {
+  return bcrypt.compare(plainPassword, hash);
+}
+
+// Usage
+async function registerUser(email, password) {
+  const hashedPassword = await hashPassword(password);
+  await db.users.insert({ email, password: hashedPassword });
+}
+
+async function loginUser(email, password) {
+  const user = await db.users.findByEmail(email);
+  if (!user) throw new Error("Invalid credentials");
+
+  const isValid = await verifyPassword(password, user.password);
+  if (!isValid) throw new Error("Invalid credentials");
+
+  return user;
+}
+```
+
+## How bcrypt Works
+
+### Salting
+
+A **salt** is a random string added to the password before hashing. Even if two users have the same password, their hashes will be different:
+
+```javascript
+// Same password, different salts → different hashes
+const hash1 = await bcrypt.hash("password123", 10);
+const hash2 = await bcrypt.hash("password123", 10);
+
+console.log(hash1 === hash2); // false (different salts)
+```
+
+The salt is stored **inside** the hash string, so you don't need a separate salt column:
+
+```
+$2b$12$LJ3m4ys3LkTx5Q2MfGKQZudG5PyoMaFqP4.TMd.bF3wMabcDeFgh
+│ │  │  └──────────────────┬──────────────────┘
+│ │  │                     └── Hash (31 chars)
+│ │  └──────────────────────── Salt (22 chars)
+│ └─────────────────────────── Cost factor (12 rounds)
+└───────────────────────────── Algorithm version (2b)
+```
+
+### Cost Factor (Salt Rounds)
+
+The cost factor determines how many rounds of hashing are performed: `2^cost` rounds. A cost of 12 means `2^12 = 4096` iterations.
+
+```javascript
+// Cost = 10 → ~100ms per hash (development, low-security)
+// Cost = 12 → ~250ms per hash (good default)
+// Cost = 14 → ~1s per hash (high-security, sensitive data)
+
+async function benchmarkCost(cost) {
+  const start = Date.now();
+  await bcrypt.hash("test", cost);
+  return Date.now() - start;
+}
+
+console.log(await benchmarkCost(10)); // ~100ms
+console.log(await benchmarkCost(12)); // ~250ms
+console.log(await benchmarkCost(14)); // ~1000ms
+```
+
+<Aside variant="tip">
+Choose the highest cost factor that your server can tolerate. For user-facing login, aim for 250-500ms per hash. For batch operations (importing users), use a lower cost.
+</Aside>
+
+## Password Validation
+
+Always validate password strength before hashing:
+
+```javascript
+function validatePassword(password) {
+  const errors = [];
+
+  if (password.length < 8) {
+    errors.push("Password must be at least 8 characters");
+  }
+  if (password.length > 128) {
+    errors.push("Password must be under 128 characters");
+  }
+  if (!/[A-Z]/.test(password)) {
+    errors.push("Password must contain an uppercase letter");
+  }
+  if (!/[a-z]/.test(password)) {
+    errors.push("Password must contain a lowercase letter");
+  }
+  if (!/\d/.test(password)) {
+    errors.push("Password must contain a number");
+  }
+  if (!/[!@#$%^&*]/.test(password)) {
+    errors.push("Password must contain a special character (!@#$%^&*)");
+  }
+
+  return errors;
+}
+
+// In your registration route:
+app.post("/api/register", async (req, res) => {
+  const errors = validatePassword(req.body.password);
+  if (errors.length > 0) {
+    return res.status(422).json({ error: "Weak password", details: errors });
+  }
+
+  const hashedPassword = await bcrypt.hash(req.body.password, 12);
+  // Save user...
+});
+```
+
+## Complete Auth Functions
+
+```javascript
+// src/utils/auth.js
+const bcrypt = require("bcrypt");
+const SALT_ROUNDS = 12;
+
+async function hashPassword(password) {
+  return bcrypt.hash(password, SALT_ROUNDS);
+}
+
+async function comparePassword(password, hash) {
+  return bcrypt.compare(password, hash);
+}
+
+// Signup
+async function createUser(email, password, userData = {}) {
+  // Check if user exists
+  const existing = await db.users.findByEmail(email);
+  if (existing) {
+    throw new Error("Email already registered");
+  }
+
+  // Hash password
+  const hashedPassword = await hashPassword(password);
+
+  // Store user
+  const user = await db.users.create({
+    email,
+    password: hashedPassword,
+    ...userData,
+    createdAt: new Date(),
+  });
+
+  // Never return the password hash
+  const { password: _, ...safeUser } = user;
+  return safeUser;
+}
+
+// Login
+async function authenticateUser(email, password) {
+  const user = await db.users.findByEmail(email);
+  if (!user) {
+    throw new Error("Invalid email or password");
+  }
+
+  const isValid = await comparePassword(password, user.password);
+  if (!isValid) {
+    throw new Error("Invalid email or password");
+  }
+
+  // Never return the password hash
+  const { password: _, ...safeUser } = user;
+  return safeUser;
+}
+```
+
+## Upgrading Hash Cost
+
+When hardware improves, you may want to increase the cost factor. Re-hash passwords on successful login:
+
+```javascript
+async function login(req, res) {
+  const { email, password } = req.body;
+  const user = await db.users.findByEmail(email);
+
+  if (!user) {
+    return res.status(401).json({ error: "Invalid credentials" });
+  }
+
+  const isValid = await bcrypt.compare(password, user.passwordHash);
+  if (!isValid) {
+    return res.status(401).json({ error: "Invalid credentials" });
+  }
+
+  // Upgrade hash if needed (cost factor increased)
+  const currentRounds = bcrypt.getRounds(user.passwordHash);
+  if (currentRounds < 12) {
+    const newHash = await bcrypt.hash(password, 12);
+    await db.users.update(user.id, { passwordHash: newHash });
+  }
+
+  // Generate token, etc.
+}
+```
+
+## Why Not SHA-256 or MD5?
+
+```javascript
+// ❌ DO NOT USE THESE FOR PASSWORDS:
+const crypto = require("crypto");
+
+// MD5 — billions of hashes per second
+const md5 = crypto.createHash("md5").update("password").digest("hex");
+// Cracked in microseconds with rainbow tables
+
+// SHA-256 — millions of hashes per second with GPU
+const sha256 = crypto.createHash("sha256").update("password").digest("hex");
+// Also vulnerable to rainbow tables (without salt)
+
+// SHA-256 + salt — better, but still too fast
+const sha256Salted = crypto
+  .createHash("sha256")
+  .update(salt + "password")
+  .digest("hex");
+// A GPU can still try millions of combinations per second
+
+// ✅ USE BCRYPT:
+const bcrypt = require("bcrypt");
+const hash = await bcrypt.hash("password", 12);
+// Limited to ~4 attempts per second per hash
+```
+
+## Quick Reference
+
+```javascript
+// Hash a password
+const hash = await bcrypt.hash(password, 12);
+
+// Compare password with hash
+const isValid = await bcrypt.compare(password, hash);
+
+// Get the salt rounds from an existing hash
+const rounds = bcrypt.getRounds(hash);
+
+// Generate a salt separately
+const salt = await bcrypt.genSalt(12);
+const hash = await bcrypt.hash(password, salt);
+```
+
+## Practice Exercises
+
+1. **Registration endpoint**: Build a `/api/register` route that accepts email and password, validates the password (min 8 chars, at least one number), hashes with bcrypt (cost 12), and stores in a JSON file or array.
+
+2. **Login endpoint**: Build a `/api/login` route that accepts email and password, compares with bcrypt, and returns a success message if valid or an error if invalid. Use constant-time comparison (bcrypt.compare handles this).
+
+3. **Benchmarking script**: Write a script that benchmarks bcrypt with cost factors 8, 10, 12, and 14. Run each 10 times and report the average. What cost factor would you choose for a production app?

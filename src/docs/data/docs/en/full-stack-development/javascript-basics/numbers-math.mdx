@@ -1,0 +1,234 @@
+---
+title: "Numbers & Math Operations"
+description: "Working with numbers in JavaScript — Number methods, Math object, rounding, random numbers, parsing, and floating-point precision."
+sidebar:
+  order: 9
+  label: "Numbers & Math"
+tab: "full-stack-development"
+---
+
+JavaScript has a single `number` type for all numeric values (integers, decimals, and special values).
+
+## Number Basics
+
+```javascript
+const integer = 42;
+const decimal = 3.14;
+const negative = -10;
+const scientific = 1.5e6;    // 1,500,000
+const hex = 0xFF;             // 255 (hexadecimal)
+const binary = 0b1010;        // 10 (binary)
+const octal = 0o77;           // 63 (octal)
+```
+
+## Parsing Numbers
+
+```javascript
+// parseInt — extract integer from start of string
+console.log(parseInt("42"));       // => 42
+console.log(parseInt("42px"));     // => 42  (stops at non-numeric)
+console.log(parseInt("  10 "));    // => 10  (trims whitespace)
+console.log(parseInt("3.14"));     // => 3   (stops at decimal)
+console.log(parseInt("hello"));    // => NaN (not a number)
+
+// parseFloat — extract decimal
+console.log(parseFloat("3.14"));   // => 3.14
+console.log(parseFloat("3.14em")); // => 3.14
+console.log(parseFloat("3.14.15")); // => 3.14 (stops at second decimal)
+
+// Number() — converts entire value
+console.log(Number("42"));         // => 42
+console.log(Number("3.14"));       // => 3.14
+console.log(Number("42px"));       // => NaN (doesn't accept trailing chars)
+```
+
+## Checking for Validity
+
+```javascript
+// NaN — "Not a Number"
+console.log(parseInt("hello"));     // => NaN
+console.log(Number(undefined));     // => NaN
+console.log(0 / 0);                // => NaN
+
+// Checking for NaN
+console.log(isNaN(NaN));            // => true
+console.log(isNaN("hello"));        // => true  (coerces string first!)
+console.log(Number.isNaN("hello")); // => false (doesn't coerce — preferred)
+
+// Infinity
+console.log(1 / 0);                // => Infinity
+console.log(-1 / 0);               // => -Infinity
+console.log(Number.isFinite(42));   // => true
+console.log(Number.isFinite(Infinity)); // => false
+
+// isInteger
+console.log(Number.isInteger(42));    // => true
+console.log(Number.isInteger(3.14));  // => false
+```
+
+## Rounding Numbers
+
+```javascript
+const num = 3.14159;
+
+// Math.round — nearest integer
+console.log(Math.round(3.1));   // => 3
+console.log(Math.round(3.6));   // => 4
+console.log(Math.round(3.5));   // => 4 (rounds up at .5)
+
+// Math.floor — round down
+console.log(Math.floor(3.9));   // => 3
+console.log(Math.floor(-3.1));  // => -4 (more negative)
+
+// Math.ceil — round up
+console.log(Math.ceil(3.1));    // => 4
+console.log(Math.ceil(-3.9));   // => -3 (less negative)
+
+// Math.trunc — remove decimal (toward zero)
+console.log(Math.trunc(3.9));   // => 3
+console.log(Math.trunc(-3.9));  // => -3
+
+// toFixed — round to specific decimal places (returns STRING)
+console.log(num.toFixed(2));     // => "3.14"
+console.log(num.toFixed(4));     // => "3.1416" (rounds up)
+console.log((42).toFixed(2));    // => "42.00"
+console.log(parseFloat((3.14159).toFixed(2)));  // => 3.14 (back to number)
+
+// toPrecision — significant digits
+console.log(num.toPrecision(3)); // => "3.14"
+console.log((1234).toPrecision(3)); // => "1.23e+3"
+```
+
+## The Math Object
+
+```javascript
+// Basic operations
+console.log(Math.abs(-5));        // => 5
+console.log(Math.pow(2, 3));      // => 8  (2³)
+console.log(Math.sqrt(16));       // => 4
+console.log(Math.cbrt(27));       // => 3
+console.log(Math.max(3, 7, 1, 9)); // => 9
+console.log(Math.min(3, 7, 1, 9)); // => 1
+
+// Trigonometry
+console.log(Math.sin(Math.PI / 2)); // => 1
+console.log(Math.cos(Math.PI));     // => -1
+
+// Constants
+console.log(Math.PI);            // => 3.141592653589793
+console.log(Math.E);             // => 2.718281828459045
+```
+
+## Random Numbers
+
+```javascript
+// Math.random() — returns 0 to < 1 (never exactly 1)
+console.log(Math.random());      // => 0.123456789...
+
+// Random integer 0-9
+const randomDigit = Math.floor(Math.random() * 10);
+
+// Random integer in range (min to max, inclusive)
+function randomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+console.log(randomInt(1, 6));    // Random dice roll
+
+// Random element from array
+function randomChoice(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+const fruits = ["apple", "banana", "cherry"];
+console.log(randomChoice(fruits));
+```
+
+## The Floating Point Problem
+
+```javascript
+// 0.1 + 0.2 is NOT exactly 0.3!
+console.log(0.1 + 0.2);          // => 0.30000000000000004
+console.log(0.1 + 0.2 === 0.3);  // => false
+
+// Why? Binary floating-point can't represent some decimals exactly
+// Just like 1/3 = 0.333... can't be represented exactly in decimal
+
+// Solutions:
+// 1. Round to needed precision
+const sum = 0.1 + 0.2;
+console.log(Math.round(sum * 100) / 100);  // => 0.3
+
+// 2. Use toFixed and parse back
+console.log(parseFloat(sum.toFixed(2)));   // => 0.3
+
+// 3. Use a tolerance for comparisons
+function approxEqual(a, b, tolerance = 0.00001) {
+  return Math.abs(a - b) < tolerance;
+}
+console.log(approxEqual(0.1 + 0.2, 0.3));  // => true
+```
+
+## Formatting as Currency
+
+```javascript
+function formatCurrency(amount, currency = "USD") {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency
+  }).format(amount);
+}
+
+console.log(formatCurrency(19.99));      // => "$19.99"
+console.log(formatCurrency(1000.5));     // => "$1,000.50"
+console.log(formatCurrency(19.99, "EUR")); // => "€19.99"
+```
+
+## Number Limits
+
+```javascript
+console.log(Number.MAX_VALUE);       // => 1.7976931348623157e+308
+console.log(Number.MIN_VALUE);       // => 5e-324
+console.log(Number.MAX_SAFE_INTEGER); // => 9007199254740991 (2⁵³ - 1)
+console.log(Number.MIN_SAFE_INTEGER); // => -9007199254740991
+
+// Beyond safe integer — use BigInt
+console.log(9007199254740991 + 1);   // => 9007199254740992 ✅
+console.log(9007199254740991 + 2);   // => 9007199254740992 ❌ (same result!)
+```
+
+## Try It Yourself
+
+```javascript
+// 1. Generate a random password of length 8 with letters and digits
+function randomPassword(length = 8) {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let result = "";
+  for (let i = 0; i < length; i++) {
+    result += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return result;
+}
+console.log(randomPassword());
+
+// 2. Calculate compound interest: A = P(1 + r/n)^(nt)
+function compoundInterest(principal, rate, timesPerYear, years) {
+  return Math.round(principal * Math.pow(1 + rate / timesPerYear, timesPerYear * years) * 100) / 100;
+}
+console.log(compoundInterest(1000, 0.05, 12, 10));  // 5% APR, monthly, 10 years
+
+// 3. Check if a number is within a tolerance of another
+function approxEqual(a, b, tolerance = 0.01) {
+  return Math.abs(a - b) < tolerance;
+}
+```
+
+## Key Takeaways
+
+- Use `parseInt()` / `parseFloat()` for extracting numbers from strings (they handle trailing non-numeric chars)
+- Use `Number()` for strict conversion (fails on trailing chars)
+- `Number.isNaN()` is safer than `isNaN()` (no type coercion)
+- Rounding functions: `Math.round` (nearest), `Math.floor` (down), `Math.ceil` (up), `Math.trunc` (toward zero)
+- `toFixed(n)` rounds to n decimals but returns a string — wrap in `parseFloat()` if you need a number
+- `Math.random()` returns 0 (inclusive) to 1 (exclusive) — use `Math.floor(Math.random() * (max - min + 1)) + min` for integers
+- Floating point arithmetic is imprecise — use rounding or tolerances for comparisons
+- Use `Intl.NumberFormat` for currency and locale-aware formatting
+- Beyond `Number.MAX_SAFE_INTEGER` (9 quadrillion), use `BigInt` for precision

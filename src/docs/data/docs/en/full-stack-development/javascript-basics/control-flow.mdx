@@ -1,0 +1,280 @@
+---
+title: "Control Flow"
+description: "Control program execution with if/else, switch statements, truthy/falsy values, guard clauses, and conditional patterns."
+sidebar:
+  order: 3
+  label: "Control Flow"
+tab: "full-stack-development"
+---
+
+Control flow determines which code blocks execute based on conditions.
+
+## Truthy and Falsy Values
+
+Every value in JavaScript is either **truthy** or **falsy** when converted to boolean:
+
+```javascript
+// Falsy values (evaluate to false in conditions)
+false
+0
+-0
+""           // Empty string
+null
+undefined
+NaN
+
+// Everything else is truthy:
+true
+1
+-1
+"hello"      // Non-empty string
+"false"      // Non-empty string (even if it says "false")
+[]           // Empty array (truthy!)
+{}           // Empty object (truthy!)
+Infinity
+```
+
+```javascript
+// Testing truthiness
+if ("hello") {
+  console.log("Truthy!");   // This runs
+}
+
+if (0) {
+  console.log("This won't run");  // 0 is falsy
+}
+
+if ([]) {
+  console.log("Truthy!");   // This runs — empty array is truthy!
+}
+```
+
+## if/else Statements
+
+```javascript
+const age = 20;
+
+if (age >= 18) {
+  console.log("You can vote");
+}
+```
+
+### if/else
+
+```javascript
+const temperature = 30;
+
+if (temperature > 25) {
+  console.log("It's hot outside");
+} else {
+  console.log("It's not too hot");
+}
+```
+
+### if/else if/else
+
+```javascript
+const score = 85;
+
+if (score >= 90) {
+  console.log("Grade: A");
+} else if (score >= 80) {
+  console.log("Grade: B");
+} else if (score >= 70) {
+  console.log("Grade: C");
+} else if (score >= 60) {
+  console.log("Grade: D");
+} else {
+  console.log("Grade: F");
+}
+```
+
+### Guard Clause (Early Return)
+
+A pattern that exits early when a condition isn't met:
+
+```javascript
+function processOrder(order) {
+  // Guard clauses — exit early if invalid
+  if (!order) {
+    return "No order provided";
+  }
+
+  if (!order.items || order.items.length === 0) {
+    return "Order has no items";
+  }
+
+  if (order.total <= 0) {
+    return "Invalid order total";
+  }
+
+  // Main logic — we know the order is valid
+  console.log(`Processing order for ${order.items.length} items`);
+  return "Order processed";
+}
+
+console.log(processOrder(null));           // => "No order provided"
+console.log(processOrder({ items: [] }));  // => "Order has no items"
+```
+
+Guard clauses make code more readable by reducing nesting.
+
+## Switch Statement
+
+Switch compares a value against multiple cases:
+
+```javascript
+const day = 3;
+let dayName;
+
+switch (day) {
+  case 1:
+    dayName = "Monday";
+    break;
+  case 2:
+    dayName = "Tuesday";
+    break;
+  case 3:
+    dayName = "Wednesday";
+    break;
+  case 4:
+    dayName = "Thursday";
+    break;
+  case 5:
+    dayName = "Friday";
+    break;
+  case 6:
+    dayName = "Saturday";
+    break;
+  case 7:
+    dayName = "Sunday";
+    break;
+  default:
+    dayName = "Invalid day";
+}
+
+console.log(dayName);  // => "Wednesday"
+```
+
+### The break Keyword
+
+Without `break`, execution "falls through" to the next case:
+
+```javascript
+const fruit = "apple";
+
+switch (fruit) {
+  case "apple":
+  case "pear":
+    console.log("This is a pome fruit");
+    break;                    // ← Without this break, it would continue!
+  case "orange":
+  case "lemon":
+    console.log("This is a citrus fruit");
+    break;
+  default:
+    console.log("Unknown fruit");
+}
+// Output: "This is a pome fruit"
+```
+
+This fall-through is useful when multiple cases share the same logic.
+
+## Conditional Patterns
+
+### Using && for Conditional Execution
+
+```javascript
+// Only call the function if the condition is true
+isLoggedIn && renderDashboard();
+
+// Same as:
+if (isLoggedIn) {
+  renderDashboard();
+}
+```
+
+### Using || for Default Values
+
+```javascript
+const username = input || "Guest";
+
+// Same as:
+let username;
+if (input) {
+  username = input;
+} else {
+  username = "Guest";
+}
+```
+
+### Using ?? for Null/Undefined Defaults
+
+```javascript
+const count = responseCount ?? 0;
+
+// Same as:
+let count;
+if (responseCount === null || responseCount === undefined) {
+  count = 0;
+} else {
+  count = responseCount;
+}
+```
+
+## Combining Conditions
+
+```javascript
+const age = 25;
+const hasLicense = true;
+const isSuspended = false;
+
+// AND (all must be true)
+if (age >= 18 && hasLicense && !isSuspended) {
+  console.log("You can drive");
+}
+
+// OR (at least one must be true)
+if (age < 18 || age > 65) {
+  console.log("Special rates apply");
+}
+
+// Complex conditions with grouping
+const isWeekend = true;
+const isHoliday = false;
+const hasWork = false;
+
+if ((isWeekend || isHoliday) && !hasWork) {
+  console.log("Time to relax!");
+}
+```
+
+## Try It Yourself
+
+```javascript
+// 1. Write a function that takes a number and returns:
+//    "positive" if > 0, "negative" if < 0, "zero" if === 0
+function checkNumber(n) {
+  // Your code here
+}
+
+// 2. Write a function that takes a year and returns
+//    whether it's a leap year (divisible by 400 OR divisible by 4 but not by 100)
+function isLeapYear(year) {
+  // Your code here
+}
+
+// 3. Use a switch statement to convert a month number (1-12) to its name
+function getMonthName(month) {
+  // Your code here
+}
+```
+
+## Key Takeaways
+
+- Falsy values: `false`, `0`, `""`, `null`, `undefined`, `NaN` — everything else is truthy
+- Guard clauses (early returns) make code flatter and more readable
+- `switch` compares one value against multiple cases — always include `break` unless you want fall-through
+- Use `&&` for conditional execution, `||` and `??` for default values
+- Combine conditions with `&&` (AND) and `||` (OR) — use `()` for grouping
+- The ternary operator `? :` is useful for simple binary choices

@@ -1,0 +1,266 @@
+---
+title: "Authentication Concepts"
+description: "Authentication vs authorization, session-based vs token-based auth, hashing vs encryption, HTTPS, and common authentication flows."
+sidebar:
+  order: 1
+  label: "Authentication Concepts"
+tab: "full-stack-development"
+---
+
+Authentication and security are critical for every web application. Before implementing code, it's essential to understand the core concepts.
+
+## Authentication vs Authorization
+
+**Authentication** — *Who are you?* Verifying the identity of a user.
+
+**Authorization** — *What are you allowed to do?* Determining what resources a user can access.
+
+```javascript
+// AUTHENTICATION: logging in proves who you are
+app.post("/api/login", async (req, res) => {
+  const { email, password } = req.body;
+  const user = await findUserByEmail(email);
+
+  if (!user || !(await bcrypt.compare(password, user.password))) {
+    return res.status(401).json({ error: "Invalid credentials" });
+  }
+
+  const token = generateToken({ id: user.id, role: user.role });
+  res.json({ token });
+});
+
+// AUTHORIZATION: checking if the user can perform an action
+function requireAdmin(req, res, next) {
+  if (req.user.role !== "admin") {
+    return res.status(403).json({ error: "Admin access required" });
+  }
+  next();
+}
+
+app.delete("/api/users/:id", requireAuth, requireAdmin, async (req, res) => {
+  // Only admins can delete users
+});
+```
+
+## Session-Based vs Token-Based Authentication
+
+### Session-Based Auth
+
+```
+1. User logs in with credentials
+2. Server creates a session (stored in memory, database, or Redis)
+3. Server sends session ID as a cookie
+4. Browser sends cookie with every request
+5. Server looks up session to identify user
+```
+
+```javascript
+// Session-based
+app.post("/api/login", async (req, res) => {
+  const user = await authenticate(req.body);
+  req.session.userId = user.id; // stored server-side
+  res.json({ success: true });
+});
+
+app.get("/api/profile", (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+  // Look up user from session
+});
+```
+
+### Token-Based Auth (JWT)
+
+```
+1. User logs in with credentials
+2. Server creates a signed JWT containing user info
+3. Server sends JWT to client (no server-side storage)
+4. Client stores JWT (memory, localStorage, or cookie)
+5. Client sends JWT in Authorization header with every request
+6. Server verifies the JWT signature to authenticate
+```
+
+```javascript
+// Token-based (JWT)
+app.post("/api/login", async (req, res) => {
+  const user = await authenticate(req.body);
+  const token = jwt.sign(
+    { id: user.id, role: user.role },
+    process.env.JWT_SECRET,
+    { expiresIn: "24h" }
+  );
+  res.json({ token });
+});
+
+app.get("/api/profile", authenticateJWT, (req, res) => {
+  res.json({ user: req.user });
+});
+```
+
+| Feature | Session-Based | Token-Based (JWT) |
+|---------|---------------|-------------------|
+| Storage | Server-side (memory/DB/Redis) | Client-side (token) |
+| Scalability | Needs shared session store | Stateless — any server can verify |
+| Revocation | Immediate (delete session) | Must wait for expiry or maintain a blacklist |
+| Payload | Minimal (just session ID) | Contains user data in the token |
+| Mobile friendly | Requires cookie support | Works with any HTTP client |
+
+## Hashing vs Encryption
+
+### Hashing (One-Way)
+
+A cryptographic hash is a **one-way** function — you cannot reverse it back to the original value. Used for passwords.
+
+```javascript
+const bcrypt = require("bcrypt");
+
+async function hashPassword(plainPassword) {
+  const salt = await bcrypt.genSalt(12);
+  const hash = await bcrypt.hash(plainPassword, salt);
+  return hash;
+}
+
+async function verifyPassword(plainPassword, hash) {
+  return bcrypt.compare(plainPassword, hash);
+}
+```
+
+### Encryption (Two-Way)
+
+Encryption is **reversible** with a key. Used for data that needs to be read later (e.g., API keys, PII).
+
+```javascript
+const crypto = require("crypto");
+
+const algorithm = "aes-256-cbc";
+const key = crypto.randomBytes(32);
+const iv = crypto.randomBytes(16);
+
+function encrypt(text) {
+  const cipher = crypto.createCipheriv(algorithm, key, iv);
+  let encrypted = cipher.update(text, "utf8", "hex");
+  encrypted += cipher.final("hex");
+  return { iv: iv.toString("hex"), encrypted };
+}
+
+function decrypt(encryptedData) {
+  const decipher = crypto.createDecipheriv(
+    algorithm,
+    key,
+    Buffer.from(encryptedData.iv, "hex")
+  );
+  let decrypted = decipher.update(encryptedData.encrypted, "hex", "utf8");
+  decrypted += decipher.final("utf8");
+  return decrypted;
+}
+```
+
+| Property | Hashing | Encryption |
+|----------|---------|------------|
+| Reversible | ❌ No | ✅ Yes (with key) |
+| Password storage | ✅ | ❌ |
+| Data storage | ❌ | ✅ |
+| Deterministic (same input = same output) | ✅ | ❌ (with random IV) |
+
+<Aside variant="danger">
+**Never store raw passwords.** Always hash them with bcrypt (or argon2). Never use MD5 or SHA1 for passwords — they are too fast and can be brute-forced. Never encrypt passwords — encryption is reversible.
+</Aside>
+
+## HTTPS / TLS
+
+HTTPS encrypts all communication between the client and server. It prevents:
+
+- **Eavesdropping**: Third parties cannot read the data
+- **Tampering**: Data cannot be modified in transit
+- **Impersonation**: Clients can verify the server's identity
+
+```javascript
+// Generate self-signed cert for development
+// openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes
+
+const https = require("https");
+const fs = require("fs");
+
+const options = {
+  key: fs.readFileSync("./key.pem"),
+  cert: fs.readFileSync("./cert.pem"),
+};
+
+https.createServer(options, app).listen(443);
+```
+
+For production, use Let's Encrypt (free) or a commercial CA. Never send passwords or tokens over HTTP.
+
+## Common Authentication Flows
+
+### 1. Email + Password
+
+Most common. User registers with email and password, then logs in with the same credentials. Passwords are hashed with bcrypt.
+
+### 2. OAuth 2.0 / Social Login
+
+User authenticates through a third party (Google, GitHub, Facebook). Your app never sees the password.
+
+### 3. Magic Link
+
+User enters their email, receives a one-time link, and clicks it to log in. No password needed.
+
+### 4. Multi-Factor Authentication (MFA)
+
+Requires two or more factors:
+- Something you **know** (password)
+- Something you **have** (phone, authenticator app)
+- Something you **are** (fingerprint, face)
+
+```javascript
+// MFA flow example
+async function loginWithMFA(email, password, totpCode) {
+  const user = await authenticate(email, password);
+  if (!user) throw new Error("Invalid credentials");
+
+  if (user.mfaEnabled) {
+    const isValid = speakeasy.totp.verify({
+      secret: user.mfaSecret,
+      encoding: "base32",
+      token: totpCode,
+    });
+    if (!isValid) throw new Error("Invalid MFA code");
+  }
+
+  return generateToken(user);
+}
+```
+
+## Security Best Practices Summary
+
+| Practice | Why |
+|----------|-----|
+| Hash passwords with bcrypt | One-way, slow enough to resist brute force |
+| Use HTTPS everywhere | Encrypts all traffic |
+| Never trust user input | Always validate and sanitize |
+| Set secure HTTP headers | Helmet.js for CORS, CSP, HSTS |
+| Use parameterised queries | Prevent SQL/NoSQL injection |
+| Implement rate limiting | Prevent brute force attacks |
+| Use short-lived tokens | Limit damage if token is stolen |
+| Log security events | Detect and investigate breaches |
+
+## Quick Reference
+
+| Concept | Summary |
+|---------|---------|
+| Authentication | Verifying identity (who you are) |
+| Authorization | Checking permissions (what you can do) |
+| Sessions | Server-side state, cookie-based |
+| JWT Tokens | Self-contained, stateless tokens |
+| Hashing | One-way — for passwords |
+| Encryption | Two-way — for data you need to read |
+| HTTPS | Encrypts all client-server communication |
+
+## Practice Exercises
+
+1. **Research**: What's the difference between `bcrypt` and `bcryptjs`? When would you use one over the other?
+
+2. **HTTPS setup**: Generate a self-signed certificate and create a simple HTTPS Express server that returns "Hello, Secure World!".
+
+3. **Compare auth methods**: Create a table comparing session-based vs token-based auth for: scalability, mobile support, logout experience, and CSRF protection.

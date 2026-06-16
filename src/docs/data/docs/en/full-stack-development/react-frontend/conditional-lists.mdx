@@ -1,0 +1,344 @@
+---
+title: "Conditional Rendering & Lists"
+description: "Conditional rendering with ternary, logical &&, if/else; rendering lists with map and keys; filtering and sorting lists; key prop best practices."
+sidebar:
+  order: 5
+  label: "Conditional Rendering & Lists"
+tab: "full-stack-development"
+---
+
+Two essential patterns in React: showing different content based on conditions, and rendering collections of data.
+
+## Conditional Rendering
+
+### Ternary Operator
+
+The most common approach for simple if/else:
+
+```jsx
+function Greeting({ isLoggedIn }) {
+  return (
+    <div>
+      {isLoggedIn ? (
+        <h1>Welcome back!</h1>
+      ) : (
+        <h1>Please sign in</h1>
+      )}
+    </div>
+  );
+}
+```
+
+### Logical && (Short-Circuit)
+
+Render only when the condition is true (no else branch):
+
+```jsx
+function NotificationBadge({ count }) {
+  return (
+    <div className="bell">
+      🔔
+      {count > 0 && (
+        <span className="badge">{count > 99 ? "99+" : count}</span>
+      )}
+    </div>
+  );
+}
+```
+
+<Aside variant="caution">
+Don't use `&&` with numbers — `0` renders as "0" on the screen. Use explicit comparisons:
+```jsx
+{count > 0 && <Badge />}   // ✅ correct
+{count && <Badge />}        // ❌ renders "0" when count is 0
+```
+</Aside>
+
+### If/Else Outside JSX
+
+For complex logic, extract it before the return:
+
+```jsx
+function Dashboard({ user, loading, error }) {
+  if (loading) {
+    return <div className="spinner">Loading...</div>;
+  }
+
+  if (error) {
+    return <div className="error">Error: {error}</div>;
+  }
+
+  if (!user) {
+    return <div className="empty">Please log in to view your dashboard.</div>;
+  }
+
+  // Main content
+  return (
+    <div className="dashboard">
+      <h1>Welcome, {user.name}</h1>
+      {/* ... */}
+    </div>
+  );
+}
+```
+
+### Switch / Multiple Conditions
+
+```jsx
+function OrderStatus({ status }) {
+  const statusConfig = {
+    pending: { label: "Pending", color: "yellow" },
+    processing: { label: "Processing", color: "blue" },
+    shipped: { label: "Shipped", color: "green" },
+    delivered: { label: "Delivered", color: "gray" },
+    cancelled: { label: "Cancelled", color: "red" },
+  };
+
+  const config = statusConfig[status] || statusConfig.pending;
+
+  return (
+    <span className={`badge badge-${config.color}`}>
+      {config.label}
+    </span>
+  );
+}
+```
+
+### Conditional Classes
+
+```jsx
+function Button({ variant = "primary", disabled, loading, children }) {
+  const className = [
+    "btn",
+    `btn-${variant}`,
+    disabled && "btn-disabled",
+    loading && "btn-loading",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    <button className={className} disabled={disabled || loading}>
+      {loading ? "Loading..." : children}
+    </button>
+  );
+}
+```
+
+### Toggle Component Visibility
+
+```jsx
+function CollapsiblePanel({ title, children }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="panel">
+      <button onClick={() => setIsOpen((prev) => !prev)}>
+        {title} {isOpen ? "▲" : "▼"}
+      </button>
+
+      {isOpen && <div className="panel-content">{children}</div>}
+    </div>
+  );
+}
+```
+
+## Rendering Lists
+
+### Map Over Arrays
+
+```jsx
+function TodoList({ todos }) {
+  return (
+    <ul>
+      {todos.map((todo) => (
+        <li key={todo.id}>
+          <span style={{ textDecoration: todo.completed ? "line-through" : "none" }}>
+            {todo.text}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+```
+
+### The `key` Prop
+
+Every rendered item needs a **unique key** — React uses it to identify which items changed, were added, or removed:
+
+```jsx
+// ✅ Good — stable, unique ID
+todos.map((todo) => <li key={todo.id}>{todo.text}</li>);
+
+// ✅ Good — combined unique fields
+items.map((item) => <li key={`${item.type}-${item.id}`}>{item.name}</li>);
+
+// ❌ Bad — don't use index for dynamic lists
+items.map((item, index) => <li key={index}>{item.name}</li>);
+```
+
+<Aside variant="danger">
+Using **index as key** leads to bugs when items are added, removed, or reordered. React reuses components based on key — wrong keys cause wrong state, incorrect animations, and performance issues. Only use index for static, read-only lists.
+</Aside>
+
+### Key Requirements
+
+- **Unique** among siblings (not globally)
+- **Stable** — doesn't change between renders
+- **Predictable** — same item always gets the same key
+- Can be a string or number
+
+### Extracting List Items
+
+```jsx
+function TodoItem({ todo, onToggle, onDelete }) {
+  return (
+    <li className={todo.completed ? "completed" : ""}>
+      <input
+        type="checkbox"
+        checked={todo.completed}
+        onChange={() => onToggle(todo.id)}
+      />
+      <span>{todo.text}</span>
+      <button onClick={() => onDelete(todo.id)}>Delete</button>
+    </li>
+  );
+}
+
+function TodoList({ todos, onToggle, onDelete }) {
+  return (
+    <ul>
+      {todos.map((todo) => (
+        <TodoItem
+          key={todo.id}
+          todo={todo}
+          onToggle={onToggle}
+          onDelete={onDelete}
+        />
+      ))}
+    </ul>
+  );
+}
+```
+
+## Filtering Lists
+
+```jsx
+function ProductList({ products }) {
+  const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
+
+  const filteredProducts = products.filter((product) => {
+    // Filter by category
+    if (filter !== "all" && product.category !== filter) return false;
+
+    // Filter by search term
+    if (search && !product.name.toLowerCase().includes(search.toLowerCase())) {
+      return false;
+    }
+
+    return true;
+  });
+
+  return (
+    <div>
+      <input
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search products..."
+      />
+
+      <div className="filters">
+        <button onClick={() => setFilter("all")}>All</button>
+        <button onClick={() => setFilter("electronics")}>Electronics</button>
+        <button onClick={() => setFilter("clothing")}>Clothing</button>
+      </div>
+
+      {filteredProducts.length === 0 ? (
+        <p className="empty">No products match your criteria.</p>
+      ) : (
+        <div className="products">
+          {filteredProducts.map((product) => (
+            <ProductCard key={product.id} product={product} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+## Sorting Lists
+
+```jsx
+function sortProducts(products, sortBy) {
+  const sorted = [...products]; // create copy before sorting
+
+  switch (sortBy) {
+    case "price-asc":
+      return sorted.sort((a, b) => a.price - b.price);
+    case "price-desc":
+      return sorted.sort((a, b) => b.price - a.price);
+    case "name":
+      return sorted.sort((a, b) => a.name.localeCompare(b.name));
+    case "rating":
+      return sorted.sort((a, b) => b.rating - a.rating);
+    default:
+      return products;
+  }
+}
+
+function Store() {
+  const [sortBy, setSortBy] = useState("name");
+  const sortedProducts = sortProducts(products, sortBy);
+
+  return (
+    <div>
+      <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+        <option value="name">Name</option>
+        <option value="price-asc">Price: Low to High</option>
+        <option value="price-desc">Price: High to Low</option>
+        <option value="rating">Rating</option>
+      </select>
+
+      <div className="grid">
+        {sortedProducts.map((product) => (
+          <ProductCard key={product.id} product={product} />
+        ))}
+      </div>
+    </div>
+  );
+}
+```
+
+## Quick Reference
+
+```jsx
+// Ternary
+{condition ? <ComponentA /> : <ComponentB />}
+
+// Short-circuit
+{condition && <Component />}
+
+// Early return (before JSX)
+if (loading) return <Spinner />;
+
+// Map
+{items.map((item) => <Item key={item.id} />)}
+
+// Filter before render
+const visible = items.filter(item => item.visible);
+{visible.map(item => <Item key={item.id} />)}
+
+// Empty state
+{items.length === 0 && <EmptyState />}
+```
+
+## Practice Exercises
+
+1. **Tabbed interface**: Build a component with 3 tabs (Info, Pricing, Reviews). Only render the content for the active tab. Use a state variable for the active tab.
+
+2. **Searchable product list**: Create a list of 10+ products with name, category, and price. Add a search input that filters as you type. Add a dropdown to sort by name or price. Show "No results" when nothing matches.
+
+3. **Conditional form steps**: Build a multi-step form where each step shows different fields. Use a `step` state and render the appropriate step component. Include validation before allowing "Next". Show a summary at the end.

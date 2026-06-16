@@ -1,0 +1,1155 @@
+---
+title: "Project: Database-Powered Task API"
+description: "Build a complete task management API with Express and Mongoose — schema design, CRUD, validation, pagination, aggregation, and Atlas deployment."
+sidebar:
+  order: 10
+  label: "Project: Database-Powered Task API"
+tab: "full-stack-development"
+---
+
+Build a full-featured task management API using Express and Mongoose, deployed to MongoDB Atlas. This project combines everything from this module: data modeling, CRUD, validation, aggregation, and Atlas deployment.
+
+## Project Overview
+
+**Stack**: Express.js + Mongoose + MongoDB Atlas + Joi validation
+
+**Features**:
+- Full CRUD for tasks, users, and projects
+- Schema validation with Mongoose + Joi
+- Pagination, sorting, filtering
+- Aggregation pipeline for stats dashboard
+- Data modeling with references and embedded docs
+- Deployed to MongoDB Atlas
+
+## Project Structure
+
+```
+task-database-api/
+├── package.json
+├── .env
+├── src/
+│   ├── index.js              # Express app entry point
+│   ├── config/
+│   │   └── db.js             # Mongoose connection
+│   ├── models/
+│   │   ├── User.js
+│   │   ├── Task.js
+│   │   └── Project.js
+│   ├── routes/
+│   │   ├── users.js
+│   │   ├── tasks.js
+│   │   └── projects.js
+│   ├── middleware/
+│   │   └── validate.js       # Joi validation middleware
+│   └── utils/
+│       └── seed.js           # Sample data seeder
+└── test/
+    └── api.test.js           # Integration tests
+```
+
+## Step 1: Setup
+
+### package.json
+
+```json
+{
+  "name": "task-database-api",
+  "private": true,
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js",
+    "seed": "node src/utils/seed.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "joi": "^17.13.3",
+    "mongoose": "^8.8.0",
+    "morgan": "^1.10.0"
+  },
+  "devDependencies": {
+    "supertest": "^7.0.0",
+    "vitest": "^2.1.0"
+  }
+}
+```
+
+### Environment Variables
+
+```bash
+# .env
+PORT=3000
+MONGODB_URI=mongodb://localhost:27017/task-api
+NODE_ENV=development
+
+# For Atlas:
+# MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/task-api?retryWrites=true&w=majority
+```
+
+### Database Connection
+
+```javascript
+// src/config/db.js
+const mongoose = require("mongoose");
+
+async function connectDB() {
+  const uri = process.env.MONGODB_URI;
+
+  try {
+    await mongoose.connect(uri, {
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+    });
+    console.log(`MongoDB connected: ${mongoose.connection.host}`);
+  } catch (err) {
+    console.error("MongoDB connection error:", err.message);
+    process.exit(1);
+  }
+
+  mongoose.connection.on("error", (err) => {
+    console.error("MongoDB runtime error:", err);
+  });
+}
+
+module.exports = connectDB;
+```
+
+## Step 2: Data Models
+
+### User Model
+
+```javascript
+// src/models/User.js
+const mongoose = require("mongoose");
+
+const userSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: [true, "Name is required"],
+    trim: true,
+    minlength: [2, "Name must be at least 2 characters"],
+    maxlength: [50, "Name cannot exceed 50 characters"],
+  },
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    lowercase: true,
+    trim: true,
+    match: [/^\S+@\S+\.\S+$/, "Please provide a valid email"],
+  },
+  role: {
+    type: String,
+    enum: ["admin", "manager", "member"],
+    default: "member",
+  },
+  active: {
+    type: Boolean,
+    default: true,
+  },
+}, {
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true },
+});
+
+// Virtual: count user's tasks
+userSchema.virtual("taskCount", {
+  ref: "Task",
+  localField: "_id",
+  foreignField: "assignee",
+  count: true,
+});
+
+// Index for common queries
+userSchema.index({ email: 1 }, { unique: true });
+userSchema.index({ role: 1, active: 1 });
+
+module.exports = mongoose.model("User", userSchema);
+```
+
+### Project Model
+
+```javascript
+// src/models/Project.js
+const mongoose = require("mongoose");
+
+const projectSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: [true, "Project name is required"],
+    trim: true,
+    maxlength: [100, "Name cannot exceed 100 characters"],
+  },
+  description: {
+    type: String,
+    maxlength: [1000, "Description cannot exceed 1000 characters"],
+  },
+  owner: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+  },
+  members: [{
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    role: {
+      type: String,
+      enum: ["owner", "editor", "viewer"],
+      default: "viewer",
+    },
+    joinedAt: {
+      type: Date,
+      default: Date.now,
+    },
+  }],
+  status: {
+    type: String,
+    enum: ["active", "archived", "completed"],
+    default: "active",
+  },
+}, {
+  timestamps: true,
+});
+
+// Index for project listing
+projectSchema.index({ owner: 1, status: 1 });
+projectSchema.index({ "members.user": 1 });
+
+module.exports = mongoose.model("Project", projectSchema);
+```
+
+### Task Model
+
+```javascript
+// src/models/Task.js
+const mongoose = require("mongoose");
+
+const taskSchema = new mongoose.Schema({
+  title: {
+    type: String,
+    required: [true, "Task title is required"],
+    trim: true,
+    minlength: [3, "Title must be at least 3 characters"],
+    maxlength: [200, "Title cannot exceed 200 characters"],
+  },
+  description: {
+    type: String,
+    maxlength: [2000, "Description cannot exceed 2000 characters"],
+    default: "",
+  },
+  status: {
+    type: String,
+    enum: ["backlog", "todo", "in_progress", "review", "done"],
+    default: "todo",
+    index: true,
+  },
+  priority: {
+    type: String,
+    enum: ["low", "medium", "high", "critical"],
+    default: "medium",
+  },
+  assignee: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    index: true,
+  },
+  project: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Project",
+    required: true,
+    index: true,
+  },
+  tags: [{
+    type: String,
+    trim: true,
+    lowercase: true,
+  }],
+  dueDate: Date,
+  completedAt: Date,
+  estimatedHours: {
+    type: Number,
+    min: 0,
+    max: 1000,
+  },
+  actualHours: {
+    type: Number,
+    min: 0,
+    default: 0,
+  },
+  attachments: [{
+    filename: String,
+    url: String,
+    uploadedAt: { type: Date, default: Date.now },
+  }],
+}, {
+  timestamps: true,
+});
+
+// Compound indexes for common queries
+taskSchema.index({ project: 1, status: 1, priority: -1 });
+taskSchema.index({ assignee: 1, status: 1 });
+taskSchema.index({ dueDate: 1 }, { sparse: true });
+
+// Middleware: set completedAt when status changes to "done"
+taskSchema.pre("save", function (next) {
+  if (this.isModified("status") && this.status === "done" && !this.completedAt) {
+    this.completedAt = new Date();
+  }
+  next();
+});
+
+// Instance method
+taskSchema.methods.isOverdue = function () {
+  return this.dueDate && this.dueDate < new Date() && this.status !== "done";
+};
+
+module.exports = mongoose.model("Task", taskSchema);
+```
+
+## Step 3: Validation Middleware
+
+```javascript
+// src/middleware/validate.js
+const Joi = require("joi");
+
+const schemas = {
+  createUser: Joi.object({
+    name: Joi.string().trim().min(2).max(50).required(),
+    email: Joi.string().email().lowercase().trim().required(),
+    role: Joi.string().valid("admin", "manager", "member").default("member"),
+  }),
+
+  updateUser: Joi.object({
+    name: Joi.string().trim().min(2).max(50),
+    email: Joi.string().email().lowercase().trim(),
+    role: Joi.string().valid("admin", "manager", "member"),
+    active: Joi.boolean(),
+  }).min(1).message("At least one field must be provided"),
+
+  createProject: Joi.object({
+    name: Joi.string().trim().max(100).required(),
+    description: Joi.string().max(1000).allow("").default(""),
+    owner: Joi.string().required(),
+  }),
+
+  createTask: Joi.object({
+    title: Joi.string().trim().min(3).max(200).required(),
+    description: Joi.string().max(2000).allow("").default(""),
+    status: Joi.string().valid("backlog", "todo", "in_progress", "review", "done").default("todo"),
+    priority: Joi.string().valid("low", "medium", "high", "critical").default("medium"),
+    assignee: Joi.string().optional(),
+    project: Joi.string().required(),
+    tags: Joi.array().items(Joi.string().trim().lowercase()).max(10).default([]),
+    dueDate: Joi.date().iso().allow(null).optional(),
+    estimatedHours: Joi.number().min(0).max(1000).optional(),
+  }),
+
+  updateTask: Joi.object({
+    title: Joi.string().trim().min(3).max(200),
+    description: Joi.string().max(2000).allow(""),
+    status: Joi.string().valid("backlog", "todo", "in_progress", "review", "done"),
+    priority: Joi.string().valid("low", "medium", "high", "critical"),
+    assignee: Joi.string().allow(null),
+    tags: Joi.array().items(Joi.string().trim().lowercase()).max(10),
+    dueDate: Joi.date().iso().allow(null),
+    estimatedHours: Joi.number().min(0).max(1000),
+  }).min(1).message("At least one field must be provided"),
+
+  queryTasks: Joi.object({
+    status: Joi.string().valid("backlog", "todo", "in_progress", "review", "done"),
+    priority: Joi.string().valid("low", "medium", "high", "critical"),
+    assignee: Joi.string(),
+    project: Joi.string(),
+    search: Joi.string().trim().max(100),
+    tags: Joi.string(),  // comma-separated
+    page: Joi.number().integer().min(1).default(1),
+    limit: Joi.number().integer().min(1).max(100).default(20),
+    sort: Joi.string().valid("createdAt", "updatedAt", "dueDate", "priority", "title", "status").default("createdAt"),
+    order: Joi.string().valid("asc", "desc").default("desc"),
+  }),
+};
+
+function validate(schemaName) {
+  return (req, res, next) => {
+    const schema = schemas[schemaName];
+    if (!schema) {
+      return res.status(500).json({ error: "Validation schema not found" });
+    }
+
+    const data = req.body || {};
+    const { error, value } = schema.validate(data, {
+      abortEarly: false,
+      stripUnknown: true,
+    });
+
+    if (error) {
+      return res.status(422).json({
+        error: "VALIDATION_ERROR",
+        details: error.details.map((d) => ({
+          field: d.path.join("."),
+          message: d.message.replace(/"/g, ""),
+        })),
+      });
+    }
+
+    req.body = value;
+    next();
+  };
+}
+
+module.exports = { validate, schemas };
+
+// For query validation:
+function validateQuery(schemaName) {
+  return (req, res, next) => {
+    const schema = schemas[schemaName];
+    const { error, value } = schema.validate(req.query, {
+      abortEarly: false,
+      stripUnknown: true,
+    });
+
+    if (error) {
+      return res.status(422).json({
+        error: "VALIDATION_ERROR",
+        details: error.details.map((d) => ({
+          field: d.path.join("."),
+          message: d.message.replace(/"/g, ""),
+        })),
+      });
+    }
+
+    req.query = value;
+    next();
+  };
+}
+
+module.exports.validateQuery = validateQuery;
+```
+
+## Step 4: Routes
+
+### Tasks Routes
+
+```javascript
+// src/routes/tasks.js
+const express = require("express");
+const router = express.Router();
+const Task = require("../models/Task");
+const { validate, validateQuery } = require("../middleware/validate");
+
+// GET /api/tasks — list with pagination, filtering, sorting
+router.get("/", validateQuery("queryTasks"), async (req, res) => {
+  try {
+    const {
+      status, priority, assignee, project,
+      search, tags, page, limit, sort, order,
+    } = req.query;
+
+    // Build filter
+    const filter = {};
+    if (status) filter.status = status;
+    if (priority) filter.priority = priority;
+    if (assignee) filter.assignee = assignee;
+    if (project) filter.project = project;
+    if (search) filter.title = { $regex: search, $options: "i" };
+    if (tags) filter.tags = { $all: tags.split(",").map((t) => t.trim()) };
+
+    // Execute query
+    const sortObj = { [sort]: order === "asc" ? 1 : -1 };
+    const skip = (page - 1) * limit;
+
+    const [tasks, total] = await Promise.all([
+      Task.find(filter)
+        .sort(sortObj)
+        .skip(skip)
+        .limit(limit)
+        .populate("assignee", "name email")
+        .populate("project", "name")
+        .lean(),
+      Task.countDocuments(filter),
+    ]);
+
+    res.json({
+      data: tasks,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+        hasNext: page * limit < total,
+        hasPrev: page > 1,
+      },
+    });
+  } catch (err) {
+    console.error("List tasks error:", err);
+    res.status(500).json({ error: "Failed to fetch tasks" });
+  }
+});
+
+// GET /api/tasks/stats — aggregation pipeline
+router.get("/stats", async (req, res) => {
+  try {
+    const stats = await Task.aggregate([
+      // Group by status
+      {
+        $group: {
+          _id: "$status",
+          count: { $sum: 1 },
+          totalEstimatedHours: { $sum: "$estimatedHours" },
+          totalActualHours: { $sum: "$actualHours" },
+          avgActualHours: { $avg: "$actualHours" },
+        },
+      },
+      { $sort: { count: -1 } },
+      // Add percentage
+      {
+        $set: {
+          percentage: {
+            $multiply: [
+              { $divide: ["$count", { $sum: "$count" }] },
+              100,
+            ],
+          },
+        },
+      },
+    ]);
+
+    // Overall stats
+    const total = stats.reduce((acc, s) => acc + s.count, 0);
+    const completed = stats.find((s) => s._id === "done")?.count || 0;
+
+    // Tasks by priority
+    const byPriority = await Task.aggregate([
+      {
+        $group: {
+          _id: "$priority",
+          count: { $sum: 1 },
+          overdue: {
+            $sum: {
+              $cond: [
+                { $and: [
+                  { $ne: ["$status", "done"] },
+                  { $lt: ["$dueDate", new Date()] },
+                ]},
+                1,
+                0,
+              ],
+            },
+          },
+        },
+      },
+    ]);
+
+    // Overdue tasks
+    const overdueCount = await Task.countDocuments({
+      status: { $ne: "done" },
+      dueDate: { $lt: new Date() },
+    });
+
+    res.json({
+      total,
+      completed,
+      completionRate: total > 0 ? Math.round((completed / total) * 100) : 0,
+      overdueCount,
+      byStatus: stats,
+      byPriority,
+    });
+  } catch (err) {
+    console.error("Task stats error:", err);
+    res.status(500).json({ error: "Failed to compute stats" });
+  }
+});
+
+// GET /api/tasks/:id
+router.get("/:id", async (req, res) => {
+  try {
+    const task = await Task.findById(req.params.id)
+      .populate("assignee", "name email")
+      .populate("project", "name description");
+
+    if (!task) {
+      return res.status(404).json({ error: "Task not found" });
+    }
+
+    res.json({ data: task });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch task" });
+  }
+});
+
+// POST /api/tasks
+router.post("/", validate("createTask"), async (req, res) => {
+  try {
+    const task = await Task.create(req.body);
+    const populated = await task.populate("assignee", "name email");
+    res.status(201).json({ data: populated });
+  } catch (err) {
+    if (err.name === "ValidationError") {
+      return res.status(422).json({
+        error: "VALIDATION_ERROR",
+        details: Object.values(err.errors).map((e) => ({
+          field: e.path,
+          message: e.message,
+        })),
+      });
+    }
+    res.status(500).json({ error: "Failed to create task" });
+  }
+});
+
+// PUT /api/tasks/:id
+router.put("/:id", validate("updateTask"), async (req, res) => {
+  try {
+    const task = await Task.findByIdAndUpdate(
+      req.params.id,
+      { $set: req.body },
+      { new: true, runValidators: true }
+    ).populate("assignee", "name email");
+
+    if (!task) {
+      return res.status(404).json({ error: "Task not found" });
+    }
+
+    res.json({ data: task });
+  } catch (err) {
+    if (err.name === "ValidationError") {
+      return res.status(422).json({
+        error: "VALIDATION_ERROR",
+        details: Object.values(err.errors).map((e) => ({
+          field: e.path,
+          message: e.message,
+        })),
+      });
+    }
+    res.status(500).json({ error: "Failed to update task" });
+  }
+});
+
+// DELETE /api/tasks/:id
+router.delete("/:id", async (req, res) => {
+  try {
+    const task = await Task.findByIdAndDelete(req.params.id);
+
+    if (!task) {
+      return res.status(404).json({ error: "Task not found" });
+    }
+
+    res.json({ message: "Task deleted", data: task });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to delete task" });
+  }
+});
+
+module.exports = router;
+```
+
+### Users Routes
+
+```javascript
+// src/routes/users.js
+const express = require("express");
+const router = express.Router();
+const User = require("../models/User");
+const Task = require("../models/Task");
+const { validate } = require("../middleware/validate");
+
+// GET /api/users
+router.get("/", async (req, res) => {
+  try {
+    const { role, active, page = 1, limit = 20 } = req.query;
+
+    const filter = {};
+    if (role) filter.role = role;
+    if (active !== undefined) filter.active = active === "true";
+
+    const skip = (page - 1) * limit;
+    const sort = { name: 1 };
+
+    const [users, total] = await Promise.all([
+      User.find(filter).sort(sort).skip(skip).limit(limit).lean(),
+      User.countDocuments(filter),
+    ]);
+
+    res.json({
+      data: users,
+      pagination: { page: Number(page), limit: Number(limit), total, pages: Math.ceil(total / limit) },
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch users" });
+  }
+});
+
+// GET /api/users/:id
+router.get("/:id", async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).lean();
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Get user's task stats
+    const taskStats = await Task.aggregate([
+      { $match: { assignee: user._id } },
+      { $group: { _id: "$status", count: { $sum: 1 } } },
+    ]);
+
+    res.json({ data: { ...user, taskStats } });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch user" });
+  }
+});
+
+// POST /api/users
+router.post("/", validate("createUser"), async (req, res) => {
+  try {
+    const user = await User.create(req.body);
+    res.status(201).json({ data: user });
+  } catch (err) {
+    if (err.code === 11000) {
+      return res.status(409).json({ error: "Email already exists" });
+    }
+    res.status(500).json({ error: "Failed to create user" });
+  }
+});
+
+// PUT /api/users/:id
+router.put("/:id", validate("updateUser"), async (req, res) => {
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { $set: req.body },
+      { new: true, runValidators: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({ data: user });
+  } catch (err) {
+    if (err.code === 11000) {
+      return res.status(409).json({ error: "Email already in use" });
+    }
+    res.status(500).json({ error: "Failed to update user" });
+  }
+});
+
+// DELETE /api/users/:id
+router.delete("/:id", async (req, res) => {
+  try {
+    const user = await User.findByIdAndDelete(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Reassign tasks to unassigned
+    await Task.updateMany(
+      { assignee: user._id },
+      { $set: { assignee: null } }
+    );
+
+    res.json({ message: "User deleted", data: user });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to delete user" });
+  }
+});
+
+module.exports = router;
+```
+
+## Step 5: Server Entry Point
+
+```javascript
+// src/index.js
+require("dotenv").config();
+
+const express = require("express");
+const cors = require("cors");
+const morgan = require("morgan");
+const connectDB = require("./config/db");
+
+const userRoutes = require("./routes/users");
+const taskRoutes = require("./routes/tasks");
+const projectRoutes = require("./routes/projects");
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Connect to MongoDB
+connectDB();
+
+// Middleware
+app.use(cors());
+app.use(express.json({ limit: "10kb" }));
+app.use(morgan("dev"));
+
+// Routes
+app.use("/api/users", userRoutes);
+app.use("/api/tasks", taskRoutes);
+app.use("/api/projects", projectRoutes);
+
+// Health check
+app.get("/api/health", (req, res) => {
+  res.json({
+    status: "ok",
+    dbState: ["disconnected", "connected", "connecting", "disconnecting"][
+      require("mongoose").connection.readyState
+    ],
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ error: "Route not found" });
+});
+
+// Error handler
+app.use((err, req, res, next) => {
+  console.error("Unhandled error:", err);
+  res.status(500).json({ error: "Internal server error" });
+});
+
+app.listen(PORT, () => {
+  console.log(`Task API running on http://localhost:${PORT}`);
+});
+```
+
+## Step 6: Seed Data
+
+```javascript
+// src/utils/seed.js
+require("dotenv").config({ path: require("path").join(__dirname, "../../.env") });
+
+const mongoose = require("mongoose");
+const User = require("../models/User");
+const Project = require("../models/Project");
+const Task = require("../models/Task");
+
+async function seed() {
+  await mongoose.connect(process.env.MONGODB_URI);
+  console.log("Connected to MongoDB");
+
+  // Clear existing data
+  await Promise.all([
+    User.deleteMany({}),
+    Project.deleteMany({}),
+    Task.deleteMany({}),
+  ]);
+
+  // Create users
+  const users = await User.create([
+    { name: "Alice Johnson", email: "alice@example.com", role: "admin" },
+    { name: "Bob Smith", email: "bob@example.com", role: "manager" },
+    { name: "Charlie Brown", email: "charlie@example.com", role: "member" },
+    { name: "Diana Prince", email: "diana@example.com", role: "member" },
+    { name: "Eve Wilson", email: "eve@example.com", role: "member" },
+  ]);
+
+  // Create projects
+  const projects = await Project.create([
+    {
+      name: "Website Redesign",
+      description: "Complete overhaul of the company website",
+      owner: users[0]._id,
+      members: [
+        { user: users[0]._id, role: "owner" },
+        { user: users[1]._id, role: "editor" },
+        { user: users[2]._id, role: "viewer" },
+      ],
+    },
+    {
+      name: "Mobile App v2",
+      description: "Version 2 of the mobile application with new features",
+      owner: users[1]._id,
+      members: [
+        { user: users[1]._id, role: "owner" },
+        { user: users[3]._id, role: "editor" },
+        { user: users[4]._id, role: "editor" },
+      ],
+    },
+    {
+      name: "API Migration",
+      description: "Migrate REST API to GraphQL",
+      owner: users[0]._id,
+      members: [
+        { user: users[0]._id, role: "owner" },
+        { user: users[2]._id, role: "editor" },
+        { user: users[4]._id, role: "editor" },
+      ],
+    },
+  ]);
+
+  // Overdue date for some tasks
+  const pastDate = new Date();
+  pastDate.setDate(pastDate.getDate() - 5);
+  const futureDate = new Date();
+  futureDate.setDate(futureDate.getDate() + 14);
+
+  // Create tasks
+  const tasks = await Task.create([
+    {
+      title: "Design new homepage layout",
+      description: "Create wireframes and mockups for the redesigned homepage",
+      status: "in_progress",
+      priority: "high",
+      assignee: users[2]._id,
+      project: projects[0]._id,
+      tags: ["design", "frontend"],
+      dueDate: futureDate,
+      estimatedHours: 16,
+    },
+    {
+      title: "Implement user authentication",
+      status: "todo",
+      priority: "critical",
+      assignee: users[3]._id,
+      project: projects[1]._id,
+      tags: ["backend", "security"],
+      dueDate: futureDate,
+      estimatedHours: 24,
+    },
+    {
+      title: "Set up CI/CD pipeline",
+      status: "done",
+      priority: "high",
+      assignee: users[4]._id,
+      project: projects[2]._id,
+      tags: ["devops", "automation"],
+      estimatedHours: 8,
+      actualHours: 10,
+    },
+    {
+      title: "Write API documentation",
+      status: "backlog",
+      priority: "low",
+      assignee: users[1]._id,
+      project: projects[2]._id,
+      tags: ["docs"],
+      dueDate: futureDate,
+      estimatedHours: 12,
+    },
+    {
+      title: "Fix navigation responsive bug",
+      status: "review",
+      priority: "medium",
+      assignee: users[2]._id,
+      project: projects[0]._id,
+      tags: ["bug", "frontend", "css"],
+      dueDate: pastDate,
+      estimatedHours: 4,
+      actualHours: 6,
+    },
+    {
+      title: "Database performance optimization",
+      status: "in_progress",
+      priority: "high",
+      assignee: users[3]._id,
+      project: projects[1]._id,
+      tags: ["backend", "performance", "database"],
+      dueDate: pastDate,
+      estimatedHours: 20,
+    },
+    {
+      title: "Unit test coverage for user module",
+      status: "todo",
+      priority: "medium",
+      assignee: users[4]._id,
+      project: projects[1]._id,
+      tags: ["testing", "backend"],
+      dueDate: pastDate,
+      estimatedHours: 8,
+    },
+  ]);
+
+  console.log(`Seeded: ${users.length} users, ${projects.length} projects, ${tasks.length} tasks`);
+
+  await mongoose.disconnect();
+  console.log("Done");
+}
+
+seed().catch(console.error);
+```
+
+## Step 7: Testing the API
+
+### Manual Tests
+
+```bash
+# Start server
+npm run dev
+
+# Seed data
+npm run seed
+
+# Test endpoints
+
+# Health check
+curl http://localhost:3000/api/health
+
+# List users
+curl http://localhost:3000/api/users
+
+# List tasks (paginated)
+curl "http://localhost:3000/api/tasks?page=1&limit=5&sort=createdAt&order=desc"
+
+# Filter tasks
+curl "http://localhost:3000/api/tasks?status=todo&priority=high"
+
+# Search tasks
+curl "http://localhost:3000/api/tasks?search=design"
+
+# Task stats
+curl http://localhost:3000/api/tasks/stats
+
+# Create task
+curl -X POST http://localhost:3000/api/tasks \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "New task from API",
+    "priority": "high",
+    "project": "<project_id>",
+    "assignee": "<user_id>"
+  }'
+
+# Update task status
+curl -X PUT http://localhost:3000/api/tasks/<task_id> \
+  -H "Content-Type: application/json" \
+  -d '{"status": "done"}'
+```
+
+### Integration Tests
+
+```javascript
+// test/api.test.js
+const { describe, it, expect, beforeAll } = require("vitest");
+const request = require("supertest");
+
+// Start server for testing
+process.env.MONGODB_URI = "mongodb://localhost:27017/task-api-test";
+const app = require("../src/index");
+
+describe("Task API", () => {
+  let userId, projectId, taskId;
+
+  it("POST /api/users — creates a user", async () => {
+    const res = await request(app)
+      .post("/api/users")
+      .send({ name: "Test User", email: "test@test.com" });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data).toHaveProperty("_id");
+    expect(res.body.data.email).toBe("test@test.com");
+    userId = res.body.data._id;
+  });
+
+  it("POST /api/users — rejects duplicate email", async () => {
+    const res = await request(app)
+      .post("/api/users")
+      .send({ name: "Another", email: "test@test.com" });
+
+    expect(res.status).toBe(409);
+  });
+
+  it("POST /api/users — validates required fields", async () => {
+    const res = await request(app)
+      .post("/api/users")
+      .send({});
+
+    expect(res.status).toBe(422);
+  });
+
+  it("POST /api/projects — creates a project", async () => {
+    const res = await request(app)
+      .post("/api/projects")
+      .send({ name: "Test Project", owner: userId });
+
+    expect(res.status).toBe(201);
+    projectId = res.body.data._id;
+  });
+
+  it("POST /api/tasks — creates a task", async () => {
+    const res = await request(app)
+      .post("/api/tasks")
+      .send({
+        title: "Test task",
+        project: projectId,
+        assignee: userId,
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.title).toBe("Test task");
+    expect(res.body.data.status).toBe("todo");
+    taskId = res.body.data._id;
+  });
+
+  it("GET /api/tasks — lists tasks with pagination", async () => {
+    const res = await request(app)
+      .get("/api/tasks?page=1&limit=10");
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toBeInstanceOf(Array);
+    expect(res.body.pagination).toHaveProperty("total");
+    expect(res.body.pagination.page).toBe(1);
+  });
+
+  it("GET /api/tasks/stats — returns aggregation stats", async () => {
+    const res = await request(app).get("/api/tasks/stats");
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty("total");
+    expect(res.body).toHaveProperty("byStatus");
+    expect(res.body.byStatus).toBeInstanceOf(Array);
+  });
+
+  it("PUT /api/tasks/:id — updates a task", async () => {
+    const res = await request(app)
+      .put(`/api/tasks/${taskId}`)
+      .send({ status: "in_progress", priority: "high" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe("in_progress");
+    expect(res.body.data.priority).toBe("high");
+  });
+
+  it("GET /api/users/:id — returns user with task stats", async () => {
+    const res = await request(app).get(`/api/users/${userId}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveProperty("taskStats");
+    expect(res.body.data.taskStats).toBeInstanceOf(Array);
+  });
+
+  it("DELETE /api/tasks/:id — deletes a task", async () => {
+    const res = await request(app).delete(`/api/tasks/${taskId}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe("Task deleted");
+  });
+});
+```
+
+## Step 8: Deploy to Atlas
+
+1. Create a free cluster on MongoDB Atlas
+2. Update `.env` with your Atlas connection string
+3. Run `npm run seed` to seed data
+4. Start the server with `npm start`
+5. Verify with `curl http://localhost:3000/api/health`
+
+## Challenge: Add These Features
+
+1. **Activity log**: Create an `Activity` collection that logs every task change (who changed what, when). Use Mongoose post-save hooks on the Task model.
+
+2. **Task dependencies**: Add a `dependsOn` array to the Task model (references to other tasks). Prevent completing a task if its dependencies aren't done.
+
+3. **Dashboard aggregation**: Build a `/api/dashboard` endpoint that returns: tasks per user, overdue count, tasks completed this week, and average completion time. Use a single aggregation pipeline.
+
+4. **Soft delete**: Instead of deleting documents, add a `deletedAt` field. Modify all queries to exclude deleted documents by default using Mongoose pre-find middleware.

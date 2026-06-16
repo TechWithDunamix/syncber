@@ -1,0 +1,353 @@
+---
+title: "Project: Interactive Calculator"
+description: "Build a command-line calculator applying all JavaScript basics — functions, control flow, loops, input handling, and error management."
+sidebar:
+  order: 10
+  label: "Calculator Project"
+tab: "full-stack-development"
+---
+
+This project brings together everything from the JavaScript Basics module — variables, functions, control flow, arrays, and loops — to build a working command-line calculator.
+
+## Project Requirements
+
+Your calculator must:
+
+- [ ] Accept two numbers and an operator (+, -, *, /)
+- [ ] Perform the calculation and display the result
+- [ ] Handle division by zero gracefully
+- [ ] Validate user input (is it a number? is the operator valid?)
+- [ ] Loop until the user chooses to exit
+- [ ] Display a history of calculations
+- [ ] Support additional operations (exponent, square root, modulo)
+
+## Setup
+
+```bash
+mkdir calculator
+cd calculator
+npm init -y
+npm install readline-sync
+touch calculator.js
+```
+
+The `readline-sync` package lets us read user input from the terminal synchronously.
+
+## Step 1: Basic Arithmetic Functions
+
+```javascript
+// calculator.js
+const readline = require("readline-sync");
+
+// Arithmetic functions
+function add(a, b) {
+  return a + b;
+}
+
+function subtract(a, b) {
+  return a - b;
+}
+
+function multiply(a, b) {
+  return a * b;
+}
+
+function divide(a, b) {
+  if (b === 0) {
+    return "Error: Division by zero";
+  }
+  return a / b;
+}
+
+function power(a, b) {
+  return Math.pow(a, b);
+}
+
+function modulo(a, b) {
+  return a % b;
+}
+```
+
+## Step 2: Operation Dispatcher
+
+```javascript
+// Map operator symbols to functions
+function getOperation(operator) {
+  const operations = {
+    "+": add,
+    "-": subtract,
+    "*": multiply,
+    "/": divide,
+    "^": power,
+    "%": modulo
+  };
+  return operations[operator];
+}
+```
+
+## Step 3: Input Validation
+
+```javascript
+function getNumber(prompt) {
+  const input = readline.question(prompt);
+  const number = parseFloat(input);
+
+  if (isNaN(number)) {
+    console.log(`Invalid number: "${input}". Please enter a valid number.`);
+    return getNumber(prompt);  // Retry
+  }
+
+  return number;
+}
+
+function getOperator() {
+  const validOperators = ["+", "-", "*", "/", "^", "%"];
+  const input = readline.question("Enter operator (+, -, *, /, ^, %): ").trim();
+
+  if (!validOperators.includes(input)) {
+    console.log(`Invalid operator: "${input}". Please use one of: ${validOperators.join(", ")}`);
+    return getOperator();  // Retry
+  }
+
+  return input;
+}
+```
+
+## Step 4: Calculation History
+
+```javascript
+const history = [];
+
+function addToHistory(a, operator, b, result) {
+  const entry = `${a} ${operator} ${b} = ${result}`;
+  history.push(entry);
+}
+
+function displayHistory() {
+  if (history.length === 0) {
+    console.log("\nNo calculations yet.");
+    return;
+  }
+
+  console.log("\n=== Calculation History ===");
+  history.forEach((entry, index) => {
+    console.log(`${index + 1}. ${entry}`);
+  });
+  console.log("==========================");
+}
+```
+
+## Step 5: Main Calculator Loop
+
+```javascript
+function runCalculator() {
+  console.log("\n=== JavaScript Calculator ===");
+  console.log("Type 'history' to see past calculations");
+  console.log("Type 'quit' to exit\n");
+
+  while (true) {
+    let a = readline.question("Enter first number (or 'quit'): ").trim().toLowerCase();
+
+    if (a === "quit") {
+      console.log("Goodbye!");
+      break;
+    }
+
+    if (a === "history") {
+      displayHistory();
+      continue;
+    }
+
+    a = parseFloat(a);
+    if (isNaN(a)) {
+      console.log("Invalid input. Please enter a number.");
+      continue;
+    }
+
+    const operator = getOperator();
+
+    // sqrt is a unary operator — handle separately
+    if (operator === "sqrt") {
+      const result = Math.sqrt(a);
+      console.log(`√${a} = ${result}`);
+      addToHistory(a, "√", "", result);
+      continue;
+    }
+
+    let b;
+    if (operator !== "√") {
+      b = getNumber("Enter second number: ");
+    }
+
+    const operation = getOperation(operator);
+
+    if (!operation) {
+      console.log(`Unknown operator: ${operator}`);
+      continue;
+    }
+
+    const result = operation(a, b);
+    console.log(`\nResult: ${a} ${operator} ${b} = ${result}\n`);
+    addToHistory(a, operator, b, result);
+  }
+}
+```
+
+## Step 6: Entry Point
+
+```javascript
+// Handle Ctrl+C gracefully
+process.on("SIGINT", () => {
+  console.log("\n\nGoodbye!");
+  process.exit(0);
+});
+
+// Start the calculator
+runCalculator();
+```
+
+## Full Program
+
+Here's the complete calculator:
+
+```javascript
+const readline = require("readline-sync");
+
+// Arithmetic functions
+const add = (a, b) => a + b;
+const subtract = (a, b) => a - b;
+const multiply = (a, b) => a * b;
+const divide = (a, b) => b === 0 ? "Error: Division by zero" : a / b;
+const power = (a, b) => Math.pow(a, b);
+const modulo = (a, b) => a % b;
+
+const operations = {
+  "+": add,
+  "-": subtract,
+  "*": multiply,
+  "/": divide,
+  "^": power,
+  "%": modulo
+};
+
+const history = [];
+
+function getNumber(prompt) {
+  const input = readline.question(prompt);
+  const number = parseFloat(input);
+  if (isNaN(number)) {
+    console.log(`Invalid input: "${input}".`);
+    return getNumber(prompt);
+  }
+  return number;
+}
+
+function getOperator() {
+  const valid = Object.keys(operations);
+  const input = readline.question(`Operator (${valid.join(", ")}): `).trim();
+  if (!valid.includes(input)) {
+    console.log(`Invalid operator. Use: ${valid.join(", ")}`);
+    return getOperator();
+  }
+  return input;
+}
+
+function runCalculator() {
+  console.log("\n=== JavaScript Calculator ===");
+  console.log("Commands: 'history', 'quit'\n");
+
+  while (true) {
+    let input = readline.question("First number: ").trim().toLowerCase();
+
+    if (input === "quit") break;
+    if (input === "history") {
+      history.forEach((e, i) => console.log(`${i + 1}. ${e}`));
+      continue;
+    }
+
+    const a = parseFloat(input);
+    if (isNaN(a)) {
+      console.log("Please enter a valid number.");
+      continue;
+    }
+
+    const operator = getOperator();
+    const b = getNumber("Second number: ");
+    const operation = operations[operator];
+
+    if (!operation) {
+      console.log("Unknown operator.");
+      continue;
+    }
+
+    const result = operation(a, b);
+    const entry = `${a} ${operator} ${b} = ${result}`;
+    console.log(`\nResult: ${entry}\n`);
+    history.push(entry);
+  }
+
+  console.log("Goodbye!");
+}
+
+runCalculator();
+```
+
+## Running the Calculator
+
+```bash
+node calculator.js
+```
+
+Example session:
+
+```
+=== JavaScript Calculator ===
+Commands: 'history', 'quit'
+
+First number: 10
+Operator (+, -, *, /, ^, %): +
+Second number: 5
+
+Result: 10 + 5 = 15
+
+First number: history
+1. 10 + 5 = 15
+First number: 25
+Operator (+, -, *, /, ^, %): /
+Second number: 0
+
+Result: 25 / 0 = Error: Division by zero
+
+First number: quit
+Goodbye!
+```
+
+## Testing Checklist
+
+- [ ] Addition, subtraction, multiplication work correctly
+- [ ] Division by zero shows error message (doesn't crash)
+- [ ] Invalid numbers (text input) are handled gracefully
+- [ ] Invalid operators show error message
+- [ ] History shows all previous calculations
+- [ ] "quit" exits the program
+- [ ] Ctrl+C gracefully exits
+
+## Extension Ideas
+
+1. **Memory functions**: Add M+, M-, MR, MC (store/recall values)
+2. **Scientific operations**: sin, cos, tan, log, ln
+3. **Percentage calculations**: what is X% of Y, X is what % of Y
+4. **Unit conversions**: Celsius↔Fahrenheit, km↔miles, kg↔lbs
+5. **Expression parser**: Accept "2 + 3 * 4" as a single line input
+6. **Persist history**: Save history to a file and load it on restart
+7. **GUI version**: Build a browser-based calculator with HTML/CSS
+
+## Key Takeaways
+
+- Real programs combine all language features — functions, loops, conditionals, and data structures
+- Input validation is critical — never trust user input
+- Recursive functions (`getNumber` calling itself on bad input) are a clean way to handle retries
+- Map data structures (`operations`) reduce repetitive code (no giant if/else chain)
+- Arrays with `push()` maintain calculation history
+- Planning the program structure (functions → dispatcher → loop) before coding saves time
+- This calculator is your first real JavaScript program — you built something useful from scratch

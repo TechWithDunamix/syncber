@@ -1,0 +1,358 @@
+---
+title: "Modern CSS Features"
+description: "Modern CSS capabilities — custom properties (CSS variables), container queries, CSS nesting, @layer cascade layers, the :has() selector, and cutting-edge features."
+sidebar:
+  order: 9
+  label: "Modern CSS"
+tab: "full-stack-development"
+---
+
+CSS has evolved dramatically. Modern CSS features reduce the need for preprocessors (Sass, Less) and JavaScript for layout and theming.
+
+## Custom Properties (CSS Variables)
+
+Custom properties store reusable values:
+
+```css
+:root {
+  /* Color palette */
+  --color-primary: #0066cc;
+  --color-secondary: #6c757d;
+  --color-success: #28a745;
+  --color-danger: #dc3545;
+  --color-bg: #ffffff;
+  --color-text: #333333;
+
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 48px;
+
+  /* Typography */
+  --font-family: "Roboto", system-ui, sans-serif;
+  --font-size-base: 16px;
+  --line-height: 1.6;
+
+  /* Border radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 16px;
+}
+```
+
+### Using Variables
+
+```css
+.button {
+  background: var(--color-primary);
+  color: white;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-family);
+}
+
+.card {
+  background: var(--color-bg);
+  color: var(--color-text);
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-md);
+}
+```
+
+### Fallback Values
+
+```css
+.element {
+  color: var(--color-brand, #0066cc);          /* If --color-brand is not defined, use #0066cc */
+  padding: var(--spacing-md, 16px);             /* Fallback to 16px */
+}
+```
+
+### Scoped Variables
+
+Variables respect the cascade — redefine them in any scope:
+
+```css
+/* Global values in :root */
+:root { --bg: white; --text: black; }
+
+/* Dark mode override */
+.dark-mode {
+  --bg: #1a1a2e;
+  --text: #e0e0e0;
+}
+
+/* Component-level override */
+.alert-danger {
+  --color-primary: var(--color-danger);
+}
+
+/* Usage */
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+```
+
+### Changing Variables with JavaScript
+
+```javascript
+// Set a variable
+document.documentElement.style.setProperty('--color-primary', '#ff6600');
+
+// Get a variable
+getComputedStyle(document.documentElement).getPropertyValue('--color-primary');
+
+// Toggle dark mode
+document.body.classList.toggle('dark-mode');
+```
+
+## Container Queries
+
+Container queries let you style elements based on their **container's size**, not the viewport:
+
+```css
+/* Define a container */
+.card-container {
+  container-type: inline-size;
+  container-name: cards;
+}
+
+/* Query the container */
+@container cards (min-width: 400px) {
+  .card {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 16px;
+  }
+}
+
+@container cards (max-width: 399px) {
+  .card {
+    display: flex;
+    flex-direction: column;
+  }
+}
+```
+
+Container queries are revolutionary for component libraries — a component can adapt to its container width without knowing where it's placed.
+
+### Container Query Units
+
+```css
+.card {
+  font-size: clamp(0.875rem, 4cqi, 1.25rem);
+  /* cqi = 1% of container's inline size */
+  /* cqw = 1% of container's width */
+  /* cqh = 1% of container's height */
+  padding: 2cqi;
+}
+```
+
+## CSS Nesting
+
+Nesting mirrors HTML structure within your CSS — no more repeating selectors:
+
+```css
+/* Before nesting */
+.card { ... }
+.card .header { ... }
+.card .body { ... }
+.card .body p { ... }
+.card.is-active { ... }
+
+/* After nesting */
+.card {
+  padding: 16px;
+
+  & .header {
+    font-weight: bold;
+  }
+
+  & .body {
+    & p {
+      line-height: 1.6;
+    }
+  }
+
+  &.is-active {
+    border-color: blue;
+  }
+}
+```
+
+You can also nest media queries:
+
+```css
+.card {
+  display: grid;
+  grid-template-columns: 1fr;
+
+  @media (min-width: 768px) {
+    grid-template-columns: 200px 1fr;
+  }
+}
+```
+
+## Cascade Layers: @layer
+
+Layers let you control the cascade order explicitly — third-party CSS, framework CSS, and your CSS no longer fight:
+
+```css
+/* Define layer order (first = lowest priority) */
+@layer reset, framework, components, utilities;
+
+/* Add styles to layers */
+@layer reset {
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+  }
+}
+
+@layer framework {
+  .btn { padding: 8px 16px; border-radius: 4px; }
+}
+
+@layer components {
+  .btn-primary { background: blue; color: white; }
+}
+
+/* Unlayered styles go ON TOP of all layers (highest priority) */
+.urgent { background: red !important; } /* Avoid this */
+```
+
+Layer order: `reset` < `framework` < `components` < `utilities` < unlayered styles.
+
+## The :has() Selector
+
+`:has()` selects an element based on its children — previously impossible with CSS alone:
+
+```css
+/* Style a card that contains an image */
+.card:has(img) {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+}
+
+/* Style a form group that has an error */
+.form-group:has(.error) {
+  border-color: red;
+}
+
+/* Style a parent that contains a checked checkbox */
+.fieldset:has(input:checked) {
+  background: #f0fff0;
+}
+
+/* Style a section that contains a heading */
+section:has(h2) {
+  padding-top: 40px;
+}
+
+/* Multiple conditions */
+.card:has(img):has(.badge) {
+  position: relative;
+}
+```
+
+## Additional Modern Features
+
+### accent-color
+
+Style form controls with a single property:
+
+```css
+input[type="checkbox"],
+input[type="radio"],
+input[type="range"],
+progress {
+  accent-color: #0066cc;
+}
+```
+
+### scroll-behavior
+
+```css
+html {
+  scroll-behavior: smooth;   /* Smooth anchor scrolling */
+}
+/* For individual elements */
+.element {
+  scroll-behavior: smooth;
+  scroll-margin-top: 80px;   /* Offset for fixed headers */
+}
+```
+
+### text-wrap
+
+```css
+h1 {
+  text-wrap: balance;          /* Balanced line wrapping for headings */
+}
+p {
+  text-wrap: pretty;           /* Prevents orphaned words */
+}
+```
+
+### color-mix()
+
+```css
+.button {
+  --brand: #0066cc;
+  background: var(--brand);
+}
+.button:hover {
+  background: color-mix(in srgb, var(--brand), black 20%);
+  /* Darkens the brand color without knowing what it is */
+}
+
+.card {
+  background: color-mix(in srgb, var(--brand), white 90%);
+  /* Tints the brand color for a subtle background */
+}
+```
+
+## Browser Support Notes
+
+| Feature | Support | Safe to Use? |
+|---------|---------|--------------|
+| Custom Properties | All modern browsers | Yes |
+| Container Queries | Chrome/Edge 105+, Safari 16+, Firefox 110+ | Yes |
+| CSS Nesting | Chrome 120+, Safari 17.2+, Firefox 117+ | Yes (2023+) |
+| @layer | All modern browsers | Yes |
+| :has() | Chrome 105+, Safari 15.4+, Firefox 121+ | Yes |
+| accent-color | All modern browsers | Yes |
+| color-mix() | Chrome 111+, Safari 16.2+, Firefox 113+ | Yes |
+
+Most features are safe for modern development. Use `@supports` for progressive enhancement:
+
+```css
+@supports (container-type: inline-size) {
+  /* Container query styles */
+}
+@supports selector(:has(*)) {
+  /* :has() styles */
+}
+```
+
+## Try It Yourself
+
+1. Create a design system with custom properties (colors, spacing, typography, radii)
+2. Build a dark mode toggle that switches variable values
+3. Use `@container` to make a card component adapt to its parent width
+4. Refactor a nested selector structure using CSS nesting
+5. Use `:has()` to highlight cards that contain images or badges
+6. Use `color-mix()` for hover states instead of hardcoded colors
+
+## Key Takeaways
+
+- Custom properties enable design tokens, theming, and runtime color changes
+- Container queries make components responsive to their parent, not just the viewport
+- CSS nesting reduces repetition and mirrors HTML structure
+- `@layer` resolves specificity wars between frameworks and your styles
+- `:has()` is the "parent selector" — it styles elements based on their children
+- `color-mix()` creates hover/active states without knowing the base color
+- Most modern CSS features are safe to use in 2026

@@ -1,0 +1,347 @@
+---
+title: "Responsive Design & Media Queries"
+description: "Create responsive websites — media queries, mobile-first design, responsive images and typography, breakpoints, hamburger menus, and testing with DevTools."
+sidebar:
+  order: 6
+  label: "Responsive Design"
+tab: "full-stack-development"
+---
+
+Responsive design ensures your website looks and works well on every device — phone, tablet, laptop, and desktop. It is not optional in 2026.
+
+## The Viewport Meta Tag
+
+This single tag in `<head>` is required for responsive design:
+
+```html
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+```
+
+- `width=device-width` — sets the page width to the device's screen width (not a desktop-width scaled down)
+- `initial-scale=1.0` — sets the initial zoom level to 100%
+
+Without it, mobile browsers render pages at a desktop width (~980px) and zoom out, making text tiny.
+
+## Media Queries
+
+Media queries apply CSS conditionally based on device characteristics:
+
+```css
+/* Syntax */
+@media media-type and (condition) {
+  /* CSS rules */
+}
+
+/* Examples */
+@media screen and (max-width: 768px) {
+  body { font-size: 14px; }
+}
+
+@media print {
+  .nav { display: none; }
+}
+```
+
+### Common Media Features
+
+```css
+/* Width-based */
+@media (max-width: 600px) { ... }   /* Viewport ≤ 600px */
+@media (min-width: 601px) { ... }   /* Viewport ≥ 601px */
+@media (width: 1024px) { ... }      /* Exactly 1024px (rare) */
+
+/* Height-based */
+@media (min-height: 800px) { ... }  /* Tall screens */
+
+/* Orientation */
+@media (orientation: portrait) { ... }  /* Taller than wide */
+@media (orientation: landscape) { ... }  /* Wider than tall */
+
+/* Device type */
+@media (hover: hover) { ... }       /* Has hover capability (mouse) */
+@media (pointer: coarse) { ... }    /* Touch screen */
+```
+
+### Standard Breakpoints
+
+```css
+/* Mobile-first approach (recommended) */
+/* Base styles = mobile (0px and up) */
+
+/* Tablet */
+@media (min-width: 768px) { ... }
+
+/* Desktop */
+@media (min-width: 1024px) { ... }
+
+/* Wide desktop */
+@media (min-width: 1440px) { ... }
+```
+
+<Aside variant="tip">
+Design for specific content, not specific devices. Start with mobile layout, then add complexity as space allows. There are thousands of device sizes — breakpoints should be based on when your content breaks, not on iPad dimensions.
+</Aside>
+
+## Mobile-First vs Desktop-First
+
+### Mobile-First (Recommended)
+
+Start with mobile styles as the base, then add complexity with `min-width`:
+
+```css
+/* Base: Mobile (0-767px) — single column */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+/* Tablet (768px+) — two columns */
+@media (min-width: 768px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Desktop (1024px+) — four columns */
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+```
+
+### Desktop-First
+
+Start with desktop styles, then override with `max-width`:
+
+```css
+/* Base: Desktop (1024px+) — four columns */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+/* Tablet (768-1023px) — two columns */
+@media (max-width: 1023px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Mobile (<768px) — single column */
+@media (max-width: 767px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+```
+
+Mobile-first is preferred because:
+- No extra CSS for mobile (it's the default)
+- Easier to add than to override
+- Better performance (fewer overrides)
+- Matches how browsers render (progressively enhanced)
+
+## Responsive Images
+
+```css
+/* Make all images responsive by default */
+img {
+  max-width: 100%;
+  height: auto;
+}
+```
+
+For background images:
+
+```css
+.hero {
+  background-image: url('hero-mobile.jpg');
+  background-size: cover;
+  background-position: center;
+}
+
+@media (min-width: 768px) {
+  .hero {
+    background-image: url('hero-tablet.jpg');
+  }
+}
+
+@media (min-width: 1024px) {
+  .hero {
+    background-image: url('hero-desktop.jpg');
+  }
+}
+```
+
+## Responsive Typography
+
+```css
+/* Method 1: clamp() — no media queries needed */
+h1 {
+  font-size: clamp(1.5rem, 4vw, 3rem);
+}
+
+/* Method 2: Media queries */
+body {
+  font-size: 16px;
+}
+
+@media (min-width: 768px) {
+  body { font-size: 18px; }
+}
+
+@media (min-width: 1024px) {
+  body { font-size: 20px; }
+}
+```
+
+## Responsive Navigation: Hamburger Menu
+
+A complete responsive navigation pattern:
+
+```html
+<nav class="navbar">
+  <div class="brand">My Site</div>
+  <button class="hamburger" aria-label="Toggle menu">☰</button>
+  <ul class="nav-links">
+    <li><a href="#">Home</a></li>
+    <li><a href="#">About</a></li>
+    <li><a href="#">Services</a></li>
+    <li><a href="#">Contact</a></li>
+  </ul>
+</nav>
+```
+
+```css
+/* Mobile base: hide links, show hamburger */
+.nav-links {
+  display: none;            /* Hidden on mobile */
+  flex-direction: column;
+}
+
+.hamburger {
+  display: block;           /* Show hamburger button */
+}
+
+/* Desktop: show links inline, hide hamburger */
+@media (min-width: 768px) {
+  .nav-links {
+    display: flex;           /* Show on desktop */
+    flex-direction: row;
+    gap: 20px;
+    list-style: none;
+  }
+
+  .hamburger {
+    display: none;          /* Hide on desktop */
+  }
+}
+```
+
+## Responsive Layout Example
+
+```css
+/* Mobile: single column */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Desktop: sidebar + main */
+@media (min-width: 768px) {
+  .page {
+    display: grid;
+    grid-template-columns: 250px 1fr;
+    gap: 20px;
+  }
+}
+```
+
+## Testing Responsive Designs
+
+### Chrome DevTools Device Emulation
+
+1. Press `Ctrl+Shift+M` (or click the device icon in DevTools)
+2. Select a device from the dropdown (iPhone, iPad, Pixel, etc.)
+3. Resize the viewport by dragging the handles
+4. Use the "Responsive" mode to test any size
+
+### Real Device Testing
+
+- Test on actual phones and tablets
+- Resize your browser window to see breakpoints in action
+- Test in Chrome, Firefox, and Safari
+- Test with different font sizes (user browser zoom)
+
+## Common Responsive Patterns
+
+### Stacking (Column Drop)
+
+```css
+/* Mobile: stacked, Desktop: side by side */
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+@media (min-width: 768px) {
+  .container {
+    flex-direction: row;
+  }
+  .container > * {
+    flex: 1;
+  }
+}
+```
+
+### Off-Canvas Navigation
+
+Navigation slides in from the side on mobile:
+
+```css
+.sidebar {
+  position: fixed;
+  left: -300px;       /* Hidden off-screen */
+  width: 300px;
+  transition: left 0.3s;
+}
+
+.sidebar.open {
+  left: 0;            /* Slide in */
+}
+
+@media (min-width: 768px) {
+  .sidebar {
+    position: static;  /* Always visible on desktop */
+    left: auto;
+  }
+}
+```
+
+## Try It Yourself
+
+Create a responsive page:
+
+1. Build a page with header, 3-column card grid, and footer
+2. Use mobile-first approach — single column as default
+3. Tablet breakpoint (768px) — 2 columns
+4. Desktop breakpoint (1024px) — 3 columns
+5. Add a responsive navigation with hamburger on mobile
+6. Use `clamp()` for heading font size
+7. Test all breakpoints in Chrome DevTools device emulation
+
+## Key Takeaways
+
+- Always include `<meta name="viewport" content="width=device-width, initial-scale=1.0">`
+- Use mobile-first approach (base styles = mobile, `min-width` queries for larger screens)
+- Standard breakpoints: 768px (tablet), 1024px (desktop), 1440px (wide)
+- `max-width: 100%; height: auto` makes all images responsive
+- `clamp()` creates fluid typography without media queries
+- `auto-fit` and `minmax()` in Grid create responsive layouts without media queries
+- Test on real devices and use Chrome DevTools device emulation
+- Always design for content breakpoints, not specific devices

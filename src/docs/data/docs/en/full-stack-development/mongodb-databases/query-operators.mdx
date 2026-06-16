@@ -1,0 +1,380 @@
+---
+title: "Query Operators & Filtering"
+description: "Comparison operators ($eq, $gt, $in), logical operators ($and, $or), element operators ($exists, $type), array operators ($all, $elemMatch), and regex search."
+sidebar:
+  order: 3
+  label: "Query Operators & Filtering"
+tab: "full-stack-development"
+---
+
+MongoDB's query language supports a rich set of operators for filtering documents by any condition imaginable — comparisons, logical combinations, array queries, regular expressions, and more.
+
+## Comparison Operators
+
+```javascript
+// Sample data
+[
+  { name: "Alice", age: 30, salary: 70000 },
+  { name: "Bob", age: 25, salary: 50000 },
+  { name: "Charlie", age: 35, salary: 90000 },
+  { name: "Diana", age: 28, salary: 65000 },
+]
+```
+
+| Operator | Meaning | Example |
+|----------|---------|---------|
+| `$eq` | Equal to | `{ age: { $eq: 30 } }` |
+| `$ne` | Not equal to | `{ age: { $ne: 30 } }` |
+| `$gt` | Greater than | `{ age: { $gt: 30 } }` |
+| `$gte` | Greater than or equal | `{ age: { $gte: 30 } }` |
+| `$lt` | Less than | `{ age: { $lt: 30 } }` |
+| `$lte` | Less than or equal | `{ age: { $lte: 30 } }` |
+| `$in` | In array | `{ age: { $in: [25, 30, 35] } }` |
+| `$nin` | Not in array | `{ age: { $nin: [20, 40] } }` |
+
+### Shorthand for Equality
+
+```javascript
+// These are equivalent:
+{ age: { $eq: 30 } }
+{ age: 30 }  // Shorthand
+```
+
+### Compound Range Queries
+
+```javascript
+// Age between 25 and 35 inclusive
+db.users.find({ age: { $gte: 25, $lte: 35 } });
+
+// Salary above 60k and below 80k (exclusive)
+db.users.find({ salary: { $gt: 60000, $lt: 80000 } });
+```
+
+### Using $in and $nin
+
+```javascript
+// Users in specific age brackets
+db.users.find({ age: { $in: [25, 30, 35] } });
+
+// Exclude certain roles
+db.users.find({ role: { $nin: ["banned", "deleted"] } });
+```
+
+## Logical Operators
+
+### $and
+
+All conditions must be true:
+
+```javascript
+// Find users over 30 who earn more than 60k
+db.users.find({
+  $and: [
+    { age: { $gt: 30 } },
+    { salary: { $gt: 60000 } },
+  ]
+});
+
+// Shorthand (implicit AND)
+db.users.find({ age: { $gt: 30 }, salary: { $gt: 60000 } });
+```
+
+Use explicit `$and` when you need multiple conditions on the same field:
+
+```javascript
+// Age between 25 and 35
+db.users.find({
+  $and: [
+    { age: { $gte: 25 } },
+    { age: { $lte: 35 } },
+  ]
+});
+
+// Simpler equivalent
+db.users.find({ age: { $gte: 25, $lte: 35 } });
+```
+
+### $or
+
+At least one condition must be true:
+
+```javascript
+// Users who are under 25 OR over 40
+db.users.find({
+  $or: [
+    { age: { $lt: 25 } },
+    { age: { $gt: 40 } },
+  ]
+});
+
+// Users who are named Alice OR earn more than 80k
+db.users.find({
+  $or: [
+    { name: "Alice" },
+    { salary: { $gt: 80000 } },
+  ]
+});
+```
+
+### $nor
+
+None of the conditions must be true (opposite of `$or`):
+
+```javascript
+// Not over 30 AND not earning more than 70k
+db.users.find({
+  $nor: [
+    { age: { $gt: 30 } },
+    { salary: { $gt: 70000 } },
+  ]
+});
+```
+
+### $not
+
+Negates a query operator:
+
+```javascript
+// Age is NOT greater than 30 (i.e., age <= 30)
+db.users.find({ age: { $not: { $gt: 30 } } });
+
+// Name does NOT match the regex pattern
+db.users.find({ name: { $not: /^A/ } });
+```
+
+## Element Operators
+
+### $exists
+
+Check if a field exists (or doesn't):
+
+```javascript
+// Users who have a "phone" field
+db.users.find({ phone: { $exists: true } });
+
+// Users WITHOUT a "phone" field
+db.users.find({ phone: { $exists: false } });
+```
+
+### $type
+
+Match documents where a field is of a specific BSON type:
+
+```javascript
+// Age field is a number (double or int)
+db.users.find({ age: { $type: "number" } });
+
+// Name field is a string
+db.users.find({ name: { $type: "string" } });
+
+// Multiple types
+db.users.find({ age: { $type: ["int", "double"] } });
+```
+
+BSON type codes: `"string"`, `"number"`, `"object"`, `"array"`, `"bool"`, `"null"`, `"int"`, `"double"`, `"date"`, `"objectId"`, etc.
+
+### $expr
+
+Use aggregation expressions within queries (useful for comparing fields):
+
+```javascript
+// Find documents where price with tax exceeds 100
+db.products.find({
+  $expr: { $gt: [{ $add: ["$price", "$tax"] }, 100] }
+});
+
+// Find users whose account balance is below the minimum
+db.accounts.find({
+  $expr: { $lt: ["$balance", "$minimumBalance"] }
+});
+```
+
+## Array Operators
+
+```javascript
+// Sample data
+db.inventory.insertMany([
+  { item: "laptop", tags: ["electronics", "computers", "portable"], price: 999 },
+  { item: "phone", tags: ["electronics", "mobile"], price: 699 },
+  { item: "book", tags: ["education"], price: 29 },
+  { item: "desk", tags: ["furniture", "office"], price: 399 },
+]);
+```
+
+### $all
+
+Matches arrays that contain **all** specified elements:
+
+```javascript
+// Items tagged as BOTH electronics AND computers
+db.inventory.find({ tags: { $all: ["electronics", "computers"] } });
+// Returns: laptop
+```
+
+### $elemMatch
+
+Matches if **at least one** array element satisfies all conditions:
+
+```javascript
+// Sample: products with ratings array
+[
+  { name: "Laptop", ratings: [{ score: 5, user: "Alice" }, { score: 3, user: "Bob" }] },
+  { name: "Phone", ratings: [{ score: 4, user: "Alice" }] },
+]
+
+// Find products with at least one rating of 5 from Alice
+db.products.find({
+  ratings: { $elemMatch: { score: 5, user: "Alice" } }
+});
+```
+
+### Array Position Access
+
+```javascript
+// First tag
+db.inventory.find({ "tags.0": "electronics" });
+
+// Array length
+db.inventory.find({ tags: { $size: 3 } });
+
+// Array index in projection
+db.inventory.find({}, { tags: { $slice: 2 } });  // First 2 tags
+db.inventory.find({}, { tags: { $slice: -1 } });  // Last tag
+```
+
+### $elemMatch in Projection
+
+```javascript
+// Return only the matching array element
+db.products.find(
+  { ratings: { $elemMatch: { score: { $gte: 4 } } } },
+  { ratings: { $elemMatch: { score: { $gte: 4 } } } }
+);
+```
+
+## Regular Expressions
+
+Regex queries for pattern matching:
+
+```javascript
+// Names starting with "A"
+db.users.find({ name: /^A/ });
+
+// Names containing "lice" (case-insensitive)
+db.users.find({ name: /lice/i });
+
+// Emails from gmail
+db.users.find({ email: /@gmail\.com$/ });
+
+// Using $regex operator (more explicit)
+db.users.find({ name: { $regex: "^A", $options: "i" } });
+```
+
+Performance note: Regex without anchor (`^`) or using case-insensitive flags (`i`) cannot use indexes efficiently. Use with caution on large collections.
+
+## Querying Embedded Documents
+
+```javascript
+// Sample documents
+[
+  {
+    name: "Alice",
+    address: { city: "London", country: "UK", zip: "EC1A 1BB" }
+  },
+  {
+    name: "Bob",
+    address: { city: "NYC", country: "USA", zip: "10001" }
+  },
+]
+```
+
+### Exact Match on Embedded Document
+
+```javascript
+// Match the entire embedded document (order matters!)
+db.users.find({ address: { city: "London", country: "UK", zip: "EC1A 1BB" } });
+```
+
+### Dot Notation (Field within Embedded Document)
+
+```javascript
+// Match a specific field within an embedded document
+db.users.find({ "address.city": "London" });
+
+// Multiple conditions on embedded fields
+db.users.find({
+  "address.city": "London",
+  "address.country": "UK",
+});
+```
+
+## Null and Missing Values
+
+```javascript
+// Field is null (either explicitly null or missing)
+db.users.find({ phone: null });
+
+// Field is explicitly null (not missing)
+db.users.find({ phone: { $type: "null" } });
+
+// Field exists AND is null
+db.users.find({ phone: { $eq: null, $exists: true } });
+```
+
+## Putting It All Together
+
+```javascript
+// Complex query: Find premium electronics under $500
+// that are in stock and have at least 4-star reviews
+db.products.find({
+  category: "electronics",
+  price: { $lte: 500 },
+  stock: { $gt: 0 },
+  $or: [
+    { "rating.average": { $gte: 4 } },
+    { "rating.count": { $gte: 100 } },
+  ],
+  tags: { $all: ["premium", "new"] },
+}).sort({ price: 1 }).limit(10);
+```
+
+## Quick Reference
+
+```javascript
+// Comparison
+{ field: { $gt: 10, $lte: 100 } }
+{ field: { $in: [1, 2, 3] } }
+{ field: { $nin: [4, 5, 6] } }
+
+// Logical
+{ $and: [{ field1: val }, { field2: val }] }
+{ $or: [{ field1: val }, { field2: val }] }
+{ $nor: [{ field1: val }, { field2: val }] }
+{ field: { $not: { $gt: 10 } } }
+
+// Element
+{ field: { $exists: true } }
+{ field: { $type: "string" } }
+
+// Array
+{ array: { $all: [val1, val2] } }
+{ array: { $elemMatch: { field: val } } }
+{ array: { $size: 3 } }
+
+// Regex
+{ field: /^pattern/i }
+{ field: { $regex: "pattern", $options: "i" } }
+
+// Embedded
+{ "embedded.field": value }
+```
+
+## Practice Exercises
+
+1. **Product filtering**: Given a `products` collection with `price`, `category`, `rating`, `inStock`, `tags`, write queries to: find products under $50 with 4+ rating, find items tagged "sale" AND "clearance", find products in "electronics" OR "computers" that are in stock.
+
+2. **User analytics**: Write queries to find users who registered in the last 30 days AND have not logged in, users whose name starts with "M" and are over 40, and users who have a "bio" field that contains "developer" (case-insensitive).
+
+3. **Array matching**: Create a collection of blog posts with a `comments` array (each comment has `user`, `text`, `likes`). Find posts where a single comment has more than 10 likes from user "Alice".
+
+4. **Regex search**: Build a search query that matches products whose name contains the search term, case-insensitive. Then add a condition to also match products whose description contains the term.

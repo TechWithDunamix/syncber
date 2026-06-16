@@ -1,0 +1,324 @@
+---
+title: "CSS Fundamentals & Selectors"
+description: "How CSS works — inline, internal, and external stylesheets, selector types (element, class, ID, attribute, combinators), specificity, the cascade, and inheritance."
+sidebar:
+  order: 1
+  label: "CSS Fundamentals"
+tab: "full-stack-development"
+---
+
+CSS (Cascading Style Sheets) controls the visual presentation of HTML. Where HTML provides structure and meaning, CSS provides color, layout, typography, and animation.
+
+## How CSS Works
+
+CSS applies styles to HTML elements by selecting them and declaring property-value pairs:
+
+```css
+selector {
+  property: value;
+}
+```
+
+Example:
+
+```css
+h1 {
+  color: blue;
+  font-size: 32px;
+}
+```
+
+This selects all `<h1>` elements and makes their text blue and 32 pixels tall.
+
+## Three Ways to Add CSS
+
+### 1. Inline CSS (Avoid)
+
+Apply styles directly to an element using the `style` attribute:
+
+```html
+<h1 style="color: blue; font-size: 32px;">Blue Heading</h1>
+```
+
+**Problems**: Mixes content with presentation, impossible to reuse, hard to maintain.
+
+### 2. Internal CSS (Good for single pages)
+
+Use a `<style>` tag in the `<head>`:
+
+```html
+<head>
+  <style>
+    h1 { color: blue; }
+    p { font-size: 16px; }
+  </style>
+</head>
+```
+
+**Better** than inline because styles are reusable across the page, but only applies to one HTML file.
+
+### 3. External CSS (Best practice)
+
+Create a separate `.css` file and link it in `<head>`:
+
+```html
+<head>
+  <link rel="stylesheet" href="styles.css">
+</head>
+```
+
+```css
+/* styles.css */
+h1 { color: blue; }
+p { font-size: 16px; }
+```
+
+**Best** because:
+- One stylesheet controls all pages on your site
+- Browsers cache the CSS file (faster subsequent loads)
+- Clean separation of content (HTML) and presentation (CSS)
+
+## CSS Selectors
+
+Selectors determine which elements get styled.
+
+### Element (Type) Selector
+
+Selects all elements of a given type:
+
+```css
+h1 { color: navy; }
+p { line-height: 1.6; }
+a { text-decoration: none; }
+```
+
+### Class Selector
+
+Selects all elements with a specific class attribute. Classes are reusable:
+
+```html
+<p class="highlight">This paragraph is highlighted.</p>
+<p>This one is not.</p>
+<p class="highlight">This one is highlighted too.</p>
+```
+
+```css
+.highlight {
+  background-color: yellow;
+  padding: 4px;
+}
+```
+
+**Naming**: Use kebab-case for class names: `.main-content`, `.nav-link`, `.error-message`.
+
+### ID Selector
+
+Selects a single element with a specific ID. IDs must be unique per page:
+
+```html
+<header id="site-header">
+  <h1>My Site</h1>
+</header>
+```
+
+```css
+#site-header {
+  background: #333;
+  color: white;
+}
+```
+
+<Aside variant="tip">
+Prefer classes over IDs for styling. IDs have very high specificity and are hard to override. Reserve IDs for JavaScript targeting and anchor links.
+</Aside>
+
+### Attribute Selector
+
+Selects elements based on attributes or attribute values:
+
+```css
+/* Elements with a specific attribute */
+[disabled] { opacity: 0.5; }
+
+/* Exact attribute value */
+input[type="email"] { border-color: blue; }
+
+/* Attribute starts with value */
+a[href^="https"] { color: green; }
+
+/* Attribute ends with value */
+a[href$=".pdf"] { color: red; }
+
+/* Attribute contains value anywhere */
+a[href*="example"] { font-weight: bold; }
+```
+
+### Combinator Selectors
+
+Combinators define relationships between elements:
+
+```css
+/* Descendant (space) — any nested level */
+article p { color: gray; }
+
+/* Child (>) — direct children only */
+ul > li { list-style: square; }
+
+/* Adjacent sibling (+) — immediately following */
+h2 + p { font-weight: bold; }
+
+/* General sibling (~) — any following sibling */
+h2 ~ p { color: darkgray; }
+```
+
+### Pseudo-Classes
+
+Pseudo-classes select elements based on state or position:
+
+```css
+/* Interactive states */
+a:hover { color: red; }
+a:focus { outline: 2px solid blue; }
+a:active { color: orange; }
+a:visited { color: purple; }
+
+/* Structural */
+li:first-child { font-weight: bold; }
+li:last-child { border-bottom: none; }
+li:nth-child(odd) { background: #f5f5f5; }
+li:nth-child(3n) { margin-bottom: 20px; } /* every 3rd */
+
+/* Form states */
+input:required { border-color: red; }
+input:disabled { background: #eee; }
+input:checked + label { font-weight: bold; }
+
+/* Negation */
+button:not(.primary) { background: gray; }
+```
+
+### Pseudo-Elements
+
+Pseudo-elements style specific parts of an element:
+
+```css
+/* First letter of a paragraph */
+p::first-letter { font-size: 200%; font-weight: bold; }
+
+/* First line of a paragraph */
+p::first-line { text-transform: uppercase; }
+
+/* Before/after an element (often used for icons) */
+.note::before { content: "Note: "; font-weight: bold; }
+.external-link::after { content: " ↗"; }
+```
+
+## Specificity
+
+When two selectors target the same element, specificity determines which wins. The browser calculates a score:
+
+```css
+/* Specificity: 0-0-1 (element) */
+p { color: black; }
+
+/* Specificity: 0-1-0 (class) */
+.text { color: blue; }
+
+/* Specificity: 1-0-0 (ID) */
+#special { color: green; }
+
+/* Specificity: 0-1-1 (class + element) */
+p.text { color: red; }
+
+/* Specificity: 0-2-0 (two classes) */
+.text.special { color: purple; }
+```
+
+### Specificity Hierarchy
+
+```
+!important   ← ALWAYS avoid (breaks the cascade)
+Inline styles ← Avoid
+IDs          ← 1-0-0
+Classes, attributes, pseudo-classes ← 0-1-0
+Elements, pseudo-elements ← 0-0-1
+```
+
+Specificity is calculated as a three-part score: **(IDs, Classes, Elements)**:
+
+| Selector | Score |
+|----------|-------|
+| `*` | 0,0,0 |
+| `p` | 0,0,1 |
+| `.text` | 0,1,0 |
+| `p.text` | 0,1,1 |
+| `#header` | 1,0,0 |
+| `#header .nav a` | 1,1,1 |
+| `style="color:red"` | inline wins |
+
+<Aside variant="caution">
+Never use `!important` in production CSS. It breaks the natural cascade and makes future overrides impossible. If you need `!important`, your specificity structure needs fixing.
+</Aside>
+
+## The Cascade
+
+CSS stands for **Cascading** Style Sheets. When multiple rules apply, the cascade resolves conflicts using three factors (in order):
+
+1. **Importance & Origin** — `!important` > normal styles, author styles > browser defaults
+2. **Specificity** — Higher specificity wins
+3. **Source Order** — Later rules override earlier ones at the same specificity
+
+```css
+/* Both have equal specificity (0,0,1) */
+p { color: red; }
+p { color: blue; }  /* This wins — it comes last */
+```
+
+## Inheritance
+
+Some CSS properties are inherited from parent to child elements:
+
+```css
+/* Inherited by all child elements */
+body {
+  color: #333;          /* All text in the page inherits this */
+  font-family: Arial;   /* All text in the page inherits this */
+  line-height: 1.6;     /* All text in the page inherits this */
+}
+
+/* Inherited properties: color, font-*, line-height, text-align, visibility */
+/* NOT inherited: margin, padding, border, background, width, height, display */
+```
+
+You can control inheritance explicitly:
+
+```css
+.child {
+  color: inherit;   /* Force inheritance from parent */
+  color: initial;   /* Reset to browser default */
+  color: unset;     /* inherit if inherited property, initial if not */
+}
+```
+
+## Try It Yourself
+
+Create an HTML page with:
+
+1. An external CSS stylesheet linked in `<head>`
+2. Style `<h1>` with an element selector (blue, 36px)
+3. Add a class `.card` with padding, border, and background
+4. Add an ID `#hero` with a background color
+5. Use a descendant selector to style `<p>` inside `.card`
+6. Use `:hover` on links to change color
+7. Use `::before` to add an icon before all `.external` links
+8. Experiment with specificity — create two rules targeting the same element and see which wins
+
+## Key Takeaways
+
+- External CSS is the best approach — link one `.css` file from all pages
+- Class selectors (`.class`) are the most versatile — prefer them over ID selectors for styling
+- Specificity determines which rule wins: IDs > Classes > Elements
+- The cascade resolves conflicts by importance, specificity, then source order
+- Some properties (color, font) are inherited; others (margin, padding) are not
+- Never use `!important` — it breaks the cascade and makes maintenance impossible
+- Pseudo-classes (`:hover`, `:nth-child`) style states; pseudo-elements (`::before`, `::after`) style sub-parts

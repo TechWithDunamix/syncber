@@ -1,0 +1,452 @@
+---
+title: "Indexing & Performance"
+description: "Index types (single, compound, multikey, text, geospatial), creating and dropping indexes, explain plans, query optimization, and performance monitoring."
+sidebar:
+  order: 4
+  label: "Indexing & Performance"
+tab: "full-stack-development"
+---
+
+Indexes are the #1 performance optimization in MongoDB. Without an index, MongoDB must scan every document in a collection (collection scan). With the right index, queries can find data in microseconds.
+
+## Why Indexes Matter
+
+Without index:
+```
+COLLSCAN — scans 1,000,000 documents to find 10 matching
+Time: 2.3 seconds
+```
+
+With index:
+```
+IXSCAN — reads 10 index entries, fetches 10 documents
+Time: 3 milliseconds
+```
+
+### When Indexes Help
+
+- Queries you run frequently
+- Sort operations on large datasets
+- Fields used in `$lookup` (JOIN) conditions
+- Fields with high cardinality (many unique values)
+
+### When Indexes Hurt
+
+- Write-heavy collections (each write updates indexes too)
+- Low-cardinality fields (e.g., boolean `isActive` — 50% of documents)
+- Unused indexes (wasted memory and write overhead)
+
+## Single Field Index
+
+```javascript
+// Create an ascending index on email
+db.users.createIndex({ email: 1 });
+
+// Create a descending index on createdAt
+db.users.createIndex({ createdAt: -1 });
+```
+
+For a single-field index, sort direction rarely matters (MongoDB can traverse in either direction):
+
+```javascript
+db.users.createIndex({ age: 1 });
+
+// Both queries use the index
+db.users.find({ age: 30 });                        // Exact match
+db.users.find({ age: { $gt: 25 } }).sort({ age: 1 });  // Range + sort
+```
+
+## Compound Index
+
+A compound index on multiple fields. **Field order matters significantly**:
+
+```javascript
+// Compound index: first by status, then by createdAt
+db.orders.createIndex({ status: 1, createdAt: -1 });
+```
+
+### ESR Rule (Equality, Sort, Range)
+
+For compound indexes, order fields by:
+
+1. **E**quality — fields checked with `$eq` (exact matches)
+2. **S**ort — fields used in `.sort()`
+3. **R**ange — fields with range operators (`$gt`, `$lt`, `$in`)
+
+```javascript
+// Query: find active orders created in the last 7 days, sorted by total
+db.orders.find({
+  status: "active",                          // Equality
+  createdAt: { $gte: sevenDaysAgo },         // Range
+}).sort({ total: -1 });                       // Sort
+
+// Optimal index (ESR order):
+db.orders.createIndex({ status: 1, total: -1, createdAt: 1 });
+//                                    ^sort        ^range
+```
+
+### Index Prefixes
+
+A compound index can serve queries that use a prefix of its fields:
+
+```javascript
+db.orders.createIndex({ a: 1, b: 1, c: 1 });
+
+// These queries use the index:
+db.orders.find({ a: 1 });                    // Uses prefix [a]
+db.orders.find({ a: 1, b: 2 });             // Uses prefix [a, b]
+db.orders.find({ a: 1, b: 2, c: 3 });      // Uses full index
+
+// These do NOT use the index efficiently:
+db.orders.find({ b: 2 });                    // Missing prefix 'a'
+db.orders.find({ c: 3 });                    // Missing prefixes 'a' and 'b'
+```
+
+## Multikey Index
+
+MongoDB automatically creates a multikey index when you index an array field:
+
+```javascript
+// Array field
+{ name: "Laptop", tags: ["electronics", "computers"] }
+
+// Create index on array field
+db.products.createIndex({ tags: 1 });
+
+// Queries using multikey index
+db.products.find({ tags: "electronics" });
+db.products.find({ tags: { $all: ["electronics", "computers"] } });
+```
+
+Key constraints:
+- Only one array field per index
+- Multikey indexes cannot be used for covered queries
+
+## Text Index
+
+For full-text search on string content:
+
+```javascript
+// Create text index on one field
+db.articles.createIndex({ content: "text" });
+
+// Create compound text index (multiple fields)
+db.articles.createIndex({
+  title: "text",
+  content: "text",
+  tags: "text",
+}, {
+  weights: {
+    title: 10,    // Title matches are 10x more important
+    content: 5,   // Content matches are 5x more important
+    tags: 1,
+  },
+  name: "articles_text_index",
+});
+```
+
+### Text Search Queries
+
+```javascript
+// Basic text search
+db.articles.find({
+  $text: { $search: "mongodb indexing" }
+});
+
+// Text search with relevance score
+db.articles.find(
+  { $text: { $search: "mongodb performance" } },
+  { score: { $meta: "textScore" } }
+).sort({ score: { $meta: "textScore" } });
+
+// Exclude term (prepend with -)
+db.articles.find({
+  $text: { $search: "mongodb -sql" }
+});
+
+// Exact phrase (wrap in quotes)
+db.articles.find({
+  $text: { $search: '"acid compliance" mongodb' }
+});
+```
+
+## Unique Index
+
+Enforces unique values (like a primary key):
+
+```javascript
+// Unique index on email
+db.users.createIndex({ email: 1 }, { unique: true });
+
+// Unique compound index
+db.users.createIndex({ firstName: 1, lastName: 1 }, { unique: true });
+```
+
+## Sparse Index
+
+Only indexes documents that have the indexed field:
+
+```javascript
+// Only index documents with a "phone" field
+db.users.createIndex({ phone: 1 }, { sparse: true });
+
+// Useful for optional fields — keeps index small
+```
+
+## TTL Index
+
+Documents automatically expire after a specified time:
+
+```javascript
+// Delete documents 7 days after their createdAt field
+db.sessions.createIndex(
+  { createdAt: 1 },
+  { expireAfterSeconds: 7 * 24 * 60 * 60 }
+);
+
+// Useful for: session stores, temporary data, event logs
+```
+
+## Geospatial Index
+
+For location-based queries:
+
+```javascript
+// 2dsphere index for GeoJSON data
+db.places.createIndex({ location: "2dsphere" });
+
+// Sample document
+{
+  name: "Central Park",
+  location: {
+    type: "Point",
+    coordinates: [-73.9654, 40.7829]  // [longitude, latitude]
+  }
+}
+
+// Find nearby places
+db.places.find({
+  location: {
+    $near: {
+      $geometry: {
+        type: "Point",
+        coordinates: [-73.97, 40.78]
+      },
+      $maxDistance: 1000,  // meters
+      $minDistance: 0,
+    }
+  }
+});
+```
+
+## Viewing & Analyzing Indexes
+
+### List Indexes
+
+```javascript
+// All indexes on a collection
+db.users.getIndexes();
+
+// Output
+[
+  { v: 2, key: { _id: 1 }, name: "_id_" },
+  { v: 2, key: { email: 1 }, name: "email_1", unique: true },
+  { v: 2, key: { status: 1, createdAt: -1 }, name: "status_1_createdAt_-1" },
+]
+```
+
+### Index Size
+
+```javascript
+// Index statistics
+db.users.stats().indexSizes;
+
+// Output
+{
+  _id_: 81920,
+  email_1: 40960,
+  status_1_createdAt_-1: 122880,
+}
+```
+
+### Drop Indexes
+
+```javascript
+// Drop by name
+db.users.dropIndex("email_1");
+
+// Drop all non-_id indexes
+db.users.dropIndexes();
+```
+
+## Explain Plans
+
+The most important tool for understanding query performance:
+
+```javascript
+db.users.find({ email: "alice@example.com" }).explain("executionStats");
+```
+
+### Explain Output
+
+```json
+{
+  "queryPlanner": {
+    "winningPlan": {
+      "stage": "FETCH",
+      "inputStage": {
+        "stage": "IXSCAN",          // Index scan (good!)
+        "indexName": "email_1",
+        "indexBounds": {
+          "email": ["[\"alice@example.com\", \"alice@example.com\"]"]
+        }
+      }
+    }
+  },
+  "executionStats": {
+    "executionSuccess": true,
+    "nReturned": 1,
+    "totalDocsExamined": 1,      // Only 1 document (excellent)
+    "totalKeysExamined": 1,       // Only 1 index entry
+    "executionTimeMillis": 2,
+    "stage" : "COLLSCAN",         // Collection scan (bad!)
+    "totalDocsExamined": 1000000, // Scanned ALL documents
+  }
+}
+```
+
+### What to Look For
+
+| Signal | Meaning | Action |
+|--------|---------|--------|
+| `IXSCAN` | Using index | ✅ Good |
+| `COLLSCAN` | Full collection scan | ❌ Add index |
+| `totalDocsExamined` ≈ `nReturned` | Efficient query | ✅ |
+| `totalDocsExamined` ≫ `nReturned` | Scanning many docs | ❌ Needs index |
+| `SORT` stage | In-memory sort | ❌ Add index with sort field |
+| `FETCH` after `IXSCAN` | Normal index usage | ✅ |
+
+### hint()
+
+Force a specific index:
+
+```javascript
+db.users.find({ email: "alice@example.com" }).hint({ email: 1 });
+```
+
+## Identifying Slow Queries
+
+### Profiling Levels
+
+```javascript
+// Enable profiling (0=off, 1=slow ops, 2=all ops)
+db.setProfilingLevel(1, { slowms: 100 });  // Log ops > 100ms
+
+// Check profiling level
+db.getProfilingStatus();
+
+// View slow queries
+db.system.profile.find().sort({ ts: -1 }).limit(5).pretty();
+```
+
+### Profiling Output
+
+```json
+{
+  "op": "query",
+  "ns": "mydb.orders",
+  "query": { "status": "pending" },
+  "nreturned": 50,
+  "nscanned": 50000,
+  "millis": 850,
+  "ts": ISODate("2024-01-15T10:30:00Z"),
+  "responseLength": 1234
+}
+```
+
+## Index Best Practices
+
+### 1. Index for Your Query Patterns
+
+```javascript
+// If you query by userId + sort by date
+const queryPattern = { userId: "123" };
+const sortPattern = { createdAt: -1 };
+
+// Best index
+db.posts.createIndex({ userId: 1, createdAt: -1 });
+```
+
+### 2. Covered Queries
+
+When all needed fields are in the index (no FETCH step):
+
+```javascript
+// Index
+db.users.createIndex({ email: 1, name: 1, age: 1 });
+
+// Covered query — only reads from index, no document fetch
+db.users.find(
+  { email: "alice@example.com" },
+  { _id: 0, name: 1, age: 1 }  // All in index!
+);
+
+// Explain will show: stage: "IXSCAN" (no FETCH)
+```
+
+### 3. Monitor Index Usage
+
+```javascript
+// If using MongoDB Atlas: Performance Advisor
+// If self-hosted: $indexStats aggregation
+db.users.aggregate([
+  { $indexStats: {} }
+]);
+
+// Output shows usage counts per index
+```
+
+### 4. Remove Unused Indexes
+
+```javascript
+// Check which indexes are used
+db.users.aggregate([
+  { $indexStats: {} },
+  { $match: { accesses: { ops: { $lt: 10 } } } }
+]);
+
+// Drop unused indexes (0 ops = never used)
+db.users.dropIndex("unused_index");
+```
+
+## Quick Reference
+
+```javascript
+// Create indexes
+db.collection.createIndex({ field: 1 })            // Ascending
+db.collection.createIndex({ field: -1 })           // Descending
+db.collection.createIndex({ a: 1, b: 1 })          // Compound
+db.collection.createIndex({ field: 1 }, { unique: true })     // Unique
+db.collection.createIndex({ field: 1 }, { sparse: true })     // Sparse
+db.collection.createIndex({ field: "text" })       // Text
+db.collection.createIndex({ loc: "2dsphere" })     // Geospatial
+
+// Analyze
+db.collection.find({}).explain("executionStats")
+db.collection.getIndexes()
+db.collection.dropIndex("index_name")
+
+// Profile
+db.setProfilingLevel(1, { slowms: 100 })
+db.system.profile.find().sort({ ts: -1 }).limit(5)
+```
+
+## Practice Exercises
+
+1. **Index creation**: Create a `orders` collection with 100,000 documents (use a loop in mongosh). Query by `status` — note the time. Create an index on `status` and query again. Compare execution times using `explain("executionStats")`.
+
+2. **ESR index design**: For the query `db.orders.find({ status: "shipped", total: { $gt: 100 } }).sort({ createdAt: -1 })`, design and create the optimal compound index following the ESR rule. Verify with `explain`.
+
+3. **Text search**: Create a text index on an `articles` collection with fields `title` and `body`, giving title double weight. Run text searches and observe how title matches rank higher.
+
+4. **Profiling setup**: Enable profiling for operations slower than 50ms. Run a slow query, then read from `system.profile` to see the captured entry. Use this information to add the right index.

@@ -1,0 +1,282 @@
+---
+title: "Functions"
+description: "Write reusable code with function declarations, expressions, arrow functions, parameters, return values, default parameters, rest params, and scope."
+sidebar:
+  order: 5
+  label: "Functions"
+tab: "full-stack-development"
+---
+
+Functions are reusable blocks of code that perform specific tasks. They are the building blocks of JavaScript programs.
+
+## Function Declarations
+
+```javascript
+function greet(name) {
+  return `Hello, ${name}!`;
+}
+
+// Call the function
+console.log(greet("Alice"));   // => "Hello, Alice!"
+console.log(greet("Bob"));     // => "Hello, Bob!"
+```
+
+**Parts of a function:**
+- `function` keyword
+- `name` (greet)
+- `parameters` (name) — inputs
+- `body` (the code between `{}`)
+- `return` value — output
+
+## Function Expressions
+
+A function stored in a variable:
+
+```javascript
+const greet = function(name) {
+  return `Hello, ${name}!`;
+};
+
+console.log(greet("Alice"));  // => "Hello, Alice!"
+```
+
+The function itself doesn't have a name (anonymous), but it's assigned to the variable `greet`.
+
+## Arrow Functions (ES6)
+
+A shorter syntax:
+
+```javascript
+// Regular function
+function add(a, b) {
+  return a + b;
+}
+
+// Arrow function (same thing)
+const add = (a, b) => {
+  return a + b;
+};
+
+// Even shorter — implicit return (no curly braces)
+const add = (a, b) => a + b;
+
+// Single parameter — parentheses optional
+const double = x => x * 2;
+
+// No parameters — empty parentheses required
+const sayHello = () => "Hello!";
+
+console.log(double(5));    // => 10
+console.log(sayHello());    // => "Hello!"
+```
+
+<Aside variant="tip">
+Use arrow functions for short operations (callbacks, array methods). Use regular functions for named, reusable logic. Arrow functions also handle `this` differently (covered in Advanced JS).
+</Aside>
+
+## Parameters and Arguments
+
+```javascript
+function multiply(a, b) {
+  return a * b;
+}
+
+console.log(multiply(3, 4));    // => 12  (3 × 4)
+console.log(multiply(3));       // => NaN (b is undefined)
+```
+
+### Default Parameters
+
+```javascript
+function greet(name = "Guest") {
+  return `Hello, ${name}!`;
+}
+
+console.log(greet("Alice"));    // => "Hello, Alice!"
+console.log(greet());            // => "Hello, Guest!"
+
+// Multiple defaults
+function createUser(name = "User", role = "viewer") {
+  return { name, role };
+}
+
+console.log(createUser("Alice"));     // => { name: "Alice", role: "viewer" }
+console.log(createUser("Bob", "admin")); // => { name: "Bob", role: "admin" }
+```
+
+### Rest Parameters (...)
+
+Collect remaining arguments into an array:
+
+```javascript
+function sum(...numbers) {
+  let total = 0;
+  for (const num of numbers) {
+    total += num;
+  }
+  return total;
+}
+
+console.log(sum(1, 2));          // => 3
+console.log(sum(1, 2, 3, 4));    // => 10
+console.log(sum());               // => 0
+
+// With regular parameters
+function logUser(role, ...names) {
+  console.log(`Role: ${role}`);
+  console.log(`Names: ${names.join(", ")}`);
+}
+
+logUser("admin", "Alice", "Bob", "Charlie");
+// Role: admin
+// Names: Alice, Bob, Charlie
+```
+
+## Return Values
+
+Every function returns something:
+
+```javascript
+// Explicit return
+function square(x) {
+  return x * x;
+}
+
+// Implicit return (arrow functions)
+const square = x => x * x;
+
+// No return = returns undefined
+function logMessage(msg) {
+  console.log(msg);
+  // No return statement
+}
+
+const result = logMessage("Hello");  // Output: "Hello"
+console.log(result);                  // => undefined
+```
+
+## Scope
+
+**Scope** determines where variables are accessible:
+
+```javascript
+// Global scope — accessible everywhere
+const globalVar = "I'm global";
+
+function myFunction() {
+  // Function scope — accessible inside this function only
+  const functionVar = "I'm in the function";
+
+  if (true) {
+    // Block scope (let/const) — accessible in this block only
+    const blockVar = "I'm in a block";
+    console.log(globalVar);     // ✅ "I'm global"
+    console.log(functionVar);   // ✅ "I'm in the function"
+    console.log(blockVar);      // ✅ "I'm in a block"
+  }
+
+  console.log(blockVar);   // ❌ ReferenceError (blockVar not defined here)
+}
+
+console.log(functionVar);  // ❌ ReferenceError (functionVar not defined here)
+```
+
+## Callback Functions
+
+Functions can be passed as arguments to other functions:
+
+```javascript
+function processUser(name, callback) {
+  const formatted = name.toUpperCase();
+  callback(formatted);
+}
+
+// Pass an anonymous function
+processUser("Alice", function(result) {
+  console.log(`Processed: ${result}`);    // => "Processed: ALICE"
+});
+
+// Or an arrow function
+processUser("Bob", (result) => {
+  console.log(`Processed: ${result}`);    // => "Processed: BOB"
+});
+```
+
+## Higher-Order Functions
+
+Functions that take or return other functions:
+
+```javascript
+function multiplyBy(factor) {
+  // Returns a new function
+  return function(number) {
+    return number * factor;
+  };
+}
+
+const double = multiplyBy(2);
+const triple = multiplyBy(3);
+
+console.log(double(5));     // => 10
+console.log(triple(5));     // => 15
+```
+
+## Pure Functions
+
+A function is pure if:
+1. Same input always produces same output
+2. No side effects (doesn't modify external state)
+
+```javascript
+// Pure — same input = same output, no side effects
+function add(a, b) {
+  return a + b;
+}
+
+// Impure — depends on external state
+let taxRate = 0.1;
+function calculateTax(amount) {
+  return amount * taxRate;  // Output changes if taxRate changes
+}
+
+// Impure — modifies external state
+let total = 0;
+function addToTotal(amount) {
+  total += amount;  // Side effect: modifies external variable
+}
+```
+
+## Try It Yourself
+
+```javascript
+// 1. Write a function that takes a temperature in Celsius and returns Fahrenheit
+function celsiusToFahrenheit(celsius) {
+  return celsius * 9/5 + 32;
+}
+
+// 2. Write an arrow function that takes a name and returns "Welcome, {name}!"
+const welcome = name => `Welcome, ${name}!`;
+
+// 3. Write a function with a default parameter, rest parameter, and explicit return
+function createTeam(leader = "Guest", ...members) {
+  return { leader, members, count: members.length };
+}
+
+// 4. Write a higher-order function that takes a function and calls it twice
+function doTwice(fn) {
+  fn();
+  fn();
+}
+```
+
+## Key Takeaways
+
+- Functions are reusable blocks of code declared with `function`, arrow `=>`, or expression syntax
+- Arrow functions with a single expression have implicit return (no `{}` or `return` needed)
+- Default parameters handle missing arguments: `function greet(name = "Guest")`
+- Rest parameters (`...args`) collect remaining arguments into an array
+- Scope determines variable accessibility: global > function > block
+- Functions are first-class citizens — they can be passed as arguments (callbacks)
+- Higher-order functions take or return other functions
+- Pure functions (same input = same output, no side effects) are easier to test and debug
+- Always use `return` explicitly unless using implicit arrow return

@@ -1,0 +1,427 @@
+---
+title: "Custom Hooks"
+description: "Building reusable custom hooks — useFetch, useLocalStorage, useDebounce, useForm, useMediaQuery, and hook composition patterns."
+sidebar:
+  order: 9
+  label: "Custom Hooks"
+tab: "full-stack-development"
+---
+
+Custom hooks let you extract component logic into reusable functions. They're the primary mechanism for code reuse in React — not classes, not mixins, not inheritance — just functions that call other hooks.
+
+## What is a Custom Hook?
+
+A custom hook is a JavaScript function that:
+- Starts with `use` (convention)
+- Calls other hooks (useState, useEffect, etc.)
+- Returns values or functions
+
+```jsx
+import { useState, useEffect } from "react";
+
+function useOnlineStatus() {
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  return isOnline;
+}
+
+// Usage:
+function StatusBadge() {
+  const isOnline = useOnlineStatus();
+  return <div>{isOnline ? "🟢 Online" : "🔴 Offline"}</div>;
+}
+```
+
+## Rule: Hooks Start with "use"
+
+This isn't just a convention — React relies on it. ESLint's `rules-of-hooks` plugin uses the name to detect violations:
+
+```jsx
+// ✅ Custom hook
+function useUser(userId) { /* ... */ }
+
+// ❌ Not a hook (won't be checked by lint rules)
+function getUser(userId) { /* ... */ }
+```
+
+## Useful Custom Hooks
+
+### useFetch
+
+```jsx
+function useFetch(url) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!url) {
+      setData(null);
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function fetchData() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const response = await fetch(url);
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        if (!cancelled) {
+          setData(result);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err.message);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
+
+  return { data, loading, error };
+}
+
+// Usage:
+function UserList() {
+  const { data: users, loading, error } = useFetch(
+    "https://jsonplaceholder.typicode.com/users"
+  );
+
+  if (loading) return <p>Loading...</p>;
+  if (error) return <p>Error: {error}</p>;
+
+  return (
+    <ul>
+      {users.map((user) => <li key={user.id}>{user.name}</li>)}
+    </ul>
+  );
+}
+```
+
+### useLocalStorage
+
+```jsx
+function useLocalStorage(key, initialValue) {
+  const [storedValue, setStoredValue] = useState(() => {
+    try {
+      const item = localStorage.getItem(key);
+      return item ? JSON.parse(item) : initialValue;
+    } catch {
+      return initialValue;
+    }
+  });
+
+  const setValue = (value) => {
+    try {
+      const valueToStore =
+        value instanceof Function ? value(storedValue) : value;
+      setStoredValue(valueToStore);
+      localStorage.setItem(key, JSON.stringify(valueToStore));
+    } catch (err) {
+      console.warn(`Failed to save to localStorage (${key}):`, err);
+    }
+  };
+
+  return [storedValue, setValue];
+}
+
+// Usage:
+function ThemeToggle() {
+  const [theme, setTheme] = useLocalStorage("theme", "light");
+
+  return (
+    <button onClick={() => setTheme(theme === "light" ? "dark" : "light")}>
+      Current theme: {theme}
+    </button>
+  );
+}
+```
+
+### useDebounce
+
+Delay updating a value until after a specified delay:
+
+```jsx
+function useDebounce(value, delay = 300) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+
+  return debouncedValue;
+}
+
+// Usage: search with debounce
+function SearchPage() {
+  const [query, setQuery] = useState("");
+  const debouncedQuery = useDebounce(query, 500);
+
+  const { data: results } = useFetch(
+    debouncedQuery
+      ? `/api/search?q=${encodeURIComponent(debouncedQuery)}`
+      : null
+  );
+
+  return (
+    <div>
+      <input value={query} onChange={(e) => setQuery(e.target.value)} />
+      {results?.map((r) => <div key={r.id}>{r.name}</div>)}
+    </div>
+  );
+}
+```
+
+### useMediaQuery
+
+```jsx
+function useMediaQuery(query) {
+  const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(query);
+
+    const handleChange = (e) => setMatches(e.matches);
+    mediaQuery.addEventListener("change", handleChange);
+
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }, [query]);
+
+  return matches;
+}
+
+// Usage:
+function ResponsiveLayout() {
+  const isMobile = useMediaQuery("(max-width: 768px)");
+  const isTablet = useMediaQuery("(max-width: 1024px)");
+  const prefersDark = useMediaQuery("(prefers-color-scheme: dark)");
+
+  return (
+    <div>
+      {isMobile ? <MobileNav /> : <DesktopNav />}
+      {prefersDark && <DarkModeStyles />}
+    </div>
+  );
+}
+```
+
+### useToggle
+
+```jsx
+function useToggle(initialValue = false) {
+  const [value, setValue] = useState(initialValue);
+
+  const toggle = useCallback(() => setValue((prev) => !prev), []);
+  const setTrue = useCallback(() => setValue(true), []);
+  const setFalse = useCallback(() => setValue(false), []);
+
+  return [value, toggle, setTrue, setFalse];
+}
+
+// Usage:
+function Modal() {
+  const [isOpen, toggleOpen, open, close] = useToggle();
+
+  return (
+    <div>
+      <button onClick={open}>Open Modal</button>
+      {isOpen && (
+        <div className="modal">
+          <p>Modal content</p>
+          <button onClick={close}>Close</button>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+### usePrevious
+
+Track the previous value of a state or prop:
+
+```jsx
+function usePrevious(value) {
+  const ref = useRef();
+
+  useEffect(() => {
+    ref.current = value;
+  }, [value]);
+
+  return ref.current;
+}
+
+// Usage:
+function Counter() {
+  const [count, setCount] = useState(0);
+  const prevCount = usePrevious(count);
+
+  return (
+    <div>
+      <p>Now: {count}, Before: {prevCount}</p>
+      <button onClick={() => setCount((c) => c + 1)}>+</button>
+    </div>
+  );
+}
+```
+
+### useDocumentTitle
+
+```jsx
+function useDocumentTitle(title) {
+  useEffect(() => {
+    const previousTitle = document.title;
+    document.title = title;
+
+    return () => {
+      document.title = previousTitle;
+    };
+  }, [title]);
+}
+
+// Usage:
+function ProfilePage() {
+  useDocumentTitle("User Profile | My App");
+  return <div>{/* ... */}</div>;
+}
+```
+
+## Hook Composition
+
+Custom hooks can call other custom hooks — compose them like functions:
+
+```jsx
+function useUser(userId) {
+  const { data: user, loading, error } = useFetch(
+    userId ? `/api/users/${userId}` : null
+  );
+
+  const [theme, setTheme] = useLocalStorage("user-theme", "light");
+
+  return { user, loading, error, theme, setTheme };
+}
+```
+
+### Complex Composition Example
+
+```jsx
+function useSearchWithFilters() {
+  const [query, setQuery] = useState("");
+  const [filters, setFilters] = useState({});
+  const [sortBy, setSortBy] = useState("relevance");
+  const [page, setPage] = useState(1);
+
+  const debouncedQuery = useDebounce(query, 400);
+
+  const queryParams = new URLSearchParams({
+    q: debouncedQuery,
+    ...filters,
+    sort: sortBy,
+    page: String(page),
+  });
+
+  const { data, loading, error } = useFetch(
+    debouncedQuery ? `/api/search?${queryParams}` : null
+  );
+
+  const totalPages = data?.totalPages || 0;
+
+  const nextPage = () => setPage((p) => Math.min(p + 1, totalPages));
+  const prevPage = () => setPage((p) => Math.max(p - 1, 1));
+
+  // Reset page when query changes
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedQuery]);
+
+  return {
+    query,
+    setQuery,
+    filters,
+    setFilters,
+    sortBy,
+    setSortBy,
+    page,
+    setPage,
+    nextPage,
+    prevPage,
+    results: data?.results || [],
+    totalResults: data?.total || 0,
+    loading,
+    error,
+  };
+}
+```
+
+## Custom Hook Guidelines
+
+1. **Do** start with `use`
+2. **Do** compose hooks
+3. **Do** return a meaningful API (objects or arrays)
+4. **Do** handle cleanup (useEffect return)
+5. **Don't** call hooks conditionally or in loops
+6. **Don't** return JSX (that's a component, not a hook)
+7. **Do** use TypeScript for better DX
+
+## Quick Reference
+
+```jsx
+// Pattern
+function useMyHook(args) {
+  const [state, setState] = useState(initialValue);
+
+  useEffect(() => {
+    // effect logic
+    return () => { /* cleanup */ };
+  }, [deps]);
+
+  return { state, action };
+}
+
+// Return array (for 2 values, like useState)
+return [value, setter];
+
+// Return object (for 3+ values)
+return { data, loading, error };
+```
+
+## Practice Exercises
+
+1. **useIntersectionObserver**: Build a hook that returns `isVisible` for a given ref. Use it to implement lazy loading for images and scroll-triggered animations.
+
+2. **useCountdown**: Build a `useCountdown(seconds)` hook that counts down to zero. Returns `{ seconds, isRunning, start, pause, reset }`. Use it for a timer component.
+
+3. **useAsyncCallback**: Build a hook that wraps an async function and returns `{ execute, loading, error, data }`. It should handle race conditions (ignore stale responses) and expose a `cancel` function.

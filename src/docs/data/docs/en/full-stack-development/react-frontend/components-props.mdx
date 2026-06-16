@@ -1,0 +1,290 @@
+---
+title: "Components & Props"
+description: "React components, passing data with props, default props, children prop, component composition, and props patterns."
+sidebar:
+  order: 2
+  label: "Components & Props"
+tab: "full-stack-development"
+---
+
+Components are the building blocks of any React application. **Props** (short for "properties") are how you pass data from a parent component to a child component.
+
+## What Are Props?
+
+Props are read-only arguments passed to components, similar to function parameters:
+
+```jsx
+// Child component receives props as an object
+function Greeting(props) {
+  return <h1>Hello, {props.name}!</h1>;
+}
+
+// Parent passes props like HTML attributes
+function App() {
+  return (
+    <div>
+      <Greeting name="Alice" />
+      <Greeting name="Bob" />
+      <Greeting name="Charlie" />
+    </div>
+  );
+}
+```
+
+### Destructuring Props
+
+```jsx
+// Instead of props.name, props.age:
+function UserCard({ name, age, role }) {
+  return (
+    <div className="card">
+      <h2>{name}</h2>
+      <p>Age: {age}</p>
+      <p>Role: {role}</p>
+    </div>
+  );
+}
+
+// Usage
+<UserCard name="Alice" age={30} role="Developer" />
+```
+
+## Passing Different Prop Types
+
+```jsx
+function PropDemo({
+  string,    // "hello"
+  number,    // {42}
+  boolean,   // {true} or just the prop name
+  array,     // {[1, 2, 3]}
+  object,    // {{ key: "value" }}
+  function,  // {() => doSomething()}
+}) {
+  return <>{/* ... */}</>;
+}
+
+// Usage
+<PropDemo
+  string="hello"
+  number={42}
+  boolean  // shorthand for boolean={true}
+  array={[1, 2, 3]}
+  object={{ name: "Alice" }}
+  function={() => console.log("clicked")}
+/>
+```
+
+<Aside variant="tip">
+Boolean props can use shorthand — `<Button disabled />` is equivalent to `<Button disabled={true} />`.
+</Aside>
+
+## Default Props (Default Parameters)
+
+Use JavaScript default parameters for optional props:
+
+```jsx
+function Button({ label = "Click Me", variant = "primary", disabled = false }) {
+  return (
+    <button className={`btn btn-${variant}`} disabled={disabled}>
+      {label}
+    </button>
+  );
+}
+
+// All of these work:
+<Button />
+<Button label="Save" />
+<Button label="Delete" variant="danger" disabled />
+```
+
+## The `children` Prop
+
+`children` is a special prop for passing content between opening and closing tags:
+
+```jsx
+function Card({ title, children }) {
+  return (
+    <div className="card">
+      <h2 className="card-title">{title}</h2>
+      <div className="card-content">{children}</div>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <Card title="Welcome">
+      <p>This content is passed as children.</p>
+      <p>You can pass anything — elements, text, or other components.</p>
+    </Card>
+  );
+}
+```
+
+### Children Patterns
+
+```jsx
+// Text child
+<Button>Click Me</Button>
+
+// Element child
+<Card><p>Content</p></Card>
+
+// Multiple children
+<Panel>
+  <Header />
+  <Body />
+  <Footer />
+</Panel>
+
+// Function as child (render prop pattern)
+<DataProvider>
+  {(data) => <List items={data} />}
+</DataProvider>
+
+// No children — self-closing
+<Icon />
+```
+
+## Component Composition
+
+Composition is combining small components to build larger ones:
+
+```jsx
+function Avatar({ src, alt }) {
+  return <img className="avatar" src={src} alt={alt} />;
+}
+
+function UserInfo({ name, role }) {
+  return (
+    <div className="user-info">
+      <h3>{name}</h3>
+      <p>{role}</p>
+    </div>
+  );
+}
+
+function UserCard({ user }) {
+  return (
+    <div className="user-card">
+      <Avatar src={user.avatar} alt={user.name} />
+      <UserInfo name={user.name} role={user.role} />
+    </div>
+  );
+}
+
+function UserList({ users }) {
+  return (
+    <div className="user-list">
+      {users.map((user) => (
+        <UserCard key={user.id} user={user} />
+      ))}
+    </div>
+  );
+}
+```
+
+## Props Patterns
+
+### Spread Props
+
+```jsx
+const user = { name: "Alice", age: 30, role: "Developer" };
+
+// Manually:
+<UserCard name={user.name} age={user.age} role={user.role} />
+
+// Spread:
+<UserCard {...user} />
+```
+
+### Conditional Props
+
+```jsx
+<Button {...(isLoading ? { disabled: true, children: "Loading..." } : { onClick: handleClick, children: "Save" })} />
+```
+
+### Component as Prop
+
+```jsx
+function Menu({ icon: Icon, title }) {
+  return (
+    <div className="menu-item">
+      <Icon />
+      <span>{title}</span>
+    </div>
+  );
+}
+
+<Menu icon={HomeIcon} title="Home" />
+<Menu icon={SettingsIcon} title="Settings" />
+```
+
+## Props Are Read-Only
+
+Never modify props inside a component:
+
+```jsx
+// ❌ Never do this
+function BadComponent(props) {
+  props.name = "New Name"; // mutates the prop!
+  return <h1>{props.name}</h1>;
+}
+
+// ✅ Props are read-only — use state for mutable data
+function GoodComponent({ name }) {
+  const [displayName, setDisplayName] = useState(name);
+  return <h1>{displayName}</h1>;
+}
+```
+
+React components must be **pure functions** with respect to their props — given the same props, they should always render the same output.
+
+## One-Way Data Flow
+
+Data flows **down** the component tree — from parent to child through props:
+
+```
+App
+├── UserList (passes users array)
+│   ├── UserCard (receives single user)
+│   │   ├── Avatar (receives src, alt)
+│   │   └── UserInfo (receives name, role)
+│   └── UserCard
+└── Footer
+```
+
+Children communicate back to parents via **callback functions** passed as props:
+
+```jsx
+function Child({ onAction }) {
+  return <button onClick={() => onAction("Data from child")}>Send Up</button>;
+}
+
+function Parent() {
+  const handleChildAction = (data) => {
+    console.log("Received:", data);
+  };
+
+  return <Child onAction={handleChildAction} />;
+}
+```
+
+## Quick Reference
+
+| Pattern | Syntax | Use Case |
+|---------|--------|----------|
+| Destructuring | `function Card({ title, desc })` | Most common — clean and explicit |
+| Default values | `function Btn({ label = "Click" })` | Optional props |
+| Children | `<Card><p>Content</p></Card>` | Wrapping content |
+| Spread | `<Card {...props} />` | Forwarding multiple props |
+| Render prop | `{(data) => <View data={data} />}` | Flexible data rendering |
+| Callback | `onClick={() => handle(id)}` | Child-to-parent communication |
+
+## Practice Exercises
+
+1. **Build a ProductCard component** that accepts props for `name`, `price`, `inStock`, and an optional `discount`. Render the product info and conditionally show a "Sale!" badge when there's a discount.
+
+2. **Create a Layout component** that uses `children` for content and also accepts a `sidebar` prop for a sidebar component. Compose a page using it.
+
+3. **Build a Button component** with variants (`primary`, `secondary`, `danger`), sizes (`small`, `medium`, `large`), and a `loading` state. Use default props for optional values.

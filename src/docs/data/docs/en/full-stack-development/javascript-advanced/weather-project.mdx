@@ -1,0 +1,596 @@
+---
+title: "Project: Weather Dashboard"
+description: "Build a weather dashboard using async JavaScript — Fetch API to call OpenWeatherMap, dynamic DOM updates, loading/error states, and local storage caching."
+sidebar:
+  order: 10
+  label: "Weather Dashboard Project"
+tab: "full-stack-development"
+---
+
+This project brings together everything from the Advanced JavaScript module — async/await, Fetch API, error handling, ES6 modules, and modern JavaScript features — to build a complete weather dashboard.
+
+## Project Overview
+
+You'll build a weather dashboard that:
+
+- Fetches real weather data from the OpenWeatherMap API
+- Displays temperature, humidity, wind speed, and weather conditions
+- Shows a 5-day forecast
+- Caches results in `localStorage` to reduce API calls
+- Handles loading states, errors, and empty states
+- Uses ES6 modules to organise the code
+
+## Step 1: Get an API Key
+
+1. Go to [OpenWeatherMap](https://openweathermap.org/api) and sign up for a free account
+2. Navigate to the API Keys section in your account dashboard
+3. Copy your API key (the free tier allows 60 calls/minute, which is plenty for development)
+
+## Step 2: Project Structure
+
+```
+weather-dashboard/
+├── index.html          # Main HTML file
+├── styles.css          # Styles
+├── app.js             # Entry point — imports and initialises
+├── modules/
+│   ├── api.js         # API calls
+│   ├── ui.js          # DOM rendering functions
+│   ├── storage.js     # localStorage caching
+│   └── utils.js       # Helper utilities
+```
+
+## Step 3: The API Module
+
+```js
+// modules/api.js
+const API_KEY = "YOUR_API_KEY_HERE";
+const BASE_URL = "https://api.openweathermap.org/data/2.5";
+
+export async function fetchCurrentWeather(city) {
+  const url = `${BASE_URL}/weather?q=${encodeURIComponent(city)}&units=metric&appid=${API_KEY}`;
+
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error(`City "${city}" not found. Please check the spelling.`);
+    }
+    if (response.status === 401) {
+      throw new Error("Invalid API key. Please check your configuration.");
+    }
+    throw new Error(`Weather service error: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function fetchForecast(city) {
+  const url = `${BASE_URL}/forecast?q=${encodeURIComponent(city)}&units=metric&appid=${API_KEY}`;
+
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`Forecast fetch failed: ${response.status}`);
+  }
+
+  return response.json();
+}
+```
+
+## Step 4: The Storage Module
+
+Cache API responses to avoid rate limits and improve performance:
+
+```js
+// modules/storage.js
+const CACHE_KEY = "weather_cache";
+const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
+
+export function getCachedWeather(city) {
+  try {
+    const cache = JSON.parse(localStorage.getItem(CACHE_KEY)) || {};
+
+    if (cache[city] && Date.now() - cache[city].timestamp < CACHE_DURATION) {
+      return cache[city].data;
+    }
+
+    return null;
+  } catch {
+    return null; // if localStorage is corrupted, ignore cache
+  }
+}
+
+export function setCachedWeather(city, data) {
+  try {
+    const cache = JSON.parse(localStorage.getItem(CACHE_KEY)) || {};
+
+    cache[city] = {
+      data,
+      timestamp: Date.now(),
+    };
+
+    // Limit cache size to prevent quota issues
+    const entries = Object.entries(cache);
+    if (entries.length > 20) {
+      // Remove oldest entry
+      entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
+      delete cache[entries[0][0]];
+    }
+
+    localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+  } catch (err) {
+    console.warn("Failed to cache weather data:", err.message);
+  }
+}
+```
+
+## Step 5: The UI Module
+
+```js
+// modules/ui.js
+const app = document.querySelector("#app");
+
+export function showLoading() {
+  app.innerHTML = `
+    <div class="loading">
+      <div class="spinner"></div>
+      <p>Fetching weather data...</p>
+    </div>
+  `;
+}
+
+export function showError(message) {
+  app.innerHTML = `
+    <div class="error">
+      <span class="error-icon">⚠️</span>
+      <p>${escapeHtml(message)}</p>
+      <button onclick="window.location.reload()">Try Again</button>
+    </div>
+  `;
+}
+
+export function showEmpty() {
+  app.innerHTML = `
+    <div class="empty">
+      <p>Enter a city name above to see the weather.</p>
+    </div>
+  `;
+}
+
+export function renderWeather(data) {
+  const { name, main, weather, wind, sys } = data;
+  const temp = Math.round(main.temp);
+  const feelsLike = Math.round(main.feels_like);
+  const description = weather[0].description;
+  const iconCode = weather[0].icon;
+
+  app.innerHTML = `
+    <div class="weather-card">
+      <div class="weather-header">
+        <h2>${escapeHtml(name)}</h2>
+        <span class="country">${sys.country}</span>
+      </div>
+
+      <div class="weather-main">
+        <img
+          src="https://openweathermap.org/img/wn/${iconCode}@2x.png"
+          alt="${description}"
+          class="weather-icon"
+        />
+        <div class="temperature">${temp}°C</div>
+      </div>
+
+      <div class="weather-details">
+        <div class="detail">
+          <span class="detail-label">Feels Like</span>
+          <span class="detail-value">${feelsLike}°C</span>
+        </div>
+        <div class="detail">
+          <span class="detail-label">Humidity</span>
+          <span class="detail-value">${main.humidity}%</span>
+        </div>
+        <div class="detail">
+          <span class="detail-label">Wind</span>
+          <span class="detail-value">${wind.speed} m/s</span>
+        </div>
+        <div class="detail">
+          <span class="detail-label">Pressure</span>
+          <span class="detail-value">${main.pressure} hPa</span>
+        </div>
+      </div>
+
+      <div class="weather-description">${capitalize(description)}</div>
+    </div>
+  `;
+}
+
+export function renderForecast(forecastData) {
+  // Group by day and get midday forecast
+  const daily = forecastData.list.reduce((acc, item) => {
+    const date = item.dt_txt.split(" ")[0];
+    if (!acc[date] || item.dt_txt.includes("12:00")) {
+      acc[date] = item;
+    }
+    return acc;
+  }, {});
+
+  const forecastHtml = Object.entries(daily)
+    .slice(0, 5)
+    .map(([date, item]) => {
+      const dayName = new Date(date).toLocaleDateString("en-US", { weekday: "short" });
+      const temp = Math.round(item.main.temp);
+      const icon = item.weather[0].icon;
+
+      return `
+        <div class="forecast-day">
+          <span class="forecast-day-name">${dayName}</span>
+          <img src="https://openweathermap.org/img/wn/${icon}.png" alt="" />
+          <span class="forecast-temp">${temp}°</span>
+        </div>
+      `;
+    })
+    .join("");
+
+  const forecastSection = document.querySelector(".forecast") || document.createElement("div");
+  forecastSection.className = "forecast";
+  forecastSection.innerHTML = `
+    <h3>5-Day Forecast</h3>
+    <div class="forecast-grid">${forecastHtml}</div>
+  `;
+
+  app.appendChild(forecastSection);
+}
+
+// Helper functions
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function capitalize(str) {
+  return str.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+```
+
+## Step 6: The Entry Point (app.js)
+
+```js
+// app.js
+import { fetchCurrentWeather, fetchForecast } from "./modules/api.js";
+import { getCachedWeather, setCachedWeather } from "./modules/storage.js";
+import { showLoading, showError, showEmpty, renderWeather, renderForecast } from "./modules/ui.js";
+
+const searchForm = document.querySelector("#search-form");
+const searchInput = document.querySelector("#search-input");
+
+let currentRequestId = 0;
+
+async function handleSearch(event) {
+  event.preventDefault();
+  const city = searchInput.value.trim();
+
+  if (!city) {
+    showError("Please enter a city name");
+    return;
+  }
+
+  // Increment to track latest request (prevents race conditions)
+  const requestId = ++currentRequestId;
+
+  showLoading();
+
+  try {
+    // Check cache first
+    const cached = getCachedWeather(city);
+    if (cached && requestId === currentRequestId) {
+      renderWeather(cached.current);
+      renderForecast(cached.forecast);
+      return;
+    }
+
+    // Fetch fresh data
+    const [currentData, forecastData] = await Promise.all([
+      fetchCurrentWeather(city),
+      fetchForecast(city),
+    ]);
+
+    // Only update UI if this is still the latest request
+    if (requestId !== currentRequestId) return;
+
+    // Cache the results
+    setCachedWeather(city, {
+      current: currentData,
+      forecast: forecastData,
+    });
+
+    renderWeather(currentData);
+    renderForecast(forecastData);
+
+  } catch (error) {
+    if (requestId === currentRequestId) {
+      showError(error.message);
+    }
+  }
+}
+
+// Initialise
+searchForm.addEventListener("submit", handleSearch);
+showEmpty();
+```
+
+## Step 7: HTML & CSS
+
+```html
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Weather Dashboard</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Weather Dashboard</h1>
+      <form id="search-form" class="search-form">
+        <input
+          type="text"
+          id="search-input"
+          placeholder="Enter city name..."
+          required
+        />
+        <button type="submit">Search</button>
+      </form>
+    </header>
+    <main id="app"></main>
+  </div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
+```
+
+```css
+/* styles.css */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+  color: #333;
+}
+
+.container {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+header h1 {
+  color: white;
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+
+.search-form {
+  display: flex;
+  gap: 0.5rem;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.search-form input {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+}
+
+.search-form button {
+  padding: 0.75rem 1.5rem;
+  background: #ff6b6b;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.search-form button:hover {
+  background: #ee5a5a;
+}
+
+/* Loading */
+.loading {
+  text-align: center;
+  color: white;
+  padding: 3rem;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Error */
+.error {
+  background: #fff3f3;
+  border: 1px solid #ffcdd2;
+  border-radius: 12px;
+  padding: 2rem;
+  text-align: center;
+  color: #c62828;
+}
+
+.error button {
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid #c62828;
+  border-radius: 6px;
+  background: white;
+  color: #c62828;
+  cursor: pointer;
+}
+
+/* Empty state */
+.empty {
+  text-align: center;
+  color: white;
+  padding: 3rem;
+  opacity: 0.9;
+}
+
+/* Weather card */
+.weather-card {
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+}
+
+.weather-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.country {
+  background: #667eea;
+  color: white;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+.weather-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.weather-icon {
+  width: 80px;
+  height: 80px;
+}
+
+.temperature {
+  font-size: 3rem;
+  font-weight: bold;
+}
+
+.weather-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.detail {
+  background: #f5f5f5;
+  padding: 0.75rem;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.detail-label {
+  display: block;
+  font-size: 0.8rem;
+  color: #666;
+  margin-bottom: 0.25rem;
+}
+
+.detail-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.weather-description {
+  text-align: center;
+  color: #666;
+  font-size: 1.1rem;
+}
+
+/* Forecast */
+.forecast {
+  margin-top: 2rem;
+  background: white;
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+}
+
+.forecast h3 {
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.forecast-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.5rem;
+}
+
+.forecast-day {
+  text-align: center;
+  padding: 0.5rem;
+}
+
+.forecast-day-name {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.forecast-temp {
+  display: block;
+  color: #666;
+  font-size: 0.9rem;
+}
+```
+
+## Step 8: Run It
+
+Open `index.html` in your browser (no server needed since we're using ES modules), or use a local server:
+
+```bash
+npx serve .
+```
+
+Search for cities like "London", "Tokyo", "New York" — the dashboard will fetch and display current weather and a 5-day forecast.
+
+## Extension Ideas
+
+1. **Geolocation**: Use the browser's `navigator.geolocation` API to auto-detect the user's city on load
+2. **Unit toggle**: Add a °C / °F toggle button
+3. **Search history**: Store recent searches and show them as quick-select buttons
+4. **Background images**: Use the weather condition to set dynamic gradients or background images
+5. **Hourly forecast**: Expand the forecast to show hourly data for the next 24 hours
+6. **Multiple cities**: Allow searching and comparing weather for multiple cities simultaneously

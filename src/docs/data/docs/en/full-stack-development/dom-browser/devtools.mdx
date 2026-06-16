@@ -1,0 +1,246 @@
+---
+title: "Chrome DevTools"
+description: "Essential Chrome DevTools features — Elements panel, Console, Network tab, Sources debugger, Performance, Lighthouse audits, and practical debugging workflows."
+sidebar:
+  order: 10
+  label: "Chrome DevTools"
+tab: "full-stack-development"
+---
+
+Chrome DevTools is the most important tool in a web developer's arsenal. It lets you inspect, debug, profile, and optimise your web applications.
+
+<Aside variant="tip">
+Open DevTools with **F12** or **Ctrl+Shift+I** (Windows/Linux) or **Cmd+Option+I** (Mac).
+</Aside>
+
+## Elements Panel
+
+Inspect and modify HTML and CSS in real time.
+
+### Inspecting Elements
+
+Right-click any element → **Inspect** to open DevTools with that element selected.
+
+- **Styles pane**: See all CSS rules affecting the element, including inherited and computed styles
+- **Box model diagram**: Visual padding, border, margin
+- **Computed tab**: Final computed values for all properties
+- **Event Listeners tab**: See all event listeners attached to the element
+
+### Live CSS Editing
+
+```css
+/* Click any property value to edit it */
+/* Changes are live but temporary — refresh to reset */
+
+/* Toggle rules on/off with checkbox */
+/* Add new rules by clicking between brackets */
+/* See specificity with the coloured circle indicators */
+```
+
+### CSS Tricks
+
+- **Force state**: Right-click an element → Force State → `:hover`, `:active`, `:focus`, `:visited`
+- **Copy selector**: Right-click a rule → Copy → Copy selector
+- **Find CSS source**: Click the filename link next to any rule to open the Sources tab
+- **Filter CSS**: Type in the filter box above the Styles pane to find specific properties
+
+## Console
+
+### Logging Levels
+
+```js
+console.log("Basic info");
+console.info("Informational");
+console.warn("Warning message");    // yellow
+console.error("Error message");     // red with stack trace
+console.debug("Debug message");     // verbose
+```
+
+### Useful Console Methods
+
+```js
+// Tabular data
+console.table([
+  { name: "Alice", age: 30, role: "Admin" },
+  { name: "Bob", age: 25, role: "User" },
+]);
+
+// Group related logs
+console.group("User Details");
+console.log("Name:", user.name);
+console.log("Email:", user.email);
+console.groupEnd();
+
+// Timing
+console.time("fetch-users");
+await fetchUsers();
+console.timeEnd("fetch-users"); // "fetch-users: 234ms"
+
+// Count occurrences
+function handleClick() {
+  console.count("Button clicked");
+}
+
+// Stack trace
+console.trace("Where was this called from?");
+
+// Styled logs
+console.log("%cStyled message", "color: blue; font-size: 20px; font-weight: bold");
+```
+
+### $ Commands
+
+```js
+$0         // Last inspected element
+$1         // Second-to-last inspected element
+$$("div")  // querySelectorAll shorthand
+$x("//div") // XPath query
+$_         // Last evaluated result
+```
+
+## Network Tab
+
+Inspect all network requests made by the page.
+
+### Key Features
+
+- **Waterfall view**: See request timing (DNS, TCP, TLS, request, response)
+- **Filter by type**: XHR/Fetch, JS, CSS, Img, Media, Font, Doc, WS
+- **Search**: Search across all request/response bodies
+- **Block requests**: Right-click → Block request URL to simulate missing resources
+- **Replay**: Right-click → Replay XHR to re-issue a request
+- **Copy as fetch**: Right-click → Copy → Copy as fetch
+
+### Throttling
+
+Simulate slow connections:
+
+1. Go to the **Network** tab
+2. Click the throttle dropdown (default: "No throttling")
+3. Select "Slow 3G" or "Fast 3G"
+4. Or add custom profiles with specific bandwidth/latency
+
+### Checking Request Details
+
+```js
+// Headers: request and response headers
+// Payload: POST request body
+// Preview: Formatted response (parsed JSON, rendered image)
+// Response: Raw response body
+// Timing: Detailed timing breakdown
+// Cookies: Cookies sent with the request
+```
+
+## Sources Tab (Debugger)
+
+Set breakpoints and step through JavaScript code.
+
+### Types of Breakpoints
+
+| Breakpoint Type | How to Set | Use Case |
+|----------------|------------|----------|
+| Line breakpoint | Click line number | Pause at specific line |
+| Conditional | Right-click line → Add conditional | Pause only when condition is true |
+| DOM breakpoint | Elements panel → right-click → Break on | Pause on subtree modification, attribute change, node removal |
+| Event listener | Sources → Event Listener Breakpoints | Pause when specific event fires |
+| XHR/fetch | Sources → XHR Breakpoints | Pause when URL contains a string |
+
+### Debugging Workflow
+
+1. Set a breakpoint on the line you want to inspect
+2. Trigger the action that runs the code
+3. Execution pauses — now you can inspect
+
+**Controls:**
+
+| Button | Shortcut | Action |
+|--------|----------|--------|
+| ▶️ Resume | F8 | Continue execution |
+| ⤵️ Step Over | F10 | Execute current line, go to next |
+| ⬇️ Step Into | F11 | Enter a function call |
+| ⬆️ Step Out | Shift+F11 | Exit current function |
+| 🔄 Restart | — | Restart execution at current frame |
+
+**Watch panel**: Add expressions to track their value across breakpoints.
+**Scope panel**: See all local, closure, and global variables.
+
+## Performance Tab
+
+Record and analyse runtime performance.
+
+### Recording
+
+1. Open Performance tab
+2. Click the ⏺ Record button
+3. Interact with your page
+4. Click Stop
+
+### Interpreting Results
+
+- **FPS chart**: Green bars at top = smooth. Red bars = jank (frame drops)
+- **CPU chart**: Which operations are consuming CPU time
+- **Flame chart**: See the call stack over time — wide bars = long operations
+- **Summary**: Time breakdown (Scripting, Rendering, Painting, System, Idle, etc.)
+
+### Common Performance Issues
+
+- **Forced reflows**: Reading layout properties (like `offsetHeight`) after changing styles
+- **Long tasks**: Main thread blocked for > 50ms
+- **Layout thrashing**: Repeated read/write cycles forcing multiple layouts
+- **Excessive DOM size**: Too many elements in the DOM
+
+## Lighthouse Tab
+
+Automated audit for performance, accessibility, SEO, and best practices.
+
+```js
+// Generate a report
+// 1. Open Lighthouse tab
+// 2. Select categories (Performance, Accessibility, Best Practices, SEO)
+// 3. Click "Generate report"
+// 4. Review scores and recommended fixes
+```
+
+### Core Web Vitals
+
+| Metric | Good | Needs Work | Poor |
+|--------|------|-----------|------|
+| LCP (Largest Contentful Paint) | ≤ 2.5s | 2.5-4.0s | > 4.0s |
+| FID (First Input Delay) | ≤ 100ms | 100-300ms | > 300ms |
+| CLS (Cumulative Layout Shift) | ≤ 0.1 | 0.1-0.25 | > 0.25 |
+
+## Memory Tab
+
+Detect memory leaks by recording heap snapshots:
+
+1. Go to **Memory** tab
+2. Select "Heap snapshot" → Take snapshot
+3. Perform actions in your app (open/close modals, navigate)
+4. Take another snapshot
+5. Compare snapshots — look for retained objects that shouldn't exist
+
+**Signs of a memory leak:**
+- Heap size keeps growing after repeated actions
+- Detached DOM elements (elements removed from DOM but still referenced in JS)
+- Event listeners on detached elements
+
+## Quick Reference
+
+| Panel | Use When You Need To |
+|-------|----------------------|
+| Elements | Inspect/edit HTML and CSS |
+| Console | Log data, run JS, debug |
+| Network | Debug requests, check API responses, throttle |
+| Sources | Step through JS with breakpoints |
+| Performance | Profile runtime performance |
+| Lighthouse | Run audits and get improvement suggestions |
+| Memory | Find memory leaks |
+| Application | Inspect storage, cookies, caches, manifests |
+
+## Practice Exercises
+
+1. **Network debugging**: Open the Network tab and visit a website. Filter to only XHR requests. Find a JSON API call and inspect the response. Try throttling to Slow 3G and reload.
+
+2. **Debugger walkthrough**: Write a small script with a bug (e.g., off-by-one in a loop, undefined variable access). Use the Sources tab to set breakpoints, step through the code, and identify the bug by inspecting variables.
+
+3. **Performance audit**: Run Lighthouse on your own site (or a test page). Note the Performance, Accessibility, and Best Practices scores. Pick one improvement suggestion and implement it.

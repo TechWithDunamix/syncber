@@ -1,0 +1,272 @@
+---
+title: "Express Server Setup"
+description: "Installing Express, creating a basic server, route handlers, req/res objects, environment variables with dotenv, and project structure."
+sidebar:
+  order: 2
+  label: "Express Server Setup"
+tab: "full-stack-development"
+---
+
+Express is the most popular Node.js web framework. It provides a minimal, flexible set of features for building web applications and APIs.
+
+## Installation
+
+```bash
+mkdir my-api && cd my-api
+npm init -y
+npm install express
+npm install --save-dev nodemon
+```
+
+Add scripts to `package.json`:
+
+```json
+{
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  }
+}
+```
+
+## Hello World Server
+
+```javascript
+// src/index.js
+const express = require("express");
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Route handler
+app.get("/", (req, res) => {
+  res.send("Hello, World!");
+});
+
+// Start the server
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});
+```
+
+Start the server:
+
+```bash
+npm run dev
+# Visit http://localhost:3000 in your browser
+```
+
+## Request and Response Objects
+
+### Request (`req`)
+
+```javascript
+app.get("/example", (req, res) => {
+  // URL info
+  req.path;       // "/example"
+  req.method;     // "GET"
+  req.hostname;   // "localhost"
+  req.protocol;   // "http"
+  req.secure;     // false (true for HTTPS)
+
+  // Query parameters — /search?q=hello&page=2
+  req.query.q;    // "hello"
+  req.query.page; // "2"
+
+  // Route parameters — /users/:id
+  req.params.id;  // from route
+
+  // Headers
+  req.headers["content-type"];
+  req.get("Authorization");
+
+  // Body (needs middleware)
+  req.body;       // populated by express.json() middleware
+
+  // Cookies
+  req.cookies;    // needs cookie-parser middleware
+});
+```
+
+### Response (`res`)
+
+```javascript
+app.get("/response-examples", (req, res) => {
+  // Send various types
+  res.send("Hello");                    // HTML/string
+  res.json({ message: "Hello" });      // JSON
+  res.json({ user: { id: 1, name: "Alice" } }); // JSON object
+  res.status(201).json({ id: 1 });      // with status code
+  res.redirect("/other-page");          // redirect
+  res.sendFile("/path/to/file.pdf");    // send a file
+  res.download("/path/to/file.pdf");    // download prompt
+  res.end();                            // empty response
+
+  // Set headers
+  res.set("X-Custom-Header", "value");
+  res.setHeader("Content-Type", "application/json");
+});
+```
+
+## Environment Variables with dotenv
+
+```bash
+npm install dotenv
+```
+
+```javascript
+// .env
+PORT=4000
+NODE_ENV=development
+DATABASE_URL=mongodb://localhost:27017/myapp
+API_KEY=sk-abc123
+```
+
+```javascript
+// src/index.js
+require("dotenv").config();
+
+console.log(process.env.PORT);       // "4000"
+console.log(process.env.NODE_ENV);   // "development"
+```
+
+<Aside variant="caution">
+**Never commit `.env` files** to version control. Add `.env` to `.gitignore`. Provide a `.env.example` file with placeholder values for other developers.
+</Aside>
+
+## Project Structure
+
+```
+my-api/
+├── src/
+│   ├── index.js          # Entry point — server setup
+│   ├── app.js            # Express app configuration
+│   ├── routes/           # Route handlers
+│   │   ├── users.js
+│   │   └── products.js
+│   ├── controllers/      # Business logic
+│   │   ├── userController.js
+│   │   └── productController.js
+│   ├── middleware/        # Custom middleware
+│   │   ├── auth.js
+│   │   └── errorHandler.js
+│   ├── models/           # Data models
+│   │   └── User.js
+│   └── utils/            # Helper functions
+│       └── logger.js
+├── tests/                # Test files
+├── .env                  # Environment variables
+├── .gitignore
+└── package.json
+```
+
+### App Configuration Pattern
+
+```javascript
+// src/app.js
+const express = require("express");
+require("dotenv").config();
+
+const app = express();
+
+// Middleware
+app.use(express.json());                    // Parse JSON bodies
+app.use(express.urlencoded({ extended: true })); // Parse form data
+app.use(express.static("public"));          // Serve static files
+
+// Routes
+app.use("/api/users", require("./routes/users"));
+app.use("/api/products", require("./routes/products"));
+
+// Health check
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ error: "Route not found" });
+});
+
+// Error handler
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: "Internal server error" });
+});
+
+module.exports = app;
+```
+
+```javascript
+// src/index.js
+const app = require("./app");
+
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
+```
+
+## Organising Routes
+
+```javascript
+// src/routes/users.js
+const express = require("express");
+const router = express.Router();
+
+// GET /api/users
+router.get("/", (req, res) => {
+  res.json([{ id: 1, name: "Alice" }]);
+});
+
+// GET /api/users/:id
+router.get("/:id", (req, res) => {
+  res.json({ id: req.params.id, name: "Alice" });
+});
+
+// POST /api/users
+router.post("/", (req, res) => {
+  const { name, email } = req.body;
+  // Create user logic
+  res.status(201).json({ id: 2, name, email });
+});
+
+module.exports = router;
+```
+
+## Running with Nodemon
+
+Nodemon automatically restarts the server when file changes are detected:
+
+```bash
+npm run dev
+# [nodemon] starting `node src/index.js`
+# Server running on port 3000
+# [nodemon] restarting due to changes...
+```
+
+## Quick Reference
+
+```javascript
+// Basic server
+app.get("/path", (req, res) => res.send("ok"));
+app.listen(PORT, () => console.log(`Running on ${PORT}`));
+
+// Common middleware
+app.use(express.json());
+app.use(express.static("public"));
+
+// Router pattern
+const router = express.Router();
+router.get("/", handler);
+app.use("/api", router);
+```
+
+## Practice Exercises
+
+1. **Basic Express server**: Create a server with routes for `/`, `/about`, and `/contact`. Each should return a simple HTML string. Use `nodemon` for development.
+
+2. **Environment configuration**: Set up a project with `dotenv`. Use environment variables for `PORT`, a custom `APP_NAME`, and an `ADMIN_EMAIL`. Log them on startup. Create a `.env.example` file.
+
+3. **Structured project**: Create a project with the structure shown above. Move route handlers to separate files. Add a `logger.js` utility that logs requests with timestamps.

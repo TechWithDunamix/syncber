@@ -1,0 +1,390 @@
+---
+title: "CORS & Security Headers"
+description: "Cross-Origin Resource Sharing (CORS) configuration, security headers (CSP, HSTS, X-Frame-Options), helmet.js, and preventing common HTTP-based attacks."
+sidebar:
+  order: 6
+  label: "CORS & Security Headers"
+tab: "full-stack-development"
+---
+
+HTTP headers are your API's first line of defense. CORS controls which origins can access your resources, and security headers like Content-Security-Policy and HSTS protect against XSS, clickjacking, and protocol downgrade attacks.
+
+## What is CORS?
+
+Cross-Origin Resource Sharing (CORS) is a browser security mechanism that controls which websites can access resources from your server. Without CORS, a malicious site could make authenticated requests to your API through a user's browser.
+
+### Same-Origin Policy
+
+Browsers enforce a **same-origin policy**: a page at `https://app.example.com` can only make requests to `https://app.example.com` by default. Different port, protocol, or host = different origin.
+
+```
+Origin A: https://app.example.com
+Origin B: https://api.example.com       ← Different host → BLOCKED
+Origin C: https://app.example.com:8080  ← Different port → BLOCKED
+Origin D: http://app.example.com        ← Different protocol → BLOCKED
+Origin E: https://app.example.com       ← Same origin → ALLOWED
+```
+
+### How CORS Works
+
+The browser sends a preflight `OPTIONS` request before certain cross-origin requests, then checks the server's response headers:
+
+```http
+# Preflight request (browser sends automatically)
+OPTIONS /api/users
+Origin: https://myapp.com
+Access-Control-Request-Method: POST
+Access-Control-Request-Headers: Content-Type, Authorization
+
+# Server response
+HTTP/1.1 204 No Content
+Access-Control-Allow-Origin: https://myapp.com
+Access-Control-Allow-Methods: GET, POST, PUT, DELETE
+Access-Control-Allow-Headers: Content-Type, Authorization
+Access-Control-Max-Age: 86400
+```
+
+## Configuring CORS in Express
+
+### Basic Setup with `cors` Package
+
+```bash
+npm install cors
+```
+
+```javascript
+const express = require("express");
+const cors = require("cors");
+
+const app = express();
+
+// Allow all origins (development only!)
+app.use(cors());
+```
+
+### Production Configuration
+
+```javascript
+const corsOptions = {
+  origin: "https://myapp.com",              // Single allowed origin
+  methods: ["GET", "POST", "PUT", "DELETE"], // Allowed HTTP methods
+  allowedHeaders: ["Content-Type", "Authorization"], // Allowed request headers
+  exposedHeaders: ["X-Request-Id"],          // Headers exposed to the browser
+  credentials: true,                         // Allow cookies/auth headers
+  maxAge: 86400,                             // Cache preflight for 24 hours
+};
+
+app.use(cors(corsOptions));
+```
+
+### Multiple Origins
+
+```javascript
+const allowedOrigins = [
+  "https://myapp.com",
+  "https://admin.myapp.com",
+  "http://localhost:5173",  // Dev frontend
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (server-to-server, Postman, curl)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
+}));
+```
+
+### CORS Error Handling
+
+```javascript
+// Global CORS error handler
+app.use((err, req, res, next) => {
+  if (err.message === "Not allowed by CORS") {
+    return res.status(403).json({
+      error: "CORS_ERROR",
+      message: "Origin not allowed",
+    });
+  }
+  next(err);
+});
+```
+
+## Security Headers with Helmet
+
+[Helmet](https://helmetjs.github.io/) sets various HTTP security headers. It's a collection of smaller middleware functions.
+
+```bash
+npm install helmet
+```
+
+```javascript
+const helmet = require("helmet");
+
+// Default (recommended for most apps)
+app.use(helmet());
+```
+
+### Headers Set by Helmet (Default)
+
+```http
+# Default helmet response headers
+Content-Security-Policy: default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests
+Cross-Origin-Embedder-Policy: require-corp
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Expect-CT: max-age=0
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=15552000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+```
+
+### Customizing Helmet
+
+```javascript
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "https://cdn.example.com"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "https://images.example.com"],
+        connectSrc: ["'self'", "https://api.example.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com"],
+        objectSrc: ["'none'"],
+        upgradeInsecureRequests: [],
+      },
+    },
+    hsts: {
+      maxAge: 31536000,      // 1 year
+      includeSubDomains: true,
+      preload: true,
+    },
+    frameguard: {
+      action: "deny",        // Block all framing (DENY vs SAMEORIGIN)
+    },
+  })
+);
+```
+
+## Key Security Headers Explained
+
+### Content-Security-Policy (CSP)
+
+CSP prevents XSS attacks by specifying which sources are allowed to load resources:
+
+```http
+Content-Security-Policy: default-src 'self'; script-src 'self' https://apis.google.com
+```
+
+**Common directives:**
+
+| Directive | Controls | Example |
+|-----------|----------|---------|
+| `default-src` | Fallback for all resource types | `default-src 'self'` |
+| `script-src` | JavaScript sources | `script-src 'self' 'nonce-abc123'` |
+| `style-src` | Stylesheet sources | `style-src 'self' 'unsafe-inline'` |
+| `img-src` | Image sources | `img-src 'self' data: https:` |
+| `connect-src` | API/fetch/XHR targets | `connect-src 'self' https://api.example.com` |
+| `frame-ancestors` | Who can embed the page in iframe | `frame-ancestors 'none'` |
+| `form-action` | Where forms can submit | `form-action 'self'` |
+
+### Strict-Transport-Security (HSTS)
+
+Forces HTTPS connections and prevents SSL stripping:
+
+```http
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+```
+
+- `max-age`: Seconds to enforce HTTPS
+- `includeSubDomains`: Apply to all subdomains
+- `preload`: Allow inclusion in browser HSTS preload lists
+
+### X-Frame-Options
+
+Prevents clickjacking by controlling iframe embedding:
+
+```http
+X-Frame-Options: DENY              # No iframe embedding
+X-Frame-Options: SAMEORIGIN        # Only same-origin iframes
+```
+
+### X-Content-Type-Options
+
+Prevents MIME-type sniffing (browsers guessing content type):
+
+```http
+X-Content-Type-Options: nosniff
+```
+
+## CORS for Different Environments
+
+### Development
+
+```javascript
+// .env
+NODE_ENV=development
+FRONTEND_URL=http://localhost:5173
+
+// cors.config.js
+function getCorsOptions() {
+  if (process.env.NODE_ENV === "development") {
+    return {
+      origin: process.env.FRONTEND_URL || "http://localhost:5173",
+      credentials: true,
+    };
+  }
+
+  return {
+    origin: process.env.FRONTEND_URL,
+    credentials: true,
+    maxAge: 86400,
+  };
+}
+```
+
+### Microservices
+
+```javascript
+// API Gateway CORS configuration
+const gatewayCors = {
+  origin: [
+    "https://app.example.com",
+    "https://admin.example.com",
+  ],
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Request-Id"],
+  exposedHeaders: ["X-Request-Id", "X-RateLimit-Remaining"],
+  credentials: true,
+  maxAge: 86400,
+};
+```
+
+## Common CORS Issues & Fixes
+
+### "No 'Access-Control-Allow-Origin' header"
+
+**Problem**: Server doesn't include the CORS header.
+
+**Fix**: Configure the server to send the header:
+
+```javascript
+// Manual CORS header (if not using cors package)
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "https://myapp.com");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+  next();
+});
+```
+
+### CORS Error with Credentials
+
+**Problem**: Using `credentials: true` but `Access-Control-Allow-Origin` is `*`.
+
+**Fix**: Wildcard origin doesn't work with credentials. Specify exact origin:
+
+```javascript
+// ❌ Will not work
+app.use(cors({ origin: "*", credentials: true }));
+
+// ✅ Must be specific
+app.use(cors({ origin: "https://myapp.com", credentials: true }));
+```
+
+### Preflight Caching
+
+Reduce preflight requests by caching the preflight response:
+
+```javascript
+app.use(cors({
+  maxAge: 86400,  // 24 hours — browser won't preflight again
+}));
+```
+
+## Security Headers Checklist
+
+```javascript
+// Complete security headers setup
+const helmet = require("helmet");
+const cors = require("cors");
+const rateLimit = require("express-rate-limit");
+
+const app = express();
+
+// 1. Security headers
+app.use(helmet());
+
+// 2. CORS
+app.use(cors({
+  origin: process.env.FRONTEND_URL,
+  credentials: true,
+  maxAge: 86400,
+}));
+
+// 3. Rate limiting
+app.use("/api/", rateLimit({
+  windowMs: 15 * 60 * 1000,  // 15 minutes
+  max: 100,
+}));
+
+// 4. Cookie security
+app.use(require("cookie-parser")());
+app.use((req, res, next) => {
+  res.cookie("session", req.sessionID, {
+    httpOnly: true,     // No JavaScript access
+    secure: true,       // HTTPS only
+    sameSite: "strict", // Same-site requests only
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
+  next();
+});
+```
+
+## Quick Reference
+
+```javascript
+// Minimum CORS setup
+const cors = require("cors");
+app.use(cors({ origin: "https://myapp.com", credentials: true }));
+
+// Minimum helmet setup
+const helmet = require("helmet");
+app.use(helmet());
+
+// Commonly needed CSP for SPA with CDN assets
+helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "https://api.example.com"],
+    },
+  },
+});
+```
+
+## Practice Exercises
+
+1. **CORS configuration**: Create an Express server with two endpoints. Configure CORS so only `http://localhost:5173` can access POST endpoints while GET is open to all origins.
+
+2. **Helmet customization**: Build an Express app where the CSP allows loading scripts from `cdn.example.com` and images from `images.example.com`. Verify with response headers.
+
+3. **Multiple origins**: Write a CORS middleware that accepts requests from `https://app.com`, `https://admin.app.com`, and any localhost origin. Reject everything else with a clear error message.

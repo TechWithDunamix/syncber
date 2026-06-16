@@ -1,0 +1,453 @@
+---
+title: "CRUD Operations"
+description: "Create, Read, Update, Delete operations in depth — insertOne, insertMany, find, findOne, updateOne, updateMany, deleteOne, deleteMany, and bulk operations."
+sidebar:
+  order: 2
+  label: "CRUD Operations"
+tab: "full-stack-development"
+---
+
+CRUD (Create, Read, Update, Delete) is the foundation of database operations. MongoDB provides a rich set of methods for each operation with fine-grained control.
+
+## Create Operations
+
+### insertOne
+
+Inserts a single document into a collection:
+
+```javascript
+const result = db.users.insertOne({
+  name: "Alice",
+  email: "alice@example.com",
+  age: 30,
+  createdAt: new Date(),
+});
+
+// Result
+{
+  acknowledged: true,
+  insertedId: ObjectId("...")
+}
+```
+
+Key behaviors:
+- If the collection doesn't exist, MongoDB creates it automatically
+- If `_id` is not provided, MongoDB generates an ObjectId
+- You can provide a custom `_id` (string, number, UUID)
+
+```javascript
+// Custom _id
+db.users.insertOne({
+  _id: "alice_001",
+  name: "Alice",
+});
+
+// Duplicate _id → error (E11000 duplicate key)
+```
+
+### insertMany
+
+Inserts multiple documents in a single operation:
+
+```javascript
+const result = db.users.insertMany([
+  { name: "Bob", email: "bob@example.com", age: 25 },
+  { name: "Charlie", email: "charlie@example.com", age: 35 },
+  { name: "Diana", email: "diana@example.com", age: 28 },
+]);
+
+// Result
+{
+  acknowledged: true,
+  insertedIds: {
+    "0": ObjectId("..."),
+    "1": ObjectId("..."),
+    "2": ObjectId("...")
+  }
+}
+```
+
+### Ordered vs Unordered Inserts
+
+By default, `insertMany` stops on the first error (ordered):
+
+```javascript
+// Ordered (default) — stops at first error
+db.users.insertMany([
+  { _id: 1, name: "First" },
+  { _id: 1, name: "Duplicate" },  // Error — stops here
+  { _id: 2, name: "Never inserted" },
+]);
+
+// Unordered — continues after errors
+db.users.insertMany([
+  { _id: 1, name: "First" },
+  { _id: 1, name: "Duplicate" },  // Error — skipped
+  { _id: 2, name: "Inserted" },   // This succeeds
+], { ordered: false });
+```
+
+## Read Operations
+
+### find
+
+Returns a cursor to matching documents. The cursor can be iterated:
+
+```javascript
+// All documents
+const cursor = db.users.find();
+
+// With filter
+const cursor = db.users.find({ age: { $gte: 30 } });
+
+// Iterate cursor
+cursor.forEach((doc) => printjson(doc));
+
+// Convert to array
+const docs = await cursor.toArray();
+```
+
+### Projection
+
+Select which fields to return (1 = include, 0 = exclude):
+
+```javascript
+// Include only name and email
+db.users.find(
+  { age: { $gte: 30 } },
+  { name: 1, email: 1, _id: 0 }  // _id is included by default
+);
+
+// Exclude sensitive fields
+db.users.find({}, { password: 0, ssn: 0 });
+```
+
+### Cursor Methods
+
+```javascript
+db.users.find()
+  .limit(10)           // Maximum 10 results
+  .skip(20)            // Skip first 20
+  .sort({ age: -1 })   // Sort descending
+  .project({ name: 1 }) // Projection alternative
+  .hint({ age: 1 })    // Force index usage
+  .maxTimeMS(5000)     // Query timeout
+  .explain("executionStats"); // Analyze performance
+```
+
+### Pagination
+
+```javascript
+const page = 2;
+const pageSize = 10;
+
+db.users.find()
+  .sort({ createdAt: -1 })
+  .skip((page - 1) * pageSize)
+  .limit(pageSize);
+```
+
+### findOne
+
+Returns a single document (or null):
+
+```javascript
+const user = db.users.findOne({ email: "alice@example.com" });
+
+// If multiple match, returns the first by natural order
+```
+
+### countDocuments
+
+```javascript
+// Total count
+db.users.countDocuments();
+
+// With filter
+db.users.countDocuments({ age: { $gte: 30 } });
+
+// Estimated count (faster, less accurate)
+db.users.estimatedDocumentCount();
+```
+
+### distinct
+
+Get unique values for a field:
+
+```javascript
+db.users.distinct("age");
+// [25, 28, 30, 35]
+
+db.users.distinct("address.city");
+// ["London", "NYC", "Tokyo"]
+```
+
+## Update Operations
+
+### updateOne
+
+Updates the first document matching the filter:
+
+```javascript
+const result = db.users.updateOne(
+  { email: "alice@example.com" },  // filter
+  { $set: { age: 31 } }            // update
+);
+
+// Result
+{
+  acknowledged: true,
+  matchedCount: 1,    // Documents that matched the filter
+  modifiedCount: 1,   // Documents actually changed
+  upsertedCount: 0,
+  upsertedId: null,
+}
+```
+
+### updateMany
+
+Updates all documents matching the filter:
+
+```javascript
+// Give all users under 25 a "junior" tag
+db.users.updateMany(
+  { age: { $lt: 25 } },
+  { $set: { status: "junior" } }
+);
+```
+
+### Upsert
+
+Create the document if it doesn't exist (update + insert):
+
+```javascript
+db.users.updateOne(
+  { email: "newuser@example.com" },
+  { $set: { name: "New User", age: 20 } },
+  { upsert: true }  // Insert if not found
+);
+
+// Result (insert case)
+{
+  acknowledged: true,
+  matchedCount: 0,
+  modifiedCount: 0,
+  upsertedCount: 1,
+  upsertedId: ObjectId("..."),
+}
+```
+
+### replaceOne
+
+Replaces the entire document (except `_id`):
+
+```javascript
+db.users.replaceOne(
+  { email: "bob@example.com" },
+  {
+    name: "Bob Smith",
+    email: "bob@example.com",  // Must keep if used in filter
+    age: 26,
+    city: "NYC",
+    updatedAt: new Date(),
+  }
+);
+```
+
+## Update Operators
+
+| Operator | Description | Example |
+|----------|-------------|---------|
+| `$set` | Set field value | `{ $set: { age: 30 } }` |
+| `$unset` | Remove field | `{ $unset: { tempField: "" } }` |
+| `$inc` | Increment (positive or negative) | `{ $inc: { views: 1 } }` |
+| `$mul` | Multiply | `{ $mul: { price: 1.1 } }` |
+| `$rename` | Rename field | `{ $rename: { "oldName": "newName" } }` |
+| `$min` | Only update if lower | `{ $min: { price: 9.99 } }` |
+| `$max` | Only update if higher | `{ $max: { score: 100 } }` |
+| `$push` | Add to array | `{ $push: { tags: "new" } }` |
+| `$pull` | Remove from array | `{ $pull: { tags: "old" } }` |
+| `$addToSet` | Add to array if not present | `{ $addToSet: { tags: "unique" } }` |
+
+### Array Updates
+
+```javascript
+// Push (add to end)
+db.posts.updateOne(
+  { _id: postId },
+  { $push: { comments: { user: "Alice", text: "Great post!" } } }
+);
+
+// Push multiple
+db.posts.updateOne(
+  { _id: postId },
+  { $push: { tags: { $each: ["javascript", "mongodb", "tutorial"] } } }
+);
+
+// Pull (remove matching)
+db.posts.updateOne(
+  { _id: postId },
+  { $pull: { tags: "old-tag" } }
+);
+
+// Pull multiple
+db.posts.updateOne(
+  { _id: postId },
+  { $pull: { tags: { $in: ["bad", "deprecated"] } } }
+);
+
+// Update specific array element
+db.posts.updateOne(
+  { _id: postId, "comments.user": "Alice" },
+  { $set: { "comments.$.text": "Updated comment" } }
+);
+```
+
+## Delete Operations
+
+### deleteOne
+
+Deletes the first matching document:
+
+```javascript
+const result = db.users.deleteOne({ email: "temp@example.com" });
+
+// Result
+{
+  acknowledged: true,
+  deletedCount: 1,
+}
+```
+
+### deleteMany
+
+Deletes all matching documents:
+
+```javascript
+// Delete inactive users
+db.users.deleteMany({ status: "inactive" });
+
+// Delete everything (but keep collection)
+db.users.deleteMany({});
+```
+
+### drop
+
+Drops the entire collection (faster than deleteMany):
+
+```javascript
+db.users.drop();
+// Returns true if successful
+```
+
+## Bulk Operations
+
+For complex multi-document operations with a single server call:
+
+```javascript
+const bulk = db.users.initializeUnorderedBulkOp();
+
+bulk.insert({ name: "Eve", age: 22 });
+bulk.find({ email: "alice@example.com" }).updateOne({ $set: { age: 32 } });
+bulk.find({ email: "bob@example.com" }).deleteOne();
+
+const result = bulk.execute();
+
+// Result
+{
+  ok: 1,
+  writeErrors: [],
+  nInserted: 1,
+  nUpserted: 0,
+  nMatched: 1,
+  nModified: 1,
+  nRemoved: 1,
+}
+```
+
+### Bulk Write (Modern API)
+
+```javascript
+const result = db.users.bulkWrite([
+  {
+    insertOne: {
+      document: { name: "Frank", age: 40 }
+    }
+  },
+  {
+    updateOne: {
+      filter: { email: "alice@example.com" },
+      update: { $inc: { loginCount: 1 } }
+    }
+  },
+  {
+    deleteOne: {
+      filter: { email: "temp@example.com" }
+    }
+  },
+]);
+```
+
+## findAndModify Operations
+
+Atomic read + write operations:
+
+### findOneAndUpdate
+
+```javascript
+const result = db.users.findOneAndUpdate(
+  { email: "alice@example.com" },
+  { $set: { lastLogin: new Date() } },
+  { returnDocument: "after" }  // "before" or "after"
+);
+```
+
+### findOneAndDelete
+
+```javascript
+const deletedUser = db.users.findOneAndDelete(
+  { email: "temp@example.com" }
+);
+```
+
+### findOneAndReplace
+
+```javascript
+const oldDoc = db.users.findOneAndReplace(
+  { _id: userId },
+  { name: "New Name", email: "new@example.com" }
+);
+```
+
+## Quick Reference
+
+```javascript
+// Create
+db.collection.insertOne({ field: "value" })
+db.collection.insertMany([{ ... }])
+
+// Read
+db.collection.find({ filter }, { projection })
+db.collection.findOne({ filter })
+db.collection.countDocuments({ filter })
+db.collection.distinct("field")
+
+// Update
+db.collection.updateOne({ filter }, { $set: { field: "value" } })
+db.collection.updateMany({ filter }, { $set: { field: "value" } })
+db.collection.replaceOne({ filter }, { ... })
+
+// Delete
+db.collection.deleteOne({ filter })
+db.collection.deleteMany({ filter })
+```
+
+## Practice Exercises
+
+1. **Seed data**: Insert 10 products into a `products` collection. Each should have: `name`, `price`, `category`, `stock`, `tags` (array), and `createdAt`.
+
+2. **Pagination query**: Find all products in the "electronics" category. Sort by price descending. Skip the first 5 and return the next 5. Use `explain("executionStats")` to see how many documents were scanned.
+
+3. **Inventory update**: Decrease stock by 1 for a specific product. If stock reaches 0, set `status: "out-of-stock"`. Use `$inc` and conditional logic.
+
+4. **Bulk order processing**: Given an array of 5 orders, use `bulkWrite` to: insert 3 new orders, update 1 existing order's status to "shipped", and delete 1 cancelled order.

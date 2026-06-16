@@ -1,0 +1,450 @@
+---
+title: "Data Modeling & Schema Design"
+description: "Embedding vs referencing, one-to-one, one-to-many, many-to-many relationships, schema patterns (outlier, polymorphic, bucket), and real-world model design."
+sidebar:
+  order: 7
+  label: "Data Modeling & Schema Design"
+tab: "full-stack-development"
+---
+
+Data modeling in MongoDB is different from SQL. Instead of normalizing into tables and joining with foreign keys, you design documents around your application's query patterns. The goal: store data the way you query it.
+
+## Embedding vs Referencing
+
+The fundamental decision in MongoDB schema design.
+
+### Embedded Documents
+
+Store related data **inside** the parent document:
+
+```javascript
+// Embedded approach — address inside user
+{
+  _id: ObjectId("..."),
+  name: "Alice",
+  email: "alice@example.com",
+  address: {
+    street: "123 Main St",
+    city: "London",
+    country: "UK",
+    zip: "EC1A 1BB"
+  }
+}
+```
+
+**Use embedding when:**
+- Data is **contained within** the parent (address belongs to one user)
+- You **always** query the embedded data with the parent
+- Embedded data changes **rarely**
+- Embedded data has a **small** and **bounded** size
+
+### Referencing (Normalization)
+
+Store a reference (ObjectId) to another document:
+
+```javascript
+// User document
+{
+  _id: ObjectId("user1"),
+  name: "Alice",
+  email: "alice@example.com"
+}
+
+// Address document (separate collection)
+{
+  _id: ObjectId("addr1"),
+  userId: ObjectId("user1"),  // Reference
+  street: "123 Main St",
+  city: "London",
+  country: "UK",
+  zip: "EC1A 1BB"
+}
+```
+
+**Use referencing when:**
+- Data is **shared** across multiple parents (an address has multiple users)
+- Embedded data grows **unboundedly** (comments on a popular post)
+- You query the related data **independently** (all users in a city)
+- You need **atomic updates** to the related data
+
+### Decision Matrix
+
+| Scenario | Embed | Reference |
+|----------|-------|-----------|
+| User has profile (name, email, avatar) | ✅ One-to-one | ❌ |
+| User has addresses (1-3) | ✅ Small, bounded | ❌ |
+| User has orders (unlimited) | ❌ Unbounded growth | ✅ |
+| Product has category | ❌ Same category shared | ✅ |
+| Blog post has comments | ❌ Could grow to 1000s | ✅ |
+| Blog post has tags (5-10) | ✅ Small, bounded | ❌ |
+| Order has line items | ✅ Queried together | ❌ |
+
+## Relationship Patterns
+
+### One-to-One
+
+```javascript
+// Embedded (preferred)
+{
+  _id: "user1",
+  name: "Alice",
+  profile: { bio: "Developer", avatar: "alice.jpg", theme: "dark" }
+}
+
+// Or referenced (if profile is large or accessed independently)
+{
+  _id: "user1",
+  name: "Alice",
+  profileId: "profile1"  // Reference to profiles collection
+}
+```
+
+### One-to-Many
+
+**One-to-few** (embed):
+
+```javascript
+// User with addresses (typically 1-3)
+{
+  _id: "user1",
+  name: "Alice",
+  addresses: [
+    { label: "Home", street: "123 Main", city: "London" },
+    { label: "Work", street: "456 High", city: "London" },
+  ]
+}
+```
+
+**One-to-many** (reference from child to parent):
+
+```javascript
+// Product with reviews (potentially thousands)
+// Store reference in the "many" side
+{
+  _id: "review1",
+  productId: "prod1",   // Reference to product
+  userId: "user1",
+  rating: 5,
+  text: "Great product!"
+}
+```
+
+**One-to-squillions** (reference from parent to child):
+
+```javascript
+// Server with log entries (millions)
+// Store references array in parent (with IDs only)
+{
+  _id: "server1",
+  name: "web-01",
+  recentLogIds: ["log1", "log2", "log3"]  // Last 3 log IDs only
+}
+
+// Or don't reference at all — query by serverId field on log
+// log collection entries have { serverId: "server1", ... }
+```
+
+### Many-to-Many
+
+**Two-way referencing**:
+
+```javascript
+// Student
+{
+  _id: "student1",
+  name: "Alice",
+  courseIds: ["course1", "course2"]  // References to courses
+}
+
+// Course
+{
+  _id: "course1",
+  title: "MongoDB 101",
+  studentIds: ["student1", "student2"]  // References to students
+}
+```
+
+**When to use array of references vs join table:**
+
+Use **array of references** when the relationship is small on both sides (< 500 each side).
+
+Use a **join/through collection** when the relationship is large or has metadata:
+
+```javascript
+// Enrollment collection (through table)
+{
+  _id: "enrollment1",
+  studentId: "student1",
+  courseId: "course1",
+  enrolledAt: ISODate("2024-01-15"),
+  grade: "A",
+  status: "active"
+}
+```
+
+## Schema Design Patterns
+
+### Polymorphic Pattern
+
+Different documents in the same collection with varied schemas:
+
+```javascript
+// products collection
+[
+  { _id: 1, type: "book", title: "MongoDB Guide", pages: 400, author: "John" },
+  { _id: 2, type: "electronics", name: "Laptop", specs: { cpu: "i7", ram: 16 }, warranty: 24 },
+  { _id: 3, type: "clothing", name: "T-Shirt", sizes: ["S", "M", "L"], material: "Cotton" },
+]
+
+// Query by common fields
+db.products.find({ price: { $lt: 100 } });
+```
+
+### Bucket Pattern
+
+Group related data into time-based buckets to limit array growth:
+
+```javascript
+// Instead of storing each reading as a document:
+// { sensorId: 1, ts: ISODate("..."), temp: 22.5 }
+// { sensorId: 1, ts: ISODate("..."), temp: 22.7 }
+// ...
+
+// Bucket by hour:
+{
+  sensorId: 1,
+  hour: ISODate("2024-01-15T10:00:00Z"),
+  readings: [
+    { ts: ISODate("..."), temp: 22.5 },
+    { ts: ISODate("..."), temp: 22.7 },
+    // ... up to 60 readings per hour
+  ],
+  readingCount: 42,
+  avgTemp: 22.6,
+}
+```
+
+### Outlier Pattern
+
+Handle edge cases where a few items exceed normal bounds:
+
+```javascript
+// Most products have < 10 reviews — embed them
+// Popular products might have 10,000+ reviews — reference them
+
+{
+  _id: "product1",
+  name: "Normal Product",
+  reviews: [  // Embedded for small products
+    { userId: "u1", text: "Great!", rating: 5 },
+    { userId: "u2", text: "Nice", rating: 4 },
+  ],
+  reviewCount: 2,
+}
+
+{
+  _id: "product2",
+  name: "Bestseller",
+  reviews: "REF:reviews_collection",  // Flag to look in separate collection
+  reviewCount: 10427,
+  reviewIds: ["rev1", "rev2", ...],   // Last 10 review IDs for quick display
+}
+```
+
+### Subset Pattern
+
+Store frequently accessed fields on the parent, less-used fields in a sub-collection:
+
+```javascript
+// Frequently displayed fields in the main document
+{
+  _id: "product1",
+  name: "Laptop",
+  price: 999,
+  rating: 4.5,
+  imageUrl: "/images/laptop.jpg",
+  // Full details (rarely accessed) in a separate collection
+  detailId: "detail1"
+}
+
+// Full detail document
+{
+  _id: "detail1",
+  productId: "product1",
+  specs: { cpu: "i7", ram: "16GB", storage: "512GB SSD" },
+  description: "Long product description with HTML...",
+  reviews: [...],
+  relatedProducts: [...]
+}
+```
+
+## Real-World Schema Examples
+
+### E-commerce
+
+```javascript
+// User
+{
+  _id: ObjectId,
+  name: String,
+  email: String,
+  shippingAddresses: [Address],       // Embedded (1-3)
+  paymentMethods: [
+    { type: "card", last4: "4242", token: "pm_..." }  // Embedded tokens
+  ],
+  cart: {                             // Embedded (current state)
+    items: [{ productId, qty, price }],
+    updatedAt: Date,
+  },
+  createdAt: Date,
+}
+
+// Product
+{
+  _id: ObjectId,
+  name: String,
+  description: String,
+  price: Number,
+  categoryId: ObjectId,              // Reference to category
+  tags: [String],                    // Embedded (small array)
+  variants: [{                       // Embedded (e.g., color, size)
+    sku: String,
+    color: String,
+    size: String,
+    stock: Number,
+  }],
+  ratings: {                         // Computed summary
+    average: Number,
+    count: Number,
+  },
+  createdAt: Date,
+}
+
+// Order
+{
+  _id: ObjectId,
+  userId: ObjectId,                  // Reference
+  items: [{                          // Embedded (snapshot of purchase)
+    productId: ObjectId,
+    name: String,
+    price: Number,
+    qty: Number,
+  }],
+  shipping: {
+    address: Address,                // Snapshot
+    method: String,
+    trackingNumber: String,
+  },
+  total: Number,
+  status: String,                    // "pending", "shipped", "delivered"
+  createdAt: Date,
+  updatedAt: Date,
+}
+
+// Category (shared, referenced)
+{
+  _id: ObjectId,
+  name: String,
+  slug: String,
+  parentId: ObjectId | null,        // Self-reference for hierarchy
+  description: String,
+}
+```
+
+### Blog Platform
+
+```javascript
+// User
+{
+  _id: ObjectId,
+  username: String,
+  email: String,
+  bio: String,
+  avatar: String,
+  stats: {                          // Computed, updated periodically
+    postCount: Number,
+    followerCount: Number,
+    totalViews: Number,
+  },
+  createdAt: Date,
+}
+
+// Post
+{
+  _id: ObjectId,
+  authorId: ObjectId,               // Reference
+  title: String,
+  slug: String,
+  content: String,
+  excerpt: String,
+  tags: [String],                   // Embedded
+  status: String,                   // "draft", "published"
+  stats: {
+    views: Number,
+    likes: Number,
+    commentCount: Number,
+  },
+  publishedAt: Date | null,
+  createdAt: Date,
+  updatedAt: Date,
+}
+
+// Comment (separate collection because unbounded)
+{
+  _id: ObjectId,
+  postId: ObjectId,                 // Reference
+  authorId: ObjectId,               // Reference
+  text: String,
+  parentId: ObjectId | null,        // For nested replies
+  likes: Number,
+  createdAt: Date,
+}
+```
+
+## Model Design Checklist
+
+Before finalizing a schema, answer:
+
+1. **Query patterns** — What queries will you run most?
+2. **Growth** — Will embedded arrays grow unboundedly?
+3. **Data consistency** — Does the data need to be atomic?
+4. **Sharing** — Is data referenced by multiple parents?
+5. **Access patterns** — Is data always fetched together?
+6. **Write frequency** — How often does each field change?
+
+## Quick Reference
+
+```javascript
+// Embed when: contained, small, always queried together
+// Reference when: shared, unbounded, queried independently
+
+// One-to-few → embed array
+{ user: "Alice", addresses: [{ city: "London" }, { city: "NYC" }] }
+
+// One-to-many → reference from child
+// child doc: { parentId: ObjectId, ... }
+
+// Many-to-many → two arrays or join collection
+// doc1: { doc2Ids: [...] }
+// doc2: { doc1Ids: [...] }
+// or: { doc1Id, doc2Id, metadata }
+```
+
+## Practice Exercises
+
+1. **Model an e-commerce system**: Design schemas for a full e-commerce platform: users, products, categories, orders, reviews, and shopping cart. Justify each embedding/referencing decision.
+
+2. **Blog with comments**: Compare two designs: (a) embedding comments in posts vs (b) storing comments in a separate collection. Write queries for "get post with last 10 comments" for both designs. Compare performance for 100 comments vs 100,000 comments.
+
+3. **Many-to-many with metadata**: Design a schema for students enrolling in courses. Include enrollment date, grade, and status. Write a query to find "all courses Alice is enrolled in with her grade".
+
+4. **Refactor a flat schema**: Below is a poorly designed schema. Identify the problems and redesign it: 
+   ```javascript
+   {
+     name: "Shop",
+     products: [{ name, price, category, reviews: [{ user, text, rating }] }],
+     employees: [{ name, role, salary, address: { street, city } }],
+     suppliers: [{ name, contact, address: { street, city } }],
+   }
+   ```
+   What happens when the shop has 10,000 products? When addresses change?

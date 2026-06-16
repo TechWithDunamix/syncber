@@ -1,0 +1,267 @@
+---
+title: "Colors, Typography & CSS Units"
+description: "Master CSS color systems, web typography with fonts and text styling, and the full range of CSS units — px, em, rem, percentages, viewport units, and more."
+sidebar:
+  order: 2
+  label: "Colors & Typography"
+tab: "full-stack-development"
+---
+
+Color and typography are the foundation of web design. This lesson covers every CSS color system, font properties, and the unit system that controls sizing.
+
+## CSS Color Systems
+
+### Named Colors
+
+CSS provides 140+ named colors:
+
+```css
+color: red;
+background-color: aquamarine;
+border-color: slategray;
+```
+
+Common ones: `red`, `blue`, `green`, `black`, `white`, `gray`, `navy`, `teal`, `coral`, `tomato`, `gold`.
+
+### Hexadecimal (Hex)
+
+```css
+color: #ff0000;    /* Pure red */
+color: #00ff00;    /* Pure green */
+color: #0000ff;    /* Pure blue */
+color: #333;       /* Shorthand: #333333 — dark gray */
+color: #ff0;       /* Shorthand: #ffff00 — yellow */
+color: #ff000080;  /* Red at 50% opacity (8-digit hex) */
+```
+
+Format: `#RRGGBB` or `#RGB` (shorthand when pairs match) or `#RRGGBBAA` (with alpha).
+
+### RGB and RGBA
+
+```css
+color: rgb(255, 0, 0);          /* Pure red */
+color: rgb(0, 255, 0);          /* Pure green */
+color: rgb(0, 0, 255);          /* Pure blue */
+color: rgba(255, 0, 0, 0.5);    /* Red at 50% opacity */
+```
+
+Each value is 0-255. Alpha is 0 (transparent) to 1 (opaque).
+
+### HSL and HSLA
+
+HSL (Hue, Saturation, Lightness) is more intuitive for creating color schemes:
+
+```css
+color: hsl(0, 100%, 50%);       /* Pure red */
+color: hsl(120, 100%, 50%);     /* Pure green */
+color: hsl(240, 100%, 50%);     /* Pure blue */
+color: hsla(0, 100%, 50%, 0.5); /* Red at 50% opacity */
+```
+
+| Component | Range | Meaning |
+|-----------|-------|---------|
+| **Hue** | 0-360 | Position on color wheel (0=red, 120=green, 240=blue) |
+| **Saturation** | 0-100% | Intensity (0%=gray, 100%=full color) |
+| **Lightness** | 0-100% | Brightness (0%=black, 100%=white, 50%=normal) |
+
+```css
+/* Different saturations of the same hue */
+color: hsl(200, 100%, 50%);    /* Vibrant blue */
+color: hsl(200, 50%, 50%);     /* Muted blue */
+color: hsl(200, 10%, 50%);     /* Almost gray-blue */
+
+/* Different lightnesses */
+color: hsl(200, 100%, 20%);    /* Dark blue */
+color: hsl(200, 100%, 50%);    /* Normal blue */
+color: hsl(200, 100%, 80%);    /* Light blue */
+```
+
+## Typography
+
+### Font Families
+
+```css
+/* System font stack (fast, no download needed) */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Serif */
+.serif-text {
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+/* Monospace (for code) */
+code {
+  font-family: "Fira Code", "Cascadia Code", "Courier New", monospace;
+}
+```
+
+### Google Fonts
+
+1. Go to [fonts.google.com](https://fonts.google.com/)
+2. Select a font and copy the `<link>` tag
+3. Add it to your HTML `<head>`:
+```html
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+```
+4. Use it in CSS:
+```css
+body {
+  font-family: "Roboto", sans-serif;
+}
+```
+
+### Font Properties
+
+```css
+p {
+  font-size: 16px;          /* Text size */
+  font-weight: 700;          /* Boldness: 100-900, or normal/bold */
+  font-style: italic;        /* normal, italic, oblique */
+  line-height: 1.6;          /* Space between lines (unitless = relative) */
+  font-family: "Roboto", sans-serif;  /* Font stack */
+}
+```
+
+| `font-weight` values | Equivalent |
+|----------------------|------------|
+| 100 | Thin |
+| 300 | Light |
+| 400 | Normal |
+| 500 | Medium |
+| 700 | Bold |
+| 900 | Black |
+
+### Text Layout Properties
+
+```css
+p {
+  text-align: left;          /* left, center, right, justify */
+  text-decoration: none;     /* none, underline, line-through, overline */
+  text-transform: uppercase; /* uppercase, lowercase, capitalize, none */
+  letter-spacing: 1px;       /* Space between characters */
+  word-spacing: 2px;         /* Space between words */
+  white-space: nowrap;       /* How whitespace is handled */
+  word-break: break-word;    /* Break long words */
+  text-wrap: balance;        /* Balance lines (modern) */
+  text-indent: 20px;         /* First-line indent */
+}
+
+/* Text shadow for depth */
+h1 {
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+  /* offset-x offset-y blur-radius color */
+}
+
+/* Limit line width for readability */
+article {
+  max-width: 65ch;           /* ~65 characters per line — ideal readability */
+}
+```
+
+## CSS Units
+
+CSS has absolute and relative units. **Always prefer relative units** for responsive designs.
+
+### Absolute Units (Avoid for most things)
+
+```css
+.box {
+  width: 200px;    /* Pixels — fixed size, not responsive */
+  height: 2in;     /* Inches — print only */
+  margin: 1cm;     /* Centimeters — print only */
+  font-size: 12pt; /* Points — print only (1pt = 1/72 inch) */
+}
+```
+
+### Relative Units (Preferred)
+
+```css
+/* em — relative to parent's font-size */
+.parent { font-size: 16px; }
+.child { font-size: 2em; }   /* 32px (2 × 16px) */
+.margin { margin: 1.5em; }   /* 1.5 × element's own font-size */
+
+/* rem — relative to root (html) font-size */
+html { font-size: 16px; }
+h1 { font-size: 2rem; }      /* 32px (2 × 16px) — always consistent */
+p { font-size: 1rem; }       /* 16px */
+
+/* % — relative to parent element */
+.parent { width: 500px; }
+.child { width: 50%; }       /* 250px (50% of 500px) */
+
+/* vw/vh — relative to viewport */
+.hero {
+  width: 100vw;              /* 100% of viewport width */
+  height: 100vh;             /* 100% of viewport height */
+}
+
+/* vmin/vmax — smaller/larger viewport dimension */
+.square {
+  width: 50vmin;             /* 50% of the smaller dimension */
+  height: 50vmin;
+}
+
+/* ch — relative to character width (0-9) */
+article {
+  max-width: 70ch;           /* ~70 characters wide — optimal reading width */
+}
+```
+
+<Aside variant="tip">
+Rule of thumb: use `rem` for font sizes (consistent scaling), `%` for widths, `vh`/`vw` for full-screen sections, `ch` for text containers, and `em` for spacing that should scale with font size.
+</Aside>
+
+### Unit Comparison
+
+| Unit | Type | Relative To | Use Case |
+|------|------|-------------|----------|
+| `px` | Absolute | Nothing | Borders, shadows, fine details |
+| `em` | Relative | Parent font-size | Spacing, padding |
+| `rem` | Relative | Root font-size | Font sizes |
+| `%` | Relative | Parent element | Widths, heights |
+| `vw` | Relative | Viewport width | Full-width sections |
+| `vh` | Relative | Viewport height | Hero sections |
+| `vmin` | Relative | Viewport min dimension | Responsive squares |
+| `ch` | Relative | Character width | Text containers |
+
+### Responsive Typography with clamp()
+
+Modern CSS allows fluid typography that scales between bounds:
+
+```css
+h1 {
+  /* Minimum: 2rem, Preferred: 5vw, Maximum: 4rem */
+  font-size: clamp(2rem, 5vw, 4rem);
+}
+
+p {
+  /* Min 1rem, preferred scales, max 1.25rem */
+  font-size: clamp(1rem, 2vw + 0.5rem, 1.25rem);
+}
+```
+
+## Try It Yourself
+
+Create a styled article page:
+
+1. Set a base font of 16px, dark gray color on the body
+2. Import a Google Font and apply it to headings
+3. Use `rem` for all font sizes — h1 at 2.5rem, h2 at 2rem, body at 1rem
+4. Set `max-width: 65ch` on the article for readability
+5. Color the article background with `hsl()` and headings with a different hue
+6. Use `text-shadow` on the main heading
+7. Create a full-viewport hero section using `100vh`
+8. Add letter-spacing to uppercase text
+
+## Key Takeaways
+
+- HSL is the most intuitive color system — adjust hue for color, lightness for brightness, saturation for intensity
+- Always provide a font stack with fallbacks (e.g., `"Roboto", Arial, sans-serif`)
+- Use `rem` for font sizes — it respects user's browser settings and scales consistently
+- `em` is good for spacing that should scale with the element's font size
+- `ch` units create optimal reading widths (~65 characters per line)
+- `clamp()` creates fluid, responsive typography without media queries
+- `text-shadow` and `letter-spacing` add polish with minimal code

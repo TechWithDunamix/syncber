@@ -1,0 +1,254 @@
+---
+title: "Selecting DOM Elements"
+description: "How to select HTML elements with JavaScript — getElementById, querySelector, querySelectorAll, getElementsByClassName, and differences between NodeList and HTMLCollection."
+sidebar:
+  order: 2
+  label: "Selecting DOM Elements"
+tab: "full-stack-development"
+---
+
+Before you can manipulate an element, you need to **select** it. JavaScript provides several methods to find elements in the DOM tree.
+
+## Selecting by ID
+
+The fastest way to select a single element:
+
+```html
+<div id="header">Welcome</div>
+```
+
+```js
+const header = document.getElementById("header");
+console.log(header); // <div id="header">Welcome</div>
+```
+
+- Returns a single element (or `null` if not found)
+- IDs must be unique per page — this always returns one result
+- This is the **fastest** selector method
+
+## Selecting by Class Name
+
+```html
+<div class="card">Card 1</div>
+<div class="card">Card 2</div>
+```
+
+```js
+const cards = document.getElementsByClassName("card");
+console.log(cards); // HTMLCollection(2) [div.card, div.card]
+console.log(cards[0]); // first element
+console.log(cards.length); // 2
+```
+
+⚠️ `getElementsByClassName` returns a **live HTMLCollection** — it updates automatically when the DOM changes. This can lead to unexpected behaviour if you're also modifying the DOM.
+
+## Selecting by Tag Name
+
+```html
+<p>First</p>
+<p>Second</p>
+<p>Third</p>
+```
+
+```js
+const paragraphs = document.getElementsByTagName("p");
+console.log(paragraphs.length); // 3
+```
+
+Also returns a **live HTMLCollection**.
+
+## Modern Selectors: `querySelector` and `querySelectorAll`
+
+These methods accept any **CSS selector**, making them the most flexible and commonly used:
+
+### querySelector — Returns First Match
+
+```js
+const firstButton = document.querySelector(".btn");
+const header = document.querySelector("#header");
+const firstListItem = document.querySelector("ul li:first-child");
+const link = document.querySelector("a[target='_blank']");
+const nested = document.querySelector(".container .content p");
+```
+
+Returns a single element or `null`.
+
+### querySelectorAll — Returns All Matches
+
+```js
+const allButtons = document.querySelectorAll(".btn");
+const allParagraphs = document.querySelectorAll("p");
+const oddRows = document.querySelectorAll("tr:nth-child(odd)");
+const checkedInputs = document.querySelectorAll("input:checked");
+```
+
+Returns a **static NodeList** — it does NOT update when the DOM changes.
+
+<Aside variant="tip">
+Unless you need a live collection (rare), prefer `querySelector`/`querySelectorAll`. They're more flexible and their static behaviour is less surprising.
+</Aside>
+
+## NodeList vs HTMLCollection
+
+| Feature | NodeList (static) | HTMLCollection (live) |
+|---------|-------------------|----------------------|
+| Live? | No (snapshot) | Yes (auto-updates) |
+| `forEach` | ✅ Built-in | ❌ Must convert |
+| `length` | ✅ | ✅ |
+| Bracket access `[0]` | ✅ | ✅ |
+| `item(index)` | ✅ | ✅ |
+| Convert to array | `[...nl]` or `Array.from(nl)` | `[...col]` or `Array.from(col)` |
+
+**Live collection gotcha:**
+
+```js
+const liveItems = document.getElementsByClassName("item");
+console.log(liveItems.length); // 3
+
+// Remove an item from the DOM
+liveItems[0].remove();
+
+console.log(liveItems.length); // 2 — live collection updated automatically!
+```
+
+## Scoped Selection
+
+You can scope selection to a specific element instead of the whole document:
+
+```js
+const container = document.getElementById("container");
+
+// Only search within container
+const items = container.querySelectorAll(".item");
+const header = container.querySelector("h2");
+```
+
+This is more efficient and avoids matching elements outside your intended scope.
+
+## Selecting Multiple Elements by Data Attributes
+
+```html
+<button data-action="save">Save</button>
+<button data-action="delete">Delete</button>
+<button data-action="edit">Edit</button>
+```
+
+```js
+const saveBtn = document.querySelector('[data-action="save"]');
+const allActionBtns = document.querySelectorAll("[data-action]");
+```
+
+## Checking if Elements Exist
+
+Always check that selections succeeded before manipulating:
+
+```js
+const el = document.querySelector(".maybe-exists");
+
+// ✅ Safe
+if (el) {
+  el.textContent = "Found it!";
+}
+
+// ❌ Dangerous — TypeError if el is null
+el.textContent = "Found it!"; // crashes if el is null
+```
+
+## Common Selection Patterns
+
+```html
+<!-- HTML to select from -->
+<div id="app">
+  <ul class="list">
+    <li class="item active">Item 1</li>
+    <li class="item">Item 2</li>
+    <li class="item">Item 3</li>
+  </ul>
+  <form id="login-form">
+    <input type="email" name="email" />
+    <input type="password" name="password" />
+    <button type="submit">Log In</button>
+  </form>
+</div>
+```
+
+```js
+// Select by ID
+const app = document.querySelector("#app");
+const form = document.getElementById("login-form");
+
+// Select by class
+const items = document.querySelectorAll(".item");
+const activeItem = document.querySelector(".item.active"); // CSS compound selector
+
+// Select by attribute
+const emailInput = document.querySelector('input[name="email"]');
+const submitBtn = document.querySelector('button[type="submit"]');
+
+// Select by relationship
+const firstItem = document.querySelector(".list .item:first-child");
+const lastItem = document.querySelector(".list .item:last-child");
+
+// Select form elements
+const formElements = document.forms["login-form"].elements;
+console.log(formElements["email"]); // the email input
+```
+
+## Converting Collections to Arrays
+
+```js
+const items = document.querySelectorAll(".item");
+
+// Option 1: Spread operator
+const itemArray = [...items];
+
+// Option 2: Array.from
+const itemArray2 = Array.from(items);
+
+// Option 3: Array.from with map
+const texts = Array.from(items, (el) => el.textContent);
+```
+
+Once converted, you can use all array methods (`map`, `filter`, `reduce`, `find`):
+
+```js
+const items = document.querySelectorAll(".item");
+const activeTexts = [...items]
+  .filter((item) => item.classList.contains("active"))
+  .map((item) => item.textContent);
+```
+
+## Performance Notes
+
+In modern browsers, performance differences between selectors are negligible for most use cases. General guidance:
+
+- `getElementById` is fastest for single elements with IDs
+- `querySelector`/`querySelectorAll` are preferred for everything else (flexibility, readability)
+- Avoid selecting by tag name inside loops — cache the selection
+
+```js
+// ✅ Good — cache the selection
+const buttons = document.querySelectorAll(".btn");
+buttons.forEach((btn) => { /* ... */ });
+
+// ❌ Bad — re-querying on every iteration
+document.querySelectorAll(".btn").forEach((btn) => { /* ... */ });
+```
+
+## Quick Reference
+
+| Method | Returns | Live? | Example |
+|--------|---------|-------|---------|
+| `getElementById(id)` | Element or null | — | `getElementById("header")` |
+| `getElementsByClassName(name)` | HTMLCollection | ✅ Live | `getElementsByClassName("card")` |
+| `getElementsByTagName(tag)` | HTMLCollection | ✅ Live | `getElementsByTagName("p")` |
+| `querySelector(css)` | Element or null | — | `querySelector(".card:first-child")` |
+| `querySelectorAll(css)` | NodeList | ❌ Static | `querySelectorAll(".card")` |
+
+## Practice Exercises
+
+1. Create an HTML page with a `<div id="app">` containing three `<p>` elements with different classes. Use each selection method to select and log them.
+
+2. On any webpage, use the console to select all links (`<a>` tags). How many are there? Filter to only external links (those starting with "http").
+
+3. Build a "select by data attribute" example: create buttons with `data-color="red"`, `data-color="blue"`, etc. Use `querySelectorAll` to select all blue buttons and log them.

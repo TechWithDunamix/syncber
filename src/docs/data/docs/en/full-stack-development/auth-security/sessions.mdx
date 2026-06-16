@@ -1,0 +1,350 @@
+---
+title: "Session-Based Authentication"
+description: "Express sessions, session stores (memory, Redis), cookies, cookie-parser, session configuration, CSRF protection, and session security."
+sidebar:
+  order: 4
+  label: "Session-Based Authentication"
+tab: "full-stack-development"
+---
+
+Session-based authentication uses server-side storage to maintain user state across requests. A session ID is sent to the client (via cookie), and the server looks up the session data on each request.
+
+## How Sessions Work
+
+```
+1. Client sends login credentials
+2. Server validates credentials
+3. Server creates a session (stores user data in session store)
+4. Server sends session ID as a cookie
+5. Browser includes cookie on every subsequent request
+6. Server reads session ID, looks up session data
+7. Server knows who the user is
+```
+
+## Installation
+
+```bash
+npm install express-session
+```
+
+For production, you'll also need a session store:
+
+```bash
+npm install connect-redis
+npm install redis
+```
+
+## Basic Setup
+
+```javascript
+const express = require("express");
+const session = require("express-session");
+
+const app = express();
+
+app.use(session({
+  secret: process.env.SESSION_SECRET || "fallback-secret-change-me",
+  resave: false,            // Don't save session if unmodified
+  saveUninitialized: false, // Don't create session until something is stored
+  cookie: {
+    secure: process.env.NODE_ENV === "production", // HTTPS only in production
+    httpOnly: true,                                 // Not accessible via JS
+    maxAge: 24 * 60 * 60 * 1000,                   // 24 hours
+    sameSite: "strict",                             // CSRF protection
+  },
+}));
+
+app.post("/api/login", (req, res) => {
+  const { email, password } = req.body;
+
+  // Validate credentials...
+  const user = authenticateUser(email, password);
+
+  // Store user data in session
+  req.session.userId = user.id;
+  req.session.userRole = user.role;
+
+  res.json({ message: "Logged in" });
+});
+
+app.get("/api/profile", (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+
+  res.json({ userId: req.session.userId, role: req.session.userRole });
+});
+
+app.post("/api/logout", (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      return res.status(500).json({ error: "Failed to logout" });
+    }
+    res.clearCookie("connect.sid"); // Clear the session cookie
+    res.json({ message: "Logged out" });
+  });
+});
+```
+
+## Session Configuration Options
+
+```javascript
+app.use(session({
+  // Required
+  secret: process.env.SESSION_SECRET, // Used to sign the session ID cookie
+
+  // Storage
+  store: redisStore,                   // Session store (default: MemoryStore)
+
+  // Save behaviour
+  resave: false,                       // Force save session on every request
+  saveUninitialized: false,            // Save new (empty) sessions
+
+  // Cookie settings
+  cookie: {
+    secure: true,                      // HTTPS only
+    httpOnly: true,                    // Not accessible by JavaScript
+    maxAge: 24 * 60 * 60 * 1000,     // Cookie expiry in ms
+    sameSite: "strict",               // CSRF protection
+    domain: ".example.com",            // Cookie domain
+    path: "/",                         // Cookie path
+  },
+
+  // Session ID settings
+  name: "sessionId",                   // Cookie name (default: connect.sid)
+  rolling: false,                      // Reset maxAge on every response
+}));
+```
+
+## Session Stores
+
+### MemoryStore (Development Only)
+
+```javascript
+// Default — NOT for production
+app.use(session({
+  secret: "dev-secret",
+  resave: false,
+  saveUninitialized: false,
+}));
+
+// ⚠️ MemoryStore leaks memory, doesn't scale across processes
+```
+
+### Redis Store (Production)
+
+```javascript
+const session = require("express-session");
+const RedisStore = require("connect-redis").default;
+const { createClient } = require("redis");
+
+// Initialize Redis client
+const redisClient = createClient({
+  url: process.env.REDIS_URL || "redis://localhost:6379",
+});
+redisClient.connect().catch(console.error);
+
+app.use(session({
+  store: new RedisStore({ client: redisClient }),
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: true,
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000,
+    sameSite: "strict",
+  },
+}));
+```
+
+### Database Store
+
+```javascript
+// Using MongoDB (connect-mongo)
+// npm install connect-mongo
+const MongoStore = require("connect-mongo");
+
+app.use(session({
+  store: MongoStore.create({
+    mongoUrl: process.env.DATABASE_URL,
+    collectionName: "sessions",
+    ttl: 24 * 60 * 60, // 24 hours (in seconds)
+  }),
+  // ...
+}));
+```
+
+| Store | Pros | Cons |
+|-------|------|------|
+| MemoryStore | Simple, no setup | Leaks memory, no persistence |
+| Redis | Fast, persistent, scalable | Requires Redis server |
+| MongoDB | Reuses existing database | Slower than Redis |
+| PostgreSQL | Can reuse existing DB | Slower, needs schema |
+
+## Session Data Patterns
+
+```javascript
+app.post("/api/login", async (req, res) => {
+  const user = await authenticate(req.body);
+
+  // Store in session
+  req.session.user = {
+    id: user.id,
+    email: user.email,
+    role: user.role,
+  };
+
+  // Flash messages (temporary, cleared after read)
+  req.session.flash = { success: "Welcome back!" };
+
+  res.json({ message: "Logged in" });
+});
+
+// Access flash messages
+app.get("/api/flash", (req, res) => {
+  const flash = req.session.flash || {};
+  delete req.session.flash; // Clear after reading
+  res.json(flash);
+});
+
+// Update session data
+app.patch("/api/profile", async (req, res) => {
+  await updateUser(req.session.user.id, req.body);
+  req.session.user = { ...req.session.user, ...req.body };
+  res.json({ message: "Profile updated" });
+});
+
+// Touch session (extend expiry)
+app.get("/api/keep-alive", (req, res) => {
+  req.session.touch(); // Reset the cookie maxAge
+  res.json({ message: "Session extended" });
+});
+```
+
+## Regenerating Sessions
+
+Always regenerate the session ID after login to prevent session fixation attacks:
+
+```javascript
+app.post("/api/login", async (req, res) => {
+  const user = await authenticate(req.body);
+
+  // Regenerate session ID (prevents session fixation)
+  req.session.regenerate((err) => {
+    if (err) {
+      return res.status(500).json({ error: "Session error" });
+    }
+
+    // Now set the new session data
+    req.session.userId = user.id;
+    req.session.role = user.role;
+
+    res.json({ message: "Logged in" });
+  });
+});
+```
+
+## Session Security
+
+### 1. Use Strong Secrets
+
+```javascript
+// ❌ Weak
+secret: "secret123"
+
+// ✅ Strong (32+ characters, random)
+secret: process.env.SESSION_SECRET
+
+// Generate: openssl rand -hex 32
+// Or in Node: crypto.randomBytes(32).toString('hex')
+```
+
+### 2. Set Proper Cookie Flags
+
+```javascript
+cookie: {
+  secure: true,          // HTTPS only
+  httpOnly: true,        // Not accessible by JavaScript (prevents XSS theft)
+  sameSite: "strict",    // Not sent with cross-site requests (prevents CSRF)
+  maxAge: 86400000,      // 24 hours — don't make sessions permanent
+}
+```
+
+### 3. Implement Absolute Timeout
+
+```javascript
+// In addition to rolling expiry, force re-login after a fixed period
+app.use((req, res, next) => {
+  if (req.session.userId && req.session.createdAt) {
+    const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
+    if (Date.now() - req.session.createdAt > maxAge) {
+      return req.session.destroy(() => {
+        res.status(401).json({ error: "Session expired, please log in again" });
+      });
+    }
+  }
+  next();
+});
+
+app.post("/api/login", (req, res) => {
+  // Store session creation time
+  req.session.createdAt = Date.now();
+  req.session.userId = user.id;
+  res.json({ message: "Logged in" });
+});
+```
+
+## Session vs JWT Comparison
+
+```javascript
+// Session-based
+app.get("/api/data", (req, res) => {
+  // Server looks up session from store
+  // Database/Redis query on every request
+  if (!req.session.userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  res.json({ data: "protected" });
+});
+
+// JWT-based
+app.get("/api/data", authenticateJWT, (req, res) => {
+  // No server-side lookup — token is self-contained
+  // Faster, no database needed
+  res.json({ data: "protected" });
+});
+```
+
+## Quick Reference
+
+```javascript
+// Setup
+app.use(session({ secret, resave: false, saveUninitialized: false, cookie: { ... } }));
+
+// Read
+req.session.userId;
+
+// Write
+req.session.userId = 123;
+
+// Destroy
+req.session.destroy(callback);
+
+// Regenerate (after login)
+req.session.regenerate(callback);
+
+// Touch (extend expiry)
+req.session.touch();
+
+// Cookie name
+name: "customSid"  // default: connect.sid
+```
+
+## Practice Exercises
+
+1. **Session login system**: Build a complete session-based auth system with login, profile (protected), and logout. Use `express-session`. Test that accessing `/profile` without logging in returns 401.
+
+2. **Redis session store**: Set up Redis with Docker (`docker run -p 6379:6379 redis`). Configure express-session to use RedisStore. Verify sessions persist across server restarts.
+
+3. **Login counter**: Store a `loginCount` in the session. Increment it each time the user logs in. Display it on the profile page. Implement session regeneration on login.

@@ -1,0 +1,295 @@
+---
+title: "Browser Storage"
+description: "Client-side storage options — localStorage, sessionStorage, cookies, IndexedDB overview, storage limits, security considerations, and practical patterns."
+sidebar:
+  order: 8
+  label: "Browser Storage"
+tab: "full-stack-development"
+---
+
+Modern browsers provide several ways to store data on the client side. Each has different characteristics for persistence, size, and accessibility.
+
+## Storage Comparison
+
+| Feature | localStorage | sessionStorage | Cookies | IndexedDB |
+|---------|-------------|---------------|---------|-----------|
+| Capacity | ~5-10 MB | ~5-10 MB | ~4 KB | Essentially unlimited |
+| Persists? | ✅ Yes | ❌ Tab closes | Configurable | ✅ Yes |
+| Sent to server? | ❌ No | ❌ No | ✅ Yes (every request) | ❌ No |
+| Async? | ❌ No | ❌ No | ❌ No | ✅ Yes |
+| Structured data? | Strings only | Strings only | Strings only | ✅ Full objects |
+| Access | Any window | Same tab | Any window | Any window |
+
+## localStorage
+
+Data persists **indefinitely** — survives browser closes, tab closes, and system restarts.
+
+```js
+// Set
+localStorage.setItem("theme", "dark");
+localStorage.setItem("user", JSON.stringify({ name: "Alice", id: 1 }));
+
+// Get
+const theme = localStorage.getItem("theme"); // "dark"
+const user = JSON.parse(localStorage.getItem("user")); // { name: "Alice", id: 1 }
+
+// Remove
+localStorage.removeItem("theme");
+
+// Clear all
+localStorage.clear();
+
+// Check size
+console.log(localStorage.length); // number of items
+```
+
+### Common Patterns
+
+**Theme persistence:**
+
+```js
+// Load saved theme
+const savedTheme = localStorage.getItem("theme") || "light";
+document.documentElement.setAttribute("data-theme", savedTheme);
+
+// Toggle and save
+document.getElementById("theme-toggle").addEventListener("click", () => {
+  const current = document.documentElement.getAttribute("data-theme");
+  const next = current === "dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", next);
+  localStorage.setItem("theme", next);
+});
+```
+
+**Form draft auto-save:**
+
+```js
+const form = document.getElementById("blog-form");
+const draftKey = "blogDraft";
+
+// Auto-save on input
+form.addEventListener("input", () => {
+  const formData = new FormData(form);
+  const draft = Object.fromEntries(formData);
+  localStorage.setItem(draftKey, JSON.stringify(draft));
+});
+
+// Restore draft on page load
+const savedDraft = localStorage.getItem(draftKey);
+if (savedDraft) {
+  const draft = JSON.parse(savedDraft);
+  Object.entries(draft).forEach(([name, value]) => {
+    const input = form.querySelector(`[name="${name}"]`);
+    if (input) input.value = value;
+  });
+}
+
+// Clear draft on successful submit
+form.addEventListener("submit", () => {
+  localStorage.removeItem(draftKey);
+});
+```
+
+<Aside variant="caution">
+`localStorage` is synchronous and blocks the main thread. For small amounts of data (< 1 MB), this is fine. For larger data, use IndexedDB.
+</Aside>
+
+## sessionStorage
+
+Data persists only **for the current tab session** — cleared when the tab or browser closes.
+
+```js
+// Same API as localStorage
+sessionStorage.setItem("scrollPosition", window.scrollY);
+sessionStorage.setItem("formStep", "3");
+
+// Use case: restore scroll position after accidental navigation
+window.addEventListener("beforeunload", () => {
+  sessionStorage.setItem("scrollPos", window.scrollY);
+});
+
+window.addEventListener("load", () => {
+  const savedPos = sessionStorage.getItem("scrollPos");
+  if (savedPos) {
+    window.scrollTo(0, parseInt(savedPos));
+  }
+});
+```
+
+## Cookies
+
+Cookies are sent with every HTTP request to the domain, making them useful for server-side session management.
+
+```js
+// Set a cookie (expires in 7 days)
+document.cookie = `theme=dark; max-age=${7 * 24 * 60 * 60}; path=/; SameSite=Lax`;
+
+// Set secure cookie (HTTPS only)
+document.cookie = "sessionId=abc123; Secure; HttpOnly; SameSite=Strict";
+
+// Read all cookies
+console.log(document.cookie); // "theme=dark; preference=compact"
+
+// Parse cookies
+function getCookie(name) {
+  const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
+  return match ? decodeURIComponent(match[2]) : null;
+}
+
+// Delete a cookie (set past expiration)
+document.cookie = "theme=; max-age=0; path=/";
+```
+
+### Cookie Attributes
+
+| Attribute | Description |
+|-----------|-------------|
+| `max-age` | Lifetime in seconds |
+| `expires` | Specific expiration date |
+| `path` | URL path the cookie applies to |
+| `domain` | Domain the cookie applies to |
+| `Secure` | HTTPS only |
+| `HttpOnly` | Not accessible from JavaScript (server-set only) |
+| `SameSite` | `Strict`, `Lax`, or `None` (CSRF protection) |
+
+<Aside variant="danger">
+Never store sensitive data (passwords, tokens) in `localStorage` or `sessionStorage` — they are accessible to any JavaScript on the page. Use `HttpOnly` cookies for authentication tokens instead.
+</Aside>
+
+## IndexedDB Overview
+
+For large, structured data, IndexedDB is a full NoSQL database in the browser:
+
+```js
+// Open/create a database
+const request = indexedDB.open("MyApp", 1);
+
+request.onupgradeneeded = (event) => {
+  const db = event.target.result;
+  // Create an object store (like a table)
+  const store = db.createObjectStore("notes", {
+    keyPath: "id",
+    autoIncrement: true,
+  });
+  store.createIndex("title", "title", { unique: false });
+};
+
+request.onsuccess = (event) => {
+  const db = event.target.result;
+  console.log("Database ready");
+};
+
+// Add a record
+function addNote(note) {
+  const db = request.result;
+  const tx = db.transaction("notes", "readwrite");
+  const store = tx.objectStore("notes");
+  store.add(note);
+}
+
+// Get all records
+function getAllNotes() {
+  return new Promise((resolve, reject) => {
+    const db = request.result;
+    const tx = db.transaction("notes", "readonly");
+    const store = tx.objectStore("notes");
+    const all = store.getAll();
+    all.onsuccess = () => resolve(all.result);
+    all.onerror = () => reject(all.error);
+  });
+}
+```
+
+For most use cases, use a wrapper library like **Dexie.js** or **idb** instead of raw IndexedDB.
+
+## Storage Limits and Errors
+
+```js
+function safeLocalStorageSet(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (error) {
+    if (error.name === "QuotaExceededError") {
+      console.warn("Storage is full — clearing old cache");
+      // Clear old items or notify user
+      return false;
+    }
+    console.error("localStorage error:", error);
+    return false;
+  }
+}
+
+// Check available storage (Chrome-based browsers)
+if (navigator.storage && navigator.storage.estimate) {
+  navigator.storage.estimate().then(({ usage, quota }) => {
+    console.log(`Using ${usage} of ${quota} bytes`);
+    console.log(`Available: ${((quota - usage) / 1024 / 1024).toFixed(1)} MB`);
+  });
+}
+```
+
+## Cache API (Service Workers)
+
+For caching network responses, the Cache API is the modern approach:
+
+```js
+// Check if Cache API is available
+if ("caches" in window) {
+  // Open a cache
+  const cache = await caches.open("api-responses");
+
+  // Store a response
+  cache.put("/api/users", new Response(JSON.stringify(users)));
+
+  // Read from cache
+  const response = await cache.match("/api/users");
+  const data = await response.json();
+}
+```
+
+## Security Best Practices
+
+1. **Never store secrets in localStorage** — any XSS vulnerability exposes all data
+2. **Use HttpOnly cookies** for authentication tokens
+3. **Sanitize data read from storage** — never trust stored data
+4. **Clean up old data** — implement cache invalidation
+5. **Handle storage errors** — storage can be full or disabled (incognito mode)
+
+```js
+// Check if storage is available
+function isStorageAvailable(type) {
+  try {
+    const storage = window[type];
+    const key = "__test__";
+    storage.setItem(key, "1");
+    storage.removeItem(key);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+if (!isStorageAvailable("localStorage")) {
+  // Fall back to in-memory storage or cookies
+  console.warn("localStorage not available");
+}
+```
+
+## Quick Reference
+
+| API | Best For | Capacity |
+|-----|----------|----------|
+| `localStorage` | Preferences, drafts, cache | 5-10 MB |
+| `sessionStorage` | Tab-scoped data, form progress | 5-10 MB |
+| `document.cookie` | Server communication, auth tokens | 4 KB |
+| `indexedDB` | Large structured data, offline apps | GBs |
+| `Cache API` | Network response caching | Depends on disk |
+
+## Practice Exercises
+
+1. **Theme switcher with persistence**: Build a dark/light mode toggle that saves the preference to localStorage and restores it on page load.
+
+2. **Session-aware form**: Create a multi-step form that saves progress to sessionStorage. If the user accidentally closes the tab and reopens it, restore their progress (note: sessionStorage is cleared on close — use localStorage for true persistence, or simulate with a warning).
+
+3. **Offline-ready notes app**: Build a simple notes app using localStorage. Users can add, edit, and delete notes. Each note has a title, body, and timestamp. Handle the "QuotaExceededError" gracefully.

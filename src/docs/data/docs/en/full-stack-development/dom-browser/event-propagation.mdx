@@ -1,0 +1,318 @@
+---
+title: "Event Propagation"
+description: "How events travel through the DOM — capturing phase, target phase, bubbling phase, stopPropagation, stopImmediatePropagation, event delegation, and practical patterns."
+sidebar:
+  order: 5
+  label: "Event Propagation"
+tab: "full-stack-development"
+---
+
+When you click an element, you're actually clicking **every ancestor** of that element. The event doesn't just fire on the target — it **travels** through the DOM tree in three phases.
+
+## The Three Phases
+
+```
+Capturing phase:      document → html → body → div → button
+Target phase:                                 button
+Bubbling phase:       button → div → body → html → document
+```
+
+```html
+<div id="outer">
+  <div id="inner">
+    <button id="btn">Click Me</button>
+  </div>
+</div>
+```
+
+```js
+// Add listeners for all three phases to see the order
+document.querySelectorAll("*").forEach((el) => {
+  // Bubbling phase (default: capture=false)
+  el.addEventListener("click", (e) => {
+    console.log(`BUBBLE: ${el.id || el.tagName}`);
+  });
+
+  // Capturing phase (capture=true)
+  el.addEventListener("click", (e) => {
+    console.log(`CAPTURE: ${el.id || el.tagName}`);
+  }, true);
+});
+```
+
+Clicking the button logs:
+
+```
+CAPTURE: html
+CAPTURE: body
+CAPTURE: outer
+CAPTURE: inner
+CAPTURE: btn
+BUBBLE: btn
+BUBBLE: inner
+BUBBLE: outer
+BUBBLE: body
+BUBBLE: html
+```
+
+### Phase 1: Capturing (Capture Phase)
+
+The event travels from `document` down to the target element. Listeners with `{ capture: true }` fire during this phase.
+
+### Phase 2: At Target
+
+The event reaches the element that was actually clicked. All listeners on that element fire (both capture and bubble).
+
+### Phase 3: Bubbling
+
+The event travels back up from the target to `document`. This is the **default** phase — most event listeners fire here.
+
+## Default: Bubbling
+
+By default, `addEventListener` attaches to the **bubbling** phase:
+
+```js
+// These are equivalent:
+button.addEventListener("click", handler);
+button.addEventListener("click", handler, false); // capture: false
+```
+
+Most events bubble. Some do not:
+- `focus` / `blur` (use `focusin` / `focusout` instead)
+- `mouseenter` / `mouseleave` (use `mouseover` / `mouseout`)
+- `scroll` (on the element itself)
+- `load` / `unload` / `abort` / `error`
+- `reset` / `submit`
+
+## Stopping Propagation
+
+### stopPropagation()
+
+Prevents the event from travelling further:
+
+```js
+inner.addEventListener("click", (event) => {
+  event.stopPropagation();
+  console.log("Inner clicked — outer won't fire");
+});
+
+outer.addEventListener("click", () => {
+  console.log("This never runs when inner is clicked");
+});
+```
+
+This stops the event from bubbling up (or capturing down, depending on which phase you're in).
+
+### stopImmediatePropagation()
+
+Also prevents **other listeners on the same element** from firing:
+
+```js
+button.addEventListener("click", (event) => {
+  event.stopImmediatePropagation();
+  console.log("First handler — blocks others");
+});
+
+button.addEventListener("click", () => {
+  console.log("This never runs");
+});
+
+button.addEventListener("click", () => {
+  console.log("This also never runs");
+});
+```
+
+<Aside variant="caution">
+Use `stopPropagation()` sparingly. It can break event delegation patterns and make debugging harder. Often, checking `event.target` is a better approach than stopping propagation.
+</Aside>
+
+## Event Delegation (Deep Dive)
+
+Event delegation leverages bubbling to handle events efficiently:
+
+```html
+<table id="data-table">
+  <tr><td data-id="1">Alice</td><td>Engineer</td></tr>
+  <tr><td data-id="2">Bob</td><td>Designer</td></tr>
+  <tr><td data-id="3">Charlie</td><td>Manager</td></tr>
+</table>
+```
+
+```js
+// ❌ Without delegation — add listener per row
+document.querySelectorAll("#data-table tr").forEach((row) => {
+  row.addEventListener("click", () => {
+    const id = row.querySelector("td:first-child").dataset.id;
+    console.log("Row clicked:", id);
+  });
+});
+
+// ✅ With delegation — single listener on table
+document.getElementById("data-table").addEventListener("click", (event) => {
+  const row = event.target.closest("tr"); // find ancestor <tr>
+  if (row) {
+    const id = row.querySelector("td").dataset.id;
+    console.log("Row clicked:", id);
+  }
+});
+```
+
+### Delegation Pattern Template
+
+```js
+parent.addEventListener("click", (event) => {
+  const target = event.target.closest(".child-selector");
+  if (!target) return; // not the element we care about
+
+  // Handle the event
+  console.log("Matched element:", target);
+});
+```
+
+### Multiple Action Delegation
+
+```html
+<div id="toolbar">
+  <button data-action="save">💾 Save</button>
+  <button data-action="delete">🗑️ Delete</button>
+  <button data-action="edit">✏️ Edit</button>
+  <button data-action="export">📤 Export</button>
+</div>
+```
+
+```js
+const actions = {
+  save: () => console.log("Saving..."),
+  delete: () => console.log("Deleting..."),
+  edit: () => console.log("Editing..."),
+  export: () => console.log("Exporting..."),
+};
+
+document.getElementById("toolbar").addEventListener("click", (event) => {
+  const action = event.target.dataset.action;
+  if (action && actions[action]) {
+    actions[action]();
+  }
+});
+```
+
+## Practical Patterns
+
+### Modal Click Outside
+
+```html
+<div id="modal-overlay">
+  <div id="modal-content">
+    <h2>Modal Title</h2>
+    <p>Modal content...</p>
+    <button id="close-modal">Close</button>
+  </div>
+</div>
+```
+
+```js
+// Close modal when clicking the overlay (background)
+document.getElementById("modal-overlay").addEventListener("click", (event) => {
+  // Only close if the overlay itself was clicked, not its children
+  if (event.target === event.currentTarget) {
+    closeModal();
+  }
+});
+
+// Alternative: use closest to check
+document.getElementById("modal-overlay").addEventListener("click", (event) => {
+  if (!event.target.closest("#modal-content")) {
+    closeModal(); // clicked outside modal content
+  }
+});
+```
+
+### Dropdown Menu
+
+```html
+<nav id="nav">
+  <div class="dropdown">
+    <button class="dropdown-toggle">Products ▾</button>
+    <ul class="dropdown-menu hidden">
+      <li><a href="/products/saas">SaaS</a></li>
+      <li><a href="/products/api">API</a></li>
+      <li><a href="/products/mobile">Mobile</a></li>
+    </ul>
+  </div>
+</nav>
+```
+
+```js
+// Open dropdown on toggle click
+document.querySelectorAll(".dropdown-toggle").forEach((btn) => {
+  btn.addEventListener("click", (event) => {
+    event.stopPropagation(); // prevent document listener
+    const menu = btn.nextElementSibling;
+    menu.classList.toggle("hidden");
+  });
+});
+
+// Close all dropdowns when clicking anywhere else
+document.addEventListener("click", () => {
+  document.querySelectorAll(".dropdown-menu").forEach((menu) => {
+    menu.classList.add("hidden");
+  });
+});
+```
+
+## Performance: Bubbling vs Direct
+
+```html
+<ul id="big-list">
+  <!-- 10,000 list items -->
+</ul>
+```
+
+```js
+// ❌ 10,000 listeners — slow to create, memory heavy
+for (let i = 0; i < 10000; i++) {
+  const li = document.createElement("li");
+  li.addEventListener("click", () => console.log(li.textContent));
+  list.appendChild(li);
+}
+
+// ✅ 1 listener — fast, minimal memory
+list.addEventListener("click", (event) => {
+  const li = event.target.closest("li");
+  if (li) console.log(li.textContent);
+});
+```
+
+## Events That Don't Bubble
+
+For non-bubbling events, use the bubbling variant or capture phase:
+
+```js
+// focus/blur don't bubble
+form.addEventListener("focus", handler); // ❌ doesn't work on children
+
+// Solution 1: use focusin/focusout (bubble)
+form.addEventListener("focusin", handler); // ✅ bubbles
+
+// Solution 2: capture phase
+form.addEventListener("focus", handler, true); // ✅ captures
+```
+
+## Quick Reference
+
+| Method | Effect |
+|--------|--------|
+| `event.stopPropagation()` | Stop event from travelling to other elements |
+| `event.stopImmediatePropagation()` | Also stop other listeners on the same element |
+| `event.preventDefault()` | Cancel default browser behaviour |
+| `event.target` | The element that received the event |
+| `event.currentTarget` | The element the listener is attached to |
+| `element.closest(selector)` | Find nearest ancestor matching selector |
+
+## Practice Exercises
+
+1. **Propagation visualiser**: Create a nested structure: `div#a > div#b > div#c`. Add click listeners that log their ID and phase (capture/bubble). Click on `#c` and trace the order.
+
+2. **Accordion with delegation**: Build an accordion widget where clicking a header expands/collapses its content. Use a single event listener on the parent container.
+
+3. **Dynamic list with delete buttons**: Create a list where each item has a "Delete" button. Use event delegation so the delete buttons work even on newly added items.

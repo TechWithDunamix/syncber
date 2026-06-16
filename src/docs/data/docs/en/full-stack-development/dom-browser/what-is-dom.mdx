@@ -1,0 +1,214 @@
+---
+title: "What is the DOM?"
+description: "The Document Object Model — how HTML becomes a tree of objects, the document object, navigating the DOM tree, and using the browser console to explore."
+sidebar:
+  order: 1
+  label: "What is the DOM?"
+tab: "full-stack-development"
+---
+
+The **Document Object Model (DOM)** is a programming interface for HTML documents. It represents the page as a tree of objects that can be manipulated with JavaScript.
+
+## From HTML to DOM
+
+When the browser loads an HTML file, it parses the markup and builds a **DOM tree**:
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <title>My Page</title>
+</head>
+<body>
+  <h1>Hello!</h1>
+  <p>This is a paragraph.</p>
+</body>
+</html>
+```
+
+Becomes this tree structure:
+
+```
+document
+ └── html
+      ├── head
+      │    └── title
+      │         └── "My Page"
+      └── body
+           ├── h1
+           │    └── "Hello!"
+           └── p
+                └── "This is a paragraph."
+```
+
+Every element, attribute, and text node is represented as an object in this tree. Each object has **properties** (like `textContent`, `style`) and **methods** (like `appendChild`, `remove`).
+
+## The `document` Object
+
+The `document` object is the entry point to the DOM. It represents the entire web page and is available globally in all browsers:
+
+```js
+// Access the document title
+console.log(document.title); // "My Page"
+
+// Get the URL
+console.log(document.URL); // "https://example.com/page"
+
+// Get the page's body element
+console.log(document.body); // <body>...</body>
+
+// Get the head element
+console.log(document.head); // <head>...</head>
+```
+
+## DOM Tree Terminology
+
+```
+document
+ └── html (root element)
+      ├── head
+      │    ├── title
+      │    │    └── text node: "My Page"
+      │    └── meta (attribute: charset="utf-8")
+      └── body
+           ├── h1
+           │    └── text node: "Hello!"
+           └── p (element node)
+                └── text node: "This is a paragraph."
+```
+
+- **Root node**: Always `document`
+- **Element nodes**: HTML tags (`html`, `body`, `h1`, `p`)
+- **Text nodes**: The text content inside elements
+- **Attribute nodes**: Attributes on elements (like `class`, `id`, `src`)
+- **Parent/Child/Sibling**: The tree follows family tree terminology
+  - `html` is the parent of `head` and `body`
+  - `head` and `body` are siblings
+  - `head` and `body` are children of `html`
+
+## Navigating the DOM Tree
+
+Every node has properties that let you navigate the tree:
+
+```js
+const body = document.body;
+
+// Parent
+console.log(body.parentNode); // <html>
+
+// Children
+console.log(body.children);   // HTMLCollection of child elements
+console.log(body.childNodes); // NodeList including text nodes
+
+// First/last child
+console.log(body.firstElementChild); // first element child
+console.log(body.lastElementChild);  // last element child
+
+// Siblings
+const h1 = document.querySelector("h1");
+console.log(h1.nextElementSibling);  // <p> after the h1
+console.log(h1.previousElementSibling); // null (h1 is first in body)
+```
+
+### Node Types vs Element Properties
+
+| Property | Includes | Returns |
+|----------|----------|---------|
+| `parentNode` | Any node type (including document) | Node |
+| `parentElement` | Only element nodes | Element or null |
+| `childNodes` | All node types (text, comment, element) | NodeList |
+| `children` | Only element nodes | HTMLCollection (live) |
+| `firstChild` | Any node type | Node |
+| `firstElementChild` | Only elements | Element |
+| `nextSibling` | Any node type | Node |
+| `nextElementSibling` | Only elements | Element |
+
+## Exploring the DOM in Console
+
+Open your browser's DevTools (F12 or Ctrl+Shift+I) and go to the Console tab:
+
+```js
+// See the whole DOM as a tree
+console.dir(document);
+
+// Inspect specific elements
+console.dir(document.body);
+
+// Check node types
+console.log(document.nodeType);       // 9 (DOCUMENT_NODE)
+console.log(document.body.nodeType);  // 1 (ELEMENT_NODE)
+
+// See the tag name
+console.log(document.body.tagName);   // "BODY"
+```
+
+**Node type constants:**
+
+| Constant | Value | Represents |
+|----------|-------|------------|
+| `ELEMENT_NODE` | 1 | HTML elements |
+| `ATTRIBUTE_NODE` | 2 | Attributes |
+| `TEXT_NODE` | 3 | Text content |
+| `COMMENT_NODE` | 8 | HTML comments |
+| `DOCUMENT_NODE` | 9 | The document |
+
+## The DOM is Live
+
+The DOM is **live** — changes in JavaScript immediately reflect in the browser:
+
+```js
+// Type this in the console on any page:
+document.title = "New Title!";
+// Watch the browser tab title change instantly
+
+document.body.style.backgroundColor = "lightblue";
+// The page background changes immediately
+```
+
+## Common Misconceptions
+
+### 1. The DOM is not the HTML source
+
+The DOM is a **live representation** that can differ from the original HTML source:
+
+```js
+// JavaScript can add elements that never existed in the HTML
+const div = document.createElement("div");
+div.textContent = "I was added by JS!";
+document.body.appendChild(div);
+```
+
+### 2. The DOM is not JavaScript
+
+The DOM is a browser API, not part of JavaScript itself. JavaScript is just one language that can interact with it. (Python, Rust, and other languages can also manipulate the DOM when compiled to WebAssembly.)
+
+### 3. `innerHTML` vs the DOM
+
+```js
+// Setting innerHTML — browser re-parses HTML string
+element.innerHTML = "<p>New paragraph</p>";
+
+// DOM methods — more explicit and slightly faster
+const p = document.createElement("p");
+p.textContent = "New paragraph";
+element.appendChild(p);
+```
+
+## Quick Reference
+
+| Concept | Description |
+|---------|-------------|
+| DOM | Tree representation of HTML |
+| `document` | Entry point to the DOM |
+| Element node | Represents an HTML tag |
+| Text node | Text content inside elements |
+| Parent/Child/Sibling | Tree relationship terms |
+| Live DOM | Changes reflect immediately |
+
+## Practice Exercises
+
+1. Open any webpage in your browser console. Use `document.body.children` to list all direct children of the body. How many are there?
+
+2. Navigate the DOM tree from `document.body`: find the first child element, then its next sibling, then the parent of that sibling. Which elements did you visit?
+
+3. Change the page's `document.title` to your name. Then inspect `document.body.firstElementChild` — what is it?

@@ -1,0 +1,417 @@
+---
+title: "Testing Node.js APIs"
+description: "Testing Express APIs with Jest and Supertest — unit tests, integration tests, test setup/teardown, mocking dependencies, and testing database operations."
+sidebar:
+  order: 9
+  label: "Testing Node.js APIs"
+tab: "full-stack-development"
+---
+
+Automated testing ensures your API works correctly as it grows. Jest and Supertest are the standard tools for testing Express applications.
+
+## Setup
+
+```bash
+npm install --save-dev jest supertest
+```
+
+Add to `package.json`:
+
+```json
+{
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
+  }
+}
+```
+
+Jest configuration (`jest.config.js`):
+
+```javascript
+module.exports = {
+  testEnvironment: "node",
+  testMatch: ["**/__tests__/**/*.test.js"],
+  setupFilesAfterSetup: ["./tests/setup.js"],
+  verbose: true,
+  forceExit: true,
+  clearMocks: true,
+};
+```
+
+## Unit Testing
+
+Test individual functions in isolation:
+
+```javascript
+// src/utils/validation.js
+function validateEmail(email) {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
+function validatePassword(password) {
+  if (password.length < 8) return "Password must be at least 8 characters";
+  if (!/\d/.test(password)) return "Password must contain a number";
+  if (!/[A-Z]/.test(password)) return "Password must contain an uppercase letter";
+  return null; // valid
+}
+
+module.exports = { validateEmail, validatePassword };
+
+// tests/unit/validation.test.js
+const { validateEmail, validatePassword } = require("../../src/utils/validation");
+
+describe("validateEmail", () => {
+  test("returns true for valid emails", () => {
+    expect(validateEmail("user@example.com")).toBe(true);
+    expect(validateEmail("alice@company.co.uk")).toBe(true);
+  });
+
+  test("returns false for invalid emails", () => {
+    expect(validateEmail("")).toBe(false);
+    expect(validateEmail("notanemail")).toBe(false);
+    expect(validateEmail("@example.com")).toBe(false);
+    expect(validateEmail("user@")).toBe(false);
+  });
+});
+
+describe("validatePassword", () => {
+  test("returns null for valid passwords", () => {
+    expect(validatePassword("Password1")).toBeNull();
+    expect(validatePassword("Str0ng!Pass")).toBeNull();
+  });
+
+  test("returns error for short passwords", () => {
+    expect(validatePassword("Ab1")).toBe("Password must be at least 8 characters");
+  });
+
+  test("returns error for passwords without numbers", () => {
+    expect(validatePassword("Passworddd")).toContain("number");
+  });
+
+  test("returns error for passwords without uppercase", () => {
+    expect(validatePassword("password1")).toContain("uppercase");
+  });
+});
+```
+
+## Integration Testing with Supertest
+
+Test the full HTTP request-response cycle:
+
+```javascript
+// src/app.js — export without starting server
+const express = require("express");
+const app = express();
+
+app.use(express.json());
+app.use("/api/users", require("./routes/users"));
+app.use(require("./middleware/errorHandler"));
+
+module.exports = app;
+```
+
+```javascript
+// tests/integration/users.test.js
+const request = require("supertest");
+const app = require("../../src/app");
+
+describe("Users API", () => {
+  describe("GET /api/users", () => {
+    test("should return a list of users", async () => {
+      const res = await request(app)
+        .get("/api/users")
+        .expect("Content-Type", /json/)
+        .expect(200);
+
+      expect(Array.isArray(res.body.data)).toBe(true);
+    });
+
+    test("should support pagination", async () => {
+      const res = await request(app)
+        .get("/api/users?page=1&limit=5")
+        .expect(200);
+
+      expect(res.body.pagination).toBeDefined();
+      expect(res.body.pagination.page).toBe(1);
+      expect(res.body.pagination.limit).toBe(5);
+    });
+  });
+
+  describe("GET /api/users/:id", () => {
+    test("should return a single user", async () => {
+      const res = await request(app)
+        .get("/api/users/1")
+        .expect(200);
+
+      expect(res.body.data).toBeDefined();
+      expect(res.body.data.id).toBe(1);
+    });
+
+    test("should return 404 for non-existent user", async () => {
+      const res = await request(app)
+        .get("/api/users/99999")
+        .expect(404);
+
+      expect(res.body.error).toBeDefined();
+    });
+  });
+
+  describe("POST /api/users", () => {
+    test("should create a new user", async () => {
+      const newUser = {
+        name: "Test User",
+        email: "test@example.com",
+      };
+
+      const res = await request(app)
+        .post("/api/users")
+        .send(newUser)
+        .expect("Content-Type", /json/)
+        .expect(201);
+
+      expect(res.body.data).toBeDefined();
+      expect(res.body.data.name).toBe("Test User");
+      expect(res.body.data.id).toBeDefined();
+    });
+
+    test("should return 422 for invalid input", async () => {
+      const res = await request(app)
+        .post("/api/users")
+        .send({ name: "" })
+        .expect(422);
+
+      expect(res.body.error.details).toBeDefined();
+    });
+  });
+
+  describe("DELETE /api/users/:id", () => {
+    test("should delete a user and return 204", async () => {
+      await request(app)
+        .delete("/api/users/1")
+        .expect(204);
+    });
+  });
+});
+```
+
+## Test Setup and Teardown
+
+```javascript
+// tests/setup.js
+const { MongoMemoryServer } = require("mongodb-memory-server");
+const mongoose = require("mongoose");
+
+let mongoServer;
+
+beforeAll(async () => {
+  mongoServer = await MongoMemoryServer.create();
+  const uri = mongoServer.getUri();
+  await mongoose.connect(uri);
+});
+
+afterAll(async () => {
+  await mongoose.disconnect();
+  await mongoServer.stop();
+});
+
+afterEach(async () => {
+  const collections = mongoose.connection.collections;
+  for (const key in collections) {
+    await collections[key].deleteMany({});
+  }
+});
+```
+
+### Factory Functions for Test Data
+
+```javascript
+// tests/factories.js
+let nextId = 1;
+
+function createUser(overrides = {}) {
+  return {
+    id: nextId++,
+    name: `User ${nextId}`,
+    email: `user${nextId}@example.com`,
+    role: "user",
+    createdAt: new Date().toISOString(),
+    ...overrides,
+  };
+}
+
+function createProduct(overrides = {}) {
+  return {
+    id: nextId++,
+    name: `Product ${nextId}`,
+    price: 9.99,
+    category: "general",
+    inStock: true,
+    ...overrides,
+  };
+}
+
+module.exports = { createUser, createProduct };
+
+// Usage in tests:
+const { createUser } = require("../factories");
+
+test("creates user with defaults", () => {
+  const user = createUser();
+  expect(user.name).toBeDefined();
+  expect(user.email).toContain("@");
+});
+
+test("creates user with overrides", () => {
+  const admin = createUser({ role: "admin", name: "Admin" });
+  expect(admin.role).toBe("admin");
+  expect(admin.name).toBe("Admin");
+});
+```
+
+## Mocking Dependencies
+
+### Mocking External Modules
+
+```javascript
+// __mocks__/emailService.js — Jest will use this automatically
+module.exports = {
+  sendWelcomeEmail: jest.fn().mockResolvedValue(true),
+  sendPasswordReset: jest.fn().mockResolvedValue(true),
+};
+
+// test file
+jest.mock("../src/services/emailService");
+const emailService = require("../src/services/emailService");
+
+test("sends welcome email on registration", async () => {
+  await request(app)
+    .post("/api/users")
+    .send({ name: "Alice", email: "alice@test.com" });
+
+  expect(emailService.sendWelcomeEmail).toHaveBeenCalledTimes(1);
+  expect(emailService.sendWelcomeEmail).toHaveBeenCalledWith(
+    "alice@test.com",
+    "Alice"
+  );
+});
+```
+
+### Mocking Database Calls
+
+```javascript
+const User = require("../src/models/User");
+jest.mock("../src/models/User");
+
+test("returns user by ID", async () => {
+  const mockUser = { id: 1, name: "Mock User", email: "mock@test.com" };
+  User.findById.mockResolvedValue(mockUser);
+
+  const res = await request(app).get("/api/users/1");
+
+  expect(User.findById).toHaveBeenCalledWith("1");
+  expect(res.body.data.name).toBe("Mock User");
+});
+```
+
+## Testing Protected Routes
+
+```javascript
+// tests/helpers/authHelper.js
+const jwt = require("jsonwebtoken");
+const config = require("../../src/config");
+
+function getAuthToken(overrides = {}) {
+  const payload = {
+    id: 1,
+    role: "user",
+    ...overrides,
+  };
+  return jwt.sign(payload, config.auth.jwtSecret);
+}
+
+function getAdminToken() {
+  return getAuthToken({ role: "admin" });
+}
+
+module.exports = { getAuthToken, getAdminToken };
+
+// Usage:
+const { getAdminToken } = require("../helpers/authHelper");
+
+test("returns 401 without token", async () => {
+  await request(app)
+    .get("/api/admin/users")
+    .expect(401);
+});
+
+test("returns 403 for non-admin", async () => {
+  const token = getAuthToken({ role: "user" });
+
+  await request(app)
+    .get("/api/admin/users")
+    .set("Authorization", `Bearer ${token}`)
+    .expect(403);
+});
+
+test("allows admin access", async () => {
+  const token = getAdminToken();
+
+  const res = await request(app)
+    .get("/api/admin/users")
+    .set("Authorization", `Bearer ${token}`)
+    .expect(200);
+
+  expect(res.body.data).toBeDefined();
+});
+```
+
+## Test Organization
+
+```
+tests/
+├── setup.js              # Global test setup
+├── helpers/
+│   ├── authHelper.js     # Auth token generation
+│   └── testData.js       # Test data factories
+├── unit/
+│   ├── validation.test.js
+│   ├── utils.test.js
+│   └── errors.test.js
+├── integration/
+│   ├── users.test.js
+│   ├── products.test.js
+│   └── auth.test.js
+└── e2e/
+    └── api.test.js       # Full flow tests
+```
+
+## Quick Reference
+
+```javascript
+// Jest expectations
+expect(value).toBe(x)           // strict equality
+expect(value).toEqual(obj)      // deep equality
+expect(value).toContain("str")  // array/string contains
+expect(fn).toHaveBeenCalled()   // spy called
+expect(fn).toHaveBeenCalledWith(args)
+
+// Supertest
+request(app).get("/path")
+request(app).post("/path").send(data)
+  .expect(statusCode)
+  .expect("Content-Type", /regex/)
+
+// Async
+await request(app).get("/path").expect(200);
+```
+
+## Practice Exercises
+
+1. **Unit test a utility**: Write a `formatCurrency(amount, currency)` function and test it with various inputs (whole numbers, decimals, different currencies, edge cases like NaN).
+
+2. **Integration test CRUD**: Write full integration tests for a products API endpoint. Test all CRUD operations, including validation errors, 404s, and successful responses.
+
+3. **Mocked email service**: Add an email notification to your registration endpoint. Write tests that verify the email is sent on registration and NOT sent when validation fails.

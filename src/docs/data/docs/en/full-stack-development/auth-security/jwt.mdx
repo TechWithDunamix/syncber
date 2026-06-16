@@ -1,0 +1,379 @@
+---
+title: "JWT (JSON Web Tokens)"
+description: "JWT structure, signing (HS256, RS256), access/refresh tokens, token expiry, verification middleware, token blacklisting, and secure storage."
+sidebar:
+  order: 3
+  label: "JWT (JSON Web Tokens)"
+tab: "full-stack-development"
+---
+
+JSON Web Tokens (JWT) are a compact, self-contained way to transmit information between parties. In web applications, they're the most common method for token-based authentication.
+
+## What is a JWT?
+
+A JWT consists of three parts separated by dots:
+
+```
+header.payload.signature
+
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.
+eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkFsaWNlIn0.
+XbT6xG7dQv9yR8z3W5kL2mN4pQ6s8T0vY2w4Z6aB8c=
+```
+
+### 1. Header
+
+```json
+{
+  "alg": "HS256",
+  "typ": "JWT"
+}
+```
+
+Specifies the signing algorithm and token type.
+
+### 2. Payload (Claims)
+
+```json
+{
+  "sub": "1234567890",
+  "name": "Alice",
+  "iat": 1516239022,
+  "exp": 1516325422
+}
+```
+
+Contains the **claims** — pieces of information about the user. Common registered claims:
+
+| Claim | Full Name | Description |
+|-------|-----------|-------------|
+| `sub` | Subject | User ID (who the token is about) |
+| `iat` | Issued At | Token creation timestamp |
+| `exp` | Expiration | Token expiration timestamp |
+| `iss` | Issuer | Who created the token |
+| `aud` | Audience | Who the token is for |
+
+### 3. Signature
+
+Created by hashing the header and payload with a secret key. This ensures the token hasn't been tampered with.
+
+## Installation
+
+```bash
+npm install jsonwebtoken
+```
+
+## Signing Tokens (HS256)
+
+```javascript
+const jwt = require("jsonwebtoken");
+
+function generateToken(user) {
+  const payload = {
+    sub: user.id,
+    email: user.email,
+    role: user.role,
+  };
+
+  return jwt.sign(payload, process.env.JWT_SECRET, {
+    expiresIn: "24h",
+    issuer: "my-app",
+  });
+}
+
+// Usage
+const token = generateToken({ id: 1, email: "alice@test.com", role: "user" });
+console.log(token); // eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+## Verifying Tokens
+
+```javascript
+function verifyToken(token) {
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, {
+      issuer: "my-app",
+    });
+    return { valid: true, decoded };
+  } catch (err) {
+    return { valid: false, error: err.message };
+  }
+}
+
+// Various error messages:
+// "jwt expired" — token past its expiration
+// "invalid signature" — token was tampered with
+// "jwt malformed" — not a valid JWT
+// "invalid issuer" — wrong issuer claim
+```
+
+## Auth Middleware
+
+```javascript
+// src/middleware/auth.js
+const jwt = require("jsonwebtoken");
+
+function authenticate(req, res, next) {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader) {
+    return res.status(401).json({ error: "No authorization header" });
+  }
+
+  // Format: "Bearer <token>"
+  const parts = authHeader.split(" ");
+  if (parts.length !== 2 || parts[0] !== "Bearer") {
+    return res.status(401).json({ error: "Invalid authorization format. Use: Bearer <token>" });
+  }
+
+  const token = parts[1];
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded; // Attach user info to request
+    next();
+  } catch (err) {
+    if (err.name === "TokenExpiredError") {
+      return res.status(401).json({ error: "Token expired", code: "TOKEN_EXPIRED" });
+    }
+    return res.status(401).json({ error: "Invalid token" });
+  }
+}
+
+function authorize(...allowedRoles) {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({ error: "Insufficient permissions" });
+    }
+
+    next();
+  };
+}
+
+module.exports = { authenticate, authorize };
+
+// Usage:
+app.get("/api/profile", authenticate, (req, res) => {
+  res.json({ user: req.user });
+});
+
+app.delete("/api/users/:id", authenticate, authorize("admin"), async (req, res) => {
+  // Only admins can delete users
+});
+```
+
+## Access Tokens vs Refresh Tokens
+
+Use a two-token system for better security:
+
+```javascript
+const jwt = require("jsonwebtoken");
+
+// Short-lived (15 minutes)
+function generateAccessToken(user) {
+  return jwt.sign(
+    { sub: user.id, role: user.role },
+    process.env.JWT_SECRET,
+    { expiresIn: "15m" }
+  );
+}
+
+// Long-lived (7 days)
+function generateRefreshToken(user) {
+  return jwt.sign(
+    { sub: user.id, type: "refresh" },
+    process.env.REFRESH_SECRET,
+    { expiresIn: "7d" }
+  );
+}
+
+// Login returns both
+app.post("/api/login", async (req, res) => {
+  const user = await authenticateUser(req.body);
+  const accessToken = generateAccessToken(user);
+  const refreshToken = generateRefreshToken(user);
+
+  // Store refresh token in database (for revocation)
+  await db.refreshTokens.create({
+    userId: user.id,
+    token: refreshToken,
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+  });
+
+  res.json({ accessToken, refreshToken });
+});
+
+// Refresh endpoint
+app.post("/api/refresh", async (req, res) => {
+  const { refreshToken } = req.body;
+
+  if (!refreshToken) {
+    return res.status(401).json({ error: "Refresh token required" });
+  }
+
+  try {
+    // Verify the refresh token
+    const decoded = jwt.verify(refreshToken, process.env.REFRESH_SECRET);
+
+    // Check if it exists in database (hasn't been revoked)
+    const stored = await db.refreshTokens.findByToken(refreshToken);
+    if (!stored) {
+      return res.status(401).json({ error: "Refresh token revoked" });
+    }
+
+    // Generate new access token
+    const accessToken = generateAccessToken({ id: decoded.sub });
+    res.json({ accessToken });
+  } catch (err) {
+    return res.status(401).json({ error: "Invalid refresh token" });
+  }
+});
+
+// Logout (revoke refresh token)
+app.post("/api/logout", async (req, res) => {
+  const { refreshToken } = req.body;
+  if (refreshToken) {
+    await db.refreshTokens.deleteByToken(refreshToken);
+  }
+  res.json({ message: "Logged out" });
+});
+```
+
+## Token Blacklisting
+
+When a user logs out or changes password, invalidate their tokens before expiry:
+
+```javascript
+// Simple blacklist using Redis
+const redis = require("redis");
+const client = redis.createClient();
+
+async function blacklistToken(jti, expiresIn) {
+  // jti = JWT ID (unique identifier for the token)
+  await client.set(`blacklist:${jti}`, "true", {
+    EX: expiresIn, // auto-expire when the token would have expired
+  });
+}
+
+async function isTokenBlacklisted(jti) {
+  const result = await client.get(`blacklist:${jti}`);
+  return result !== null;
+}
+
+// Updated verify function
+function verifyWithBlacklist(token) {
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Check blacklist
+    if (isTokenBlacklisted(decoded.jti)) {
+      return { valid: false, error: "Token revoked" };
+    }
+
+    return { valid: true, decoded };
+  } catch (err) {
+    return { valid: false, error: err.message };
+  }
+}
+```
+
+## Token Storage Security
+
+| Storage Method | Security | Notes |
+|---------------|----------|-------|
+| `httpOnly` cookie | 🟢 Best | Not accessible to JavaScript, protected from XSS |
+| `localStorage` | 🟡 Medium | Accessible to any JavaScript (XSS risk) |
+| `sessionStorage` | 🟡 Medium | Same as localStorage, cleared on tab close |
+| URL/query params | 🔴 Worst | Exposed in browser history, server logs |
+
+### Recommended: httpOnly Cookie
+
+```javascript
+// Set token as httpOnly cookie
+app.post("/api/login", async (req, res) => {
+  const user = await authenticateUser(req.body);
+  const token = generateAccessToken(user);
+
+  res.cookie("token", token, {
+    httpOnly: true,     // Not accessible via JavaScript
+    secure: true,       // HTTPS only
+    sameSite: "strict", // CSRF protection
+    maxAge: 15 * 60 * 1000, // 15 minutes
+  });
+
+  res.json({ message: "Logged in" });
+});
+
+// Read token from cookie
+function authenticateCookie(req, res, next) {
+  const token = req.cookies.token;
+  if (!token) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+
+  try {
+    req.user = jwt.verify(token, process.env.JWT_SECRET);
+    next();
+  } catch {
+    res.status(401).json({ error: "Invalid token" });
+  }
+}
+```
+
+## Best Practices
+
+1. **Use short expiry times** (15-30 minutes for access tokens)
+2. **Use refresh tokens** for longer sessions
+3. **Store tokens in httpOnly cookies** when possible
+4. **Validate the `iss` (issuer) and `aud` (audience)** claims
+5. **Don't store sensitive data** in the payload (it's base64 encoded, not encrypted)
+6. **Rotate secrets** periodically
+7. **Blacklist tokens** on logout or password change
+
+```javascript
+// Don't store sensitive data in JWT payload
+// ❌ BAD
+const badToken = jwt.sign({
+  sub: user.id,
+  creditCard: "4111-1111-1111-1111",
+  ssn: "123-45-6789",
+}, secret);
+
+// ✅ GOOD — store only what you need for authorization
+const goodToken = jwt.sign({
+  sub: user.id,
+  role: user.role,
+  // Sensitive data fetched from database on each request
+}, secret);
+```
+
+## Quick Reference
+
+```javascript
+// Sign
+jwt.sign(payload, secret, { expiresIn: "15m" });
+
+// Verify
+jwt.verify(token, secret);
+
+// Decode (without verification)
+jwt.decode(token);
+
+// Common options
+{ expiresIn: "15m" }     // 15 minutes
+{ expiresIn: "7d" }      // 7 days
+{ issuer: "my-app" }     // iss claim
+{ jwtid: uuid() }        // jti claim (for blacklisting)
+```
+
+## Practice Exercises
+
+1. **JWT auth system**: Build a complete login/register system with JWT. Include middleware that authenticates routes and returns the user. Test with curl.
+
+2. **Refresh token flow**: Implement the full access/refresh token flow. Access token expires in 15 minutes, refresh token in 7 days. Build a `/refresh` endpoint and a `/logout` endpoint.
+
+3. **Role-based authorization**: Add roles to your JWT payload. Build middleware that checks for specific roles. Protect admin routes. Test that users without the right role get 403.

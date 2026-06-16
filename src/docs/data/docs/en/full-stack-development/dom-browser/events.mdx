@@ -1,0 +1,304 @@
+---
+title: "Events & Event Listeners"
+description: "Adding event listeners, event types (click, submit, keydown, scroll, input), the event object, removing listeners, one-time events, and common patterns."
+sidebar:
+  order: 4
+  label: "Events & Event Listeners"
+tab: "full-stack-development"
+---
+
+Events are the core of interactivity on the web. An event is a signal that something has happened — a click, a keypress, a form submission, a page load. JavaScript can listen for these events and respond.
+
+## Adding an Event Listener
+
+```js
+const button = document.querySelector("button");
+
+button.addEventListener("click", function() {
+  console.log("Button was clicked!");
+});
+```
+
+The `addEventListener` method takes:
+1. **Event type** — string like `"click"`, `"submit"`, `"keydown"`
+2. **Callback function** — runs when the event fires
+3. **Options** (optional) — `{ once: true }`, `{ passive: true }`, etc.
+
+## The Event Object
+
+The callback receives an **event object** with information about what happened:
+
+```js
+button.addEventListener("click", (event) => {
+  console.log(event.type);       // "click"
+  console.log(event.target);     // the element that was clicked
+  console.log(event.currentTarget); // the element the listener is attached to
+  console.log(event.clientX);    // mouse X position relative to viewport
+  console.log(event.clientY);    // mouse Y position relative to viewport
+});
+```
+
+### Common Event Properties
+
+| Property | Description |
+|----------|-------------|
+| `type` | Event name (`"click"`, `"keydown"`, etc.) |
+| `target` | Element that triggered the event |
+| `currentTarget` | Element the listener is attached to |
+| `clientX` / `clientY` | Mouse position relative to viewport |
+| `key` | Key pressed (keyboard events) |
+| `code` | Physical key code (keyboard events) |
+| `preventDefault()` | Cancel default behaviour |
+| `stopPropagation()` | Stop event bubbling |
+
+## Common Event Types
+
+### Mouse Events
+
+```js
+element.addEventListener("click", handler);     // single click
+element.addEventListener("dblclick", handler);  // double click
+element.addEventListener("mousedown", handler); // mouse button pressed
+element.addEventListener("mouseup", handler);   // mouse button released
+element.addEventListener("mousemove", handler); // mouse moved
+element.addEventListener("mouseenter", handler);// mouse enters element
+element.addEventListener("mouseleave", handler);// mouse leaves element
+element.addEventListener("contextmenu", handler);// right-click
+```
+
+### Keyboard Events
+
+```js
+document.addEventListener("keydown", (event) => {
+  console.log(`Key pressed: ${event.key}`);   // "a", "Enter", "ArrowUp"
+  console.log(`Key code: ${event.code}`);     // "KeyA", "Enter", "ArrowUp"
+
+  if (event.key === "Enter") {
+    console.log("Enter was pressed");
+  }
+
+  // Check modifier keys
+  if (event.ctrlKey && event.key === "s") {
+    event.preventDefault(); // prevent browser save dialog
+    console.log("Ctrl+S was pressed");
+  }
+});
+
+document.addEventListener("keyup", handler); // key released
+```
+
+<Aside variant="tip">
+Use `event.key` for the meaning of the key (e.g., `"a"` vs `"A"`), and `event.code` for the physical key position (always `"KeyA"` regardless of shift/caps lock).
+</Aside>
+
+### Form Events
+
+```js
+const form = document.querySelector("form");
+const input = document.querySelector("input");
+
+form.addEventListener("submit", (event) => {
+  event.preventDefault(); // stop page reload
+  console.log("Form submitted!");
+});
+
+input.addEventListener("input", (event) => {
+  console.log(event.target.value); // current input value on every change
+});
+
+input.addEventListener("change", (event) => {
+  console.log("Value changed and focus lost:", event.target.value);
+});
+
+input.addEventListener("focus", () => console.log("Input focused"));
+input.addEventListener("blur", () => console.log("Input lost focus"));
+```
+
+### Document Events
+
+```js
+document.addEventListener("DOMContentLoaded", () => {
+  // DOM is ready — safe to query elements
+  console.log("DOM fully loaded");
+});
+
+window.addEventListener("load", () => {
+  // Everything loaded including images, styles, scripts
+  console.log("Page fully loaded");
+});
+
+window.addEventListener("scroll", () => {
+  console.log("Scrolled:", window.scrollY);
+});
+
+window.addEventListener("resize", () => {
+  console.log("Window resized:", window.innerWidth, "x", window.innerHeight);
+});
+```
+
+## Removing Event Listeners
+
+To remove a listener, you need a **reference to the same function**:
+
+```js
+function handleClick(event) {
+  console.log("Clicked!");
+}
+
+// Add
+button.addEventListener("click", handleClick);
+
+// Remove — must be the same function reference
+button.removeEventListener("click", handleClick);
+```
+
+This **does not work** — anonymous functions are different references:
+
+```js
+// ❌ Cannot remove — different function references
+button.addEventListener("click", () => console.log("Click"));
+button.removeEventListener("click", () => console.log("Click")); // no effect
+```
+
+## One-Time Events
+
+Use `{ once: true }` for events that should fire only once:
+
+```js
+button.addEventListener("click", () => {
+  console.log("This runs only on the first click");
+}, { once: true });
+```
+
+## Event Listener Options
+
+```js
+element.addEventListener("click", handler, {
+  capture: false,    // use capture phase (default: false)
+  once: false,       // auto-remove after first invocation
+  passive: false,    // if true, indicates handler won't call preventDefault()
+  signal: controller.signal, // AbortSignal to remove listener
+});
+```
+
+**Passive listeners** improve scroll performance:
+
+```js
+// Tell browser this listener won't prevent scroll
+window.addEventListener("touchstart", handler, { passive: true });
+```
+
+## Delegation Pattern (Setting up listeners on parent elements)
+
+Instead of adding listeners to many individual elements, add one to a parent:
+
+```html
+<ul id="list">
+  <li>Item 1</li>
+  <li>Item 2</li>
+  <li>Item 3</li>
+</ul>
+```
+
+```js
+// ❌ Inefficient — one listener per item
+document.querySelectorAll("li").forEach((li) => {
+  li.addEventListener("click", () => console.log(li.textContent));
+});
+
+// ✅ Efficient — single listener on parent
+document.getElementById("list").addEventListener("click", (event) => {
+  if (event.target.tagName === "LI") {
+    console.log(event.target.textContent);
+  }
+});
+```
+
+Benefits of delegation:
+- Works for elements added **after** the listener is attached
+- Uses less memory (one listener vs hundreds)
+- Better performance
+
+## `this` in Event Handlers
+
+In a regular function (not arrow), `this` refers to the element the listener is attached to:
+
+```js
+button.addEventListener("click", function() {
+  console.log(this); // the button element
+  console.log(this.textContent);
+});
+
+// Arrow functions don't have their own `this`
+button.addEventListener("click", () => {
+  console.log(this); // NOT the button — surrounding lexical scope
+});
+```
+
+## Preventing Default Behaviour
+
+```js
+link.addEventListener("click", (event) => {
+  event.preventDefault(); // don't navigate
+  console.log("Link clicked but navigation prevented");
+});
+
+form.addEventListener("submit", (event) => {
+  event.preventDefault(); // don't reload page
+  // handle form with JavaScript instead
+});
+
+document.addEventListener("contextmenu", (event) => {
+  event.preventDefault(); // disable right-click menu
+});
+```
+
+## Triggering Events Programmatically
+
+```js
+// Trigger a click
+button.click();
+
+// Or use the Event constructor
+const event = new Event("click");
+button.dispatchEvent(event);
+
+// With custom data
+const custom = new CustomEvent("userLogin", {
+  detail: { userId: 123, name: "Alice" },
+});
+document.dispatchEvent(custom);
+
+// Listen for it
+document.addEventListener("userLogin", (event) => {
+  console.log(event.detail); // { userId: 123, name: "Alice" }
+});
+```
+
+## Quick Reference
+
+```js
+// Add event listener
+element.addEventListener("event", handler, options);
+
+// Remove event listener
+element.removeEventListener("event", handler);
+
+// Common events
+"click", "submit", "keydown", "keyup", "input", "change"
+"scroll", "resize", "load", "DOMContentLoaded", "focus", "blur"
+"mouseenter", "mouseleave", "mousemove"
+
+// Useful event properties
+event.target, event.currentTarget, event.type
+event.key, event.code, event.clientX, event.clientY
+event.preventDefault(), event.stopPropagation()
+```
+
+## Practice Exercises
+
+1. **Key logger**: Create a page that displays every key the user presses. Use `document.addEventListener("keydown", ...)` and show the key name in a div.
+
+2. **Form with live preview**: Create a form with a text input. Below it, show a live preview that updates as the user types (use the `input` event).
+
+3. **Click counter**: Create a button that counts how many times it was clicked. Use `{ once: true }` for a "First Click" log, then keep counting normally. Add a "Reset" button.

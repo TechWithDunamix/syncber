@@ -61,6 +61,10 @@ export interface DocsSection {
    * Display title for the section
    */
   title: string;
+  /**
+   * Optional nested child sections (e.g., phases containing modules)
+   */
+  children?: DocsSection[];
 }
 
 /**

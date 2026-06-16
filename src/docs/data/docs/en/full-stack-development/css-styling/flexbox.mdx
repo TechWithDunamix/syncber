@@ -1,0 +1,321 @@
+---
+title: "Flexbox Layout"
+description: "Build flexible one-dimensional layouts with CSS Flexbox — main and cross axis alignment, wrapping, ordering, flex sizing, and common layout patterns."
+sidebar:
+  order: 4
+  label: "Flexbox"
+tab: "full-stack-development"
+---
+
+Flexbox is a one-dimensional layout system designed for distributing space and aligning content in rows or columns. It solves the problems that floats and inline-block couldn't handle.
+
+## The Flex Container
+
+Flexbox works with a parent-child relationship:
+
+```html
+<div class="container">
+  <div class="item">1</div>
+  <div class="item">2</div>
+  <div class="item">3</div>
+</div>
+```
+
+```css
+.container {
+  display: flex;  /* or display: inline-flex */
+}
+```
+
+The parent becomes a **flex container**; children become **flex items**.
+
+## Main Axis and Cross Axis
+
+Flexbox operates on two axes:
+
+```
+Flex-direction: row (default)
+────────────────────────────────
+→  [1]  [2]  [3]  [4]  [5]     ← main axis (horizontal)
+                                ↓ cross axis (vertical)
+
+Flex-direction: column
+────────────────────────────────
+↓  [1]
+   [2]
+   [3]                         ← main axis (vertical)
+   [4]                         → cross axis (horizontal)
+   [5]
+```
+
+## Container Properties
+
+### flex-direction
+
+Controls the direction of the main axis:
+
+```css
+.container {
+  flex-direction: row;            /* Default: left to right */
+  flex-direction: row-reverse;    /* Right to left */
+  flex-direction: column;         /* Top to bottom */
+  flex-direction: column-reverse; /* Bottom to top */
+}
+```
+
+### justify-content
+
+Aligns items along the **main axis**:
+
+```css
+.container {
+  justify-content: flex-start;    /* Default: packed at start */
+  justify-content: flex-end;      /* Packed at end */
+  justify-content: center;        /* Centered */
+  justify-content: space-between; /* Equal space BETWEEN items */
+  justify-content: space-around;  /* Equal space AROUND items */
+  justify-content: space-evenly;  /* Equal space everywhere */
+}
+```
+
+### align-items
+
+Aligns items along the **cross axis**:
+
+```css
+.container {
+  align-items: stretch;     /* Default: items stretch to fill height */
+  align-items: flex-start;  /* Aligned to top */
+  align-items: flex-end;    /* Aligned to bottom */
+  align-items: center;      /* Vertically centered */
+  align-items: baseline;    /* Aligned by text baseline */
+}
+```
+
+### flex-wrap
+
+Controls whether items wrap to new lines:
+
+```css
+.container {
+  flex-wrap: nowrap;      /* Default: all on one line (may shrink) */
+  flex-wrap: wrap;        /* Items wrap to new lines */
+  flex-wrap: wrap-reverse; /* Wrap, but in reverse order */
+}
+```
+
+### gap
+
+The modern way to add spacing between items:
+
+```css
+.container {
+  gap: 16px;        /* Row and column gap */
+  row-gap: 20px;    /* Gap between rows only */
+  column-gap: 16px; /* Gap between columns only */
+}
+```
+
+### align-content
+
+Aligns wrapped rows (only works with `flex-wrap: wrap`):
+
+```css
+.container {
+  flex-wrap: wrap;
+  align-content: flex-start;    /* Packed at top */
+  align-content: center;        /* Centered vertically */
+  align-content: space-between; /* Equal space between rows */
+  align-content: stretch;       /* Default: rows stretch to fill */
+}
+```
+
+## Item Properties
+
+### align-self
+
+Overrides `align-items` for a single item:
+
+```css
+.item.special {
+  align-self: flex-end;  /* This item aligns to bottom */
+  align-self: stretch;   /* This item stretches */
+  align-self: center;    /* This item centers vertically */
+}
+```
+
+### flex-grow
+
+Controls how much an item grows relative to others:
+
+```css
+.item { flex-grow: 0; }  /* Default: doesn't grow */
+.item.main { flex-grow: 1; }  /* Takes remaining space */
+.item.double { flex-grow: 2; } /* Takes twice as much */
+```
+
+### flex-shrink
+
+Controls how much an item shrinks when space is tight:
+
+```css
+.item { flex-shrink: 1; }  /* Default: can shrink */
+.item.no-shrink { flex-shrink: 0; }  /* Won't shrink */
+```
+
+### flex-basis
+
+Sets the initial size before growing/shrinking:
+
+```css
+.item { flex-basis: auto; }   /* Default: based on content */
+.item { flex-basis: 200px; }  /* Start at 200px then grow/shrink */
+.item { flex-basis: 0; }      /* Ignore content size */
+```
+
+### flex Shorthand
+
+```css
+.item {
+  /* flex: grow shrink basis */
+  flex: 0 1 auto;   /* Default */
+  flex: 1;          /* flex: 1 1 0 — grow evenly */
+  flex: 0 0 200px;  /* Fixed at 200px (no grow, no shrink) */
+  flex: 1 1 200px;  /* Start at 200px, grow/shrink as needed */
+}
+```
+
+### order
+
+Changes the visual order (does NOT affect HTML order):
+
+```css
+.item:nth-child(1) { order: 3; }
+.item:nth-child(2) { order: 1; }
+.item:nth-child(3) { order: 2; }
+/* Rendered: 2, 3, 1 */
+```
+
+All items default to `order: 0`. Higher values appear later.
+
+## Common Layout Patterns
+
+### 1. Centering Everything
+
+```css
+.center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;  /* or any height */
+}
+```
+
+### 2. Navigation Bar
+
+```css
+.nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+}
+```
+
+```html
+<nav class="nav">
+  <div class="logo">My Site</div>
+  <ul class="nav-links" style="display: flex; gap: 20px; list-style: none;">
+    <li><a href="#">Home</a></li>
+    <li><a href="#">About</a></li>
+    <li><a href="#">Contact</a></li>
+  </ul>
+  <button>Login</button>
+</nav>
+```
+
+### 3. Card Grid with Wrapping
+
+```css
+.card-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.card {
+  flex: 1 1 300px;   /* Grow, shrink, base 300px */
+  /* min-width: 280px; — prevents cards from getting too narrow */
+}
+```
+
+```html
+<div class="card-grid">
+  <div class="card">Card 1</div>
+  <div class="card">Card 2</div>
+  <div class="card">Card 3</div>
+  <div class="card">Card 4</div>
+</div>
+```
+
+### 4. Sticky Footer
+
+```css
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.content {
+  flex: 1;   /* Grows to push footer down */
+}
+
+.footer {
+  /* Stays at the bottom */
+}
+```
+
+```html
+<div class="page">
+  <header>...</header>
+  <main class="content">...</main>
+  <footer class="footer">...</footer>
+</div>
+```
+
+### 5. Equal-Height Columns
+
+```css
+.row {
+  display: flex;
+}
+
+.column {
+  flex: 1;          /* Equal width */
+  padding: 20px;
+}
+```
+
+Flex items in the same container automatically have equal heights (because `align-items: stretch` is the default).
+
+## Try It Yourself
+
+Create a page with:
+
+1. A horizontal navigation bar with logo on left, links in center, button on right
+2. A card grid with 6 cards (flex-wrap, 300px base width)
+3. A centered hero section (h1 + paragraph + button, all centered)
+4. Add a sidebar + main content layout using flex
+5. Use `order` to rearrange items without changing HTML
+6. Experiment with different `flex-grow` values
+
+## Key Takeaways
+
+- Flexbox is one-dimensional — works along a single axis (row or column)
+- `display: flex` on the container enables flexbox for all direct children
+- `justify-content` aligns along main axis; `align-items` aligns along cross axis
+- `flex-wrap: wrap` makes items flow to new lines; `gap` adds spacing
+- `flex: 1` makes items grow to fill available space equally
+- `order` changes visual order without affecting HTML source order
+- Flexbox is perfect for navbars, card grids, centering, and component-level layouts

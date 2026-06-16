@@ -1,0 +1,695 @@
+---
+title: "Mongoose ODM"
+description: "Mongoose schemas, models, validation, hooks (middleware), virtuals, population (references), plugins, and best practices for Node.js + MongoDB."
+sidebar:
+  order: 6
+  label: "Mongoose ODM"
+tab: "full-stack-development"
+---
+
+Mongoose is an Object Document Mapper (ODM) for MongoDB and Node.js. It provides a schema-based solution to model your application data with built-in validation, query building, and business logic hooks.
+
+## Why Mongoose?
+
+| Feature | Benefit |
+|---------|---------|
+| Schema | Define structure + validation in one place |
+| Middleware | Pre/post hooks for business logic |
+| Population | Reference-based JOINs (like SQL foreign keys) |
+| Validation | Built-in and custom validators |
+| Casting | Auto-converts types (string → ObjectId, etc.) |
+| Virtuals | Computed properties not stored in MongoDB |
+
+## Installation & Connection
+
+```bash
+npm install mongoose
+```
+
+```javascript
+const mongoose = require("mongoose");
+
+// Connect to MongoDB
+mongoose.connect("mongodb://localhost:27017/myapp")
+  .then(() => console.log("Connected to MongoDB"))
+  .catch((err) => console.error("Connection error:", err));
+
+// Connection events
+mongoose.connection.on("disconnected", () => {
+  console.log("MongoDB disconnected");
+});
+
+// Graceful shutdown
+process.on("SIGINT", async () => {
+  await mongoose.connection.close();
+  process.exit(0);
+});
+```
+
+### Connection Options
+
+```javascript
+mongoose.connect("mongodb://localhost:27017/myapp", {
+  // Mongoose 7+ defaults are good:
+  // - autoIndex: true
+  // - autoCreate: true
+  // - maxPoolSize: 100
+});
+
+// Production connection with authentication
+mongoose.connect("mongodb://user:pass@host:27017/myapp?retryWrites=true&w=majority", {
+  maxPoolSize: 10,           // Connection pool size
+  serverSelectionTimeoutMS: 5000,  // Timeout after 5s
+  socketTimeoutMS: 45000,         // Socket idle timeout
+});
+```
+
+## Schema & Model
+
+### Defining a Schema
+
+```javascript
+const mongoose = require("mongoose");
+
+const userSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true,
+    trim: true,
+    minlength: 2,
+    maxlength: 50,
+  },
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    lowercase: true,
+    trim: true,
+    match: /^\S+@\S+\.\S+$/,
+  },
+  age: {
+    type: Number,
+    min: 13,
+    max: 150,
+  },
+  passwordHash: {
+    type: String,
+    required: true,
+    select: false,  // Don't return by default in queries
+  },
+  role: {
+    type: String,
+    enum: ["user", "admin", "moderator"],
+    default: "user",
+  },
+  tags: [String],                     // Array of strings
+  address: {                          // Embedded subdocument
+    street: String,
+    city: String,
+    zip: String,
+  },
+  metadata: mongoose.Schema.Types.Mixed,  // Any JSON
+  lastLogin: Date,
+}, {
+  timestamps: true,  // Adds createdAt and updatedAt
+});
+```
+
+### Schema Types
+
+| Type | Description |
+|------|-------------|
+| `String` | UTF-8 string |
+| `Number` | 64-bit float / integer |
+| `Date` | BSON Date |
+| `Buffer` | Binary data |
+| `Boolean` | true/false |
+| `ObjectId` | Unique MongoDB identifier |
+| `Array` | Array of any type |
+| `Map` | Key-value pairs |
+| `Mixed` | Any type (disable casting) |
+| `Decimal128` | High-precision decimal |
+| `Schema.Types.ObjectId` | Reference to another document |
+
+### Creating a Model
+
+```javascript
+const User = mongoose.model("User", userSchema);
+
+// Usage
+const user = new User({
+  name: "Alice",
+  email: "ALICE@EXAMPLE.COM",
+  age: 30,
+  passwordHash: "$2b$12$...",
+});
+
+await user.save();
+console.log(user.email); // "alice@example.com" (lowercased by schema)
+```
+
+## CRUD with Mongoose
+
+### Create
+
+```javascript
+// Method 1: new + save
+const user = new User({ name: "Bob", email: "bob@example.com", age: 25 });
+await user.save();
+
+// Method 2: create (shortcut)
+const user = await User.create({
+  name: "Charlie",
+  email: "charlie@example.com",
+  age: 35,
+});
+
+// Insert many
+const users = await User.insertMany([
+  { name: "Diana", email: "diana@example.com", age: 28 },
+  { name: "Eve", email: "eve@example.com", age: 32 },
+]);
+```
+
+### Read
+
+```javascript
+// Find all
+const users = await User.find();
+
+// With filter
+const users = await User.find({ age: { $gte: 30 } });
+
+// Find one
+const user = await User.findOne({ email: "alice@example.com" });
+
+// Find by ID
+const user = await User.findById("507f1f77bcf86cd799439011");
+
+// Count
+const count = await User.countDocuments({ role: "admin" });
+
+// Chaining
+const users = await User
+  .find({ age: { $gte: 25 } })
+  .sort({ name: 1 })
+  .limit(10)
+  .skip(20)
+  .select("name email")  // Only return name and email
+  .lean();               // Return plain JS objects (faster)
+```
+
+### Update
+
+```javascript
+// Update one
+const result = await User.updateOne(
+  { email: "alice@example.com" },
+  { $set: { age: 31 } }
+);
+
+// Update many
+await User.updateMany(
+  { role: "user" },
+  { $set: { role: "member" } }
+);
+
+// Find + update (returns updated doc)
+const user = await User.findOneAndUpdate(
+  { email: "alice@example.com" },
+  { $set: { lastLogin: new Date() } },
+  { new: true }  // Return updated document (default: false)
+);
+
+// Find by ID + update
+await User.findByIdAndUpdate(id, { $push: { tags: "new-tag" } });
+```
+
+### Delete
+
+```javascript
+// Delete one
+await User.deleteOne({ email: "temp@example.com" });
+
+// Delete many
+await User.deleteMany({ role: "guest" });
+
+// Find + delete (returns deleted doc)
+const user = await User.findOneAndDelete({ email: "temp@example.com" });
+
+// Find by ID + delete
+await User.findByIdAndDelete(id);
+```
+
+## Validation
+
+### Built-in Validators
+
+```javascript
+const productSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: [true, "Product name is required"],
+    minlength: [3, "Name must be at least 3 characters"],
+    maxlength: [100, "Name cannot exceed 100 characters"],
+    trim: true,
+  },
+  price: {
+    type: Number,
+    required: true,
+    min: [0.01, "Price must be positive"],
+    max: [100000, "Price seems too high"],
+  },
+  category: {
+    type: String,
+    enum: {
+      values: ["electronics", "clothing", "food", "books"],
+      message: "{VALUE} is not a valid category",
+    },
+  },
+  inStock: {
+    type: Boolean,
+    default: true,
+  },
+});
+```
+
+### Custom Validators
+
+```javascript
+const userSchema = new mongoose.Schema({
+  password: {
+    type: String,
+    validate: {
+      validator: function (v) {
+        return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(v);
+      },
+      message: "Password must contain uppercase, lowercase, and number",
+    },
+  },
+  confirmPassword: {
+    type: String,
+    validate: {
+      validator: function (v) {
+        return v === this.password;
+      },
+      message: "Passwords do not match",
+    },
+  },
+});
+
+// Async validator (e.g., check uniqueness)
+const emailSchema = new mongoose.Schema({
+  email: {
+    type: String,
+    validate: {
+      validator: async function (email) {
+        const count = await this.constructor.countDocuments({
+          email,
+          _id: { $ne: this._id },
+        });
+        return count === 0;
+      },
+      message: "Email already exists",
+    },
+  },
+});
+```
+
+### Validation on Update
+
+```javascript
+// Validation runs on save() and create() by default
+// For findOneAndUpdate, runValidators must be true:
+await User.findOneAndUpdate(
+  { _id: id },
+  { $set: { age: 12 } },
+  { runValidators: true }  // Check min: 13
+);
+// Throws ValidationError
+```
+
+## Middleware (Hooks)
+
+Mongoose has `pre` and `post` hooks for model lifecycle events.
+
+### Pre-save Hook
+
+```javascript
+const bcrypt = require("bcrypt");
+
+userSchema.pre("save", async function (next) {
+  // `this` is the document being saved
+  // Only hash if password was modified
+  if (!this.isModified("password")) return next();
+
+  try {
+    const salt = await bcrypt.genSalt(12);
+    this.passwordHash = await bcrypt.hash(this.password, salt);
+    this.password = undefined; // Don't store plain text
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
+```
+
+### Pre-remove Hook
+
+```javascript
+userSchema.pre("deleteOne", { document: true, query: false }, async function () {
+  // When a user is deleted, also delete their posts
+  await Post.deleteMany({ author: this._id });
+});
+```
+
+### Post-save Hook
+
+```javascript
+userSchema.post("save", function (doc) {
+  console.log(`User created: ${doc.email}`);
+  // Send welcome email, log to analytics, etc.
+});
+
+userSchema.post("save", function (error, doc, next) {
+  if (error.code === 11000) {  // Duplicate key error
+    next(new Error("Email already exists"));
+  } else {
+    next(error);
+  }
+});
+```
+
+### Query Middleware
+
+```javascript
+// Pre-find hook — runs before any find query
+userSchema.pre(/^find/, function (next) {
+  // `this` is the query object
+  this.where({ active: { $ne: false } });  // Only active users
+  this.startTime = Date.now();
+  next();
+});
+
+// Post-find hook
+userSchema.post(/^find/, function (docs) {
+  // Log query timing
+  console.log(`Query took ${Date.now() - this.startTime}ms`);
+});
+```
+
+## Virtuals
+
+Virtual properties are computed fields not stored in MongoDB:
+
+```javascript
+const userSchema = new mongoose.Schema({
+  firstName: String,
+  lastName: String,
+});
+
+// Virtual getter
+userSchema.virtual("fullName").get(function () {
+  return `${this.firstName} ${this.lastName}`;
+});
+
+// Virtual with populate (reverse relationship)
+userSchema.virtual("posts", {
+  ref: "Post",           // Model to reference
+  localField: "_id",     // Field in User
+  foreignField: "author", // Field in Post that references User
+});
+
+const User = mongoose.model("User", userSchema);
+const user = await User.findById(id).populate("posts");
+console.log(user.fullName); // "Alice Smith" (virtual)
+console.log(user.posts);    // Array of Post documents (populated)
+```
+
+## Population (References)
+
+Population replaces document references with the actual documents:
+
+```javascript
+// Post schema references User
+const postSchema = new mongoose.Schema({
+  title: String,
+  content: String,
+  author: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",        // Reference to User model
+    required: true,
+  },
+  comments: [{
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    text: String,
+    createdAt: { type: Date, default: Date.now },
+  }],
+});
+
+const Post = mongoose.model("Post", postSchema);
+
+// Create post with reference
+const post = await Post.create({
+  title: "Mongoose Guide",
+  content: "...",
+  author: user._id,  // Just the ObjectId
+});
+
+// Populate reference
+const populated = await Post.findById(post._id)
+  .populate("author", "name email")          // Populate author with selected fields
+  .populate("comments.user", "name");         // Populate nested references
+
+console.log(populated.author.name);  // "Alice" (the full user document)
+console.log(populated.author.email); // "alice@example.com"
+```
+
+### Deep Population
+
+```javascript
+const order = await Order.findById(id)
+  .populate({
+    path: "customer",
+    populate: {
+      path: "addresses",
+      model: "Address",
+    },
+  });
+```
+
+## Schema Options
+
+```javascript
+const schema = new mongoose.Schema(
+  { name: String },
+  {
+    timestamps: true,           // Adds createdAt, updatedAt
+    toJSON: { virtuals: true },  // Include virtuals in JSON output
+    toObject: { virtuals: true },
+    strict: true,                // Don't save fields not in schema (default)
+    strictPopulate: true,        // Validate populate paths
+    collection: "custom_name",   // Collection name (auto-derived from model by default)
+  }
+);
+```
+
+## Query Helpers
+
+```javascript
+userSchema.query.byName = function (name) {
+  return this.where({ name: new RegExp(name, "i") });
+};
+
+userSchema.query.activeOnly = function () {
+  return this.where({ active: true });
+};
+
+// Usage
+const users = await User.find().byName("alice").activeOnly();
+```
+
+## Instance Methods
+
+```javascript
+userSchema.methods.comparePassword = async function (candidatePassword) {
+  return bcrypt.compare(candidatePassword, this.passwordHash);
+};
+
+userSchema.methods.toPublicJSON = function () {
+  return {
+    id: this._id,
+    name: this.name,
+    email: this.email,
+  };
+};
+
+// Usage
+const user = await User.findById(id);
+const isValid = await user.comparePassword("password123");
+const publicData = user.toPublicJSON();
+```
+
+## Statics
+
+```javascript
+userSchema.statics.findByEmail = function (email) {
+  return this.findOne({ email: email.toLowerCase().trim() });
+};
+
+userSchema.statics.getAdminCount = async function () {
+  return this.countDocuments({ role: "admin" });
+};
+
+// Usage
+const user = await User.findByEmail("alice@example.com");
+const adminCount = await User.getAdminCount();
+```
+
+## Plugins
+
+Reusable schema logic:
+
+```javascript
+// plugin/timestamp.js
+module.exports = function timestampPlugin(schema) {
+  schema.add({ createdBy: String });
+  schema.add({ updatedBy: String });
+
+  schema.pre("save", function (next) {
+    this.updatedBy = "system";
+    if (this.isNew) {
+      this.createdBy = "system";
+    }
+    next();
+  });
+};
+
+// Usage
+const userSchema = new mongoose.Schema({ name: String });
+userSchema.plugin(timestampPlugin);
+```
+
+### Built-in Plugin: mongoose-paginate
+
+```bash
+npm install mongoose-paginate-v2
+```
+
+```javascript
+const mongoosePaginate = require("mongoose-paginate-v2");
+
+userSchema.plugin(mongoosePaginate);
+
+const User = mongoose.model("User", userSchema);
+
+// Paginated query
+const result = await User.paginate(
+  { role: "user" },
+  {
+    page: 2,
+    limit: 20,
+    sort: { name: 1 },
+    select: "name email",
+  }
+);
+
+// Result
+{
+  docs: [...],           // Array of documents
+  totalDocs: 150,
+  limit: 20,
+  page: 2,
+  totalPages: 8,
+  hasNextPage: true,
+  hasPrevPage: true,
+  nextPage: 3,
+  prevPage: 1,
+}
+```
+
+## Best Practices
+
+### 1. Schema Design
+
+```javascript
+// Define schemas in separate files
+// models/user.model.js
+const userSchema = new mongoose.Schema({ ... });
+module.exports = mongoose.model("User", userSchema);
+
+// Always use timestamps
+{ timestamps: true }
+
+// Set reasonable defaults
+{
+  select: false,     // Hide sensitive fields
+  required: true,    // Enforce required fields
+  default: 0,        // Provide defaults
+}
+```
+
+### 2. Query Performance
+
+```javascript
+// Use .lean() for read-only queries (30-50% faster)
+const users = await User.find({ active: true }).lean();
+
+// Use .select() to limit returned fields
+const emails = await User.find({}).select("email").lean();
+
+// Create indexes for common queries
+userSchema.index({ email: 1 }, { unique: true });
+userSchema.index({ role: 1, createdAt: -1 });
+```
+
+### 3. Error Handling
+
+```javascript
+try {
+  const user = await User.create(data);
+} catch (err) {
+  if (err instanceof mongoose.Error.ValidationError) {
+    // Handle validation errors
+    console.error(err.errors);
+  } else if (err.code === 11000) {
+    // Handle duplicate key
+    console.error("Duplicate field value");
+  } else {
+    // Handle other errors
+    console.error(err);
+  }
+}
+```
+
+## Quick Reference
+
+```javascript
+// Schema basics
+new mongoose.Schema({ field: { type: String, required: true } }, { timestamps: true })
+
+// Model operations
+Model.create(data)
+Model.find({ filter }).sort({ field: 1 }).limit(10).lean()
+Model.findById(id)
+Model.findOne({ filter })
+Model.findByIdAndUpdate(id, update, { new: true })
+
+// Middleware
+schema.pre("save", async function (next) { /* this = doc */ })
+schema.post("find", function (docs) { /* this = query */ })
+
+// Populate
+Query.populate("field", "select fields")
+Query.populate({ path: "field", populate: { path: "nested" } })
+```
+
+## Practice Exercises
+
+1. **User model with validation**: Create a Mongoose User model with name, email (unique, lowercase, regex validated), password (min 8 chars, custom validator for complexity), and role (enum: user/admin). Add a pre-save hook that hashes the password.
+
+2. **Blog with population**: Create Post and Comment models. Post references User as author. Comment references User and Post. Write a query that gets a post with author name and all comments with commenter names.
+
+3. **Query helpers**: Add a query helper `recent(days)` that filters documents created within N days. Add a static method `getSummary()` that returns total count, count by role, and most recent user.
+
+4. **Pagination plugin**: Implement pagination for a product listing endpoint using mongoose-paginate-v2. Include sorting by price and filtering by category. Return page info with the results.

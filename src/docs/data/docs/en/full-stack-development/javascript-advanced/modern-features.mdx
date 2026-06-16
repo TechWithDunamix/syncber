@@ -1,0 +1,460 @@
+---
+title: "Modern JavaScript Features"
+description: "ES2020+ features — optional chaining, nullish coalescing, logical assignment, Map/Set, Symbol, iterators, generators, WeakRef, Temporal, and structuredClone."
+sidebar:
+  order: 9
+  label: "Modern JS Features"
+tab: "full-stack-development"
+---
+
+JavaScript evolves rapidly. Modern features make the language safer, more expressive, and more pleasant to work with. This page covers the most useful additions from ES2020 through ES2024.
+
+## Optional Chaining (`?.`)
+
+Access deeply nested properties without checking each level:
+
+```js
+// Before — tedious null checks
+const city = user && user.address && user.address.city;
+
+// After — elegant
+const city = user?.address?.city;
+
+// Also works with dynamic properties
+const value = obj?.[key];
+
+// And method calls
+const result = obj.method?.(); // calls only if method exists
+```
+
+Short-circuits as soon as it hits `null` or `undefined`:
+
+```js
+const user = null;
+console.log(user?.name);        // undefined (not TypeError)
+console.log(user?.address?.city); // undefined (short-circuits)
+
+// Array access
+const arr = null;
+console.log(arr?.[0]); // undefined
+```
+
+<Aside variant="tip">
+Optional chaining is a **reading** feature — it cannot be used on the left side of assignment. `user?.name = "Alice"` throws a SyntaxError.
+</Aside>
+
+## Nullish Coalescing (`??`)
+
+Returns the right-hand operand only when the left-hand is `null` or `undefined`:
+
+```js
+const value = null ?? "default";
+console.log(value); // "default"
+
+const zero = 0 ?? 42;
+console.log(zero); // 0 (zero is NOT nullish)
+
+const empty = "" ?? "fallback";
+console.log(empty); // "" (empty string is NOT nullish)
+
+const bool = false ?? true;
+console.log(bool); // false (false is NOT nullish)
+```
+
+This differs from `||` which treats all falsy values (0, "", false, NaN) as default-triggering:
+
+```js
+const count = 0;
+console.log(count || 10);  // 10 — bug! 0 is a valid count
+console.log(count ?? 10);  // 0 — correct
+```
+
+## Logical Assignment Operators
+
+Combine logical operators with assignment:
+
+```js
+// ??= — assign only if null/undefined
+let user = null;
+user ??= { name: "Anonymous" };
+console.log(user.name); // "Anonymous"
+
+// &&= — assign only if truthy
+let isValid = true;
+isValid &&= false;
+console.log(isValid); // false
+
+// ||= — assign only if falsy
+let cache = null;
+cache ||= fetchData();
+```
+
+These are especially useful for **config defaults** and **lazy initialization**:
+
+```js
+function getConfig(key) {
+  config.cache ??= new Map(); // lazy init cache only once
+  return config.cache.get(key);
+}
+
+// Property update pattern
+user.name &&= user.name.trim(); // only trim if name exists
+```
+
+## Map and Set
+
+### Map
+
+`Map` is a key-value collection that allows **any type** as key (objects, functions, primitives):
+
+```js
+const map = new Map();
+
+// Setting values
+map.set("name", "Alice");
+map.set(42, "The answer");
+map.set({ id: 1 }, "Object key");
+
+// Getting values
+console.log(map.get("name")); // "Alice"
+console.log(map.get(42));     // "The answer"
+
+// Size and existence
+console.log(map.size);     // 3
+console.log(map.has(42));  // true
+
+// Deleting and clearing
+map.delete(42);
+map.clear();
+```
+
+**Object vs Map comparison:**
+
+| Feature | Object | Map |
+|---------|--------|-----|
+| Key types | Strings/Symbols only | Any type |
+| Order | Integer keys first, then insertion for strings | Insertion order |
+| Size | Manual counting | `.size` property |
+| Iteration | `Object.keys()` / `for...in` | Built-in iterator |
+| Performance | Good for small sets | Better for frequent add/delete |
+| JSON | `JSON.stringify()` native | Manual conversion |
+
+**Iterating a Map** (insertion order):
+
+```js
+const users = new Map([
+  ["alice", { age: 30 }],
+  ["bob", { age: 25 }],
+  ["charlie", { age: 35 }],
+]);
+
+for (const [key, value] of users) {
+  console.log(key, value);
+}
+
+// Methods that return iterators
+users.keys();   // "alice", "bob", "charlie"
+users.values(); // { age: 30 }, ...
+users.entries(); // ["alice", { age: 30 }], ...
+
+// Convert to/from arrays
+const arr = Array.from(users);
+const restored = new Map(arr);
+```
+
+**Map with objects as keys** — powerful for caching:
+
+```js
+const cache = new Map();
+
+function processObject(obj) {
+  if (cache.has(obj)) {
+    return cache.get(obj); // object identity lookup
+  }
+  const result = expensiveOperation(obj);
+  cache.set(obj, result);
+  return result;
+}
+```
+
+### Set
+
+`Set` stores **unique values** of any type:
+
+```js
+const set = new Set([1, 2, 3, 3, 4, 4, 5]);
+console.log(set); // Set(5) { 1, 2, 3, 4, 5 }
+
+set.add(6);
+set.add(1);        // ignored — already exists
+console.log(set.size); // 6
+console.log(set.has(3)); // true
+set.delete(3);
+
+// Iteration
+for (const value of set) {
+  console.log(value);
+}
+```
+
+**Common Set operations:**
+
+```js
+const a = new Set([1, 2, 3, 4]);
+const b = new Set([3, 4, 5, 6]);
+
+// Union
+const union = new Set([...a, ...b]); // {1, 2, 3, 4, 5, 6}
+
+// Intersection
+const intersection = new Set([...a].filter(x => b.has(x))); // {3, 4}
+
+// Difference
+const difference = new Set([...a].filter(x => !b.has(x))); // {1, 2}
+
+// Remove duplicates from array
+const unique = [...new Set([1, 2, 2, 3, 3, 4])]; // [1, 2, 3, 4]
+```
+
+## Symbol
+
+`Symbol` creates a **unique**, immutable primitive value, often used as object property keys to avoid name collisions:
+
+```js
+const id1 = Symbol("id");
+const id2 = Symbol("id");
+
+console.log(id1 === id2); // false — always unique
+console.log(id1.toString()); // "Symbol(id)"
+```
+
+**Use as private-like object keys:**
+
+```js
+const _password = Symbol("password");
+
+class User {
+  constructor(name, password) {
+    this.name = name;
+    this[_password] = password; // not truly private but hidden from iteration
+  }
+
+  checkPassword(attempt) {
+    return this[_password] === attempt;
+  }
+}
+
+const user = new User("Alice", "secret123");
+console.log(user.password);      // undefined
+console.log(Object.keys(user));  // ["name"] — Symbol keys excluded
+console.log(Object.getOwnPropertySymbols(user)); // [Symbol(password)]
+```
+
+**Well-known Symbols** — JavaScript uses Symbols to customise behaviour:
+
+```js
+const iterable = {
+  data: [10, 20, 30],
+  [Symbol.iterator]() {
+    let index = 0;
+    return {
+      next: () => ({
+        value: this.data[index++],
+        done: index > this.data.length,
+      }),
+    };
+  },
+};
+
+for (const item of iterable) {
+  console.log(item); // 10, 20, 30
+}
+```
+
+## Iterators & Generators
+
+### Custom Iterator
+
+Any object with a `[Symbol.iterator]` method is **iterable**:
+
+```js
+class Range {
+  constructor(start, end) {
+    this.start = start;
+    this.end = end;
+  }
+
+  [Symbol.iterator]() {
+    let current = this.start;
+    const end = this.end;
+
+    return {
+      next() {
+        if (current <= end) {
+          return { value: current++, done: false };
+        }
+        return { value: undefined, done: true };
+      },
+    };
+  }
+}
+
+const range = new Range(1, 5);
+console.log([...range]); // [1, 2, 3, 4, 5]
+
+for (const n of range) {
+  console.log(n); // 1, 2, 3, 4, 5
+}
+```
+
+### Generators
+
+Generator functions (`function*`) produce a sequence of values lazily:
+
+```js
+function* countUpTo(max) {
+  for (let i = 1; i <= max; i++) {
+    yield i; // pause and return i
+  }
+}
+
+const counter = countUpTo(3);
+console.log(counter.next()); // { value: 1, done: false }
+console.log(counter.next()); // { value: 2, done: false }
+console.log(counter.next()); // { value: 3, done: false }
+console.log(counter.next()); // { value: undefined, done: true }
+
+// Or consume directly with for...of
+for (const n of countUpTo(5)) {
+  console.log(n); // 1, 2, 3, 4, 5
+}
+```
+
+**Infinite sequence** (lazy — doesn't crash)::
+
+```js
+function* fibonacci() {
+  let a = 0, b = 1;
+  while (true) {
+    yield a;
+    [a, b] = [b, a + b];
+  }
+}
+
+const fib = fibonacci();
+console.log(fib.next().value); // 0
+console.log(fib.next().value); // 1
+console.log(fib.next().value); // 1
+console.log(fib.next().value); // 2
+console.log(fib.next().value); // 3
+// ... continues indefinitely, one at a time
+```
+
+## Structured Clone
+
+Deep-clone objects safely with `structuredClone()` (ES2022):
+
+```js
+const original = {
+  name: "Alice",
+  hobbies: ["reading", "coding"],
+  settings: { theme: "dark" },
+  date: new Date(),
+};
+
+const clone = structuredClone(original);
+
+clone.name = "Bob";
+clone.hobbies.push("gaming");
+
+console.log(original.hobbies); // ["reading", "coding"] — unaffected
+console.log(clone.hobbies);    // ["reading", "coding", "gaming"]
+```
+
+`structuredClone` handles **circular references**, `Date`, `Map`, `Set`, `RegExp`, `ArrayBuffer`, and more — unlike `JSON.parse(JSON.stringify(obj))`:
+
+```js
+// JSON approach fails with:
+const withDate = { date: new Date() };
+JSON.parse(JSON.stringify(withDate)); // date becomes string, not Date
+
+const withCircular = { self: null };
+withCircular.self = withCircular;
+JSON.parse(JSON.stringify(withCircular)); // throws!
+
+// structuredClone handles both:
+structuredClone(withDate);     // ✅ Date stays Date
+structuredClone(withCircular); // ✅ Circular references work
+```
+
+## Other Modern Features
+
+### Numeric Separators (ES2021)
+
+```js
+const billion = 1_000_000_000; // more readable
+const bytes = 0xFF_EC_DE_5E;
+const shares = 1_000.50;
+```
+
+### `replaceAll` (ES2021)
+
+```js
+const str = "hello-world-foo-bar";
+console.log(str.replaceAll("-", " ")); // "hello world foo bar"
+
+// Without replaceAll: str.replace(/-/g, " ")
+```
+
+### `Promise.any` (ES2021)
+
+```js
+const result = await Promise.any([
+  fetch("/primary").then((r) => r.json()),
+  fetch("/fallback").then((r) => r.json()),
+]);
+console.log(result); // first successful response
+```
+
+### `at()` Method (ES2022)
+
+```js
+const arr = [10, 20, 30, 40];
+console.log(arr.at(-1)); // 40 — last element
+console.log(arr.at(-2)); // 30 — second to last
+
+// Strings too
+"hello".at(-1); // "o"
+```
+
+### `Object.hasOwn()` (ES2022)
+
+```js
+const obj = { name: "Alice" };
+console.log(Object.hasOwn(obj, "name")); // true
+console.log(Object.hasOwn(obj, "toString")); // false
+// Safer than obj.hasOwnProperty() which can be overridden
+```
+
+## Quick Reference
+
+| Feature | Syntax | When to Use |
+|---------|--------|-------------|
+| Optional chaining | `obj?.prop` | Safe nested access |
+| Nullish coalescing | `a ?? b` | Defaults for null/undefined only |
+| Logical assignment | `x ??= y`, `x &&= y`, `x \|\|= y` | Conditional assignment |
+| Map | `new Map()` | Any-type keys, frequent add/delete |
+| Set | `new Set()` | Unique values |
+| Symbol | `Symbol("desc")` | Unique property keys |
+| Generator | `function*() { yield }` | Lazy sequences |
+| structuredClone | `structuredClone(obj)` | Deep cloning |
+| Numeric separator | `1_000_000` | Readable large numbers |
+| `at()` | `arr.at(-1)` | Negative indexing |
+
+## Practice Exercises
+
+1. **Deep flatten with generators**: Write a generator function `function* deepFlatten(arr)` that yields all nested array values recursively. Test with `[1, [2, [3, 4]], 5]`.
+
+2. **Cache with Map**: Build a `memoize(fn)` function using `Map` that caches results based on the first argument as key. Handle object-identity lookups correctly.
+
+3. **Set operations library**: Create utility functions `union(a, b)`, `intersection(a, b)`, `difference(a, b)`, and `symmetricDifference(a, b)` using `Set`.

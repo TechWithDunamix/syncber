@@ -1,0 +1,364 @@
+---
+title: "Semantic HTML & Accessibility"
+description: "Structure web pages meaningfully with HTML5 semantic elements — header, nav, main, section, article, aside, footer — and build for accessibility with ARIA landmarks and keyboard navigation."
+sidebar:
+  order: 8
+  label: "Semantic HTML"
+tab: "full-stack-development"
+---
+
+Semantic HTML means using elements that describe their meaning, not just their appearance. A `<div>` means nothing — a `<nav>` means "this is navigation." Semantic HTML is the foundation of accessible, SEO-friendly, maintainable web pages.
+
+## Why Semantic HTML Matters
+
+Compare these two approaches:
+
+```html
+<!-- ❌ Non-semantic: all divs -->
+<div class="header">
+  <div class="nav">...</div>
+</div>
+<div class="main">
+  <div class="section">...</div>
+</div>
+<div class="footer">...</div>
+
+<!-- ✅ Semantic: meaningful elements -->
+<header>
+  <nav>...</nav>
+</header>
+<main>
+  <section>...</section>
+</main>
+<footer>...</footer>
+```
+
+| Benefit | Why |
+|---------|-----|
+| **Accessibility** | Screen readers navigate by semantic landmarks |
+| **SEO** | Search engines understand content hierarchy |
+| **Maintainability** | Code is self-documenting |
+| **Future-proof** | Browsers add features for semantic elements |
+
+## HTML5 Semantic Elements
+
+### Document Structure Landmarks
+
+```html
+<body>
+  <header>
+    <!-- Site header: logo, search, tagline -->
+  </header>
+
+  <nav>
+    <!-- Primary navigation -->
+  </nav>
+
+  <main>
+    <!-- Unique page content (one per page) -->
+  </main>
+
+  <footer>
+    <!-- Site footer: copyright, links, contact -->
+  </footer>
+</body>
+```
+
+### Content Sectioning
+
+```html
+<main>
+  <article>
+    <!-- Self-contained content (blog post, news article) -->
+    <header>
+      <h1>Article Title</h1>
+      <time datetime="2026-06-16">June 16, 2026</time>
+    </header>
+    <p>Article content...</p>
+  </article>
+
+  <section>
+    <!-- Thematic grouping of content -->
+    <h2>Related Resources</h2>
+    <p>Content grouped by topic...</p>
+  </section>
+
+  <aside>
+    <!-- Indirectly related content (sidebar, related links) -->
+    <h3>Related Articles</h3>
+    <ul>
+      <li><a href="#">Article 1</a></li>
+      <li><a href="#">Article 2</a></li>
+    </ul>
+  </aside>
+</main>
+```
+
+### Element Reference
+
+| Element | Purpose | When to Use |
+|---------|---------|-------------|
+| `<header>` | Introductory content, logo, navigation | Top of page or section |
+| `<nav>` | Navigation links | Main site navigation |
+| `<main>` | Primary page content | Once per page, wrap unique content |
+| `<section>` | Thematic content group | Needs a heading (`<h1>`-`<h6>`) |
+| `<article>` | Self-contained content | Blog posts, news, comments, widgets |
+| `<aside>` | Indirectly related content | Sidebars, callouts, related links |
+| `<footer>` | Closing content | Copyright, links, author info |
+| `<figure>` | Self-contained media | Images with captions |
+| `<time>` | Machine-readable date/time | Dates, times, durations |
+
+## Complete Semantic Page Structure
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Blog</title>
+</head>
+<body>
+  <header>
+    <h1>My Blog</h1>
+    <nav>
+      <ul>
+        <li><a href="/">Home</a></li>
+        <li><a href="/about">About</a></li>
+        <li><a href="/contact">Contact</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <article>
+      <header>
+        <h2>Understanding Semantic HTML</h2>
+        <p>Published: <time datetime="2026-06-16">June 16, 2026</time></p>
+      </header>
+
+      <section>
+        <h3>What is Semantic HTML?</h3>
+        <p>Semantic HTML means using elements that carry meaning...</p>
+      </section>
+
+      <section>
+        <h3>Why It Matters</h3>
+        <p>Accessibility, SEO, and maintainability...</p>
+      </section>
+
+      <footer>
+        <p>Tags: <a href="/tags/html">HTML</a>, <a href="/tags/accessibility">Accessibility</a></p>
+      </footer>
+    </article>
+
+    <aside>
+      <h3>Recent Posts</h3>
+      <ul>
+        <li><a href="/post1">CSS Grid Layout</a></li>
+        <li><a href="/post2">JavaScript Basics</a></li>
+      </ul>
+    </aside>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 My Blog. All rights reserved.</p>
+  </footer>
+</body>
+</html>
+```
+
+## Accessibility (A11y) Basics
+
+Accessibility ensures people with disabilities can use your website — it's both ethical and often legally required.
+
+### ARIA Landmarks
+
+ARIA (Accessible Rich Internet Applications) attributes supplement HTML semantics:
+
+```html
+<!-- HTML5 semantic elements already imply ARIA roles -->
+<nav> → role="navigation"
+<main> → role="main"
+<header> → role="banner" (when page-level)
+<footer> → role="contentinfo" (when page-level)
+<aside> → role="complementary"
+
+<!-- When you must use non-semantic elements, add ARIA roles -->
+<div role="navigation">...</div>
+<div role="main">...</div>
+```
+
+### `aria-label` and `aria-labelledby`
+
+```html
+<!-- Label an element when the visual text is insufficient -->
+<nav aria-label="Main navigation">
+  <a href="/">Home</a>
+  <a href="/shop">Shop</a>
+</nav>
+
+<nav aria-label="Footer navigation">
+  <a href="/privacy">Privacy</a>
+  <a href="/terms">Terms</a>
+</nav>
+
+<!-- Reference another element as the label -->
+<section aria-labelledby="news-heading">
+  <h2 id="news-heading">Latest News</h2>
+  ...
+</section>
+```
+
+### Skip Navigation Link
+
+The first thing on every page should be a "skip to main content" link:
+
+```html
+<body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <header>...</header>
+
+  <main id="main-content">
+    ...
+  </main>
+</body>
+```
+
+```css
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: #000;
+  color: #fff;
+  padding: 8px;
+  z-index: 100;
+}
+.skip-link:focus {
+  top: 0;
+}
+```
+
+### Heading Hierarchy
+
+Screen reader users navigate by headings. Maintain a logical hierarchy:
+
+```html
+<!-- ✅ Correct hierarchy -->
+<h1>Page Title</h1>
+  <h2>Section</h2>
+    <h3>Sub-section</h3>
+  <h2>Another Section</h2>
+
+<!-- ❌ Broken hierarchy -->
+<h1>Page Title</h1>
+  <h3>Sub-section</h3>  <!-- Skipped h2 -->
+  <h2>Section</h2>      <!-- Wrong order -->
+```
+
+### Keyboard Navigation
+
+All interactive elements must be keyboard-accessible:
+
+```html
+<!-- ✅ Links and buttons are keyboard-accessible by default -->
+<a href="/page">Link</a>
+<button>Button</button>
+
+<!-- ✅ Add tabindex to make non-interactive elements focusable -->
+<div tabindex="0">This can receive keyboard focus</div>
+
+<!-- tabindex values: -->
+<!-- tabindex="0" — follows tab order (use this) -->
+<!-- tabindex="-1" — programmatically focusable, not tab order -->
+<!-- tabindex="5" — DON'T DO THIS. Use document order instead -->
+```
+
+### Color Contrast
+
+Text must have sufficient contrast against its background:
+
+```html
+<style>
+  /* ✅ Good contrast (WCAG AA) */
+  body {
+    color: #333;        /* dark gray on white */
+    background: #fff;   /* sufficient contrast ratio */
+  }
+
+  /* ❌ Poor contrast — hard to read */
+  .bad {
+    color: #ccc;        /* light gray */
+    background: #eee;   /* on light background — nearly invisible */
+  }
+</style>
+```
+
+Use Chrome DevTools to check contrast: Inspect element → Check the color picker → See "Contrast ratio" section.
+
+## Semantic vs Div-Based Layout Comparison
+
+### Non-Semantic Layout (Avoid)
+
+```html
+<div class="wrapper">
+  <div class="top">
+    <div class="logo">...</div>
+    <div class="menu">...</div>
+  </div>
+  <div class="content">
+    <div class="main-area">...</div>
+    <div class="sidebar">...</div>
+  </div>
+  <div class="bottom">...</div>
+</div>
+```
+
+### Semantic Layout (Use)
+
+```html
+<body>
+  <header>
+    <div class="logo">...</div>
+    <nav>...</nav>
+  </header>
+  <main>
+    <article>...</article>
+    <aside>...</aside>
+  </main>
+  <footer>...</footer>
+</body>
+```
+
+The semantic version:
+- Screen readers can jump directly to `<nav>`, `<main>`, `<article>`, `<aside>`
+- Search engines give more weight to content inside `<main>` and `<article>`
+- The code is readable without CSS — you can tell what each part does
+
+## Try It Yourself
+
+Build a complete news article page with:
+
+1. `<header>` with a logo and `<nav>` with 3 links
+2. `<main>` with:
+   - An `<article>` containing a news story (title, date with `<time>`, paragraphs, and a `<section>` for quotes)
+   - An `<aside>` with related article links
+3. `<footer>` with copyright information
+4. A skip navigation link at the top
+5. Proper `<h1>`-`<h3>` heading hierarchy
+6. Add `aria-label` to navigation elements
+7. Test with Chrome's Lighthouse accessibility audit
+
+## Key Takeaways
+
+- Semantic elements tell browsers, screen readers, and search engines what your content means
+- Use `<header>`, `<nav>`, `<main>`, `<section>`, `<article>`, `<aside>`, `<footer>` instead of generic `<div>`s
+- One `<main>` per page — it wraps unique page content
+- Every `<section>` should have a heading
+- ARIA attributes supplement HTML semantics when needed — `aria-label`, `aria-labelledby`, role attributes
+- Always include a skip navigation link as the first focusable element
+- Maintain a logical heading hierarchy (`h1` → `h2` → `h3`, never skip levels)
+- Ensure color contrast meets WCAG AA standards (minimum 4.5:1 for normal text)
+- Test your pages with keyboard-only navigation (Tab, Enter, Escape)

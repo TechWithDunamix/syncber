@@ -1,0 +1,266 @@
+---
+title: "Lists & Tables"
+description: "Organize content with ordered lists, unordered lists, description lists, and HTML tables — including nested structures, accessible markup, and styling."
+sidebar:
+  order: 6
+  label: "Lists & Tables"
+tab: "full-stack-development"
+---
+
+Lists and tables are fundamental for organizing structured content. HTML provides three types of lists and a powerful table element.
+
+## Unordered Lists: `<ul>`
+
+Unordered lists are for items where order does not matter:
+
+```html
+<ul>
+  <li>Apples</li>
+  <li>Bananas</li>
+  <li>Oranges</li>
+</ul>
+```
+
+Renders as:
+- Apples
+- Bananas
+- Oranges
+
+## Ordered Lists: `<ol>`
+
+Ordered lists are for sequential items:
+
+```html
+<ol>
+  <li>Preheat oven to 350F</li>
+  <li>Mix flour and sugar</li>
+  <li>Bake for 30 minutes</li>
+</ol>
+```
+
+### Customizing Ordered Lists
+
+```html
+<!-- Lowercase letters -->
+<ol type="a">
+  <li>First item</li>
+  <li>Second item</li>
+</ol>
+
+<!-- Roman numerals starting at 5 -->
+<ol type="I" start="5">
+  <li>Item five</li>
+  <li>Item six</li>
+</ol>
+
+<!-- Reversed order -->
+<ol reversed>
+  <li>Step 3 (shown first)</li>
+  <li>Step 2</li>
+  <li>Step 1</li>
+</ol>
+```
+
+| Attribute | Values | Effect |
+|-----------|--------|--------|
+| `type` | `1`, `A`, `a`, `I`, `i` | Numbering style |
+| `start` | Any number | Starting number/letter |
+| `reversed` | (no value) | Descending order |
+
+## Nested Lists
+
+Lists can be nested inside other list items:
+
+```html
+<ul>
+  <li>Fruits
+    <ul>
+      <li>Apples</li>
+      <li>Bananas</li>
+    </ul>
+  </li>
+  <li>Vegetables
+    <ul>
+      <li>Carrots</li>
+      <li>Broccoli</li>
+    </ul>
+  </li>
+</ul>
+```
+
+**Important**: Always place nested lists inside a `<li>`, never directly inside a `<ul>` or `<ol>`.
+
+## Description Lists: `<dl>`
+
+Description lists pair terms with descriptions:
+
+```html
+<dl>
+  <dt>HTML</dt>
+  <dd>HyperText Markup Language — the standard language for web pages.</dd>
+
+  <dt>CSS</dt>
+  <dd>Cascading Style Sheets — controls the presentation of HTML.</dd>
+
+  <dt>JavaScript</dt>
+  <dd>A programming language that adds interactivity to web pages.</dd>
+</dl>
+```
+
+- `<dt>` = definition term (the item being defined)
+- `<dd>` = definition description (the definition)
+- One term can have multiple descriptions, and vice versa
+
+Use cases: glossaries, metadata lists, key-value pairs.
+
+## Tables: `<table>`
+
+Tables display data in rows and columns:
+
+```html
+<table>
+  <caption>Employee Salary Overview</caption>
+  <thead>
+    <tr>
+      <th scope="col">Name</th>
+      <th scope="col">Department</th>
+      <th scope="col">Salary</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Alice Johnson</td>
+      <td>Engineering</td>
+      <td>$95,000</td>
+    </tr>
+    <tr>
+      <td>Bob Smith</td>
+      <td>Marketing</td>
+      <td>$72,000</td>
+    </tr>
+  </tbody>
+  <tfoot>
+    <tr>
+      <td colspan="2">Total</td>
+      <td>$167,000</td>
+    </tr>
+  </tfoot>
+</table>
+```
+
+### Table Structure Elements
+
+| Element | Purpose |
+|---------|---------|
+| `<caption>` | Title/description of the table (optional but recommended) |
+| `<thead>` | Header rows (column titles) |
+| `<tbody>` | Main data rows |
+| `<tfoot>` | Footer rows (summaries, totals) |
+| `<tr>` | Table row |
+| `<th>` | Header cell (bold, centered by default) |
+| `<td>` | Data cell |
+
+### `scope` Attribute for Accessibility
+
+The `scope` attribute tells screen readers whether a header applies to a column or row:
+
+```html
+<th scope="col">Name</th>     <!-- Column header -->
+<th scope="row">Alice</th>    <!-- Row header (e.g., first column in each row) -->
+```
+
+Always use `scope="col"` on column headers and `scope="row"` on row headers.
+
+### Merging Cells with `colspan` and `rowspan`
+
+```html
+<table>
+  <tr>
+    <th>Name</th>
+    <th colspan="2">Contact Details</th>
+  </tr>
+  <tr>
+    <td>Alice</td>
+    <td>alice@example.com</td>
+    <td>+1-555-0100</td>
+  </tr>
+  <tr>
+    <td rowspan="2">Bob</td>
+    <td>bob@example.com</td>
+    <td>+1-555-0101</td>
+  </tr>
+  <tr>
+    <!-- This row has Bob's name merged from above -->
+    <td>bob.work@example.com</td>
+    <td>+1-555-0102</td>
+  </tr>
+</table>
+```
+
+- `colspan="N"` — cell spans N columns horizontally
+- `rowspan="N"` — cell spans N rows vertically
+
+## Styling Tables with CSS
+
+Basic table styling makes data much more readable:
+
+```html
+<style>
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  th, td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+  }
+  th {
+    background-color: #f4f4f4;
+  }
+  tr:nth-child(even) {
+    background-color: #f9f9f9;
+  }
+  caption {
+    font-weight: bold;
+    margin-bottom: 8px;
+  }
+</style>
+```
+
+## When to Use Tables vs Other Elements
+
+| Use Case | Element |
+|----------|---------|
+| Navigation links | `<nav>` with `<ul>`/`<li>` |
+| Shopping list | `<ul>` |
+| Step-by-step instructions | `<ol>` |
+| Glossary or metadata | `<dl>` |
+| Spreadsheet data | `<table>` |
+| Page layout | CSS Grid or Flexbox (NOT tables) |
+
+<Aside variant="caution">
+Do NOT use HTML tables for page layout. Tables were used for layout in the 1990s but create inaccessible, non-responsive pages. Use CSS Flexbox or Grid for layout purposes.
+</Aside>
+
+## Try It Yourself
+
+Create a page with:
+
+1. An ordered list of your top 5 favorite movies (with a custom starting number)
+2. An unordered list of your skills, each with a nested sub-list
+3. A description list defining 3 HTML elements
+4. A table showing a weekly schedule with columns for Day, Time, Activity
+5. The table should have a `<caption>`, `<thead>`, at least 3 rows in `<tbody>`, and use `colspan` for a merged cell
+6. Apply basic CSS to make the table look professional
+
+## Key Takeaways
+
+- `<ul>` for unordered items, `<ol>` for sequential items (use `type`, `start`, `reversed`)
+- Nest lists properly: always put nested `<ul>`/`<ol>` inside a `<li>`
+- `<dl>` pairs terms (`<dt>`) with descriptions (`<dd>`) — for glossaries and metadata
+- Tables use `<thead>`, `<tbody>`, `<tfoot>` for semantic structure
+- `scope="col"` and `scope="row"` make tables accessible to screen readers
+- `colspan` and `rowspan` merge cells across columns and rows
+- Use `border-collapse: collapse` for clean table borders
+- Do NOT use tables for page layout — use CSS Grid or Flexbox instead

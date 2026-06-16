@@ -1,0 +1,299 @@
+---
+title: "CSS Grid Layout"
+description: "Two-dimensional layouts with CSS Grid — grid containers, explicit and implicit grids, named grid areas, responsive patterns, and alignment."
+sidebar:
+  order: 5
+  label: "CSS Grid"
+tab: "full-stack-development"
+---
+
+CSS Grid is a **two-dimensional** layout system that controls both rows and columns simultaneously. While Flexbox handles one-dimensional layouts (rows OR columns), Grid handles both at once.
+
+## The Grid Container
+
+```css
+.container {
+  display: grid;
+}
+```
+
+## Defining Columns and Rows
+
+```css
+.container {
+  display: grid;
+
+  /* Three equal columns */
+  grid-template-columns: 1fr 1fr 1fr;
+  /* Or: repeat(3, 1fr) */
+
+  /* Mix of fixed and flexible */
+  grid-template-columns: 200px 1fr 200px;
+
+  /* Auto-height rows (based on content) */
+  grid-template-rows: auto;
+
+  /* Fixed height rows */
+  grid-template-rows: 100px auto 100px;
+
+  /* Gap between grid cells */
+  gap: 16px;
+}
+```
+
+### The `fr` Unit
+
+`fr` (fraction) distributes available space:
+
+```css
+/* Sidebar (250px) + main (rest) */
+grid-template-columns: 250px 1fr;
+
+/* 4 equal columns */
+grid-template-columns: repeat(4, 1fr);
+
+/* Asymmetric: 2:1 ratio */
+grid-template-columns: 2fr 1fr;
+
+/* Header auto-height, main fills rest, footer auto-height */
+grid-template-rows: auto 1fr auto;
+```
+
+### minmax()
+
+Creates flexible tracks with minimum and maximum sizes:
+
+```css
+/* Columns: minimum 200px, maximum 1fr (grow equally) */
+grid-template-columns: repeat(3, minmax(200px, 1fr));
+
+/* Sidebar: min 200px max 300px, content: min 400px max 1fr */
+grid-template-columns: minmax(200px, 300px) minmax(400px, 1fr);
+```
+
+### auto-fit and auto-fill
+
+Create truly responsive grids without media queries:
+
+```css
+/* auto-fit — collapses empty tracks */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+/* auto-fill — preserves empty tracks (different behavior with fewer items) */
+.grid {
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+}
+```
+
+This alone creates a responsive grid: items are at least 250px wide, and as many as fit in a row get 1fr each. No media queries needed.
+
+## Placing Items
+
+### Implicit Placement (Default)
+
+Children automatically fill cells left to right, top to bottom:
+
+```css
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+/* Items 1,2,3 in row 1; 4,5,6 in row 2; etc. */
+```
+
+### Explicit Placement with Line Numbers
+
+Grid lines are numbered starting from 1:
+
+```css
+.item1 {
+  grid-column: 1 / 3;    /* Start at line 1, end at line 3 (spans 2 columns) */
+  grid-row: 1 / 3;       /* Start at line 1, end at line 3 (spans 2 rows) */
+}
+
+.item2 {
+  grid-column: 3 / 4;    /* Column 3 only */
+  grid-row: 1 / 3;       /* Rows 1-2 */
+}
+
+.item3 {
+  grid-column: 1 / -1;   /* Span all columns (from line 1 to last line) */
+}
+```
+
+Or use the `span` keyword:
+
+```css
+.item1 {
+  grid-column: span 2;   /* Span 2 columns */
+  grid-row: span 2;      /* Span 2 rows */
+}
+```
+
+### Named Grid Areas
+
+The most intuitive way to create page layouts:
+
+```css
+.container {
+  display: grid;
+  grid-template-columns: 200px 1fr 200px;
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas:
+    "header  header  header"
+    "sidebar content aside"
+    "footer  footer  footer";
+  min-height: 100vh;
+  gap: 0;
+}
+
+header  { grid-area: header; }
+nav     { grid-area: sidebar; }
+main    { grid-area: content; }
+aside   { grid-area: aside; }
+footer  { grid-area: footer; }
+```
+
+```html
+<div class="container">
+  <header>Header</header>
+  <nav>Sidebar</nav>
+  <main>Main Content</main>
+  <aside>Aside</aside>
+  <footer>Footer</footer>
+</div>
+```
+
+Named areas make layout structure visible in CSS — you can see the grid like a diagram.
+
+## Alignment
+
+Grid has the same alignment properties as Flexbox:
+
+```css
+.container {
+  /* Align items within their cells */
+  justify-items: stretch;    /* Horizontal (default) */
+  align-items: stretch;      /* Vertical (default) */
+
+  /* Align the entire grid within the container */
+  justify-content: start;    /* Horizontal grid alignment */
+  align-content: start;      /* Vertical grid alignment */
+}
+
+/* Per-item overrides */
+.item {
+  justify-self: center;
+  align-self: center;
+}
+```
+
+## Real-World Layouts
+
+### Holy Grail Layout (Header, Content, Footer)
+
+```css
+.holy-grail {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-height: 100vh;
+}
+
+.holy-grail > main {
+  display: grid;
+  grid-template-columns: 200px 1fr 200px;
+  gap: 20px;
+  padding: 20px;
+}
+```
+
+### Dashboard Layout
+
+```css
+.dashboard {
+  display: grid;
+  grid-template-columns: 250px 1fr;
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "sidebar header"
+    "sidebar main";
+  min-height: 100vh;
+}
+
+.sidebar { grid-area: sidebar; }
+.header  { grid-area: header; }
+.main    {
+  grid-area: main;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+  padding: 20px;
+}
+```
+
+### Responsive Photo Gallery
+
+```css
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.gallery img {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;     /* Crop images to fill the cell */
+  border-radius: 4px;
+}
+
+/* Featured image spans 2 columns */
+.gallery .featured {
+  grid-column: span 2;
+  grid-row: span 2;
+}
+```
+
+## Flexbox vs Grid — When to Use What
+
+| Scenario | Use |
+|----------|-----|
+| Navigation bar (items in a row) | Flexbox |
+| Card grid (equal cards wrapping) | Flexbox with `flex-wrap` or Grid |
+| Centering a single element | Flexbox (`justify-content: center; align-items: center`) |
+| Full page layout (header + sidebar + content + footer) | Grid |
+| Dashboard with widgets in specific positions | Grid with named areas |
+| Content that flows naturally (blog posts) | Flexbox with wrapping |
+| Two-dimensional control required | Grid |
+| Content dictates layout (unknown number of items) | Flexbox |
+| Layout dictates content (specific positions) | Grid |
+
+<Aside variant="tip">
+Use Flexbox for component-level layouts (navbars, cards, centering). Use Grid for page-level layouts (overall page structure, dashboards, galleries). They work beautifully together — Grid for the outer page, Flexbox for inner components.
+</Aside>
+
+## Try It Yourself
+
+Build a complete page layout:
+
+1. Create a full-page layout with header, sidebar, main content, and footer using `grid-template-areas`
+2. Make the sidebar 250px, the main content fills the rest
+3. Inside the main content, add a responsive 3-column card grid using `auto-fit` and `minmax`
+4. Make one card span 2 columns using `grid-column: span 2`
+5. Create a responsive photo gallery with `auto-fill` and `minmax`
+6. Experiment with `justify-items` and `align-items`
+
+## Key Takeaways
+
+- Grid is two-dimensional — it handles rows AND columns simultaneously
+- `grid-template-columns: repeat(auto-fit, minmax(250px, 1fr))` creates responsive grids without media queries
+- `grid-template-areas` makes layout structure visual and intuitive
+- `span 2` or `1 / 3` syntax places items across multiple tracks
+- Use `minmax()` for flexible track sizing
+- Grid is best for page-level layouts; Flexbox is best for component-level layouts
+- They are complementary — use both together in real projects

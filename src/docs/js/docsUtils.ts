@@ -39,10 +39,62 @@ export const getTabSections = (tabId: string, locale: LocaleType): DocsSection[]
 };
 
 /**
- * Get an array of section IDs in the order they should appear in navigation for a specific tab
+ * Recursively flatten nested sections into a flat array of IDs
+ */
+function flattenSectionIds(sections: DocsSection[]): string[] {
+  const ids: string[] = [];
+  for (const section of sections) {
+    if (section.children && section.children.length > 0) {
+      // Include the parent section ID, then children
+      ids.push(section.id, ...flattenSectionIds(section.children));
+    } else {
+      ids.push(section.id);
+    }
+  }
+  return ids;
+}
+
+function buildChildToParentMap(sections: DocsSection[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const section of sections) {
+    if (section.children) {
+      for (const child of section.children) {
+        map.set(child.id, section.id);
+      }
+    }
+  }
+  return map;
+}
+
+function getSectionForDoc(docId: string, tabId: string, locale: LocaleType): string {
+  const tab = getTabById(tabId, locale);
+  if (!tab) return docId.split("/")[0];
+
+  const segments = docId.split("/");
+  const childToParent = buildChildToParentMap(tab.sections);
+
+  for (const segment of segments) {
+    if (childToParent.has(segment)) {
+      return childToParent.get(segment)!;
+    }
+  }
+
+  const sectionIds = new Set(tab.sections.map((s) => s.id));
+  for (const segment of segments) {
+    if (sectionIds.has(segment)) {
+      return segment;
+    }
+  }
+
+  return segments[0];
+}
+
+/**
+ * Get an array of section IDs in the order they should appear in navigation for a specific tab.
+ * Handles nested sections by flattening recursively.
  */
 export const getOrderedSectionIds = (tabId: string, locale: LocaleType): string[] => {
-  return getTabSections(tabId, locale).map((section) => section.id);
+  return flattenSectionIds(getTabSections(tabId, locale));
 };
 
 /**
@@ -96,8 +148,8 @@ export const getAdjacentPages = async (currentId: string, locale: LocaleType, ta
 
   // Sort docs by section order and then by sidebar order
   const sortedDocs = filteredDocs.sort((a, b) => {
-    const [aSection] = a.id.split("/");
-    const [bSection] = b.id.split("/");
+    const aSection = getSectionForDoc(a.id, tabId, locale);
+    const bSection = getSectionForDoc(b.id, tabId, locale);
 
     // Get section indices
     const aSectionIndex = sectionIndexMap.get(aSection) ?? -1;
@@ -184,8 +236,7 @@ export const processTabsContent = async (
     const tabSections = filteredDocs
       .filter((doc) => doc.data.tab === tab.id)
       .reduce((acc, doc) => {
-        // Get the top-level directory from the doc.id
-        const [section] = doc.id.split("/");
+        const section = getSectionForDoc(doc.id, tab.id, currLocale);
         if (!acc[section]) {
           acc[section] = [];
         }
@@ -276,8 +327,9 @@ export const getFirstPagesMap = async (
 
       // For each section in the config order
       for (const section of tabSections) {
-        // Find docs in this section (top-level directory) and index file
-        const sectionDocs = tabDocs.filter((doc) => doc.id.startsWith(section.id + "/"));
+        const sectionDocs = tabDocs.filter((doc) =>
+          getSectionForDoc(doc.id, tab.id, currLocale) === section.id,
+        );
 
         // Find index files in this section (doc.id == section.id, like 'getting-started/index')
         const indexDoc = tabDocs.find(
@@ -384,11 +436,9 @@ export const processDocsBySection = (
   docsBySection: Record<string, DocLink[]>;
   sections: string[];
 } => {
-  // Group docs by their top-level directory
   const docsBySection = sectionFilteredDocs.reduce(
     (acc, doc) => {
-      // Get the top-level directory from the doc.id
-      const [section] = doc.id.split("/");
+      const section = getSectionForDoc(doc.id, sectionId, currLocale);
       if (!acc[section]) {
         acc[section] = [];
       }

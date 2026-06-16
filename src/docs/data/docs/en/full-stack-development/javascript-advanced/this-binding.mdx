@@ -1,0 +1,369 @@
+---
+title: "The `this` Keyword & Binding"
+description: "How `this` works in JavaScript — default binding, implicit binding, explicit binding with call/apply/bind, arrow functions, event handlers, and common pitfalls."
+sidebar:
+  order: 2
+  label: "`this` Keyword & Binding"
+tab: "full-stack-development"
+---
+
+The `this` keyword is one of the most misunderstood features in JavaScript. Unlike other languages where `this` always refers to the current object instance, JavaScript's `this` is **dynamic** — it depends entirely on **how a function is called**, not where it's defined.
+
+## The Five Binding Rules
+
+`this` is determined by five rules, applied in order of precedence:
+
+### 1. Default Binding (Global)
+
+When a function is called as a plain function call (no dot, no special method), `this` refers to the **global object** (or `undefined` in strict mode).
+
+```js
+function showThis() {
+  console.log(this);
+}
+
+showThis(); // In browser: Window (global object)
+```
+
+With strict mode:
+
+```js
+"use strict";
+function showThis() {
+  console.log(this);
+}
+
+showThis(); // undefined
+```
+
+<Aside variant="caution">
+Default binding is almost never what you want. It's why accidentally calling a method without its object leads to bugs.
+</Aside>
+
+### 2. Implicit Binding (Method Call)
+
+When a function is called as a **method of an object** (with a dot), `this` refers to the object to the **left of the dot**.
+
+```js
+const user = {
+  name: "Alice",
+  greet() {
+    console.log(`Hi, I'm ${this.name}`);
+  }
+};
+
+user.greet(); // "Hi, I'm Alice"
+```
+
+The key insight: only the **immediate** call site matters:
+
+```js
+function sayName() {
+  console.log(this.name);
+}
+
+const user1 = { name: "Alice", sayName };
+const user2 = { name: "Bob", sayName };
+
+user1.sayName(); // "Alice"
+user2.sayName(); // "Bob"
+```
+
+**The "lost this" problem** — when you extract a method from its object:
+
+```js
+const user = {
+  name: "Alice",
+  greet() {
+    console.log(`Hi, I'm ${this.name}`);
+  }
+};
+
+const greetFn = user.greet;
+greetFn(); // "Hi, I'm undefined" — lost implicit binding!
+```
+
+The function was called as a plain function, so default binding applies.
+
+### 3. Explicit Binding (`call`, `apply`, `bind`)
+
+You can **force** what `this` should be using three methods available on every function.
+
+**`call`** — calls the function with a given `this` and arguments listed individually:
+
+```js
+function introduce(greeting, punctuation) {
+  console.log(`${greeting}, I'm ${this.name}${punctuation}`);
+}
+
+const person = { name: "Charlie" };
+
+introduce.call(person, "Hello", "!"); // "Hello, I'm Charlie!"
+```
+
+**`apply`** — same as `call` but arguments are passed as an array:
+
+```js
+introduce.apply(person, ["Hi", "!!"]); // "Hi, I'm Charlie!!"
+```
+
+**`bind`** — returns a **new function** with `this` permanently bound:
+
+```js
+const boundIntroduce = introduce.bind(person, "Hey");
+boundIntroduce("?"); // "Hey, I'm Charlie?"
+```
+
+`bind` does **not** call the function immediately. It returns a new function with `this` locked.
+
+### 4. `new` Binding (Constructor)
+
+When a function is called with the `new` keyword, a new object is created and `this` points to that object:
+
+```js
+function User(name) {
+  // `this` is a brand-new object
+  this.name = name;
+  // no return — implicit return of `this`
+}
+
+const alice = new User("Alice");
+console.log(alice.name); // "Alice"
+```
+
+### 5. Arrow Functions (Lexical `this`)
+
+Arrow functions **do not** have their own `this`. They capture `this` from the **surrounding lexical scope** at the time they are defined.
+
+```js
+const user = {
+  name: "Alice",
+  greet: () => {
+    console.log(`Hi, I'm ${this.name}`);
+  }
+};
+
+user.greet(); // "Hi, I'm undefined" — arrow function used here!
+```
+
+The arrow function captured `this` from the surrounding scope (the global scope), not from `user`.
+
+**Where arrow functions shine** — inside methods that need to reference the parent `this`:
+
+```js
+const timer = {
+  seconds: 0,
+  start() {
+    setInterval(() => {
+      this.seconds++; // `this` captured from start()'s scope → timer object
+      console.log(this.seconds);
+    }, 1000);
+  }
+};
+
+timer.start(); // 1, 2, 3...
+```
+
+Without the arrow function, you'd need a workaround:
+
+```js
+// Old approach: capture `this` in a variable
+start() {
+  const self = this;
+  setInterval(function() {
+    self.seconds++;
+  }, 1000);
+}
+
+// Or use .bind
+start() {
+  setInterval(function() {
+    this.seconds++;
+  }.bind(this), 1000);
+}
+```
+
+## Binding Precedence
+
+When multiple rules could apply, this is the order:
+
+1. **`new` binding** — highest priority
+2. **Explicit binding** (`call`/`apply`/`bind`)
+3. **Implicit binding** (method call)
+4. **Default binding** — lowest priority
+
+```js
+function identify() {
+  console.log(this.name);
+}
+
+const obj1 = { name: "obj1" };
+const obj2 = { name: "obj2" };
+
+// bind wins over implicit
+const boundFn = identify.bind(obj1);
+boundFn.call(obj2); // "obj1" — bind is permanent
+
+// new wins over bind
+function User(name) {
+  this.name = name;
+}
+const boundUser = User.bind({ name: "ignored" });
+const instance = new boundUser("Alice");
+console.log(instance.name); // "Alice" — new overrides bind
+```
+
+## Event Handlers and `this`
+
+In DOM event handlers, `this` refers to the element that fired the event:
+
+```js
+button.addEventListener("click", function() {
+  console.log(this); // the button element
+});
+```
+
+With arrow functions, `this` is captured from the surrounding scope:
+
+```js
+button.addEventListener("click", () => {
+  console.log(this); // NOT the button — probably Window/undefined
+});
+```
+
+## Common Pitfalls
+
+### 1. Method Reference Loss
+
+```js
+const user = {
+  name: "Alice",
+  greet() {
+    console.log(`Hi, I'm ${this.name}`);
+  }
+};
+
+// Problem: passing method as a callback
+setTimeout(user.greet, 1000); // "Hi, I'm undefined"
+
+// Fix 1: wrap in arrow function
+setTimeout(() => user.greet(), 1000);
+
+// Fix 2: bind the method
+setTimeout(user.greet.bind(user), 1000);
+```
+
+### 2. Inner Function in Method
+
+```js
+const obj = {
+  data: [1, 2, 3],
+  process() {
+    // `this` is obj here
+    this.data.forEach(function(item) {
+      console.log(this); // undefined (strict) or Window (sloppy) — not obj!
+    });
+  }
+};
+
+// Fix 1: arrow function
+this.data.forEach((item) => console.log(this));
+
+// Fix 2: pass thisArg
+this.data.forEach(function(item) {
+  console.log(this);
+}, this);
+
+// Fix 3: capture this
+const self = this;
+this.data.forEach(function(item) {
+  console.log(self);
+});
+```
+
+### 3. Class Methods as Callbacks
+
+```js
+class Button {
+  constructor(label) {
+    this.label = label;
+  }
+
+  handleClick() {
+    console.log(`${this.label} clicked`);
+  }
+}
+
+const btn = new Button("Save");
+document.querySelector("button").addEventListener("click", btn.handleClick);
+// "undefined clicked" — `this` is the button element
+
+// Fix: bind in constructor
+class Button {
+  constructor(label) {
+    this.label = label;
+    this.handleClick = this.handleClick.bind(this);
+  }
+  // or use class field with arrow function:
+  handleClick = () => {
+    console.log(`${this.label} clicked`);
+  }
+}
+```
+
+## Quick Reference
+
+| Call Pattern | `this` Value |
+|---|---|
+| Plain function call `fn()` | `window` (sloppy) / `undefined` (strict) |
+| Method call `obj.fn()` | `obj` |
+| `.call(ctx)` / `.apply(ctx)` | `ctx` |
+| `.bind(ctx)` | `ctx` (permanent) |
+| `new Fn()` | New empty object |
+| Arrow function | Lexical (surrounding scope) |
+| Event handler `function()` | Element that fired event |
+| Event handler `() =>` | Lexical scope |
+
+## Practice Exercises
+
+1. What does this log?
+   ```js
+   const obj = {
+     name: "obj",
+     greet() {
+       console.log(this.name);
+     }
+   };
+   const fn = obj.greet;
+   fn();
+   ```
+
+2. Fix this timer without changing `setInterval`:
+   ```js
+   class Timer {
+     constructor() {
+       this.seconds = 0;
+     }
+     start() {
+       setInterval(function() {
+         this.seconds++;
+         console.log(this.seconds);
+       }, 1000);
+     }
+   }
+   new Timer().start();
+   ```
+
+3. Create a `partial` function that works like `bind` but also allows additional arguments later:
+   ```js
+   function partial(fn, ...args) {
+     // your code here
+   }
+
+   function add(a, b, c) {
+     return a + b + c;
+   }
+
+   const add5 = partial(add, 5);
+   console.log(add5(10, 20)); // 35
+   ```

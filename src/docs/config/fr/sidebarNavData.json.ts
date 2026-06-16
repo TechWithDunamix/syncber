@@ -49,16 +49,64 @@ const sidebarNavData: DocsSidebarNavData = {
           title: "Aperçu du Cours",
         },
         {
-          id: "frontend-basics",
-          title: "Bases du Frontend",
+          id: "phase-1-frontend",
+          title: "Phase 1 : Fondamentaux du Frontend",
+          children: [
+            {
+              id: "html-fundamentals",
+              title: "HTML & Fondamentaux du Web",
+            },
+            {
+              id: "css-styling",
+              title: "CSS & Style",
+            },
+            {
+              id: "javascript-basics",
+              title: "Bases de JavaScript",
+            },
+          ],
         },
         {
-          id: "backend-development",
-          title: "Développement Backend",
+          id: "phase-2-javascript",
+          title: "Phase 2 : JavaScript Approfondi",
+          children: [
+            {
+              id: "javascript-advanced",
+              title: "JavaScript Avancé",
+            },
+            {
+              id: "dom-browser",
+              title: "DOM & API du Navigateur",
+            },
+          ],
         },
         {
-          id: "databases",
-          title: "Bases de Données & API",
+          id: "phase-3-frontend",
+          title: "Phase 3 : Frontend Moderne",
+          children: [
+            {
+              id: "react-frontend",
+              title: "React & Frontend Moderne",
+            },
+          ],
+        },
+        {
+          id: "phase-4-backend",
+          title: "Phase 4 : Développement Backend",
+          children: [
+            {
+              id: "node-express",
+              title: "Node.js & Express",
+            },
+            {
+              id: "auth-security",
+              title: "Authentification & Sécurité",
+            },
+            {
+              id: "mongodb-databases",
+              title: "MongoDB & Bases de Données",
+            },
+          ],
         },
       ],
     },

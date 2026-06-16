@@ -1,0 +1,468 @@
+---
+title: "Rate Limiting & DDoS Protection"
+description: "Rate limiting strategies (token bucket, sliding window), express-rate-limit, DDoS mitigation, bot detection, and protecting APIs from abuse."
+sidebar:
+  order: 7
+  label: "Rate Limiting & DDoS Protection"
+tab: "full-stack-development"
+---
+
+Rate limiting prevents a single client from overwhelming your server with too many requests. Combined with DDoS mitigation techniques, it keeps your application available under attack conditions.
+
+## Why Rate Limiting Matters
+
+Without rate limiting, your API is vulnerable to:
+
+- **Brute force attacks** — Thousands of login attempts per second
+- **Web scraping** — Bots consuming your entire dataset
+- **Resource exhaustion** — One user consuming all database connections
+- **DDoS attacks** — Distributed requests overwhelming server capacity
+- **Cost spikes** — Uncontrolled API usage on paid infrastructure
+
+## Rate Limiting Strategies
+
+### Fixed Window
+
+Counts requests in fixed time windows (e.g., 100 requests per minute). Simple but can burst at window boundaries:
+
+```
+Window 1 (12:00:00 - 12:01:00)          Window 2 (12:01:00 - 12:02:00)
+[####################] 100/100          [####] 20/100
+                        ↑                       ↑
+              Burst at edge resets counter
+```
+
+### Sliding Window
+
+Tracks requests across a rolling time window, preventing edge bursts:
+
+```javascript
+// Sliding window: last 60 seconds, not calendar minute
+// Request at 12:01:30 counts requests from 12:00:30 to 12:01:30
+```
+
+### Token Bucket
+
+Each client gets a bucket of tokens that refill at a fixed rate:
+
+```javascript
+// Bucket: 10 tokens, refills 1 token per second
+// Client can burst 10 requests, then 1 per second
+// After 5 seconds of no requests: bucket has 5 tokens again
+```
+
+### Leaky Bucket
+
+Requests fill a queue that drains at a fixed rate. Excess requests are rejected:
+
+```javascript
+// Queue: 10 requests, drains 2 per second
+// Steady processing rate, no bursting
+```
+
+## Implementation with express-rate-limit
+
+```bash
+npm install express-rate-limit
+```
+
+### Basic Setup
+
+```javascript
+const rateLimit = require("express-rate-limit");
+
+// Global limiter
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,  // 15 minutes
+  max: 100,                    // 100 requests per window
+  standardHeaders: true,       // Return rate limit info in headers
+  legacyHeaders: false,        // Disable X-RateLimit-* headers
+});
+
+app.use("/api/", limiter);
+```
+
+### Response Headers
+
+When `standardHeaders: true`, clients see:
+
+```http
+RateLimit-Limit: 100
+RateLimit-Remaining: 87
+RateLimit-Reset: 1682345678
+Retry-After: 45
+```
+
+### Per-Route Limiters
+
+```javascript
+// Strict limiter for auth endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,             // 5 login attempts per 15 minutes
+  message: {
+    error: "TOO_MANY_ATTEMPTS",
+    message: "Too many login attempts. Try again in 15 minutes.",
+  },
+});
+
+// Generous limiter for public read endpoints
+const publicLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,            // 60 requests per minute
+});
+
+app.post("/api/auth/login", authLimiter);
+app.get("/api/products", publicLimiter);
+```
+
+### Custom Key Generator
+
+By default, rate limiting uses the IP address. Use a custom key for more precise limiting:
+
+```javascript
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  keyGenerator: (req) => {
+    // Rate limit by user ID if authenticated, otherwise by IP
+    return req.user?.id || req.ip;
+  },
+});
+```
+
+### Skip Successful Requests
+
+Don't count successful responses toward the limit:
+
+```javascript
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  skipSuccessfulRequests: true,  // Only count errors
+});
+```
+
+## Rate Limiting with Redis
+
+For distributed apps running multiple server instances, use Redis for shared state:
+
+```bash
+npm install rate-limit-redis ioredis
+```
+
+```javascript
+const RedisStore = require("rate-limit-redis").default;
+const Redis = require("ioredis");
+
+const redis = new Redis({
+  host: process.env.REDIS_HOST,
+  port: 6379,
+});
+
+const limiter = rateLimit({
+  store: new RedisStore({
+    sendCommand: (...args) => redis.call(...args),
+  }),
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+});
+```
+
+## Advanced Rate Limiting Techniques
+
+### Tiered Rate Limits
+
+Different limits based on user role:
+
+```javascript
+function getRateLimitConfig(req) {
+  if (req.user?.role === "premium") {
+    return { windowMs: 60 * 1000, max: 200 };    // 200 req/min
+  }
+  if (req.user?.role === "admin") {
+    return { windowMs: 60 * 1000, max: 500 };    // 500 req/min
+  }
+  return { windowMs: 60 * 1000, max: 30 };       // 30 req/min
+}
+
+// Dynamic limiter middleware
+app.use("/api/", (req, res, next) => {
+  const config = getRateLimitConfig(req);
+  rateLimit({
+    windowMs: config.windowMs,
+    max: config.max,
+    keyGenerator: () => req.user?.id || req.ip,
+  })(req, res, next);
+});
+```
+
+### Global + Per-Endpoint Limiting
+
+Combine a global limiter with stricter endpoint-specific limiters:
+
+```javascript
+// Global: 1000 requests per hour
+app.use(rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 1000,
+}));
+
+// Auth: 5 attempts per 15 minutes (stricter)
+app.post("/api/auth/login", rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+}));
+
+// Upload: 10 requests per minute
+app.post("/api/upload", rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+}));
+```
+
+### IP-based + User-based Limiting
+
+Layer both for defense in depth:
+
+```javascript
+// Layer 1: IP-based (coarse)
+const ipLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  keyGenerator: (req) => req.ip,
+});
+
+// Layer 2: User-based (fine)
+const userLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  keyGenerator: (req) => req.user?.id || req.ip,
+});
+
+app.use("/api/", ipLimiter);
+app.use("/api/", userLimiter);
+```
+
+## DDoS Mitigation
+
+Rate limiting alone isn't enough for DDoS attacks. Use multiple layers:
+
+### Connection Limiting
+
+```javascript
+const http = require("http");
+
+const server = http.createServer(app);
+
+// Limit concurrent connections per IP
+const connections = new Map();
+
+server.on("connection", (socket) => {
+  const ip = socket.remoteAddress;
+  const count = (connections.get(ip) || 0) + 1;
+
+  if (count > 50) {
+    socket.destroy();
+    console.warn(`DDoS prevention: destroyed connection from ${ip}`);
+    return;
+  }
+
+  connections.set(ip, count);
+
+  socket.on("close", () => {
+    connections.set(ip, (connections.get(ip) || 1) - 1);
+  });
+});
+```
+
+### Request Size Limiting
+
+```javascript
+// Limit request body size
+app.use(express.json({ limit: "10kb" }));
+app.use(express.urlencoded({ extended: true, limit: "10kb" }));
+
+// Limit request time
+app.use((req, res, next) => {
+  req.setTimeout(30000, () => {
+    res.status(408).json({ error: "Request timeout" });
+  });
+  next();
+});
+```
+
+### Bot Detection
+
+```javascript
+function detectBot(req) {
+  const userAgent = req.headers["user-agent"]?.toLowerCase() || "";
+
+  // Check for known bot patterns
+  const botPatterns = [
+    "googlebot", "bingbot", "slurp",     // Legitimate crawlers
+    "curl", "wget", "python-requests",   // CLI tools (potential abuse)
+    "scrapy", "nikto", "nmap",           // Scanners
+  ];
+
+  const isKnownBot = botPatterns.some((p) => userAgent.includes(p));
+  const hasBrowserHeaders = req.headers["accept-language"] &&
+    req.headers["sec-ch-ua"];
+
+  return {
+    isBot: isKnownBot && !hasBrowserHeaders,
+    userAgent,
+  };
+}
+
+// Optional: rate limit suspected bots harder
+app.use("/api/", (req, res, next) => {
+  const { isBot } = detectBot(req);
+
+  if (isBot) {
+    return rateLimit({
+      windowMs: 60 * 1000,
+      max: 5,  // 5 requests per minute for bots
+    })(req, res, next);
+  }
+
+  next();
+});
+```
+
+## Rate Limiting Response Format
+
+Standardize rate limit responses:
+
+```javascript
+class RateLimitError extends Error {
+  constructor(retryAfter) {
+    super("Rate limit exceeded");
+    this.statusCode = 429;
+    this.retryAfter = retryAfter;
+  }
+}
+
+// Global rate limit error handler
+app.use((err, req, res, next) => {
+  if (err instanceof RateLimitError) {
+    return res.status(429).json({
+      error: "RATE_LIMITED",
+      message: "Too many requests. Please slow down.",
+      retryAfter: err.retryAfter,
+      documentation: "https://docs.example.com/rate-limiting",
+    });
+  }
+  next(err);
+});
+```
+
+## Testing Rate Limiting
+
+```javascript
+// test/rate-limit.test.js
+const request = require("supertest");
+
+describe("Rate Limiting", () => {
+  it("should allow requests within limit", async () => {
+    for (let i = 0; i < 5; i++) {
+      const res = await request(app)
+        .post("/api/auth/login")
+        .send({ email: "test@test.com", password: "wrong" });
+
+      expect(res.status).not.toBe(429);
+    }
+  });
+
+  it("should block requests exceeding limit", async () => {
+    // Use a unique IP to avoid shared rate limit state
+    const uniqueIp = `192.168.1.${Date.now()}`;
+
+    for (let i = 0; i < 5; i++) {
+      await request(app)
+        .post("/api/auth/login")
+        .set("X-Forwarded-For", uniqueIp)
+        .send({ email: "test@test.com", password: "wrong" });
+    }
+
+    const res = await request(app)
+      .post("/api/auth/login")
+      .set("X-Forwarded-For", uniqueIp)
+      .send({ email: "test@test.com", password: "wrong" });
+
+    expect(res.status).toBe(429);
+    expect(res.body).toHaveProperty("error", "TOO_MANY_ATTEMPTS");
+  });
+
+  it("should include rate limit headers", async () => {
+    const res = await request(app).get("/api/products");
+
+    expect(res.headers).toHaveProperty("ratelimit-limit");
+    expect(res.headers).toHaveProperty("ratelimit-remaining");
+  });
+});
+```
+
+## Production Checklist
+
+```javascript
+// Comprehensive rate limiting setup
+const rateLimit = require("express-rate-limit");
+const RedisStore = require("rate-limit-redis").default;
+
+// 1. Global rate limiter
+app.use(rateLimit({
+  store: new RedisStore({ /* ... */ }),
+  windowMs: 60 * 1000,
+  max: 60,
+}));
+
+// 2. Strict auth limiter
+app.post("/api/auth/login", rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  skipSuccessfulRequests: true,
+}));
+
+// 3. Registration limiter
+app.post("/api/auth/register", rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 3,  // 3 accounts per hour per IP
+}));
+
+// 4. Password reset limiter
+app.post("/api/auth/reset-password", rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 2,
+}));
+
+// 5. API key limiter (if applicable)
+app.post("/api/keys", rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,  // 5 API keys per hour
+}));
+```
+
+## Quick Reference
+
+```javascript
+// Basic rate limit
+app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
+
+// Strict auth limit
+app.post("/login", rateLimit({ windowMs: 15 * 60 * 1000, max: 5 }));
+
+// Per-user limit
+rateLimit({ keyGenerator: (req) => req.user.id });
+
+// With Redis
+rateLimit({ store: new RedisStore({ /* ... */ }) });
+```
+
+## Practice Exercises
+
+1. **Login brute force protection**: Implement rate limiting on a login endpoint. Allow 5 attempts per 15 minutes. Return a clear error message and retry-after time.
+
+2. **Tiered API limits**: Build middleware that gives free users 30 requests/minute, premium users 200 requests/minute, and admin users 1000 requests/minute. Use API keys to identify users.
+
+3. **DDoS simulation**: Create a test script that sends 1000 concurrent requests. Implement connection limiting + rate limiting to handle the flood gracefully (no crash, clear 429 responses).

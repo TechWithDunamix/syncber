@@ -1,0 +1,380 @@
+---
+title: "File Handling & Uploads"
+description: "Reading and writing files with Node.js fs module, serving static files, handling file uploads with multer, file validation, and streaming large files."
+sidebar:
+  order: 6
+  label: "File Handling & Uploads"
+tab: "full-stack-development"
+---
+
+File handling is essential for many applications — user uploads, serving images, processing CSVs, and more. Node.js provides the `fs` module for file system operations, and Express integrates with `multer` for file uploads.
+
+## Reading and Writing Files
+
+### With callbacks (traditional)
+
+```javascript
+const fs = require("fs");
+
+// Read
+fs.readFile("./data.txt", "utf8", (err, data) => {
+  if (err) {
+    console.error("Error reading file:", err.message);
+    return;
+  }
+  console.log(data);
+});
+
+// Write (overwrites if exists)
+fs.writeFile("./output.txt", "Hello, World!", "utf8", (err) => {
+  if (err) console.error("Error writing file:", err.message);
+  else console.log("File written successfully");
+});
+
+// Append
+fs.appendFile("./log.txt", `${new Date().toISOString()}\n`, (err) => {
+  if (err) console.error("Error appending to file:", err.message);
+});
+```
+
+### With promises (preferred)
+
+```javascript
+const fs = require("fs").promises;
+
+async function handleFile() {
+  try {
+    const data = await fs.readFile("./data.txt", "utf8");
+    console.log(data);
+
+    await fs.writeFile("./backup.txt", data, "utf8");
+    console.log("Backup created");
+  } catch (err) {
+    console.error("File operation failed:", err.message);
+  }
+}
+```
+
+### Synchronous (blocking — avoid in request handlers)
+
+```javascript
+const data = fs.readFileSync("./config.json", "utf8");
+const config = JSON.parse(data);
+```
+
+## Working with Directories
+
+```javascript
+const fs = require("fs").promises;
+
+async function manageDirectories() {
+  // Create directory (recursive — creates parents too)
+  await fs.mkdir("./uploads/images", { recursive: true });
+
+  // Read directory contents
+  const files = await fs.readdir("./uploads");
+  console.log(files); // ["images", "file1.pdf", ...]
+
+  // Check if path exists
+  const exists = await fs.access("./uploads").then(() => true).catch(() => false);
+
+  // Get file stats
+  const stats = await fs.stat("./file.txt");
+  console.log(stats.size);     // file size in bytes
+  console.log(stats.isFile()); // true
+  console.log(stats.mtime);    // modification time
+
+  // Remove file
+  await fs.unlink("./old-file.txt");
+
+  // Remove directory (must be empty)
+  await fs.rmdir("./empty-dir");
+
+  // Remove recursively (Node 14+)
+  await fs.rm("./dir-to-remove", { recursive: true, force: true });
+}
+```
+
+## Serving Static Files
+
+Express's built-in `express.static` middleware serves files from a directory:
+
+```javascript
+const express = require("express");
+const path = require("path");
+const app = express();
+
+// Serve files from "public" directory
+app.use(express.static(path.join(__dirname, "public")));
+
+// With virtual path prefix
+app.use("/static", express.static("public"));
+// /static/style.css  →  public/style.css
+
+// Multiple directories (searched in order)
+app.use(express.static("public"));
+app.use(express.static("uploads"));
+
+// Disable directory index
+app.use(express.static("public", { dotfiles: "deny", index: false }));
+```
+
+## File Uploads with Multer
+
+```bash
+npm install multer
+```
+
+### Basic Upload
+
+```javascript
+const multer = require("multer");
+const path = require("path");
+
+// Configure storage
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/");
+  },
+  filename: (req, file, cb) => {
+    // Create unique filename: timestamp-originalname
+    const uniqueName = `${Date.now()}-${file.originalname}`;
+    cb(null, uniqueName);
+  },
+});
+
+// File filter (accept only images)
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error("Only JPEG, PNG, GIF, and WebP images are allowed"), false);
+  }
+};
+
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+});
+
+// Single file upload
+app.post("/api/upload", upload.single("avatar"), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: "No file uploaded" });
+  }
+
+  res.json({
+    message: "File uploaded successfully",
+    file: {
+      filename: req.file.filename,
+      originalName: req.file.originalname,
+      size: req.file.size,
+      mimetype: req.file.mimetype,
+      path: `/uploads/${req.file.filename}`,
+    },
+  });
+});
+```
+
+### Multiple File Upload
+
+```javascript
+// Multiple files (same field name)
+app.post("/api/upload-multiple", upload.array("photos", 5), (req, res) => {
+  res.json({
+    message: `${req.files.length} files uploaded`,
+    files: req.files.map((f) => ({
+      filename: f.filename,
+      size: f.size,
+    })),
+  });
+});
+
+// Multiple fields
+app.post("/api/upload-fields", upload.fields([
+  { name: "avatar", maxCount: 1 },
+  { name: "gallery", maxCount: 5 },
+]), (req, res) => {
+  res.json({
+    avatar: req.files.avatar?.[0]?.filename,
+    gallery: req.files.gallery?.map((f) => f.filename),
+  });
+});
+```
+
+### Upload Error Handling
+
+```javascript
+const upload = multer({
+  storage,
+  limits: { fileSize: 1024 * 1024 }, // 1MB
+});
+
+app.post("/api/upload", (req, res) => {
+  upload.single("file")(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      if (err.code === "LIMIT_FILE_SIZE") {
+        return res.status(400).json({ error: "File too large (max 1MB)" });
+      }
+      return res.status(400).json({ error: err.message });
+    }
+
+    if (err) {
+      return res.status(400).json({ error: err.message });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: "No file selected" });
+    }
+
+    res.json({ filename: req.file.filename });
+  });
+});
+```
+
+## Streaming Files
+
+For large files, use streams to avoid loading everything into memory:
+
+```javascript
+const fs = require("fs");
+const path = require("path");
+
+app.get("/api/stream/:filename", (req, res) => {
+  const filePath = path.join(__dirname, "uploads", req.params.filename);
+
+  // Check if file exists
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: "File not found" });
+  }
+
+  // Get file stats for Content-Length
+  const stats = fs.statSync(filePath);
+
+  res.set({
+    "Content-Type": "application/octet-stream",
+    "Content-Length": stats.size,
+    "Content-Disposition": `attachment; filename="${req.params.filename}"`,
+  });
+
+  // Stream the file (never fully loaded into memory)
+  const readStream = fs.createReadStream(filePath);
+  readStream.pipe(res);
+
+  readStream.on("error", (err) => {
+    console.error("Stream error:", err);
+    res.status(500).end();
+  });
+});
+```
+
+### Range Requests (Video Streaming)
+
+```javascript
+app.get("/api/video/:filename", (req, res) => {
+  const filePath = path.join(__dirname, "videos", req.params.filename);
+  const stat = fs.statSync(filePath);
+  const fileSize = stat.size;
+  const range = req.headers.range;
+
+  if (range) {
+    const parts = range.replace(/bytes=/, "").split("-");
+    const start = parseInt(parts[0], 10);
+    const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+    const chunksize = (end - start) + 1;
+
+    const stream = fs.createReadStream(filePath, { start, end });
+
+    res.writeHead(206, {
+      "Content-Range": `bytes ${start}-${end}/${fileSize}`,
+      "Accept-Ranges": "bytes",
+      "Content-Length": chunksize,
+      "Content-Type": "video/mp4",
+    });
+
+    stream.pipe(res);
+  } else {
+    res.writeHead(200, {
+      "Content-Length": fileSize,
+      "Content-Type": "video/mp4",
+    });
+    fs.createReadStream(filePath).pipe(res);
+  }
+});
+```
+
+## Security Considerations
+
+### 1. Validate File Types
+
+Never trust `mimetype` alone — check the actual file content:
+
+```javascript
+const fileType = require("file-type"); // npm install file-type
+
+async function validateFile(buffer) {
+  const type = await fileType.fromBuffer(buffer);
+  if (!type || !["image/jpeg", "image/png"].includes(type.mime)) {
+    throw new Error("Invalid file type");
+  }
+}
+```
+
+### 2. Prevent Path Traversal
+
+```javascript
+const path = require("path");
+
+function safePath(baseDir, filename) {
+  const fullPath = path.join(baseDir, filename);
+  // Make sure the resolved path stays within baseDir
+  if (!fullPath.startsWith(path.resolve(baseDir))) {
+    throw new Error("Invalid path");
+  }
+  return fullPath;
+}
+```
+
+### 3. Limit Upload Size
+
+```javascript
+const upload = multer({
+  limits: {
+    fileSize: 5 * 1024 * 1024,  // 5 MB per file
+    files: 10,                    // max 10 files
+  },
+});
+```
+
+## Quick Reference
+
+```javascript
+// File operations (promises)
+await fs.readFile(path, "utf8");
+await fs.writeFile(path, data);
+await fs.appendFile(path, data);
+await fs.unlink(path);
+await fs.mkdir(path, { recursive: true });
+await fs.readdir(path);
+
+// Multer
+upload.single("fieldname")        // single file
+upload.array("fieldname", 5)      // multiple files (same field)
+upload.fields([{ name, maxCount }]) // multiple fields
+upload.none()                     // only text fields
+
+// Static files
+app.use(express.static("public"));
+app.use("/path", express.static("dir"));
+```
+
+## Practice Exercises
+
+1. **Profile picture upload**: Create an endpoint that accepts a single image upload, resizes it to 200x200px (use the `sharp` library), saves it, and returns the URL.
+
+2. **CSV parser**: Write an endpoint that accepts CSV file uploads, parses them (use the `csv-parse` library), and returns the data as JSON. Validate the CSV has the expected headers.
+
+3. **File manager API**: Build endpoints for: listing files in a directory, uploading files, downloading files, deleting files, and creating directories. Prevent path traversal attacks.

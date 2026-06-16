@@ -1,0 +1,194 @@
+---
+title: "Setting Up Your Development Environment"
+description: "Install and configure Visual Studio Code, Node.js, Live Server, and browser developer tools — everything you need to start writing HTML."
+sidebar:
+  order: 1
+  label: "Setup Environment"
+tab: "full-stack-development"
+---
+
+Before you write your first line of HTML, you need the right tools. This guide walks through installing and configuring everything required for web development.
+
+## What You Need
+
+| Tool | Purpose |
+|------|---------|
+| **VS Code** | Code editor — write and edit HTML, CSS, JavaScript |
+| **Node.js** | JavaScript runtime (needed later for backend, but install now) |
+| **Live Server** | VS Code extension — auto-reloads your page when you save |
+| **Browser (Chrome/Firefox)** | View and debug your web pages |
+| **Git** | Version control (install but we'll use it later) |
+
+## Step 1: Install VS Code
+
+Visual Studio Code is the most popular code editor for web development — it's free, fast, and has a rich extension ecosystem.
+
+### Download and Install
+
+1. Go to [code.visualstudio.com](https://code.visualstudio.com/)
+2. Click the download button (auto-detects your OS)
+3. Run the installer:
+   - **Windows**: Run `.exe` — check "Add to PATH" and "Open with Code"
+   - **macOS**: Open `.zip`, drag VS Code to Applications folder
+   - **Linux**: Download `.deb`/`.rpm` or use package manager
+
+<Aside variant="tip">
+On Linux, you can install via Snap: `sudo snap install code --classic`
+Or via apt: `sudo apt install code`
+</Aside>
+
+### Install Essential Extensions
+
+Open VS Code and install these extensions (click Extensions icon in sidebar or press `Ctrl+Shift+X`):
+
+| Extension | Why You Need It |
+|-----------|-----------------|
+| **Live Server** (by Ritwick Dey) | Launches a local dev server with auto-reload on save |
+| **Prettier - Code formatter** | Auto-formats your HTML/CSS/JS to be clean and consistent |
+| **ESLint** | Catches JavaScript errors as you type |
+| **HTML CSS Support** | Intelligent CSS class suggestions in HTML |
+| **Path Intellisense** | Auto-completes file paths in your code |
+
+### Configure VS Code Settings
+
+Open settings (`Ctrl+,` or `Cmd+,`) and set:
+
+```json
+{
+  "editor.fontSize": 16,
+  "editor.tabSize": 2,
+  "editor.wordWrap": "on",
+  "editor.formatOnSave": true,
+  "editor.minimap.enabled": false,
+  "files.autoSave": "onFocusChange",
+  "emmet.includeLanguages": {
+    "html": "html"
+  }
+}
+```
+
+These settings give you a clean, beginner-friendly editing experience.
+
+## Step 2: Install Node.js
+
+Node.js lets you run JavaScript outside the browser. You'll use it heavily in later modules.
+
+1. Go to [nodejs.org](https://nodejs.org/)
+2. Download the **LTS** version (left button, stable)
+3. Run the installer (all defaults are fine)
+4. Verify installation:
+
+```bash
+node --version
+# v20.x.x (or similar)
+npm --version
+# 10.x.x (or similar)
+```
+
+`npm` (Node Package Manager) comes with Node.js — you'll use it to install libraries later.
+
+## Step 3: Install Git
+
+Git tracks changes to your code and is essential for collaboration.
+
+1. Go to [git-scm.com](https://git-scm.com/)
+2. Download and run the installer (defaults are fine)
+3. Verify:
+
+```bash
+git --version
+# git version 2.x.x
+```
+
+## Step 4: Set Up Your Browser
+
+You need a modern browser with developer tools. Chrome and Firefox both work well.
+
+### Chrome DevTools Overview
+
+Press `F12` or `Ctrl+Shift+I` (`Cmd+Option+I` on Mac) to open DevTools:
+
+| Tab | What It Does |
+|-----|--------------|
+| **Elements** | Inspect and edit HTML/CSS in real time |
+| **Console** | View JavaScript output and errors |
+| **Network** | See all network requests (images, API calls) |
+| **Sources** | Debug JavaScript with breakpoints |
+| **Application** | View storage, cookies, cache |
+
+### Firefox DevTools
+
+Press `F12` — similar tabs but with some unique features:
+- **Accessibility** tab for accessibility auditing
+- **CSS Grid/Flexbox** inspector with visual overlay
+
+## Step 5: Create Your First HTML File
+
+Let's test that everything works:
+
+1. Create a folder called `my-first-site` on your desktop
+2. Open VS Code: `File > Open Folder` and select `my-first-site`
+3. Create a new file: `File > New File` and save as `index.html`
+4. Type or paste this:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My First Page</title>
+</head>
+<body>
+  <h1>Hello, World!</h1>
+  <p>This is my first web page.</p>
+</body>
+</html>
+```
+
+5. Right-click the file in VS Code Explorer and select **Open with Live Server**
+6. Your browser should open to `http://localhost:5500` showing your page
+
+<Aside variant="tip">
+You should see "Hello, World!" in large text and "This is my first web page." below it. If you do, everything is working perfectly.
+</Aside>
+
+### Test the Auto-Reload
+
+Keep the browser open, go back to VS Code, and change the `<h1>` text to something else. Save (`Ctrl+S`). The browser should update automatically — this is Live Server in action.
+
+## Step 6: Understand the File Structure
+
+As you build more complex sites, keep your files organised:
+
+```
+my-project/
+├── index.html        # Main page
+├── about.html        # About page
+├── css/
+│   └── style.css     # Stylesheet
+├── js/
+│   └── script.js     # JavaScript
+├── images/
+│   └── photo.jpg     # Images
+└── assets/           # Other files (fonts, PDFs)
+```
+
+## Verification Checklist
+
+Before moving on, verify you have:
+
+- [ ] VS Code installed with Live Server and Prettier extensions
+- [ ] Node.js and npm installed (`node --version` works)
+- [ ] Git installed (`git --version` works)
+- [ ] Created an `index.html` file and viewed it in browser
+- [ ] Live Server auto-reloads when you save changes
+- [ ] DevTools open with `F12` (Elements and Console tabs visible)
+
+## Key Takeaways
+
+- VS Code + Live Server is the standard web development workflow — edit, save, see changes instantly
+- Node.js and npm are required for JavaScript tooling and backend development
+- Chrome DevTools (F12) is your best friend for debugging and inspecting pages
+- Organise your project files into folders (css/, js/, images/) from day one
+- The auto-reload workflow saves enormous time — you never manually refresh

@@ -1,0 +1,337 @@
+---
+title: "State with useState"
+description: "The useState hook — declaring state, updating state, immutability, array and object state, multiple state variables, lifting state up, and common patterns."
+sidebar:
+  order: 3
+  label: "State with useState"
+tab: "full-stack-development"
+---
+
+State is what makes React components interactive. Unlike props, which are read-only and passed from parents, state is internal to a component and can change over time. When state changes, the component **re-renders** to reflect the new state.
+
+## The `useState` Hook
+
+```jsx
+import { useState } from "react";
+
+function Counter() {
+  // Declare a state variable
+  // count: current value
+  // setCount: function to update it
+  const [count, setCount] = useState(0); // 0 is the initial value
+
+  return (
+    <div>
+      <p>Count: {count}</p>
+      <button onClick={() => setCount(count + 1)}>Increment</button>
+      <button onClick={() => setCount(count - 1)}>Decrement</button>
+    </div>
+  );
+}
+```
+
+### How useState Works
+
+1. `useState(initialValue)` returns an array of two items
+2. The **first item** is the current state value
+3. The **second item** is a function to update that value
+4. Calling the updater function **re-renders** the component
+
+```jsx
+// You can name them anything:
+const [isOpen, setIsOpen] = useState(false);
+const [user, setUser] = useState(null);
+const [items, setItems] = useState([]);
+```
+
+## Updating State
+
+### Direct Update
+
+```jsx
+const [count, setCount] = useState(0);
+
+// Set to a specific value
+setCount(5);
+
+// Update based on previous value
+setCount((prevCount) => prevCount + 1);
+```
+
+<Aside variant="tip">
+When the new state depends on the previous state, use the **function form**: `setCount(prev => prev + 1)`. This ensures correctness even when React batches multiple updates.
+</Aside>
+
+### Why the Function Form Matters
+
+```jsx
+// ❌ Might be wrong — uses stale count
+function handleClick() {
+  setCount(count + 1);
+  setCount(count + 1); // still count + 1, not count + 2
+}
+
+// ✅ Always correct — React guarantees prev is current
+function handleClick() {
+  setCount((prev) => prev + 1);
+  setCount((prev) => prev + 1); // correctly adds 2
+}
+```
+
+## State Immutability
+
+Never mutate state directly — always create a new value:
+
+```jsx
+// ❌ Wrong — mutating state directly
+const [user, setUser] = useState({ name: "Alice", age: 30 });
+user.age = 31; // React won't detect this change!
+setUser(user); // might not re-render
+
+// ✅ Correct — creating a new object
+setUser({ ...user, age: 31 });
+
+// Also correct using function form
+setUser((prev) => ({ ...prev, age: 31 }));
+```
+
+### Array State
+
+```jsx
+const [items, setItems] = useState(["apple", "banana"]);
+
+// Add item (create new array)
+setItems([...items, "orange"]);
+
+// Add at beginning
+setItems(["orange", ...items]);
+
+// Remove by filter
+setItems(items.filter((item) => item !== "banana"));
+
+// Update an item
+setItems(items.map((item) =>
+  item === "banana" ? "blueberry" : item
+));
+
+// Using function form for all of the above
+setItems((prev) => [...prev, "orange"]);
+```
+
+### Object State
+
+```jsx
+const [form, setForm] = useState({
+  name: "",
+  email: "",
+  age: 0,
+});
+
+// Update one field (spread existing, then override)
+setForm({ ...form, name: "Alice" });
+
+// Update multiple fields
+setForm({ ...form, name: "Alice", age: 30 });
+
+// Nested objects need spreading at every level
+const [config, setConfig] = useState({
+  theme: { mode: "dark", fontSize: 14 },
+  notifications: { email: true, push: false },
+});
+
+setConfig({
+  ...config,
+  theme: { ...config.theme, mode: "light" },
+});
+```
+
+## Multiple State Variables
+
+You can use `useState` multiple times for independent pieces of state:
+
+```jsx
+function Form() {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState({});
+
+  // Each state variable is independent
+  return (
+    <form>
+      <input value={name} onChange={(e) => setName(e.target.value)} />
+      <input value={email} onChange={(e) => setEmail(e.target.value)} />
+      <button disabled={isSubmitting}>Submit</button>
+    </form>
+  );
+}
+```
+
+### Group vs Separate State
+
+```jsx
+// Group related state in an object:
+const [user, setUser] = useState({ name: "", email: "", role: "user" });
+
+// Keep unrelated state separate:
+const [isLoading, setIsLoading] = useState(false);
+const [error, setError] = useState(null);
+const [items, setItems] = useState([]);
+```
+
+## Controlled Inputs
+
+Form inputs whose value is controlled by React state:
+
+```jsx
+function LoginForm() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    console.log("Logging in:", { email, password });
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input
+        type="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="Email"
+      />
+      <input
+        type="password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        placeholder="Password"
+      />
+      <button type="submit">Login</button>
+    </form>
+  );
+}
+```
+
+## Lifting State Up
+
+When multiple components need to share the same state, move that state to their closest common ancestor:
+
+```jsx
+function Parent() {
+  const [selectedId, setSelectedId] = useState(null);
+
+  return (
+    <div>
+      <ItemList onSelect={setSelectedId} />
+      <ItemDetail id={selectedId} />
+    </div>
+  );
+}
+
+function ItemList({ onSelect }) {
+  const items = ["Item A", "Item B", "Item C"];
+  return (
+    <ul>
+      {items.map((item) => (
+        <li key={item} onClick={() => onSelect(item)}>
+          {item}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ItemDetail({ id }) {
+  if (!id) return <p>Select an item</p>;
+  return <p>Showing details for: {id}</p>;
+}
+```
+
+## Common Patterns
+
+### Toggle
+
+```jsx
+const [isOpen, setIsOpen] = useState(false);
+
+// Method 1: toggle function
+const toggle = () => setIsOpen((prev) => !prev);
+
+// Method 2: inline
+<button onClick={() => setIsOpen((prev) => !prev)}>
+  {isOpen ? "Close" : "Open"}
+</button>
+```
+
+### Counter with Limits
+
+```jsx
+function Counter({ min = 0, max = 10 }) {
+  const [count, setCount] = useState(min);
+
+  const increment = () => setCount((prev) => Math.min(prev + 1, max));
+  const decrement = () => setCount((prev) => Math.max(prev - 1, min));
+
+  return (
+    <div>
+      <button onClick={decrement} disabled={count <= min}>-</button>
+      <span>{count}</span>
+      <button onClick={increment} disabled={count >= max}>+</button>
+    </div>
+  );
+}
+```
+
+### Derived State
+
+Don't store values that can be **computed** from existing state:
+
+```jsx
+function ShoppingCart({ items }) {
+  // ❌ Don't store this — it's derived
+  const [total, setTotal] = useState(0);
+  useEffect(() => {
+    setTotal(items.reduce((sum, item) => sum + item.price, 0));
+  }, [items]);
+
+  // ✅ Compute it directly
+  const total = items.reduce((sum, item) => sum + item.price, 0);
+  const itemCount = items.length;
+  const hasItems = items.length > 0;
+
+  return <p>{itemCount} items, total: ${total}</p>;
+}
+```
+
+## Quick Reference
+
+```jsx
+// Declaration
+const [state, setState] = useState(initialValue);
+
+// Direct update
+setState(newValue);
+
+// Function update (when new depends on previous)
+setState((prev) => prev + 1);
+
+// Object state (immutable update)
+setState({ ...state, key: newValue });
+
+// Array state (immutable update)
+setState([...state, newItem]);        // add
+setState(state.filter(x => x !== i));  // remove
+setState(state.map(x => x === old ? new : x)); // update
+
+// Lazy initialisation
+const [data] = useState(() => expensiveComputation());
+```
+
+## Practice Exercises
+
+1. **Build a Temperature Converter**: Two inputs — one for Celsius, one for Fahrenheit. When the user types in either, update the other automatically. (Formula: F = C × 9/5 + 32)
+
+2. **Build a Shopping Cart**: A list of products with "Add to Cart" buttons. Track the cart as state (array of items). Show the cart total and item count. Allow removing items.
+
+3. **Build a Multi-Step Form**: A form with 3 steps. Use a `step` state variable. Show different form fields based on the current step. Include "Next" and "Back" buttons. Collect all data and log it on the final step.

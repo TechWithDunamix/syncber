@@ -1,0 +1,442 @@
+---
+title: "Project: Personal Portfolio Page"
+description: "Build and publish your first complete web page — a personal portfolio using all HTML concepts: semantic structure, navigation, images, lists, tables, forms, and accessible markup."
+sidebar:
+  order: 9
+  label: "Portfolio Project"
+tab: "full-stack-development"
+---
+
+This project brings together everything you learned in the HTML module. You'll build a personal portfolio page — a single-page website that showcases your skills, projects, and contact information.
+
+## Project Requirements
+
+Your portfolio page must include:
+
+- [ ] Semantic HTML5 structure (`<header>`, `<nav>`, `<main>`, `<section>`, `<footer>`)
+- [ ] Navigation bar with anchor links to each section
+- [ ] A hero/about section with your name and bio
+- [ ] A skills section using unordered lists
+- [ ] A projects section using `<figure>` and `<figcaption>`
+- [ ] A experience/timeline section using a table
+- [ ] A contact section with a validated form
+- [ ] A footer with links and copyright
+- [ ] At least one image with proper `alt` text
+- [ ] A skip navigation link for accessibility
+- [ ] Proper heading hierarchy (one `<h1>`, logical `<h2>`-`<h3>`)
+- [ ] HTML validation passes W3C validator
+
+## Step-by-Step Build
+
+### Step 1: Create the File
+
+Create a new folder called `portfolio` and add an `index.html` file:
+
+```bash
+mkdir portfolio
+cd portfolio
+touch index.html
+```
+
+Open the folder in VS Code and start Live Server.
+
+### Step 2: Document Structure
+
+Start with the complete HTML document structure:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Portfolio of [Your Name] — web developer">
+  <title>[Your Name] | Portfolio</title>
+</head>
+<body>
+  <!-- Content will go here -->
+</body>
+</html>
+```
+
+### Step 3: Skip Navigation Link
+
+Add this as the first element inside `<body>`:
+
+```html
+<a href="#main-content" class="skip-link">Skip to main content</a>
+```
+
+Add minimal styling in a `<style>` block in `<head>`:
+
+```html
+<style>
+  .skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: #000;
+    color: #fff;
+    padding: 8px 16px;
+    z-index: 100;
+  }
+  .skip-link:focus {
+    top: 0;
+  }
+</style>
+```
+
+### Step 4: Header and Navigation
+
+```html
+<header>
+  <h1>[Your Name]</h1>
+  <p>Web Developer &amp; Designer</p>
+  <nav aria-label="Main navigation">
+    <ul>
+      <li><a href="#about">About</a></li>
+      <li><a href="#skills">Skills</a></li>
+      <li><a href="#projects">Projects</a></li>
+      <li><a href="#experience">Experience</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ul>
+  </nav>
+</header>
+```
+
+### Step 5: Main Content and About Section
+
+```html
+<main id="main-content">
+  <section id="about">
+    <h2>About Me</h2>
+    <img src="https://placehold.co/200x200" alt="Portrait photo of [Your Name]" width="200" height="200">
+    <p>Hello! I'm [Your Name], a web developer passionate about building accessible, user-friendly websites. I specialize in HTML, CSS, and JavaScript, and I'm constantly learning new technologies.</p>
+    <p>When I'm not coding, you'll find me [your hobby]. I believe in writing clean code that works for everyone.</p>
+  </section>
+```
+
+### Step 6: Skills Section
+
+```html
+  <section id="skills">
+    <h2>Skills</h2>
+
+    <h3>Frontend</h3>
+    <ul>
+      <li>HTML5</li>
+      <li>CSS3</li>
+      <li>JavaScript</li>
+      <li>React (learning)</li>
+    </ul>
+
+    <h3>Tools &amp; Workflow</h3>
+    <ul>
+      <li>VS Code</li>
+      <li>Git &amp; GitHub</li>
+      <li>Chrome DevTools</li>
+      <li>Figma</li>
+    </ul>
+  </section>
+```
+
+### Step 7: Projects Section
+
+```html
+  <section id="projects">
+    <h2>Projects</h2>
+
+    <figure>
+      <img src="https://placehold.co/400x250/eee/333?text=Project+1" alt="Screenshot of a personal portfolio website" width="400" height="250">
+      <figcaption>
+        <h3>Personal Portfolio</h3>
+        <p>A responsive personal portfolio built with semantic HTML and CSS.</p>
+      </figcaption>
+    </figure>
+
+    <figure>
+      <img src="https://placehold.co/400x250/eee/333?text=Project+2" alt="Screenshot of a survey form" width="400" height="250">
+      <figcaption>
+        <h3>Survey Form</h3>
+        <p>A validated HTML form with multiple input types and accessibility features.</p>
+      </figcaption>
+    </figure>
+  </section>
+```
+
+### Step 8: Experience Section (Table)
+
+```html
+  <section id="experience">
+    <h2>Experience &amp; Education</h2>
+
+    <table>
+      <caption>Professional timeline</caption>
+      <thead>
+        <tr>
+          <th scope="col">Year</th>
+          <th scope="col">Role</th>
+          <th scope="col">Organization</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>2026</td>
+          <td>Full Stack Student</td>
+          <td>Solstice Academy</td>
+        </tr>
+        <tr>
+          <td>2025</td>
+          <td>Junior Web Developer</td>
+          <td>Freelance</td>
+        </tr>
+        <tr>
+          <td>2024</td>
+          <td>Web Development Certificate</td>
+          <td>Online Course</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+```
+
+### Step 9: Contact Section (Form)
+
+```html
+  <section id="contact">
+    <h2>Contact Me</h2>
+
+    <form action="#" method="post">
+      <div>
+        <label for="name">Name:</label>
+        <input type="text" id="name" name="name" required placeholder="Your name">
+      </div>
+
+      <div>
+        <label for="email">Email:</label>
+        <input type="email" id="email" name="email" required placeholder="you@example.com">
+      </div>
+
+      <div>
+        <label for="subject">Subject:</label>
+        <select id="subject" name="subject" required>
+          <option value="">-- Select a subject --</option>
+          <option value="project">Project Inquiry</option>
+          <option value="collaboration">Collaboration</option>
+          <option value="feedback">Feedback</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="message">Message:</label>
+        <textarea id="message" name="message" rows="5" required placeholder="Your message..." maxlength="1000"></textarea>
+      </div>
+
+      <button type="submit">Send Message</button>
+    </form>
+  </section>
+</main>
+```
+
+### Step 10: Footer
+
+```html
+<footer>
+  <p>&copy; 2026 [Your Name]. All rights reserved.</p>
+  <nav aria-label="Social links">
+    <ul>
+      <li><a href="https://github.com/yourusername" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+      <li><a href="https://linkedin.com/in/yourusername" target="_blank" rel="noopener noreferrer">LinkedIn</a></li>
+      <li><a href="mailto:your.email@example.com">Email</a></li>
+    </ul>
+  </nav>
+</footer>
+```
+
+## Step 11: Add Basic CSS
+
+Create a `style.css` file and link it in your `<head>`:
+
+```html
+<link rel="stylesheet" href="style.css">
+```
+
+```css
+/* Reset defaults */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  line-height: 1.6;
+  color: #333;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+header {
+  text-align: center;
+  padding: 40px 0;
+  border-bottom: 2px solid #eee;
+}
+
+nav ul {
+  list-style: none;
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  padding: 20px 0;
+}
+
+nav a {
+  text-decoration: none;
+  color: #0066cc;
+  padding: 8px 16px;
+  border-radius: 4px;
+}
+
+nav a:hover {
+  background: #f0f7ff;
+}
+
+section {
+  padding: 40px 0;
+  border-bottom: 1px solid #eee;
+}
+
+h2 {
+  margin-bottom: 20px;
+  color: #222;
+}
+
+img {
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0;
+}
+
+th, td {
+  border: 1px solid #ddd;
+  padding: 12px;
+  text-align: left;
+}
+
+th {
+  background: #f4f4f4;
+}
+
+form div {
+  margin-bottom: 16px;
+}
+
+label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+input, select, textarea {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 16px;
+}
+
+button {
+  background: #0066cc;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  font-size: 16px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #0052a3;
+}
+
+footer {
+  text-align: center;
+  padding: 20px 0;
+  color: #666;
+}
+```
+
+## Validating Your HTML
+
+Always validate your HTML — it catches errors and ensures standards compliance:
+
+1. Go to [validator.w3.org](https://validator.w3.org/)
+2. Select "Validate by Direct Input"
+3. Copy and paste your entire HTML
+4. Click "Check"
+5. Fix any errors or warnings
+
+Common validation fixes:
+- Unclosed tags (e.g., missing `</li>`)
+- Incorrectly nested elements
+- Duplicate `id` attributes
+- Missing `alt` on images
+
+## Publishing with GitHub Pages
+
+Publish your portfolio for free:
+
+1. Create a GitHub account at [github.com](https://github.com)
+2. Create a new repository named `yourusername.github.io`
+3. Push your portfolio files:
+```bash
+git init
+git add .
+git commit -m "Initial portfolio"
+git remote add origin https://github.com/yourusername/yourusername.github.io.git
+git push -u origin main
+```
+4. Go to Settings > Pages — your site is live at `https://yourusername.github.io`
+
+## Extension Ideas
+
+Once the basic portfolio is complete, try adding:
+
+- A responsive navigation (hamburger menu for mobile)
+- Dark mode toggle
+- Animated skill bars
+- A project carousel
+- Testimonials section with `<blockquote>`
+- Embedded Google Map showing your location
+
+## Submission Checklist
+
+Before considering this project complete:
+
+- [ ] Semantic HTML5 elements used throughout
+- [ ] All images have descriptive `alt` text
+- [ ] Skip navigation link works (Tab → Enter on first load)
+- [ ] Heading hierarchy is logical (h1 → h2 → h3)
+- [ ] Form validates with HTML5 attributes
+- [ ] Table has `scope` attributes on headers
+- [ ] Navigation links jump to the correct sections
+- [ ] Page passes W3C HTML validation
+- [ ] page passes Lighthouse accessibility audit (aim for 90+)
+- [ ] Code is properly indented
+- [ ] Published on GitHub Pages (optional but recommended)
+
+## Key Takeaways
+
+- A complete HTML page combines all the elements you've learned into a cohesive whole
+- Semantic structure makes pages accessible, maintainable, and SEO-friendly
+- Forms connect users to you — proper validation ensures quality submissions
+- W3C validation catches structural errors before they reach users
+- GitHub Pages provides free hosting for static sites — publish your work
+- This portfolio is your first project — you'll improve it with CSS and JavaScript in the coming modules

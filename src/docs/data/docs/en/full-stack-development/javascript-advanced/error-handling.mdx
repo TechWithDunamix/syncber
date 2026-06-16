@@ -1,0 +1,372 @@
+---
+title: "Error Handling"
+description: "JavaScript error handling patterns — try/catch/finally, custom error classes, the Error object, stack traces, defensive programming, and async error handling."
+sidebar:
+  order: 6
+  label: "Error Handling"
+tab: "full-stack-development"
+---
+
+Errors are inevitable in every application. How you handle them separates robust code from fragile code. JavaScript provides `try`/`catch`/`finally` for synchronous errors and special patterns for asynchronous code.
+
+## The Error Object
+
+JavaScript has a built-in `Error` class with a `message` property and a `stack` trace:
+
+```js
+const error = new Error("Something went wrong");
+console.log(error.message); // "Something went wrong"
+console.log(error.stack);   // Stack trace with file and line numbers
+console.log(error.name);    // "Error"
+```
+
+When an error is thrown and not caught, the program crashes. The stack trace tells you exactly where the error originated:
+
+```
+Error: Something went wrong
+    at processData (script.js:15:11)
+    at main (script.js:21:3)
+    at script.js:24:1
+```
+
+## Try / Catch / Finally
+
+```js
+try {
+  // Code that might throw
+  const result = JSON.parse(invalidJSON);
+  console.log(result);
+} catch (error) {
+  // Handle the error
+  console.error("Failed to parse JSON:", error.message);
+} finally {
+  // Always runs, regardless of error
+  console.log("Parse attempt finished");
+}
+```
+
+### Key Behaviours
+
+- **`try`** — wraps risky code. If any statement throws, control jumps immediately to `catch`
+- **`catch`** — receives the error object. You can re-throw, handle, or log
+- **`finally`** — always executes, even if `try` has `return`, or `catch` re-throws
+
+```js
+function divide(a, b) {
+  try {
+    if (b === 0) throw new Error("Division by zero");
+    return a / b;
+  } catch (err) {
+    console.error(err.message);
+    return null;
+  } finally {
+    console.log("divide() completed");
+  }
+}
+
+console.log(divide(10, 2)); // 5, then "divide() completed"
+console.log(divide(10, 0)); // "Division by zero", null, then "divide() completed"
+```
+
+## Throwing Errors
+
+Use `throw` to signal error conditions. You can throw any value, but always throw `Error` objects for proper stack traces:
+
+```js
+function validateAge(age) {
+  if (age < 0) {
+    throw new Error("Age cannot be negative");
+  }
+  if (age > 150) {
+    throw new Error("Age seems unrealistic");
+  }
+  return true;
+}
+
+try {
+  validateAge(-5);
+} catch (err) {
+  console.error(err.message); // "Age cannot be negative"
+}
+```
+
+<Aside variant="tip">
+Always throw `Error` instances (`new Error(...)`), not strings or objects. Strings and plain objects don't have stack traces, making debugging significantly harder.
+</Aside>
+
+## Custom Error Classes
+
+Create domain-specific error types by extending `Error`:
+
+```js
+class ValidationError extends Error {
+  constructor(message, field) {
+    super(message);
+    this.name = "ValidationError";
+    this.field = field;
+  }
+}
+
+class NotFoundError extends Error {
+  constructor(resource, id) {
+    super(`${resource} with id ${id} not found`);
+    this.name = "NotFoundError";
+    this.resource = resource;
+    this.id = id;
+    this.statusCode = 404;
+  }
+}
+
+class NetworkError extends Error {
+  constructor(statusCode, url) {
+    super(`Request to ${url} failed with status ${statusCode}`);
+    this.name = "NetworkError";
+    this.statusCode = statusCode;
+    this.url = url;
+  }
+}
+```
+
+Using custom errors enables targeted handling:
+
+```js
+try {
+  const user = await api.getUser(userId);
+} catch (err) {
+  if (err instanceof NotFoundError) {
+    showUserNotFoundPage();
+  } else if (err instanceof NetworkError) {
+    showRetryPrompt();
+  } else if (err instanceof ValidationError) {
+    showFieldError(err.field, err.message);
+  } else {
+    // Unexpected error — log and show generic message
+    logError(err);
+    showGenericError();
+  }
+}
+```
+
+## Defensive Programming Patterns
+
+### 1. Guard Clauses
+
+Check preconditions early and throw immediately:
+
+```js
+function processPayment(amount, currency, userId) {
+  // Guards — fail fast
+  if (typeof amount !== "number" || amount <= 0) {
+    throw new ValidationError("Invalid payment amount", "amount");
+  }
+  if (!currency || typeof currency !== "string") {
+    throw new ValidationError("Currency is required", "currency");
+  }
+  if (!userId) {
+    throw new ValidationError("User must be authenticated", "userId");
+  }
+
+  // Main logic — preconditions guaranteed by this point
+  return chargeUser(userId, amount, currency);
+}
+```
+
+### 2. Default Values with Fallthrough
+
+```js
+function getConfig(key, defaultValue = null) {
+  try {
+    const value = readConfigFile(key);
+    return value !== undefined ? value : defaultValue;
+  } catch {
+    // If config file is missing, return the default
+    return defaultValue;
+  }
+}
+```
+
+### 3. Input Validation Wrapper
+
+```js
+function withValidation(fn, validator) {
+  return function(...args) {
+    const result = validator(...args);
+    if (!result.valid) {
+      throw new ValidationError(result.message, result.field);
+    }
+    return fn(...args);
+  };
+}
+
+const validatedCreateUser = withValidation(createUser, (data) => {
+  if (!data.email?.includes("@")) {
+    return { valid: false, message: "Invalid email", field: "email" };
+  }
+  return { valid: true };
+});
+```
+
+## Async Error Handling
+
+### Promises
+
+Every Promise chain needs a `.catch()`:
+
+```js
+fetchUser(1)
+  .then((user) => getPosts(user.id))
+  .then((posts) => renderPosts(posts))
+  .catch((err) => {
+    // Catches errors from any step in the chain
+    showError("Failed to load posts");
+    logError(err);
+  });
+```
+
+### Async/Await
+
+Use `try`/`catch` with `async` functions:
+
+```js
+async function loadDashboard(userId) {
+  try {
+    const [user, posts, settings] = await Promise.all([
+      fetchUser(userId),
+      getPosts(userId),
+      getSettings(userId),
+    ]);
+    renderDashboard(user, posts, settings);
+  } catch (err) {
+    if (err instanceof NetworkError) {
+      showOfflineMessage();
+    } else {
+      showError("Failed to load dashboard");
+      logError(err);
+    }
+  }
+}
+```
+
+### Unhandled Promise Rejections
+
+Any Promise rejection that isn't caught becomes an **unhandled rejection**. In Node.js, this crashes the process. Always catch:
+
+```js
+// Global handler (last resort — better to catch locally)
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("Unhandled Rejection:", reason);
+  process.exit(1);
+});
+
+// Browser equivalent
+window.addEventListener("unhandledrejection", (event) => {
+  console.error("Unhandled Rejection:", event.reason);
+  event.preventDefault();
+});
+```
+
+### Top-Level Await Errors (ES2022+)
+
+In modules, top-level `await` can be wrapped:
+
+```js
+// module.mjs
+try {
+  const config = await fetchConfig();
+  export default config;
+} catch (err) {
+  console.error("Failed to load config:", err);
+  export default {};
+}
+```
+
+## Async Error Wrappers
+
+### Handle async errors in Express.js
+
+```js
+// Wrapper to catch async errors in Express route handlers
+function asyncHandler(fn) {
+  return (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+}
+
+app.get("/users/:id", asyncHandler(async (req, res) => {
+  const user = await findUser(req.params.id);
+  if (!user) {
+    throw new NotFoundError("User", req.params.id);
+  }
+  res.json(user);
+}));
+```
+
+### Wrapper for consistent error responses
+
+```js
+async function apiCall(fn) {
+  try {
+    const data = await fn();
+    return { success: true, data };
+  } catch (err) {
+    const statusCode = err.statusCode || 500;
+    return {
+      success: false,
+      error: {
+        message: err.message || "Internal server error",
+        code: statusCode,
+      }
+    };
+  }
+}
+
+const result = await apiCall(() => fetchUser(1));
+if (!result.success) {
+  console.error(`API Error ${result.error.code}: ${result.error.message}`);
+}
+```
+
+## Error Logging
+
+In production, log errors with enough context to debug:
+
+```js
+function logError(error, context = {}) {
+  const logEntry = {
+    timestamp: new Date().toISOString(),
+    name: error.name,
+    message: error.message,
+    stack: error.stack,
+    ...context,
+  };
+
+  // In development: console
+  if (process.env.NODE_ENV === "development") {
+    console.error(logEntry);
+    return;
+  }
+
+  // In production: send to logging service
+  // fetch("/api/logs", { method: "POST", body: JSON.stringify(logEntry) });
+}
+```
+
+## Quick Reference
+
+| Pattern | Use Case |
+|---------|----------|
+| `try/catch` | Synchronous error handling |
+| `try/catch/finally` | When cleanup code must always run |
+| Custom Error classes | Domain-specific errors with metadata |
+| Guard clauses | Validate inputs early, fail fast |
+| `.catch()` on Promises | Async error handling |
+| `try/catch` with `async/await` | Readable async error handling |
+| Error wrapper functions | Consistent error formatting |
+
+## Practice Exercises
+
+1. **Create error types**: Build `AuthenticationError`, `AuthorizationError`, and `RateLimitError` classes. Each should have an appropriate HTTP status code. Write a middleware that catches them and returns proper JSON responses.
+
+2. **Safe JSON parser**: Write a function `safeJSON(str)` that returns `{ success: true, data }` or `{ success: false, error }` instead of throwing. Test it with `'{"valid": true}'`, `'invalid'`, and `'{"broken": "yes"'`.
+
+3. **Retry with backoff**: Write an `asyncRetry(fn, maxAttempts)` function that calls `fn()`, and if it throws, waits and retries up to `maxAttempts` times. Use exponential backoff (1s, 2s, 4s, 8s...).

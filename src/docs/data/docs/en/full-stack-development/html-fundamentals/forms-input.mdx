@@ -1,0 +1,341 @@
+---
+title: "Forms & Input Elements"
+description: "Build interactive forms with all input types — text fields, radio buttons, checkboxes, select menus, textareas, buttons, HTML5 validation, and accessible form design."
+sidebar:
+  order: 7
+  label: "Forms & Input"
+tab: "full-stack-development"
+---
+
+Forms are how users send data to a web server — login, registration, search, checkout, contact messages. This lesson covers every common form control.
+
+## The `<form>` Element
+
+```html
+<form action="/submit" method="post">
+  <!-- form controls go here -->
+</form>
+```
+
+| Attribute | Purpose |
+|-----------|---------|
+| `action` | URL where form data is sent |
+| `method` | HTTP method — `get` (URL parameters) or `post` (body, for sensitive data) |
+| `name` | Identifies the form (useful when there are multiple forms) |
+| `novalidate` | Disables browser validation (when using custom JS validation) |
+
+For now, set `action` to `#` (stay on same page) while learning:
+
+```html
+<form action="#" method="post">
+  ...
+  <button type="submit">Submit</button>
+</form>
+```
+
+## Text Inputs
+
+### Single-line Text
+
+```html
+<label for="username">Username:</label>
+<input type="text" id="username" name="username" placeholder="Enter your username" required>
+
+<label for="email">Email:</label>
+<input type="email" id="email" name="email" placeholder="you@example.com" required>
+
+<label for="password">Password:</label>
+<input type="password" id="password" name="password" minlength="8" required>
+
+<label for="search">Search:</label>
+<input type="search" id="search" name="search" placeholder="Search...">
+
+<label for="phone">Phone:</label>
+<input type="tel" id="phone" name="phone" pattern="[0-9]{3}-[0-9]{3}-[0-9]{4}" placeholder="555-123-4567">
+
+<label for="url">Website:</label>
+<input type="url" id="url" name="url" placeholder="https://example.com">
+```
+
+### The `<label>` Element
+
+Always connect labels to inputs using the `for` attribute:
+
+```html
+<!-- Method 1: for/id matching (preferred) -->
+<label for="email">Email:</label>
+<input type="email" id="email" name="email">
+
+<!-- Method 2: wrapping the input -->
+<label>
+  Email:
+  <input type="email" name="email">
+</label>
+```
+
+Method 1 is preferred because it works even when the label and input are in different containers.
+
+## Number and Date Inputs
+
+```html
+<label for="age">Age:</label>
+<input type="number" id="age" name="age" min="0" max="150" step="1">
+
+<label for="birthday">Birthday:</label>
+<input type="date" id="birthday" name="birthday">
+
+<label for="meeting-time">Meeting Time:</label>
+<input type="datetime-local" id="meeting-time" name="meeting-time">
+
+<label for="color">Favorite Color:</label>
+<input type="color" id="color" name="color" value="#ff0000">
+
+<label for="rating">Rating:</label>
+<input type="range" id="rating" name="rating" min="1" max="5" value="3">
+```
+
+## Checkboxes and Radio Buttons
+
+### Checkboxes (multiple selection)
+
+```html
+<fieldset>
+  <legend>Select your interests:</legend>
+
+  <input type="checkbox" id="coding" name="interests" value="coding">
+  <label for="coding">Coding</label>
+
+  <input type="checkbox" id="design" name="interests" value="design">
+  <label for="design">Design</label>
+
+  <input type="checkbox" id="writing" name="interests" value="writing" checked>
+  <label for="writing">Writing</label>
+</fieldset>
+```
+
+### Radio Buttons (single selection)
+
+```html
+<fieldset>
+  <legend>Choose your plan:</legend>
+
+  <input type="radio" id="basic" name="plan" value="basic">
+  <label for="basic">Basic - $9/mo</label>
+
+  <input type="radio" id="pro" name="plan" value="pro" checked>
+  <label for="pro">Pro - $29/mo</label>
+
+  <input type="radio" id="enterprise" name="plan" value="enterprise">
+  <label for="enterprise">Enterprise - Contact us</label>
+</fieldset>
+```
+
+**Key rule**: Radio buttons with the same `name` attribute are mutually exclusive — selecting one deselects others.
+
+<Aside variant="tip">
+Always use `<fieldset>` and `<legend>` to group related form controls. This helps screen readers understand the relationship between controls.
+</Aside>
+
+## Select Menus and Textareas
+
+### Select (Dropdown)
+
+```html
+<label for="country">Country:</label>
+<select id="country" name="country">
+  <option value="">-- Select a country --</option>
+  <option value="us">United States</option>
+  <option value="ca">Canada</option>
+  <option value="uk">United Kingdom</option>
+</select>
+
+<!-- Multi-select -->
+<label for="skills">Skills (hold Ctrl to select multiple):</label>
+<select id="skills" name="skills" multiple size="4">
+  <option value="html">HTML</option>
+  <option value="css">CSS</option>
+  <option value="js">JavaScript</option>
+  <option value="python">Python</option>
+</select>
+
+<!-- Grouped options -->
+<label for="browser">Browser:</label>
+<select id="browser" name="browser">
+  <optgroup label="Popular">
+    <option value="chrome">Chrome</option>
+    <option value="firefox">Firefox</option>
+    <option value="edge">Edge</option>
+  </optgroup>
+  <optgroup label="Other">
+    <option value="safari">Safari</option>
+    <option value="opera">Opera</option>
+  </optgroup>
+</select>
+```
+
+### Textarea (Multi-line Text)
+
+```html
+<label for="message">Message:</label>
+<textarea id="message" name="message" rows="5" cols="40" placeholder="Write your message here..." maxlength="1000"></textarea>
+```
+
+## Buttons
+
+```html
+<!-- Submit the form -->
+<button type="submit">Submit</button>
+
+<!-- Reset form fields to defaults -->
+<button type="reset">Reset</button>
+
+<!-- Regular button (does nothing without JavaScript) -->
+<button type="button">Click Me</button>
+
+<!-- Button using input element -->
+<input type="submit" value="Submit">
+<input type="reset" value="Reset">
+<input type="button" value="Click Me">
+```
+
+`<button>` is preferred over `<input type="button">` because it can contain HTML content (icons, images, etc.).
+
+## HTML5 Form Validation
+
+HTML provides built-in validation attributes — no JavaScript needed:
+
+```html
+<form>
+  <label for="email">Email (required):</label>
+  <input
+    type="email"
+    id="email"
+    name="email"
+    required
+    placeholder="you@example.com"
+  >
+
+  <label for="password">Password (8+ characters):</label>
+  <input
+    type="password"
+    id="password"
+    name="password"
+    minlength="8"
+    required
+  >
+
+  <label for="age">Age (18-120):</label>
+  <input
+    type="number"
+    id="age"
+    name="age"
+    min="18"
+    max="120"
+    required
+  >
+
+  <label for="zip">ZIP Code (5 digits):</label>
+  <input
+    type="text"
+    id="zip"
+    name="zip"
+    pattern="[0-9]{5}"
+    placeholder="12345"
+    required
+  >
+
+  <button type="submit">Register</button>
+</form>
+```
+
+| Validation Attribute | Effect |
+|---------------------|--------|
+| `required` | Field must be filled |
+| `minlength` / `maxlength` | Character count limits |
+| `min` / `max` | Value range limits (number/date inputs) |
+| `pattern` | Regex pattern match |
+| `type="email"` | Validates email format |
+| `type="url"` | Validates URL format |
+
+When a form is submitted with invalid data, the browser:
+1. Shows an error message near the first invalid field
+2. Prevents form submission
+3. Highlights invalid fields with `:invalid` CSS pseudo-class
+
+## Styling Form Validation States
+
+```html
+<style>
+  input:valid {
+    border-color: green;
+  }
+  input:invalid {
+    border-color: red;
+  }
+  input:focus:invalid {
+    outline-color: orange;
+  }
+</style>
+```
+
+## Full Form Example
+
+```html
+<form action="/register" method="post">
+  <fieldset>
+    <legend>Account Information</legend>
+
+    <label for="fullname">Full Name:</label>
+    <input type="text" id="fullname" name="fullname" required>
+
+    <label for="email">Email:</label>
+    <input type="email" id="email" name="email" required>
+
+    <label for="password">Password:</label>
+    <input type="password" id="password" name="password" minlength="8" required>
+  </fieldset>
+
+  <fieldset>
+    <legend>Preferences</legend>
+
+    <label for="newsletter">
+      <input type="checkbox" id="newsletter" name="newsletter" checked>
+      Subscribe to newsletter
+    </label>
+
+    <label for="theme">Theme:</label>
+    <select id="theme" name="theme">
+      <option value="light">Light</option>
+      <option value="dark">Dark</option>
+      <option value="auto">Auto</option>
+    </select>
+  </fieldset>
+
+  <button type="submit">Create Account</button>
+</form>
+```
+
+## Try It Yourself
+
+Build a registration form with:
+
+1. Text inputs for first name, last name, email, and password (all required)
+2. A number input for age (18-120)
+3. Radio buttons for gender (with appropriate labels)
+4. Checkboxes for interests (at least 4 options)
+5. A select dropdown for country
+6. A textarea for a short bio
+7. A submit button
+8. Use `<fieldset>` and `<legend>` to group related fields
+9. Add HTML5 validation attributes to all fields
+10. Test the form — try submitting with empty required fields
+
+## Key Takeaways
+
+- Always use `<label>` with `for` attribute matching the input's `id` for accessibility
+- Group related controls with `<fieldset>` and `<legend>`
+- Use the correct `type` for each input — `email`, `tel`, `url`, `number`, etc. — to get appropriate mobile keyboards and built-in validation
+- Radio buttons with the same `name` are mutually exclusive; checkboxes allow multiple selection
+- HTML5 validation attributes (`required`, `minlength`, `pattern`, `min`, `max`) provide free client-side validation
+- `:valid` and `:invalid` CSS pseudo-classes let you style validation states
+- `<button type="submit">` is preferred over `<input type="submit">`

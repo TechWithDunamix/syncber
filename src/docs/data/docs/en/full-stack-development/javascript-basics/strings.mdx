@@ -1,0 +1,268 @@
+---
+title: "Strings & Template Literals"
+description: "String methods, template literals, string interpolation, multi-line strings, and regular expression basics in JavaScript."
+sidebar:
+  order: 8
+  label: "Strings"
+tab: "full-stack-development"
+---
+
+Strings represent text. JavaScript provides a rich set of methods for manipulating strings.
+
+## Creating Strings
+
+```javascript
+// Three ways
+const single = 'Hello';
+const double = "Hello";
+const backtick = `Hello`;     // Template literal
+
+// All three work — be consistent (most projects use double quotes or backticks)
+```
+
+## String Properties and Access
+
+```javascript
+const str = "JavaScript";
+
+// Length
+console.log(str.length);      // => 10
+
+// Character access
+console.log(str[0]);           // => "J"
+console.log(str[str.length - 1]); // => "t"
+
+// charAt (older way)
+console.log(str.charAt(4));    // => "S"
+```
+
+## Common String Methods
+
+### Case Conversion
+
+```javascript
+const text = "Hello World";
+
+console.log(text.toUpperCase());      // => "HELLO WORLD"
+console.log(text.toLowerCase());      // => "hello world"
+console.log(text);                     // => "Hello World" (original unchanged)
+```
+
+### Trimming
+
+```javascript
+const padded = "  spaces around  ";
+console.log(padded.trim());           // => "spaces around"
+console.log(padded.trimStart());      // => "spaces around  "
+console.log(padded.trimEnd());        // => "  spaces around"
+```
+
+### Searching
+
+```javascript
+const sentence = "The quick brown fox jumps over the lazy dog";
+
+console.log(sentence.indexOf("fox"));       // => 16
+console.log(sentence.indexOf("cat"));       // => -1 (not found)
+console.log(sentence.includes("fox"));      // => true
+console.log(sentence.startsWith("The"));    // => true
+console.log(sentence.endsWith("dog"));      // => true
+
+// lastIndexOf — finds last occurrence
+console.log(sentence.lastIndexOf("the"));   // => 31
+```
+
+### Extracting Parts
+
+```javascript
+const str = "JavaScript";
+
+console.log(str.slice(0, 4));     // => "Java"  (start at 0, end before 4)
+console.log(str.slice(4));        // => "Script"  (from 4 to end)
+console.log(str.slice(-6));       // => "Script"  (last 6 characters)
+
+console.log(str.substring(0, 4)); // => "Java"  (similar to slice)
+console.log(str.substr(4, 3));    // => "Scr"  (deprecated — avoid)
+```
+
+### Splitting and Joining
+
+```javascript
+// Split string into array
+const csv = "apple,banana,cherry";
+console.log(csv.split(","));       // => ["apple", "banana", "cherry"]
+
+const words = "one two three";
+console.log(words.split(" "));     // => ["one", "two", "three"]
+
+// Split into characters
+console.log("hello".split(""));    // => ["h", "e", "l", "l", "o"]
+
+// Join array into string (opposite of split)
+const parts = ["2026", "06", "16"];
+console.log(parts.join("-"));     // => "2026-06-16"
+```
+
+### Replacing
+
+```javascript
+const text = "I like cats. Cats are great.";
+
+// Replace FIRST match only
+console.log(text.replace("cats", "dogs"));
+// => "I like dogs. Cats are great."
+
+// Replace ALL (case-sensitive)
+console.log(text.replace(/cats/g, "dogs"));
+// => "I like dogs. Cats are great."
+
+// Replace ALL (case-insensitive)
+console.log(text.replace(/cats/gi, "dogs"));
+// => "I like dogs. dogs are great."
+
+// Replace with function
+const prices = "Total: $10.50";
+const result = prices.replace(/\$(\d+\.\d+)/, (match, amount) => {
+  return `$${(parseFloat(amount) * 1.1).toFixed(2)}`;  // Add 10% tax
+});
+console.log(result);  // => "Total: $11.55"
+```
+
+### Padding
+
+```javascript
+// Pad to a minimum length
+console.log("5".padStart(3, "0"));     // => "005"
+console.log("123".padStart(3, "0"));   // => "123" (already long enough)
+console.log("hello".padEnd(10, "-"));  // => "hello-----"
+```
+
+### Repeating
+
+```javascript
+console.log("ha".repeat(3));  // => "hahaha"
+```
+
+## Template Literals
+
+Template literals (backticks) provide features regular quotes don't:
+
+```javascript
+const name = "Alice";
+const age = 30;
+
+// String interpolation
+console.log(`Hello, my name is ${name} and I am ${age} years old.`);
+// => "Hello, my name is Alice and I am 30 years old."
+
+// Expressions
+console.log(`Next year I'll be ${age + 1}.`);
+console.log(`Total: ${10 * 5} dollars.`);
+
+// Multi-line strings
+const html = `
+  <div class="card">
+    <h2>${name}</h2>
+    <p>Age: ${age}</p>
+  </div>
+`;
+console.log(html);
+```
+
+## Regular Expression Basics
+
+Regular expressions (regex) match patterns in strings:
+
+```javascript
+// Creating regex patterns
+const pattern1 = /hello/;
+const pattern2 = new RegExp("hello");
+
+// test — returns boolean
+console.log(/hello/.test("hello world"));  // => true
+console.log(/hello/.test("goodbye"));      // => false
+
+// match — returns array of matches (or null)
+const message = "The colors are red, green, and blue";
+console.log(message.match(/green/));
+// => ["green", index: 15, input: "...", groups: undefined]
+
+// matchAll — returns all matches (with flags)
+const tags = "<h1>Title</h1><p>Text</p><h2>Subtitle</h2>";
+const headings = tags.matchAll(/<h[1-6]>(.*?)<\/h[1-6]>/g);
+for (const match of headings) {
+  console.log(match[1]);  // Captured group
+}
+// Title
+// Text
+// Subtitle
+
+// Common regex patterns
+console.log(/^\d{5}$/.test("12345"));      // => true  (5-digit zip code)
+console.log(/^\S+@\S+\.\S+$/.test("user@example.com")); // => true (basic email)
+console.log(/^https?:\/\//.test("https://example.com")); // => true (URL starting with http)
+```
+
+### Regex Flags
+
+```javascript
+/g  // Global — find all matches, not just first
+/i  // Case-insensitive
+/m  // Multiline — ^ and $ match line boundaries
+/s  // Dotall — . matches newlines
+```
+
+### Character Classes
+
+```javascript
+\d  // Any digit (0-9)
+\w  // Any word character (a-z, A-Z, 0-9, _)
+\s  // Any whitespace (space, tab, newline)
+\D  // NOT a digit
+\W  // NOT a word character
+.   // Any character except newline
+```
+
+### Quantifiers
+
+```javascript
++     // One or more
+*     // Zero or more
+?     // Zero or one
+{3}   // Exactly 3
+{2,4} // 2 to 4
+{3,}  // 3 or more
+```
+
+## Try It Yourself
+
+```javascript
+// 1. Validate an email address using regex
+function isValidEmail(email) {
+  return /^\S+@\S+\.\S+$/.test(email);
+}
+
+// 2. Extract all numbers from a string
+function extractNumbers(text) {
+  return text.match(/\d+/g)?.map(Number) || [];
+}
+console.log(extractNumbers("Item 1 costs $25, item 2 costs $30"));  // => [1, 25, 2, 30]
+
+// 3. Convert "hello_world_example" to "helloWorldExample" (snake to camelCase)
+function snakeToCamel(str) {
+  return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+}
+console.log(snakeToCamel("hello_world_example"));  // => "helloWorldExample"
+```
+
+## Key Takeaways
+
+- Strings are immutable — methods return new strings, they don't modify the original
+- Template literals (backticks) provide interpolation `${}` and multi-line support
+- `slice(start, end)` extracts parts — negative indices count from the end
+- `replace()` with regex `/pattern/g` replaces all matches; `gi` flags for global + case-insensitive
+- `split()` turns strings into arrays; `join()` turns arrays into strings
+- `padStart()`/`padEnd()` are useful for formatting (zero-padding, alignment)
+- Regex provides powerful pattern matching — `test()` checks existence, `match()` extracts matches
+- Common regex patterns: `\d+` for numbers, `\S+@\S+\.\S+` for basic email validation
+- Use `.trim()` to remove whitespace from user input

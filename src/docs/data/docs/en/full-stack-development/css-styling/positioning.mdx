@@ -1,0 +1,327 @@
+---
+title: "Positioning & Stacking Context"
+description: "Master CSS positioning — static, relative, absolute, fixed, sticky positioning, z-index, stacking contexts, and practical layout patterns."
+sidebar:
+  order: 7
+  label: "Positioning"
+tab: "full-stack-development"
+---
+
+Positioning lets you remove elements from the normal document flow and place them exactly where you want. It's essential for modals, dropdowns, tooltips, sticky headers, and overlays.
+
+## The Position Property
+
+```css
+.element {
+  position: static;    /* Default — normal document flow */
+  position: relative;  /* Offset from normal position */
+  position: absolute;  /* Removed from flow, positioned relative to ancestor */
+  position: fixed;     /* Removed from flow, positioned relative to viewport */
+  position: sticky;    /* Hybrid: normal flow until scroll threshold, then fixed */
+}
+```
+
+## Position Values
+
+### Static (Default)
+
+```css
+.element {
+  position: static;
+  /* top, right, bottom, left, z-index have NO effect */
+}
+```
+
+Elements flow in normal document order. You cannot offset them with `top`/`left`.
+
+### Relative
+
+```css
+.element {
+  position: relative;
+  top: 10px;
+  left: 20px;
+}
+```
+
+- Element stays in normal flow (occupies original space)
+- Offset is calculated from its original position
+- Other elements are NOT affected (they act as if the element is still in its original spot)
+- Creates a new positioning context for child `absolute` elements
+
+### Absolute
+
+```css
+.child {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+```
+
+- Element is REMOVED from normal flow (takes no space)
+- Positioned relative to the nearest positioned ancestor (any ancestor with `position: relative | absolute | fixed | sticky`)
+- If no positioned ancestor, positioned relative to `<html>` (the initial containing block)
+- Other elements act as if it doesn't exist
+
+**The parent-child pattern is essential:**
+
+```css
+.parent {
+  position: relative;   /* Creates reference point for child */
+  /* width, height, etc. */
+}
+
+.child {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);  /* Perfect centering */
+}
+```
+
+### Fixed
+
+```css
+.fixed-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 100;
+}
+```
+
+- Removed from normal flow
+- Positioned relative to the **viewport** (browser window), not any ancestor
+- Stays in place when the page scrolls
+- Common uses: sticky headers, back-to-top buttons, cookie consent banners
+
+### Sticky
+
+```css
+.sticky-nav {
+  position: sticky;
+  top: 0;              /* Becomes fixed when scroll reaches this point */
+  z-index: 10;
+}
+```
+
+- Behaves like `relative` normally (in flow, takes space)
+- Becomes `fixed` when scroll reaches the specified threshold
+- Only works within its parent container — scrolls away when the parent exits viewport
+- Requires at least one of: `top`, `right`, `bottom`, or `left`
+
+## Offsetting with top/right/bottom/left
+
+```css
+/* These only work on positioned elements (not static) */
+.absolute-element {
+  position: absolute;
+  top: 10px;         /* 10px from top edge of positioned ancestor */
+  right: 20px;       /* 20px from right edge */
+  bottom: 30px;      /* 30px from bottom edge */
+  left: 40px;        /* 40px from left edge */
+}
+
+/* Stretch to fill */
+.stretched {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  /* This element fills its positioned ancestor completely */
+}
+
+/* Center an absolutely positioned element */
+.centered {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+```
+
+## Z-Index and Stacking Context
+
+When positioned elements overlap, `z-index` controls which appears on top:
+
+```css
+.element1 {
+  position: absolute;
+  z-index: 1;   /* Lower number = behind */
+}
+
+.element2 {
+  position: absolute;
+  z-index: 2;   /* Higher number = in front */
+}
+```
+
+### Z-Index Rules
+
+- Only works on **positioned** elements (not `static`)
+- Higher values appear in front of lower values
+- Can be negative (behind normal flow elements)
+- Default is `auto` (same as `0`)
+- Each stacking context is isolated from others
+
+### What Creates a New Stacking Context
+
+A stacking context is a group of elements whose z-index is scoped. New contexts are created by:
+
+```css
+/* Position + z-index (most common) */
+.element {
+  position: relative;
+  z-index: 1;
+}
+
+/* Opacity less than 1 */
+.element { opacity: 0.9; }
+
+/* Transform */
+.element { transform: scale(1); }
+
+/* Filter */
+.element { filter: blur(2px); }
+
+/* Will-change */
+.element { will-change: transform; }
+
+/* Container queries */
+.container { container-type: inline-size; }
+
+/* Isolation (explicitly creates context) */
+.element { isolation: isolate; }
+```
+
+**Important**: A child's z-index is scoped to its stacking context. If parent A has `z-index: 1` and parent B has `z-index: 2`, children of A will always be behind children of B, regardless of their individual z-index values.
+
+## Practical Patterns
+
+### 1. Modal Overlay
+
+```css
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: white;
+  padding: 24px;
+  border-radius: 8px;
+  max-width: 500px;
+  width: 90%;
+}
+```
+
+### 2. Badge on a Card
+
+```css
+.card {
+  position: relative;    /* Anchor for badge */
+  padding: 20px;
+  border: 1px solid #ddd;
+}
+
+.badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: red;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+```
+
+### 3. Fixed Back-to-Top Button
+
+```css
+.back-to-top {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 48px;
+  height: 48px;
+  background: #0066cc;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 100;
+}
+```
+
+### 4. Dropdown Menu
+
+```css
+.dropdown {
+  position: relative;       /* Anchor for menu */
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: 100%;                /* Below the trigger */
+  left: 0;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  display: none;            /* Hidden by default */
+  min-width: 200px;
+  z-index: 10;
+}
+
+.dropdown:hover .dropdown-menu {
+  display: block;           /* Show on hover */
+}
+```
+
+### 5. Sticky Section Headers
+
+```css
+.section-header {
+  position: sticky;
+  top: 0;
+  background: white;
+  padding: 12px 0;
+  z-index: 5;
+  border-bottom: 2px solid #333;
+}
+```
+
+## Try It Yourself
+
+Create a page with:
+
+1. A fixed header at the top (stays on scroll)
+2. Card components with "New" badges positioned at top-right
+3. A modal overlay (use a fixed full-screen background with centered modal)
+4. A dropdown menu triggered by hover
+5. A sticky sidebar that follows as you scroll
+6. A back-to-top button fixed at bottom-right
+7. Experiment with z-index to understand stacking
+
+## Key Takeaways
+
+- `position: relative` offsets from normal position and anchors absolute children
+- `position: absolute` removes from flow, positions relative to nearest positioned ancestor
+- `position: fixed` removes from flow, positions relative to viewport (stays on scroll)
+- `position: sticky` is relative until scroll threshold, then fixed
+- `z-index` only works on positioned elements (not static)
+- Each stacking context isolates its children's z-index from other contexts
+- The parent-child `position: relative` + `position: absolute` pattern is fundamental
+- Use `transform: translate(-50%, -50%)` for perfect centering of absolute elements

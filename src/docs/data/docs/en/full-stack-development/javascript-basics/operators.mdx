@@ -1,0 +1,228 @@
+---
+title: "Operators & Expressions"
+description: "JavaScript operators — arithmetic, comparison, logical, assignment, ternary, and operator precedence with practical examples."
+sidebar:
+  order: 2
+  label: "Operators"
+tab: "full-stack-development"
+---
+
+Operators perform actions on values and produce new values. JavaScript has several categories of operators.
+
+## Arithmetic Operators
+
+```javascript
+// Basic arithmetic
+let sum = 5 + 3;          // => 8    (addition)
+let diff = 10 - 4;        // => 6    (subtraction)
+let product = 4 * 3;      // => 12   (multiplication)
+let quotient = 15 / 4;    // => 3.75 (division)
+let remainder = 15 % 4;   // => 3    (modulo/remainder)
+let power = 2 ** 4;       // => 16   (exponentiation)
+
+// String concatenation with +
+let greeting = "Hello " + "World";  // => "Hello World"
+
+// Careful: + with mixed types
+console.log(1 + "2");      // => "12" (number coerced to string)
+console.log("3" + 4 + 5); // => "345" (left to right: "3"+4 = "34", "34"+5 = "345")
+console.log(3 + 4 + "5"); // => "75"  (3+4 = 7, then 7+"5" = "75")
+```
+
+### Increment and Decrement
+
+```javascript
+let count = 5;
+
+// Post-increment: returns value THEN increments
+console.log(count++);     // => 5
+console.log(count);       // => 6
+
+// Pre-increment: increments THEN returns value
+console.log(++count);     // => 7
+console.log(count);       // => 7
+
+// Decrement works the same way
+let x = 10;
+console.log(x--);         // => 10
+console.log(x);           // => 9
+console.log(--x);         // => 8
+```
+
+## Comparison Operators
+
+```javascript
+// Strict equality (recommended)
+console.log(5 === 5);      // => true
+console.log(5 === "5");    // => false (different types)
+
+// Strict inequality
+console.log(5 !== "5");    // => true
+console.log(5 !== 5);      // => false
+
+// Loose equality (avoid)
+console.log(5 == "5");     // => true  (coerces types)
+console.log(0 == false);   // => true  (coerces!)
+console.log("" == false);  // => true  (coerces!)
+
+// Relational
+console.log(10 > 5);       // => true
+console.log(10 < 5);       // => false
+console.log(10 >= 10);     // => true
+console.log(10 <= 5);      // => false
+
+// String comparison (lexicographic, by Unicode order)
+console.log("apple" < "banana");  // => true ('a' comes before 'b')
+console.log("Apple" < "apple");   // => true (uppercase < lowercase)
+```
+
+## Logical Operators
+
+```javascript
+let a = true;
+let b = false;
+
+// AND (&&) — true only if both operands are true
+console.log(a && b);        // => false
+console.log(true && true);  // => true
+
+// OR (||) — true if at least one operand is true
+console.log(a || b);        // => true
+console.log(false || false); // => false
+
+// NOT (!) — inverts boolean
+console.log(!a);            // => false
+console.log(!b);            // => true
+console.log(!!"hello");     // => true (double NOT converts to boolean)
+```
+
+### Short-Circuit Evaluation
+
+Logical operators don't always evaluate both sides:
+
+```javascript
+// && — if left is falsy, return left; otherwise return right
+console.log(false && "anything");  // => false  (short-circuits)
+console.log(true && "result");     // => "result"
+
+// || — if left is truthy, return left; otherwise return right
+console.log("hello" || "fallback"); // => "hello" (short-circuits)
+console.log("" || "fallback");      // => "fallback"
+
+// Practical: default values
+const username = userInput || "Guest";
+
+// Practical: conditional execution
+isLoggedIn && renderDashboard();  // Only calls renderDashboard if isLoggedIn is true
+```
+
+### Nullish Coalescing (??)
+
+```javascript
+// ?? returns right side only if left is null or undefined
+let value1 = null;
+let value2 = undefined;
+let value3 = false;
+
+console.log(value1 ?? "default");   // => "default"
+console.log(value2 ?? "default");   // => "default"
+console.log(value3 ?? "default");   // => false (not null/undefined)
+```
+
+Unlike `||`, `??` only treats `null`/`undefined` as absent — not `false`, `0`, or `""`.
+
+## Assignment Operators
+
+```javascript
+let x = 10;
+
+x += 5;     // x = x + 5   => 15
+x -= 3;     // x = x - 3   => 12
+x *= 2;     // x = x * 2   => 24
+x /= 4;     // x = x / 4   => 6
+x %= 2;     // x = x % 2   => 0
+x **= 3;    // x = x ** 3  => 0 (0^3)
+
+// More concise increments
+let count = 0;
+count += 1;  // => 1
+```
+
+## Ternary Operator (Conditional)
+
+The ternary operator is a shorthand for `if/else`:
+
+```javascript
+// Syntax: condition ? valueIfTrue : valueIfFalse
+const age = 20;
+const status = age >= 18 ? "Adult" : "Minor";
+console.log(status);  // => "Adult"
+
+// Nested ternary (use sparingly — can be hard to read)
+const score = 85;
+const grade = score >= 90 ? "A" : score >= 80 ? "B" : score >= 70 ? "C" : "F";
+console.log(grade);   // => "B"
+```
+
+## Operator Precedence
+
+Operators have an order of precedence (like math):
+
+```javascript
+// PEMDAS-like: * and / before + and -
+let result = 2 + 3 * 4;          // => 14 (3*4=12, 12+2=14)
+let result2 = (2 + 3) * 4;       // => 20 (2+3=5, 5*4=20)
+
+// Comparison operators have lower precedence than arithmetic
+let check = 5 + 3 > 2 + 4;       // => true (8 > 6)
+let check2 = 5 + (3 > 2) + 4;    // => 10   (5 + true(1) + 4)
+
+// Logical operators: NOT > AND > OR
+console.log(true || false && false);        // => true  (&& first: false && false = false, then true || false = true)
+console.log((true || false) && false);      // => false (|| first: true || false = true, then true && false = false)
+```
+
+Precedence Table (highest to lowest):
+
+| Precedence | Operators |
+|------------|-----------|
+| 1 | `()` grouping |
+| 2 | `++` `--` `!` `typeof` (unary) |
+| 3 | `**` |
+| 4 | `*` `/` `%` |
+| 5 | `+` `-` |
+| 6 | `<` `>` `<=` `>=` |
+| 7 | `===` `!==` `==` `!=` |
+| 8 | `&&` |
+| 9 | `||` |
+| 10 | `??` |
+| 11 | `?:` (ternary) |
+| 12 | `=` `+=` `-=` etc. |
+
+When in doubt, use parentheses `()` to make intent clear.
+
+## Try It Yourself
+
+```javascript
+// 1. What is the result of 10 + "5"? Why?
+// 2. What is the result of 10 - "5"? Why?
+// 3. Is 0 == false? Is 0 === false?
+// 4. What does "5" + 3 + 2 evaluate to?
+// 5. What does 5 + 3 + "2" evaluate to?
+// 6. Use the ternary operator to check if a number is even or odd
+// 7. Use || to provide a default value for a variable
+
+const num = 7;
+const parity = num % 2 === 0 ? "even" : "odd";
+console.log(`${num} is ${parity}`);  // => "7 is odd"
+```
+
+## Key Takeaways
+
+- Use `===` and `!==` for comparisons — never `==` or `!=`
+- `||` returns the first truthy value; `&&` returns the first falsy value (short-circuit)
+- `??` (nullish coalescing) only treats `null`/`undefined` as absent — safer than `||` for defaults
+- Increment/decrement operators: `++x` (pre) vs `x++` (post) — understand the difference
+- Use `let` variables with `+=`, `-=` etc. for concise updates
+- The ternary operator `condition ? a : b` is a compact `if/else`
+- When in doubt about precedence, use `()` to make your code clear

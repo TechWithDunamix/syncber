@@ -1,0 +1,406 @@
+---
+title: "ES6 Classes"
+description: "JavaScript class syntax — constructor, methods, static members, extends, super, private fields, getters/setters, and best practices for object-oriented design."
+sidebar:
+  order: 4
+  label: "ES6 Classes"
+tab: "full-stack-development"
+---
+
+ES6 classes are **syntactic sugar** over JavaScript's existing prototypal inheritance. They provide a cleaner, more familiar syntax for creating constructor functions and managing prototypes.
+
+## Class Syntax Basics
+
+```js
+class User {
+  constructor(name, email) {
+    this.name = name;
+    this.email = email;
+    this.createdAt = new Date();
+  }
+
+  // Instance method (goes on User.prototype)
+  greet() {
+    return `Hi, I'm ${this.name}`;
+  }
+
+  // Another instance method
+  getProfile() {
+    return `${this.name} (${this.email})`;
+  }
+}
+
+const alice = new User("Alice", "alice@example.com");
+console.log(alice.greet());      // "Hi, I'm Alice"
+console.log(alice.getProfile()); // "Alice (alice@example.com)"
+
+// Methods are on the prototype (shared, not copied)
+console.log(User.prototype.greet === alice.greet); // true
+```
+
+<Aside variant="tip">
+A `class` is still a function under the hood. `typeof User` returns `"function"`. The `constructor` method replaces the function body, and other methods are added to `User.prototype`.
+</Aside>
+
+## The `constructor` Method
+
+The `constructor` is a special method that runs when you create a new instance with `new`. It's optional — if you omit it, JavaScript adds an empty constructor automatically.
+
+```js
+class Animal {
+  // No constructor — same as constructor() {}
+}
+
+const dog = new Animal(); // works, creates empty instance
+```
+
+You can only have **one** constructor per class. If you need multiple initialization patterns, use static factory methods:
+
+```js
+class User {
+  constructor(name, email) {
+    this.name = name;
+    this.email = email;
+  }
+
+  // Factory method — alternative construction
+  static fromJSON(json) {
+    const data = JSON.parse(json);
+    return new User(data.name, data.email);
+  }
+
+  static anonymous() {
+    return new User("Anonymous", "anon@example.com");
+  }
+}
+
+const user1 = User.fromJSON('{"name":"Bob","email":"bob@test.com"}');
+const user2 = User.anonymous();
+```
+
+## Instance Methods
+
+All methods defined inside the class body (except `constructor` and `static`) are **prototype methods** — shared across all instances:
+
+```js
+class Counter {
+  constructor() {
+    this.count = 0;
+  }
+
+  increment() {
+    this.count++;
+    return this;
+  }
+
+  decrement() {
+    this.count--;
+    return this;
+  }
+
+  getValue() {
+    return this.count;
+  }
+}
+
+const c = new Counter();
+c.increment().increment().decrement(); // method chaining
+console.log(c.getValue()); // 1
+```
+
+## Static Methods & Properties
+
+**Static** members belong to the class itself, not to instances. Use them for utility functions or factory methods:
+
+```js
+class MathUtils {
+  static add(a, b) {
+    return a + b;
+  }
+
+  static max(...numbers) {
+    return Math.max(...numbers);
+  }
+
+  static readonly PI = 3.14159; // static property (ES2022+)
+}
+
+console.log(MathUtils.add(3, 5));  // 8
+console.log(MathUtils.max(1, 9, 4)); // 9
+console.log(MathUtils.PI); // 3.14159
+
+// Cannot call on instances
+const m = new MathUtils();
+console.log(m.add); // undefined
+```
+
+### Static vs Instance: When to Use Each
+
+| Static | Instance |
+|--------|----------|
+| Utility functions | Object behaviour |
+| Factory methods | Object state |
+| Constants | Instance data |
+| `MathUtils.add()` | `user.greet()` |
+
+## Getters & Setters
+
+Classes support `get` and `set` syntax for computed properties:
+
+```js
+class Temperature {
+  constructor(celsius) {
+    this._celsius = celsius;
+  }
+
+  get fahrenheit() {
+    return this._celsius * 9/5 + 32;
+  }
+
+  set fahrenheit(value) {
+    this._celsius = (value - 32) * 5/9;
+  }
+
+  get celsius() {
+    return this._celsius;
+  }
+
+  set celsius(value) {
+    if (value < -273.15) {
+      throw new Error("Temperature below absolute zero");
+    }
+    this._celsius = value;
+  }
+}
+
+const temp = new Temperature(0);
+console.log(temp.fahrenheit); // 32 (computed, not stored)
+temp.fahrenheit = 212;
+console.log(temp.celsius);    // 100 (setter converted it)
+```
+
+Getters/setters appear as **properties** to consumers — no parentheses needed.
+
+## Private Fields (ES2022+)
+
+Truly private fields use the `#` prefix. They cannot be accessed from outside the class:
+
+```js
+class BankAccount {
+  #balance = 0; // private field
+  #transactions = [];
+
+  constructor(owner, initialDeposit) {
+    this.owner = owner;
+    if (initialDeposit > 0) {
+      this.#balance = initialDeposit;
+      this.#transactions.push({ type: "deposit", amount: initialDeposit });
+    }
+  }
+
+  deposit(amount) {
+    if (amount <= 0) throw new Error("Amount must be positive");
+    this.#balance += amount;
+    this.#transactions.push({ type: "deposit", amount });
+    return this.#balance;
+  }
+
+  withdraw(amount) {
+    if (amount > this.#balance) throw new Error("Insufficient funds");
+    this.#balance -= amount;
+    this.#transactions.push({ type: "withdrawal", amount });
+    return this.#balance;
+  }
+
+  get balance() {
+    return this.#balance;
+  }
+
+  get transactionCount() {
+    return this.#transactions.length;
+  }
+
+  // Private methods also supported
+  #log(message) {
+    console.log(`[${this.owner}] ${message}`);
+  }
+}
+
+const account = new BankAccount("Alice", 1000);
+console.log(account.balance); // 1000
+account.deposit(500);
+console.log(account.#balance); // ❌ SyntaxError — private!
+```
+
+<Aside variant="tip">
+Before private fields (`#`), convention used `_` prefix to signal "private" — but it was only a convention. The `#` prefix provides real enforcement.
+</Aside>
+
+## Inheritance with `extends` and `super`
+
+### Basic Inheritance
+
+```js
+class Animal {
+  constructor(name) {
+    this.name = name;
+  }
+
+  speak() {
+    console.log(`${this.name} makes a sound`);
+  }
+}
+
+class Dog extends Animal {
+  constructor(name, breed) {
+    super(name); // call parent constructor first!
+    this.breed = breed;
+  }
+
+  speak() {
+    console.log(`${this.name} barks!`);
+  }
+
+  fetch() {
+    console.log(`${this.name} fetches the ball`);
+  }
+}
+
+const dog = new Dog("Rex", "German Shepherd");
+dog.speak();  // "Rex barks!" (overridden)
+dog.fetch();  // "Rex fetches the ball"
+```
+
+**Rules for `super()`:**
+- Must call `super()` before using `this` in the child constructor
+- If you don't call `super()`, the child constructor throws a `ReferenceError`
+- If the child class has no constructor, JavaScript auto-calls `super()` with no arguments
+
+### Calling Parent Methods
+
+Use `super.methodName()` to call an overridden parent method:
+
+```js
+class Admin extends User {
+  constructor(name, email, role) {
+    super(name, email);
+    this.role = role;
+  }
+
+  getProfile() {
+    // Call parent's getProfile, then extend it
+    const baseProfile = super.getProfile();
+    return `${baseProfile} — ${this.role}`;
+  }
+}
+```
+
+### Override Checking with `super`
+
+```js
+class Base {
+  show() {
+    console.log("Base show");
+  }
+}
+
+class Child extends Base {
+  show() {
+    console.log("Before");
+    super.show(); // calls Base.show()
+    console.log("After");
+  }
+}
+
+new Child().show();
+// "Before"
+// "Base show"
+// "After"
+```
+
+## Inheritance vs Composition
+
+Favor **composition** over inheritance for flexible code:
+
+```js
+// ❌ Deep inheritance (fragile)
+class Animal {}
+class Mammal extends Animal {}
+class Dog extends Mammal {}
+class Poodle extends Dog {}
+
+// ✅ Composition (flexible)
+const canBark = { bark() { console.log("Woof!"); } };
+const canFetch = { fetch() { console.log("Fetching!"); } };
+const canSwim = { swim() { console.log("Swimming!"); } };
+
+function createPoodle(name) {
+  return Object.assign({ name }, canBark, canFetch);
+}
+
+function createLabrador(name) {
+  return Object.assign({ name }, canBark, canFetch, canSwim);
+}
+```
+
+## instanceof Operator
+
+Check if an object is an instance of a class (walks the prototype chain):
+
+```js
+class A {}
+class B extends A {}
+
+const b = new B();
+
+console.log(b instanceof B); // true
+console.log(b instanceof A); // true (walks up the chain)
+console.log(b instanceof Object); // true (all objects)
+console.log(b instanceof Array); // false
+```
+
+## Class Field Declarations (ES2022+)
+
+You can declare instance fields directly in the class body without the constructor:
+
+```js
+class User {
+  // Instance fields (set on `this`)
+  name = "";
+  email = "";
+  createdAt = new Date();
+
+  // Private fields
+  #id = crypto.randomUUID();
+
+  // Methods
+  greet() {
+    return `Hi, I'm ${this.name}`;
+  }
+}
+```
+
+Fields are set before the constructor body runs, making the code cleaner. This is especially useful when you have many default values.
+
+## Quick Reference
+
+| Feature | Syntax | Purpose |
+|---------|--------|---------|
+| Constructor | `constructor(params)` | Initialise new instances |
+| Instance method | `methodName() {}` | Shared behaviour on prototype |
+| Static method | `static methodName() {}` | Utility on the class itself |
+| Getter | `get prop() {}` | Computed read-only property |
+| Setter | `set prop(v) {}` | Computed writeable property |
+| Private field | `#fieldName` | Truly private instance data |
+| Private method | `#methodName() {}` | Truly private behaviour |
+| Extends | `class A extends B` | Inheritance |
+| Super | `super()` / `super.method()` | Parent constructor/method access |
+| Instance field | `field = value` | Declared in class body |
+
+## Practice Exercises
+
+1. **Create a `Rectangle` class** with width, height, a `getArea()` method, a `getPerimeter()` method, and a static method `createSquare(size)`.
+
+2. **Build a class hierarchy**: Create `Vehicle` → `Car` → `ElectricCar`. Each should add properties and override a `getInfo()` method. `ElectricCar` should have a `charge()` method.
+
+3. **Private field validation**: Create a `Password` class that stores a private `#password` field, with a `check(password)` method that returns boolean, and a `reset(newPassword)` method that validates minimum length. The password should never be readable from outside.

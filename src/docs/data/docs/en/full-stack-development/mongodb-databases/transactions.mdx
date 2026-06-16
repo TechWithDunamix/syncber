@@ -1,0 +1,388 @@
+---
+title: "Transactions & Atomicity"
+description: "Multi-document ACID transactions, atomic operations, two-phase commits, error handling, retry logic, and when to use transactions vs atomic updates."
+sidebar:
+  order: 9
+  label: "Transactions & Atomicity"
+tab: "full-stack-development"
+---
+
+Since MongoDB 4.0, multi-document ACID transactions are supported. But not every operation needs a transaction — MongoDB's single-document operations are already atomic.
+
+## Single-Document Atomicity
+
+In MongoDB, **all writes to a single document are atomic**. If you update multiple fields in one document, either all changes apply or none:
+
+```javascript
+// This is always atomic — all $set operations succeed or none
+db.users.updateOne(
+  { _id: userId },
+  {
+    $set: { status: "active", lastLogin: new Date() },
+    $inc: { loginCount: 1 },
+  }
+);
+```
+
+### When Single-Document Atomicity Is Enough
+
+- Transferring between fields in the same document
+- Updating an embedded document with related fields
+- Incrementing counters alongside other changes
+
+```javascript
+// Atomic: decrement stock and update status in one document
+db.products.updateOne(
+  { _id: productId, stock: { $gt: 0 } },
+  {
+    $inc: { stock: -1 },
+    $set: { lastSold: new Date() },
+  }
+);
+```
+
+## When You Need Multi-Document Transactions
+
+Transactions become necessary when you need to update **multiple documents** (possibly in **multiple collections**) atomically:
+
+- Transferring funds between accounts (debit one, credit another)
+- Creating an order and decrementing inventory
+- Updating a user and their associated posts
+- Any operation where partial failure would corrupt data
+
+## Using Transactions
+
+### Prerequisites
+
+Transactions require a **replica set** (even a single-node replica set works):
+
+```javascript
+// For local development, convert standalone to single-node replica set:
+// 1. Stop mongod
+// 2. Start with --replSet rs0
+mongod --replSet rs0
+
+// 3. Initialize
+mongosh --eval "rs.initiate()"
+```
+
+### Basic Transaction
+
+```javascript
+const { MongoClient } = require("mongodb");
+
+async function transferFunds(fromId, toId, amount) {
+  const client = new MongoClient(uri);
+  await client.connect();
+
+  const session = client.startSession();
+
+  try {
+    const result = await session.withTransaction(async () => {
+      const accounts = client.db("bank").collection("accounts");
+
+      // Check sender's balance
+      const sender = await accounts.findOne(
+        { _id: fromId },
+        { session }
+      );
+
+      if (sender.balance < amount) {
+        throw new Error("Insufficient funds");
+      }
+
+      // Debit sender
+      await accounts.updateOne(
+        { _id: fromId },
+        { $inc: { balance: -amount } },
+        { session }
+      );
+
+      // Credit receiver
+      await accounts.updateOne(
+        { _id: toId },
+        { $inc: { balance: amount } },
+        { session }
+      );
+
+      // Log transaction
+      await client.db("bank").collection("transactions").insertOne({
+        from: fromId,
+        to: toId,
+        amount,
+        type: "transfer",
+        timestamp: new Date(),
+      }, { session });
+
+      return { success: true };
+    });
+
+    console.log("Transaction completed:", result);
+  } catch (err) {
+    console.error("Transaction failed:", err.message);
+    // Transaction was aborted — no changes applied
+  } finally {
+    await session.endSession();
+    await client.close();
+  }
+}
+```
+
+### Transaction with Mongoose
+
+```javascript
+const mongoose = require("mongoose");
+
+async function createOrder(userId, productId, quantity) {
+  const session = await mongoose.startSession();
+
+  try {
+    const result = await session.withTransaction(async () => {
+      const Order = mongoose.model("Order");
+      const Product = mongoose.model("Product");
+
+      // 1. Decrement product stock
+      const product = await Product.findById(productId).session(session);
+      if (!product || product.stock < quantity) {
+        throw new Error("Insufficient stock");
+      }
+
+      await Product.updateOne(
+        { _id: productId },
+        { $inc: { stock: -quantity } },
+        { session }
+      );
+
+      // 2. Create the order
+      const order = await Order.create([{
+        userId,
+        productId,
+        quantity,
+        total: product.price * quantity,
+        status: "confirmed",
+      }], { session });
+
+      return order[0];
+    });
+
+    return result;
+  } catch (err) {
+    // Transaction aborted — no changes persisted
+    throw err;
+  } finally {
+    await session.endSession();
+  }
+}
+```
+
+## Transaction Options
+
+```javascript
+session.withTransaction(
+  async () => {
+    // Transaction operations
+  },
+  {
+    readPreference: "primary",
+    readConcern: { level: "snapshot" },     // Consistent read view
+    writeConcern: { w: "majority" },        // Confirm writes to majority
+    maxCommitTimeMS: 10000,                 // Max time for commit
+  }
+);
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `readConcern` | `"snapshot"` | Isolation level |
+| `writeConcern` | `"majority"` | Durability guarantee |
+| `readPreference` | `"primary"` | Which replica to read from |
+| `maxCommitTimeMS` | None | Time limit for commit phase |
+
+## Transaction Error Handling
+
+```javascript
+async function safeTransaction(callback) {
+  const session = await mongoose.startSession();
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await session.withTransaction(callback);
+    } catch (err) {
+      // Transient errors — retry
+      if (isTransientError(err)) {
+        console.log(`Retry attempt ${attempt + 1}`);
+        continue;
+      }
+
+      // Permanent errors — don't retry
+      throw err;
+    } finally {
+      if (attempt === 2) await session.endSession();
+    }
+  }
+}
+
+function isTransientError(err) {
+  const transientCodes = [
+    "TransientTransactionError",
+    "UnknownTransactionCommitResult",
+    "InterruptedAtShutdown",
+  ];
+  return transientCodes.some((code) => err.message?.includes(code));
+}
+```
+
+## When NOT to Use Transactions
+
+Transactions have overhead. Don't use them when:
+
+### 1. Single Document Is Enough
+
+```javascript
+// ❌ Unnecessary transaction
+const session = client.startSession();
+session.withTransaction(async () => {
+  await users.updateOne({ _id: id }, { $set: { name: "New" } }, { session });
+});
+
+// ✅ Single atomic operation
+await users.updateOne({ _id: id }, { $set: { name: "New" } });
+```
+
+### 2. Eventual Consistency Is Acceptable
+
+```javascript
+// Analytics counters don't need strict consistency
+// ❌ Unnecessary transaction
+session.withTransaction(async () => {
+  await orders.insertOne(order, { session });
+  await analytics.updateOne({ date }, { $inc: { count: 1 } }, { session });
+});
+
+// ✅ Acceptable to do sequentially (counter can lag slightly)
+await orders.insertOne(order);
+await analytics.updateOne({ date }, { $inc: { count: 1 } });
+```
+
+### 3. High-Volume Operations
+
+Transactions add latency. For operations that run thousands of times per second:
+- Use atomic single-document operations
+- Use idempotent operations with retry logic
+- Accept eventual consistency where appropriate
+
+## Performance Considerations
+
+```javascript
+// Transaction limits:
+// 1. Max transaction runtime: default 60 seconds
+// 2. Max lock timeout: default 5 seconds
+// 3. Max operations per transaction: 100,000
+// 4. Transactions hold locks — keep them short
+
+// ✅ Good: Quick reads and writes
+session.withTransaction(async () => {
+  await coll1.updateOne(...);
+  await coll2.updateOne(...);
+});
+
+// ❌ Bad: Slow operations in transaction
+session.withTransaction(async () => {
+  const data = await apiCall();           // Slow external call
+  await processFile(data);                // CPU-heavy processing
+  await coll.updateOne({ ... }, { session });  // Quick write
+});
+```
+
+## Atomic Operations Alternative
+
+For many cases, atomic operators avoid the need for transactions:
+
+```javascript
+// FindOneAndUpdate with condition (atomic check-and-set)
+const result = await products.findOneAndUpdate(
+  { _id: productId, stock: { $gte: quantity } },  // Check condition
+  { $inc: { stock: -quantity } },                   // Update atomically
+  { returnDocument: "after" }
+);
+
+if (!result) {
+  throw new Error("Insufficient stock");
+}
+
+// This replaces a transaction for simple inventory checks
+```
+
+## Two-Phase Commit Pattern
+
+For long-running operations that span services, implement a compensation pattern:
+
+```javascript
+// Phase 1: Reserve
+await orders.insertOne({
+  _id: orderId,
+  userId,
+  items,
+  total,
+  status: "pending",       // Not confirmed yet
+  createdAt: new Date(),
+});
+
+// Phase 2: Process (payment, inventory, shipping)
+try {
+  await processPayment(orderId);
+  await reserveInventory(orderId);
+  await scheduleShipping(orderId);
+
+  // Phase 3: Commit
+  await orders.updateOne(
+    { _id: orderId },
+    { $set: { status: "confirmed" } }
+  );
+} catch (err) {
+  // Compensation: Rollback partial progress
+  await refundPayment(orderId);
+  await releaseInventory(orderId);
+  await orders.updateOne(
+    { _id: orderId },
+    { $set: { status: "failed", error: err.message } }
+  );
+}
+```
+
+## Quick Reference
+
+```javascript
+// MongoDB transaction
+const session = client.startSession();
+await session.withTransaction(async () => {
+  await collection.updateOne({}, {}, { session });
+  await collection.insertOne({}, { session });
+});
+await session.endSession();
+
+// Mongoose transaction
+const session = await mongoose.startSession();
+await session.withTransaction(async () => {
+  await Model.findByIdAndUpdate(id, update, { session });
+  await Model.create([doc], { session });
+});
+await session.endSession();
+
+// Atomic alternative
+await collection.findOneAndUpdate(
+  { _id: id, condition: true },
+  { $inc: { field: -1 } },
+  { returnDocument: "after" }
+);
+```
+
+## Practice Exercises
+
+1. **Bank transfer**: Implement a fund transfer function that atomically debits one account and credits another within a transaction. Handle the case where the sender has insufficient funds.
+
+2. **Order creation**: Write a transaction that: (a) decrements product stock, (b) creates an order document, (c) adds the order ID to the user's order list. Ensure all three succeed or none do.
+
+3. **Retry logic**: Add retry logic to your transaction handler. Simulate a transient error by killing the primary node mid-transaction. Verify that the retry mechanism recovers and the transaction completes.
+
+4. **Transaction vs atomic**: Compare the performance of: (a) decrementing stock in a transaction vs (b) using `findOneAndUpdate` with a condition. Measure and document the latency difference for 1000 operations.

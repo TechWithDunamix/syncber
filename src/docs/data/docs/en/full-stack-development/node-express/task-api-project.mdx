@@ -1,0 +1,635 @@
+---
+title: "Project: RESTful Task API"
+description: "Build a complete REST API for a task manager with full CRUD, validation, error handling, search, pagination, and testing."
+sidebar:
+  order: 10
+  label: "Task API Project"
+tab: "full-stack-development"
+---
+
+This project brings together everything from the Node.js & Express module — routing, middleware, error handling, validation, file handling, configuration, and testing — to build a production-ready task management API.
+
+## Project Overview
+
+You'll build a REST API for a task manager that:
+
+- Full CRUD operations for tasks
+- Input validation with express-validator
+- Centralised error handling with custom error classes
+- Pagination, filtering, and sorting
+- Search by title/description
+- Persistent storage (file-based JSON for simplicity)
+- Request logging
+- Environment configuration
+- Comprehensive test suite
+
+## Step 1: Project Setup
+
+```bash
+mkdir task-api && cd task-api
+npm init -y
+npm install express cors morgan dotenv express-validator uuid
+npm install --save-dev nodemon jest supertest
+```
+
+```json
+// package.json scripts
+{
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "jest --watchAll",
+    "test:ci": "jest --coverage"
+  }
+}
+```
+
+## Step 2: Directory Structure
+
+```
+task-api/
+├── src/
+│   ├── server.js           # Entry point
+│   ├── app.js              # Express config
+│   ├── config/
+│   │   └── index.js        # Configuration
+│   ├── routes/
+│   │   ├── tasks.js        # Task routes
+│   │   └── health.js       # Health check
+│   ├── controllers/
+│   │   └── taskController.js
+│   ├── middleware/
+│   │   ├── errorHandler.js
+│   │   ├── validator.js
+│   │   └── requestLogger.js
+│   ├── utils/
+│   │   ├── errors.js
+│   │   └── storage.js      # File-based storage
+│   └── __tests__/
+│       ├── tasks.test.js
+│       └── validation.test.js
+├── data/                   # JSON storage
+├── .env
+├── .env.example
+└── package.json
+```
+
+## Step 3: Configuration
+
+```javascript
+// src/config/index.js
+require("dotenv").config();
+
+const config = {
+  port: parseInt(process.env.PORT, 10) || 3000,
+  env: process.env.NODE_ENV || "development",
+  logging: {
+    level: process.env.LOG_LEVEL || "dev",
+  },
+  get isDev() {
+    return this.env === "development";
+  },
+};
+
+module.exports = config;
+```
+
+## Step 4: Error Classes
+
+```javascript
+// src/utils/errors.js
+class AppError extends Error {
+  constructor(message, statusCode = 500) {
+    super(message);
+    this.name = "AppError";
+    this.statusCode = statusCode;
+    this.isOperational = true;
+    Error.captureStackTrace(this, this.constructor);
+  }
+}
+
+class NotFoundError extends AppError {
+  constructor(resource = "Resource") {
+    super(`${resource} not found`, 404);
+    this.name = "NotFoundError";
+  }
+}
+
+class ValidationError extends AppError {
+  constructor(details) {
+    super("Validation failed", 422);
+    this.name = "ValidationError";
+    this.details = details;
+  }
+}
+
+module.exports = { AppError, NotFoundError, ValidationError };
+```
+
+## Step 5: File Storage
+
+```javascript
+// src/utils/storage.js
+const fs = require("fs").promises;
+const path = require("path");
+
+const DATA_DIR = path.join(__dirname, "../../data");
+const TASKS_FILE = path.join(DATA_DIR, "tasks.json");
+
+async function initStorage() {
+  try {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+    try {
+      await fs.access(TASKS_FILE);
+    } catch {
+      await fs.writeFile(TASKS_FILE, JSON.stringify([]), "utf8");
+    }
+  } catch (err) {
+    console.error("Failed to initialise storage:", err);
+    throw err;
+  }
+}
+
+async function readTasks() {
+  try {
+    const data = await fs.readFile(TASKS_FILE, "utf8");
+    return JSON.parse(data);
+  } catch {
+    return [];
+  }
+}
+
+async function writeTasks(tasks) {
+  await fs.writeFile(TASKS_FILE, JSON.stringify(tasks, null, 2), "utf8");
+}
+
+module.exports = { initStorage, readTasks, writeTasks };
+```
+
+## Step 6: Controller
+
+```javascript
+// src/controllers/taskController.js
+const { v4: uuidv4 } = require("uuid");
+const storage = require("../utils/storage");
+const { NotFoundError } = require("../utils/errors");
+
+exports.getTasks = async (req, res) => {
+  let tasks = await storage.readTasks();
+
+  // Search
+  const { search } = req.query;
+  if (search) {
+    const term = search.toLowerCase();
+    tasks = tasks.filter(
+      (t) =>
+        t.title.toLowerCase().includes(term) ||
+        t.description.toLowerCase().includes(term)
+    );
+  }
+
+  // Filter by status
+  const { status } = req.query;
+  if (status) {
+    tasks = tasks.filter((t) => t.status === status);
+  }
+
+  // Filter by priority
+  const { priority } = req.query;
+  if (priority) {
+    tasks = tasks.filter((t) => t.priority === priority);
+  }
+
+  // Sort
+  const { sortBy = "createdAt", order = "desc" } = req.query;
+  const validSortFields = ["title", "status", "priority", "createdAt", "updatedAt"];
+  const sortField = validSortFields.includes(sortBy) ? sortBy : "createdAt";
+
+  tasks.sort((a, b) => {
+    const cmp = a[sortField] > b[sortField] ? 1 : -1;
+    return order === "asc" ? cmp : -cmp;
+  });
+
+  // Pagination
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 10));
+  const total = tasks.length;
+  const totalPages = Math.ceil(total / limit);
+  const startIndex = (page - 1) * limit;
+  const paginatedTasks = tasks.slice(startIndex, startIndex + limit);
+
+  res.json({
+    data: paginatedTasks,
+    pagination: { page, limit, total, totalPages },
+  });
+};
+
+exports.getTask = async (req, res) => {
+  const tasks = await storage.readTasks();
+  const task = tasks.find((t) => t.id === req.params.id);
+
+  if (!task) {
+    throw new NotFoundError("Task");
+  }
+
+  res.json({ data: task });
+};
+
+exports.createTask = async (req, res) => {
+  const tasks = await storage.readTasks();
+
+  const task = {
+    id: uuidv4(),
+    title: req.body.title,
+    description: req.body.description || "",
+    status: "pending",
+    priority: req.body.priority || "medium",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  tasks.push(task);
+  await storage.writeTasks(tasks);
+
+  res.status(201).json({ data: task });
+};
+
+exports.updateTask = async (req, res) => {
+  const tasks = await storage.readTasks();
+  const index = tasks.findIndex((t) => t.id === req.params.id);
+
+  if (index === -1) {
+    throw new NotFoundError("Task");
+  }
+
+  const task = tasks[index];
+
+  const allowedFields = ["title", "description", "status", "priority"];
+  allowedFields.forEach((field) => {
+    if (req.body[field] !== undefined) {
+      task[field] = req.body[field];
+    }
+  });
+
+  task.updatedAt = new Date().toISOString();
+  tasks[index] = task;
+
+  await storage.writeTasks(tasks);
+  res.json({ data: task });
+};
+
+exports.deleteTask = async (req, res) => {
+  const tasks = await storage.readTasks();
+  const index = tasks.findIndex((t) => t.id === req.params.id);
+
+  if (index === -1) {
+    throw new NotFoundError("Task");
+  }
+
+  tasks.splice(index, 1);
+  await storage.writeTasks(tasks);
+
+  res.status(204).send();
+};
+```
+
+## Step 7: Validation Middleware
+
+```javascript
+// src/middleware/validator.js
+const { body, param, validationResult } = require("express-validator");
+const { ValidationError } = require("../utils/errors");
+
+const handleValidation = (req, res, next) => {
+  const errors = validationResult(req);
+
+  if (!errors.isEmpty()) {
+    throw new ValidationError(
+      errors.array().map((e) => ({
+        field: e.path,
+        message: e.msg,
+      }))
+    );
+  }
+
+  next();
+};
+
+const validateCreateTask = [
+  body("title")
+    .trim()
+    .notEmpty().withMessage("Title is required")
+    .isLength({ min: 3, max: 200 }).withMessage("Title must be 3-200 characters"),
+  body("description")
+    .optional()
+    .trim()
+    .isLength({ max: 2000 }).withMessage("Description must be under 2000 characters"),
+  body("priority")
+    .optional()
+    .isIn(["low", "medium", "high"]).withMessage("Priority must be low, medium, or high"),
+  handleValidation,
+];
+
+const validateUpdateTask = [
+  param("id").isUUID(4).withMessage("Invalid task ID"),
+  body("title")
+    .optional()
+    .trim()
+    .isLength({ min: 3, max: 200 }).withMessage("Title must be 3-200 characters"),
+  body("status")
+    .optional()
+    .isIn(["pending", "in_progress", "completed", "cancelled"])
+    .withMessage("Invalid status"),
+  body("priority")
+    .optional()
+    .isIn(["low", "medium", "high"]).withMessage("Priority must be low, medium, or high"),
+  handleValidation,
+];
+
+module.exports = { validateCreateTask, validateUpdateTask };
+```
+
+## Step 8: Routes
+
+```javascript
+// src/routes/tasks.js
+const { Router } = require("express");
+const controller = require("../controllers/taskController");
+const { validateCreateTask, validateUpdateTask } = require("../middleware/validator");
+
+const router = Router();
+
+router.get("/", controller.getTasks);
+router.get("/:id", controller.getTask);
+router.post("/", validateCreateTask, controller.createTask);
+router.put("/:id", validateUpdateTask, controller.updateTask);
+router.delete("/:id", controller.deleteTask);
+
+module.exports = router;
+```
+
+```javascript
+// src/routes/health.js
+const { Router } = require("express");
+const router = Router();
+
+router.get("/", (req, res) => {
+  res.json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  });
+});
+
+module.exports = router;
+```
+
+## Step 9: Middleware
+
+```javascript
+// src/middleware/errorHandler.js
+const { AppError } = require("../utils/errors");
+
+const errorHandler = (err, req, res, next) => {
+  console.error(`[${new Date().toISOString()}] ${err.name}: ${err.message}`);
+
+  if (err instanceof AppError) {
+    const response = {
+      error: {
+        message: err.message,
+        code: err.name,
+      },
+    };
+    if (err.details) response.error.details = err.details;
+    return res.status(err.statusCode).json(response);
+  }
+
+  // Unexpected errors
+  res.status(500).json({
+    error: {
+      message: process.env.NODE_ENV === "production"
+        ? "Internal server error"
+        : err.message,
+      code: "INTERNAL_ERROR",
+    },
+  });
+};
+
+module.exports = errorHandler;
+```
+
+```javascript
+// src/middleware/requestLogger.js
+const requestLogger = (req, res, next) => {
+  const start = Date.now();
+  res.on("finish", () => {
+    const duration = Date.now() - start;
+    console.log(
+      `${req.method} ${req.originalUrl} ${res.statusCode} ${duration}ms`
+    );
+  });
+  next();
+};
+
+module.exports = requestLogger;
+```
+
+## Step 10: App & Server
+
+```javascript
+// src/app.js
+const express = require("express");
+const cors = require("cors");
+const morgan = require("morgan");
+const config = require("./config");
+const requestLogger = require("./middleware/requestLogger");
+const errorHandler = require("./middleware/errorHandler");
+const tasksRouter = require("./routes/tasks");
+const healthRouter = require("./routes/health");
+
+const app = express();
+
+// Global middleware
+app.use(cors());
+app.use(express.json());
+app.use(morgan(config.logging.level));
+app.use(requestLogger);
+
+// Routes
+app.use("/api/health", healthRouter);
+app.use("/api/tasks", tasksRouter);
+
+// 404
+app.use((req, res) => {
+  res.status(404).json({
+    error: { message: `Route ${req.method} ${req.path} not found`, code: "NOT_FOUND" },
+  });
+});
+
+// Error handler
+app.use(errorHandler);
+
+module.exports = app;
+```
+
+```javascript
+// src/server.js
+const app = require("./app");
+const config = require("./config");
+const { initStorage } = require("./utils/storage");
+
+async function start() {
+  try {
+    await initStorage();
+    app.listen(config.port, () => {
+      console.log(`Task API running on port ${config.port} (${config.env})`);
+    });
+  } catch (err) {
+    console.error("Failed to start server:", err);
+    process.exit(1);
+  }
+}
+
+start();
+```
+
+## Step 11: Environment Files
+
+```
+# .env
+PORT=3000
+NODE_ENV=development
+LOG_LEVEL=dev
+```
+
+```
+# .env.example
+PORT=3000
+NODE_ENV=development
+LOG_LEVEL=dev
+```
+
+## Step 12: Tests
+
+```javascript
+// src/__tests__/tasks.test.js
+const request = require("supertest");
+const app = require("../app");
+const { initStorage } = require("../utils/storage");
+
+beforeEach(async () => {
+  await initStorage();
+});
+
+describe("Task API", () => {
+  let createdTaskId;
+
+  describe("POST /api/tasks", () => {
+    test("creates a new task", async () => {
+      const res = await request(app)
+        .post("/api/tasks")
+        .send({ title: "Test Task", priority: "high" })
+        .expect(201);
+
+      expect(res.body.data).toBeDefined();
+      expect(res.body.data.title).toBe("Test Task");
+      expect(res.body.data.priority).toBe("high");
+      expect(res.body.data.status).toBe("pending");
+      createdTaskId = res.body.data.id;
+    });
+
+    test("returns 422 for missing title", async () => {
+      await request(app)
+        .post("/api/tasks")
+        .send({})
+        .expect(422);
+    });
+
+    test("returns 422 for invalid priority", async () => {
+      await request(app)
+        .post("/api/tasks")
+        .send({ title: "Task", priority: "urgent" })
+        .expect(422);
+    });
+  });
+
+  describe("GET /api/tasks", () => {
+    test("returns paginated tasks", async () => {
+      const res = await request(app)
+        .get("/api/tasks")
+        .expect(200);
+
+      expect(res.body.data).toBeInstanceOf(Array);
+      expect(res.body.pagination).toBeDefined();
+    });
+  });
+
+  describe("GET /api/tasks/:id", () => {
+    test("returns 404 for non-existent task", async () => {
+      await request(app)
+        .get("/api/tasks/nonexistent-id")
+        .expect(404);
+    });
+  });
+
+  describe("PUT /api/tasks/:id", () => {
+    test("updates a task", async () => {
+      // First create
+      const createRes = await request(app)
+        .post("/api/tasks")
+        .send({ title: "Update me" });
+
+      const res = await request(app)
+        .put(`/api/tasks/${createRes.body.data.id}`)
+        .send({ title: "Updated!", status: "completed" })
+        .expect(200);
+
+      expect(res.body.data.title).toBe("Updated!");
+      expect(res.body.data.status).toBe("completed");
+    });
+  });
+
+  describe("DELETE /api/tasks/:id", () => {
+    test("deletes a task", async () => {
+      const createRes = await request(app)
+        .post("/api/tasks")
+        .send({ title: "Delete me" });
+
+      await request(app)
+        .delete(`/api/tasks/${createRes.body.data.id}`)
+        .expect(204);
+    });
+  });
+});
+```
+
+## Step 13: Run It
+
+```bash
+# Start the server
+npm run dev
+
+# Test the API
+curl http://localhost:3000/api/health
+curl http://localhost:3000/api/tasks
+curl -X POST http://localhost:3000/api/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"title":"My first task","priority":"high"}'
+
+# Run tests
+npm test
+```
+
+## Extension Ideas
+
+1. **Database integration**: Replace file storage with MongoDB and Mongoose. Update tests to use `mongodb-memory-server`.
+
+2. **User authentication**: Add user registration/login with JWT. Protect task routes so users only see their own tasks.
+
+3. **Due dates**: Add a `dueDate` field. Support filtering by overdue tasks. Add sorting by due date.
+
+4. **Tags/Categories**: Add a `tags` array field. Support filtering by tag. Add a tags endpoint to list all unique tags.
+
+5. **API documentation**: Add Swagger/OpenAPI documentation accessible at `/api-docs`.
+
+6. **Rate limiting**: Add rate limiting with `express-rate-limit`. Different limits for read vs write endpoints.

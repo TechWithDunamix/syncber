@@ -1,0 +1,401 @@
+---
+title: "Forms & Form Events"
+description: "Handling form submissions with JavaScript — FormData, input validation, real-time validation, controlled form patterns, and preventing default submission."
+sidebar:
+  order: 6
+  label: "Forms & Form Events"
+tab: "full-stack-development"
+---
+
+Forms are how users submit data to your application. JavaScript lets you intercept form submissions, validate data, and provide real-time feedback without a page reload.
+
+## Basic Form Handling
+
+```html
+<form id="signup-form">
+  <div>
+    <label for="name">Name:</label>
+    <input type="text" id="name" name="name" required />
+  </div>
+  <div>
+    <label for="email">Email:</label>
+    <input type="email" id="email" name="email" required />
+  </div>
+  <button type="submit">Sign Up</button>
+</form>
+
+<div id="message"></div>
+```
+
+```js
+const form = document.getElementById("signup-form");
+const message = document.getElementById("message");
+
+form.addEventListener("submit", (event) => {
+  event.preventDefault(); // prevent page reload
+
+  const formData = new FormData(form);
+  const data = Object.fromEntries(formData);
+
+  message.textContent = `Welcome, ${data.name}! Check your email at ${data.email}.`;
+});
+```
+
+## FormData API
+
+`FormData` provides a clean way to collect form values:
+
+```js
+form.addEventListener("submit", (event) => {
+  event.preventDefault();
+
+  const formData = new FormData(form);
+
+  // Get individual values
+  console.log(formData.get("name"));   // "Alice"
+  console.log(formData.get("email"));  // "alice@example.com"
+
+  // Check if a field exists
+  console.log(formData.has("name")); // true
+
+  // Get all values for a field (checkboxes, multi-select)
+  formData.getAll("hobbies"); // ["reading", "coding"]
+
+  // Iterate all entries
+  for (const [key, value] of formData) {
+    console.log(key, value);
+  }
+
+  // Convert to plain object
+  const data = Object.fromEntries(formData);
+  console.log(data); // { name: "Alice", email: "alice@example.com" }
+
+  // Send as JSON
+  fetch("/api/users", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+});
+```
+
+## Form Events
+
+### Submit Event
+
+Fires when the user clicks a submit button or presses Enter in a form field:
+
+```js
+form.addEventListener("submit", (event) => {
+  event.preventDefault();
+  // process form data
+});
+```
+
+### Input Event
+
+Fires on every value change — ideal for **real-time validation** and live previews:
+
+```js
+const nameInput = document.getElementById("name");
+const preview = document.getElementById("preview");
+
+nameInput.addEventListener("input", () => {
+  preview.textContent = nameInput.value || "Your name will appear here";
+});
+```
+
+### Change Event
+
+Fires when the value changes **and** the input loses focus (or for checkboxes/radios, immediately on change):
+
+```js
+emailInput.addEventListener("change", () => {
+  // Fires when user finishes editing and clicks away
+  validateEmail(emailInput.value);
+});
+
+selectInput.addEventListener("change", () => {
+  console.log("Selected:", selectInput.value);
+});
+```
+
+### Focus and Blur
+
+```js
+input.addEventListener("focus", () => {
+  input.parentElement.classList.add("focused");
+});
+
+input.addEventListener("blur", () => {
+  input.parentElement.classList.remove("focused");
+  // Good time to validate (after user finishes)
+  validateField(input);
+});
+```
+
+## Input Validation
+
+### HTML5 Built-in Validation
+
+```html
+<form>
+  <input type="text" required minlength="2" maxlength="50" />
+  <input type="email" required />
+  <input type="number" min="18" max="120" />
+  <input type="url" />
+  <input pattern="[A-Za-z]+" title="Letters only" />
+</form>
+```
+
+Check validity with the Constraint Validation API:
+
+```js
+const input = document.getElementById("name");
+
+// Check validity
+console.log(input.validity.valid); // true/false
+console.log(input.validity.tooShort);
+console.log(input.validity.valueMissing);
+console.log(input.validationMessage); // browser's error message
+
+// Custom validation
+input.setCustomValidity(""); // clear custom error
+input.setCustomValidity("This name is already taken"); // set error
+
+// Report validity visually
+input.reportValidity();
+```
+
+### Custom Validation with JavaScript
+
+```js
+const form = document.getElementById("signup-form");
+const emailInput = document.getElementById("email");
+const passwordInput = document.getElementById("password");
+const errors = document.getElementById("errors");
+
+function validateField(input) {
+  const error = input.parentElement.querySelector(".error");
+  if (!error) return true;
+
+  if (input.validity.valid) {
+    error.textContent = "";
+    input.classList.remove("invalid");
+    return true;
+  }
+
+  // Custom error messages
+  if (input.validity.valueMissing) {
+    error.textContent = `${input.name} is required`;
+  } else if (input.validity.typeMismatch) {
+    error.textContent = `Please enter a valid ${input.type}`;
+  } else if (input.validity.tooShort) {
+    error.textContent = `Minimum ${input.minLength} characters required`;
+  }
+
+  input.classList.add("invalid");
+  return false;
+}
+
+form.addEventListener("submit", (event) => {
+  event.preventDefault();
+
+  // Validate all fields
+  const inputs = form.querySelectorAll("input, select, textarea");
+  let isValid = true;
+
+  inputs.forEach((input) => {
+    if (!validateField(input)) {
+      isValid = false;
+    }
+  });
+
+  if (isValid) {
+    const formData = new FormData(form);
+    console.log("Form submitted:", Object.fromEntries(formData));
+  }
+});
+
+// Real-time validation
+emailInput.addEventListener("blur", () => validateField(emailInput));
+passwordInput.addEventListener("input", () => validateField(passwordInput));
+```
+
+## Real-Time Validation Pattern
+
+```html
+<form id="password-form">
+  <div class="field">
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password"
+           minlength="8" required />
+    <ul class="password-requirements">
+      <li id="req-length" class="invalid">At least 8 characters</li>
+      <li id="req-number" class="invalid">Contains a number</li>
+      <li id="req-upper" class="invalid">Contains uppercase letter</li>
+    </ul>
+  </div>
+</form>
+```
+
+```js
+const passwordInput = document.getElementById("password");
+
+passwordInput.addEventListener("input", () => {
+  const value = passwordInput.value;
+
+  toggleRequirement("req-length", value.length >= 8);
+  toggleRequirement("req-number", /\d/.test(value));
+  toggleRequirement("req-upper", /[A-Z]/.test(value));
+
+  if (passwordInput.validity.valid) {
+    passwordInput.classList.add("valid");
+    passwordInput.classList.remove("invalid");
+  } else {
+    passwordInput.classList.remove("valid");
+    passwordInput.classList.add("invalid");
+  }
+});
+
+function toggleRequirement(id, met) {
+  const el = document.getElementById(id);
+  el.className = met ? "valid" : "invalid";
+}
+```
+
+```css
+.valid { color: green; }
+.valid::before { content: "✓ "; }
+.invalid { color: #999; }
+.invalid::before { content: "✗ "; }
+```
+
+## Working with Different Input Types
+
+### Checkboxes
+
+```html
+<label><input type="checkbox" name="newsletter" value="weekly" checked /> Weekly Newsletter</label>
+<label><input type="checkbox" name="newsletter" value="daily" /> Daily Digest</label>
+```
+
+```js
+// Single checkbox (boolean)
+const agree = document.getElementById("agree");
+console.log(agree.checked); // true/false
+
+// Multiple checkboxes
+form.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const formData = new FormData(form);
+  const newsletters = formData.getAll("newsletter");
+  console.log("Selected:", newsletters); // ["weekly", "daily"]
+});
+```
+
+### Radio Buttons
+
+```html
+<label><input type="radio" name="plan" value="free" checked /> Free</label>
+<label><input type="radio" name="plan" value="pro" /> Pro</label>
+<label><input type="radio" name="plan" value="enterprise" /> Enterprise</label>
+```
+
+```js
+form.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const plan = new FormData(form).get("plan");
+  console.log("Selected plan:", plan); // "free", "pro", or "enterprise"
+});
+```
+
+### Select Dropdowns
+
+```html
+<select name="country" id="country">
+  <option value="">Select a country</option>
+  <option value="US">United States</option>
+  <option value="UK">United Kingdom</option>
+  <option value="JP">Japan</option>
+</select>
+
+<select name="skills" multiple>
+  <option value="js">JavaScript</option>
+  <option value="py">Python</option>
+  <option value="rb">Ruby</option>
+</select>
+```
+
+```js
+// Single select
+console.log(document.getElementById("country").value); // "US"
+
+// Multiple select
+const skills = new FormData(form).getAll("skills");
+console.log(skills); // ["js", "py"]
+```
+
+## Controlled Form Pattern
+
+Collect and manage form state in a JavaScript object:
+
+```js
+const formState = {
+  name: "",
+  email: "",
+  password: "",
+  newsletter: false,
+  plan: "free",
+};
+
+const form = document.getElementById("signup-form");
+
+// Sync state with form on every input
+form.addEventListener("input", (event) => {
+  const { name, value, type, checked } = event.target;
+  formState[name] = type === "checkbox" ? checked : value;
+  console.log("Current state:", formState);
+});
+
+form.addEventListener("submit", (event) => {
+  event.preventDefault();
+  console.log("Final data:", formState);
+  // Submit formState to API
+});
+```
+
+## Form Reset
+
+```js
+// Reset to initial values
+form.reset();
+
+// Clear all fields manually
+form.querySelectorAll("input").forEach((input) => {
+  if (input.type === "checkbox" || input.type === "radio") {
+    input.checked = false;
+  } else {
+    input.value = "";
+  }
+});
+```
+
+## Quick Reference
+
+| Event | Fires When | Use Case |
+|-------|------------|----------|
+| `submit` | Form is submitted | Process form data |
+| `input` | Value changes (every keystroke) | Real-time validation, live preview |
+| `change` | Value committed (focus lost) | Final validation |
+| `focus` | Element gains focus | Highlight active field |
+| `blur` | Element loses focus | Validate on completion |
+| `reset` | Form is reset | Clear UI state |
+
+## Practice Exercises
+
+1. **Registration form**: Build a complete registration form with name, email, password, and confirm password. Validate that passwords match, email is valid, and name is not empty. Show inline error messages.
+
+2. **Dynamic field builder**: Create a form where selecting a "category" from a dropdown dynamically shows/hides additional fields (e.g., selecting "Company" shows a company name field).
+
+3. **Character counter**: Add a character counter below a `<textarea>` that updates in real-time, turns red when near the limit (90%), and prevents submission if over the maxlength.

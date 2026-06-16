@@ -1,0 +1,218 @@
+---
+title: "Images & Media"
+description: "Embed images, video, and audio in web pages — img attributes, responsive images with srcset, the picture element, video/audio controls, and media accessibility."
+sidebar:
+  order: 5
+  label: "Images & Media"
+tab: "full-stack-development"
+---
+
+Images, video, and audio make web pages engaging. HTML provides dedicated elements for each media type with rich controls and accessibility features.
+
+## Images: The `<img>` Element
+
+The `<img>` element embeds an image in the page:
+
+```html
+<img src="photo.jpg" alt="A sunset over the mountains">
+```
+
+`<img>` is a **void element** — no closing tag. Two attributes are required:
+
+| Attribute | Purpose |
+|-----------|---------|
+| `src` | Image file path (absolute or relative URL) |
+| `alt` | Text description for accessibility and fallback |
+
+### The `alt` Attribute — Critical for Accessibility
+
+```html
+<!-- ✅ Good: descriptive alt text for informative images -->
+<img src="chart.png" alt="Bar chart showing 40% revenue growth in Q2 2026">
+
+<!-- ✅ Good: decorative images should have empty alt -->
+<img src="decoration.png" alt="">
+
+<!-- ❌ Bad: missing alt — screen readers read the filename -->
+<img src="DSC_0012.jpg">
+
+<!-- ❌ Bad: redundant alt that repeats the caption -->
+<img src="team.jpg" alt="Team photo">
+<p>Our amazing team</p>
+```
+
+Rules for `alt`:
+- **Informative images**: Describe what's shown
+- **Decorative images**: Use `alt=""` (empty) — screen readers skip them
+- **Logo in a link**: Use `alt="Company Name Home"` (describe the link's purpose)
+- **Never omit `alt`** — without it, screen readers read the filename
+
+### Image Dimensions
+
+```html
+<!-- Set width and height for layout stability -->
+<img src="photo.jpg" alt="Description" width="800" height="600">
+```
+
+Always specify `width` and `height` to prevent layout shifts when the image loads (Cumulative Layout Shift — a Core Web Vital metric).
+
+## Image Formats
+
+| Format | Best For | Notes |
+|--------|----------|-------|
+| **JPEG (.jpg)** | Photos, complex images | Small file size, lossy compression, no transparency |
+| **PNG (.png)** | Graphics, logos, screenshots | Lossless, transparency support, larger files |
+| **WebP (.webp)** | Everything (modern) | 25-35% smaller than JPEG/PNG, supports transparency + animation |
+| **AVIF (.avif)** | Next-generation | Even better compression than WebP, growing browser support |
+| **GIF (.gif)** | Simple animations | Limited to 256 colors, large file size — prefer video or WebP |
+| **SVG (.svg)** | Icons, logos, illustrations | Resolution-independent, code-based, can be styled with CSS |
+
+```html
+<!-- Modern approach: provide WebP with JPEG fallback -->
+<picture>
+  <source srcset="photo.webp" type="image/webp">
+  <source srcset="photo.avif" type="image/avif">
+  <img src="photo.jpg" alt="Description">
+</picture>
+```
+
+<Aside variant="tip">
+Always use modern formats (WebP, AVIF) with the `<picture>` element for backward compatibility. The browser picks the first format it supports.
+</Aside>
+
+## Responsive Images with `srcset`
+
+Send different image sizes to different screen sizes using `srcset` and `sizes`:
+
+```html
+<img
+  src="photo-800.jpg"
+  srcset="
+    photo-400.jpg 400w,
+    photo-800.jpg 800w,
+    photo-1200.jpg 1200w
+  "
+  sizes="
+    (max-width: 600px) 100vw,
+    (max-width: 1200px) 50vw,
+    800px
+  "
+  alt="Mountain landscape"
+>
+```
+
+- `srcset` lists image files with their actual widths
+- `sizes` tells the browser how much space the image will occupy
+- The browser selects the best image based on device resolution and viewport
+
+## The `<figure>` and `<figcaption>` Elements
+
+Group images with captions:
+
+```html
+<figure>
+  <img src="architecture.jpg" alt="Modern building with glass facade">
+  <figcaption>Downtown office building designed by Studio X</figcaption>
+</figure>
+```
+
+`<figure>` can also contain code blocks, diagrams, or multiple images:
+
+```html
+<figure>
+  <pre><code>console.log("Hello!");</code></pre>
+  <figcaption>Figure 1: JavaScript hello world example</figcaption>
+</figure>
+```
+
+## Lazy Loading
+
+Defer loading off-screen images until the user scrolls near them:
+
+```html
+<img src="large-photo.jpg" alt="Description" loading="lazy">
+```
+
+- `loading="lazy"` — loads when near the viewport (saves bandwidth)
+- `loading="eager"` — loads immediately (default)
+- Lazy load all images below the fold, but never lazy load the hero image
+
+## Video: `<video>` Element
+
+```html
+<video controls width="640" height="360">
+  <source src="movie.mp4" type="video/mp4">
+  <source src="movie.webm" type="video/webm">
+  <p>Your browser does not support video. <a href="movie.mp4">Download the video</a>.</p>
+</video>
+```
+
+### Video Attributes
+
+| Attribute | Effect |
+|-----------|--------|
+| `controls` | Shows play/pause, volume, fullscreen controls |
+| `autoplay` | Starts playing immediately (usually blocked without `muted`) |
+| `muted` | Starts with no sound |
+| `loop` | Repeats the video |
+| `poster="image.jpg"` | Placeholder image before playback |
+| `preload="none"` | Don't download until play is clicked |
+
+```html
+<!-- Autoplay example (muted required by browsers) -->
+<video autoplay muted loop poster="thumbnail.jpg">
+  <source src="background.mp4" type="video/mp4">
+</video>
+```
+
+<Aside variant="caution">
+Avoid autoplay with sound — it is universally considered a bad user experience. If you must autoplay, always add `muted`.
+</Aside>
+
+## Audio: `<audio>` Element
+
+```html
+<audio controls>
+  <source src="song.mp3" type="audio/mpeg">
+  <source src="song.ogg" type="audio/ogg">
+  <p>Your browser does not support audio. <a href="song.mp3">Download the podcast</a>.</p>
+</audio>
+```
+
+Audio attributes mirror video: `controls`, `autoplay`, `muted`, `loop`, `preload`.
+
+## Embedding YouTube Videos
+
+```html
+<iframe
+  width="560"
+  height="315"
+  src="https://www.youtube.com/embed/dQw4w9WgXcQ"
+  title="YouTube video player"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
+  allowfullscreen
+></iframe>
+```
+
+Replace the video ID (`dQw4w9WgXcQ`) with your target video's ID from its URL.
+
+## Try It Yourself
+
+Create a page with:
+
+1. A hero banner image with descriptive alt text (use a free stock photo URL)
+2. A `<figure>` with an image and `<figcaption>` caption
+3. A responsive image using `srcset` with at least 3 sizes
+4. A video element with controls and multiple source formats
+5. An audio player with controls and a fallback message
+6. A YouTube embed iframe
+
+## Key Takeaways
+
+- Always provide `alt` text — informative images get descriptions, decorative images get `alt=""`
+- Use modern formats (WebP, AVIF) with `<picture>` for fallback
+- `srcset` + `sizes` delivers the right image size for each device — saves bandwidth
+- Always specify `width` and `height` on images to prevent layout shifts
+- Use `loading="lazy"` on images below the fold to improve initial page load
+- Provide multiple source formats for video (MP4 + WebM) and audio (MP3 + OGG)
+- Include fallback content between opening and closing `<video>`/`<audio>` tags

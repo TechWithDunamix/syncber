@@ -1,0 +1,213 @@
+---
+title: "React Fundamentals & JSX"
+description: "What is React, setting up a project with Vite, JSX syntax, rendering elements, components, and React DevTools."
+sidebar:
+  order: 1
+  label: "React Fundamentals & JSX"
+tab: "full-stack-development"
+---
+
+React is a JavaScript library for building user interfaces. It lets you compose complex UIs from small, isolated pieces of code called **components**.
+
+## What is React?
+
+- **Declarative**: You describe what the UI should look like for each state, and React figures out how to update the DOM efficiently
+- **Component-based**: Build encapsulated components that manage their own state, then compose them to make complex UIs
+- **Learn once, write anywhere**: React can render on the client (browser), server (Next.js), or native (React Native)
+
+## Setting Up with Vite
+
+Vite is the recommended way to create a new React project:
+
+```bash
+npm create vite@latest my-app -- --template react
+cd my-app
+npm install
+npm run dev
+```
+
+Your project structure:
+
+```
+my-app/
+├── src/
+│   ├── App.jsx        # Main component
+│   ├── main.jsx       # Entry point
+│   ├── App.css
+│   └── index.css
+├── index.html
+├── package.json
+└── vite.config.js
+```
+
+Open `http://localhost:5173` in your browser.
+
+## JSX: JavaScript + XML
+
+JSX is a syntax extension that looks like HTML but works inside JavaScript:
+
+```jsx
+const element = <h1>Hello, World!</h1>;
+```
+
+### JSX Rules
+
+**1. Single root element** — return one parent element:
+
+```jsx
+// ✅ Correct
+function App() {
+  return (
+    <div>
+      <h1>Title</h1>
+      <p>Content</p>
+    </div>
+  );
+}
+
+// ✅ Or use a fragment
+function App() {
+  return (
+    <>
+      <h1>Title</h1>
+      <p>Content</p>
+    </>
+  );
+}
+```
+
+**2. All tags must close** — even self-closing ones:
+
+```jsx
+<img src="photo.jpg" alt="Photo" />  {/* ✅ must close */}
+<br />                                {/* ✅ must close */}
+<input type="text" />                 {/* ✅ must close */}
+```
+
+**3. Use `className` instead of `class`**:
+
+```jsx
+<h1 className="title">Hello</h1>  {/* ✅ not class="title" */}
+```
+
+**4. Use camelCase for CSS properties**:
+
+```jsx
+const style = {
+  backgroundColor: "blue",  // ✅ not background-color
+  fontSize: "16px",         // ✅ not font-size
+};
+```
+
+**5. Curly braces for JavaScript expressions**:
+
+```jsx
+const name = "Alice";
+const age = 30;
+
+const element = (
+  <div>
+    <h1>Hello, {name}</h1>          {/* variable */}
+    <p>Age: {age + 5}</p>           {/* expression */}
+    <p>{name.toUpperCase()}</p>     {/* method call */}
+    <p>{condition ? "Yes" : "No"}</p> {/* ternary */}
+  </div>
+);
+```
+
+### JSX is JavaScript
+
+JSX compiles to `React.createElement` calls:
+
+```jsx
+// This JSX:
+const element = <h1 className="greeting">Hello!</h1>;
+
+// Compiles to:
+const element = React.createElement("h1", { className: "greeting" }, "Hello!");
+```
+
+## Your First Component
+
+A component is a JavaScript function that returns JSX:
+
+```jsx
+// Welcome.jsx
+function Welcome() {
+  const name = "Alice";
+  return <h1>Welcome, {name}!</h1>;
+}
+
+export default Welcome;
+```
+
+Using it in another component:
+
+```jsx
+// App.jsx
+import Welcome from "./Welcome";
+
+function App() {
+  return (
+    <div>
+      <Welcome />
+      <Welcome />
+      <Welcome />
+    </div>
+  );
+}
+```
+
+## The Entry Point
+
+```jsx
+// main.jsx
+import React from "react";
+import ReactDOM from "react-dom/client";
+import App from "./App";
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+```
+
+`StrictMode` enables additional checks in development (double-rendering to catch side effects, etc.). It doesn't affect production builds.
+
+## React DevTools
+
+1. Install the [React DevTools browser extension](https://react.dev/learn/react-developer-tools)
+2. Open DevTools (F12) → **Components** tab
+3. You can:
+   - See the component tree
+   - Inspect props and state
+   - Search for components
+   - View component source location
+
+## Component Rules
+
+1. **Name components with capital letters** — `MyComponent`, not `myComponent` (React treats lowercase tags as HTML)
+2. **Each component returns a single JSX element** (or fragment)
+3. **Components can render other components**
+4. **Keep components focused** — one component, one responsibility
+
+## Quick Reference
+
+| JSX | HTML Equivalent | Notes |
+|-----|-----------------|-------|
+| `<div className="x">` | `<div class="x">` | `className` not `class` |
+| `<label htmlFor="x">` | `<label for="x">` | `htmlFor` not `for` |
+| `{variable}` | — | JS expression in JSX |
+| `style={{ color: "red" }}` | `style="color: red"` | Object with camelCase keys |
+| `onClick={handler}` | `onclick="handler()"` | camelCase event handlers |
+| `/* comment */` | `<!-- comment -->` | JSX comments use `{/* */}` |
+
+## Practice Exercises
+
+1. **Create a new Vite + React project** and run the dev server. Confirm you see the default Vite page.
+
+2. **Build a ProfileCard component** that renders a name, job title, and a short bio. Use JSX expressions to render variables. Reuse the component three times in `App`.
+
+3. **Experiment with JSX**: Create a component that renders today's date (`new Date().toLocaleDateString()`) and a random number between 1 and 100 using JSX expressions.

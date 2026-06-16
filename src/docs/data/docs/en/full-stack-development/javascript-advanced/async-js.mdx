@@ -1,0 +1,397 @@
+---
+title: "Promises & Async/Await"
+description: "Asynchronous JavaScript — callbacks, Promise chaining, Promise.all/race/allSettled, async/await syntax, error handling in async code, and the event loop basics."
+sidebar:
+  order: 5
+  label: "Promises & Async/Await"
+tab: "full-stack-development"
+---
+
+JavaScript is **single-threaded** — it can only execute one piece of code at a time. Asynchronous patterns let your program handle long-running operations (API calls, file reads, timers) without blocking the main thread.
+
+## The Problem: Blocking Code
+
+```js
+// This blocks the entire program for 3 seconds
+const start = Date.now();
+while (Date.now() - start < 3000) {
+  // wait...
+}
+console.log("Done"); // nothing else can happen during these 3 seconds
+```
+
+In real applications, blocking the main thread freezes the UI, drops network requests, and creates a terrible user experience.
+
+## Callbacks (The Old Way)
+
+A **callback** is a function passed as an argument to be called later when an operation completes:
+
+```js
+function fetchData(callback) {
+  setTimeout(() => {
+    callback({ id: 1, name: "Alice" });
+  }, 1000);
+}
+
+fetchData((user) => {
+  console.log(user.name); // "Alice" — called after 1 second
+});
+```
+
+### Callback Hell
+
+Nested callbacks quickly become unreadable:
+
+```js
+getUser(1, (user) => {
+  getPosts(user.id, (posts) => {
+    getComments(posts[0].id, (comments) => {
+      getLikes(comments[0].id, (likes) => {
+        console.log(likes);
+        // ...each level adds more nesting
+      });
+    });
+  });
+});
+```
+
+This pyramid of doom is why Promises were created.
+
+## Promises
+
+A **Promise** represents a value that may be available now, later, or never. It has three states:
+
+- **Pending** — initial state, neither fulfilled nor rejected
+- **Fulfilled** — the operation completed successfully
+- **Rejected** — the operation failed
+
+```js
+const promise = new Promise((resolve, reject) => {
+  const success = true;
+
+  if (success) {
+    resolve("Operation succeeded!");
+  } else {
+    reject("Operation failed!");
+  }
+});
+```
+
+### Consuming Promises
+
+```js
+promise
+  .then((value) => {
+    console.log(value); // "Operation succeeded!"
+  })
+  .catch((error) => {
+    console.error(error); // "Operation failed!"
+  })
+  .finally(() => {
+    console.log("Done"); // always runs
+  });
+```
+
+### Real Promise Example
+
+```js
+function fetchUser(id) {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      if (id <= 0) {
+        reject(new Error("Invalid user ID"));
+        return;
+      }
+      resolve({ id, name: `User ${id}` });
+    }, 1000);
+  });
+}
+
+fetchUser(1)
+  .then((user) => console.log(user.name))
+  .catch((err) => console.error(err.message));
+```
+
+### Promise Chaining
+
+Each `.then()` returns a new Promise, allowing you to chain operations linearly:
+
+```js
+fetchUser(1)
+  .then((user) => {
+    console.log("User:", user.name);
+    return getPosts(user.id);
+  })
+  .then((posts) => {
+    console.log("Posts:", posts.length);
+    return getComments(posts[0].id);
+  })
+  .then((comments) => {
+    console.log("Comments:", comments.length);
+  })
+  .catch((err) => {
+    // Catches ANY error in the chain
+    console.error("Something went wrong:", err.message);
+  });
+```
+
+A single `.catch()` at the end catches errors from any step — no more callback nesting.
+
+### Returning Values in Chains
+
+If you return a **non-Promise value** from `.then()`, it's automatically wrapped in `Promise.resolve()`:
+
+```js
+fetchUser(1)
+  .then((user) => user.name) // returns a string
+  .then((name) => `Hello, ${name}!`) // returns a string
+  .then((greeting) => console.log(greeting)); // "Hello, User 1!"
+```
+
+## Promise Combinators
+
+### Promise.all
+
+Runs multiple promises **in parallel** and waits for **all** to complete. If any rejects, the whole thing rejects:
+
+```js
+const userPromise = fetchUser(1);
+const postsPromise = getPosts(1);
+const settingsPromise = getSettings(1);
+
+Promise.all([userPromise, postsPromise, settingsPromise])
+  .then(([user, posts, settings]) => {
+    console.log("All data loaded:", user, posts, settings);
+  })
+  .catch((err) => {
+    // If ANY promise rejects, this runs immediately
+    console.error("Failed to load:", err);
+  });
+```
+
+### Promise.race
+
+Resolves or rejects as soon as **any** promise settles (first to complete wins):
+
+```js
+const timeout = new Promise((_, reject) =>
+  setTimeout(() => reject(new Error("Request timed out")), 5000)
+);
+
+Promise.race([fetchUser(1), timeout])
+  .then((user) => console.log("Got user:", user))
+  .catch((err) => console.error(err.message)); // "Request timed out" if > 5s
+```
+
+### Promise.allSettled
+
+Waits for **all** promises to complete and returns their outcomes — regardless of rejections:
+
+```js
+const promises = [
+  fetchUser(1),
+  fetchUser(-1), // this will reject
+  fetchUser(3),
+];
+
+Promise.allSettled(promises).then((results) => {
+  results.forEach((result) => {
+    if (result.status === "fulfilled") {
+      console.log("✅", result.value);
+    } else {
+      console.log("❌", result.reason.message);
+    }
+  });
+});
+```
+
+### Promise.any (ES2021)
+
+Resolves when **any** promise fulfills. Rejects only if **all** reject:
+
+```js
+Promise.any([
+  fetchFromCache(1),
+  fetchFromServer(1),
+  fetchFromBackup(1),
+]).then((result) => {
+  console.log("Got data from fastest source:", result);
+}).catch((err) => {
+  console.error("All sources failed:", err);
+});
+```
+
+## Async/Await
+
+`async`/`await` is syntactic sugar over Promises — it makes asynchronous code read like synchronous code:
+
+```js
+async function loadUserData(userId) {
+  try {
+    const user = await fetchUser(userId);
+    const posts = await getPosts(user.id);
+    const comments = await getComments(posts[0].id);
+    return { user, posts, comments };
+  } catch (err) {
+    console.error("Failed to load:", err);
+    throw err; // re-throw if caller needs to handle it
+  }
+}
+
+// Usage:
+const data = await loadUserData(1);
+console.log(data.user.name);
+```
+
+### Key Rules
+
+1. **`async`** before a function declaration makes it return a Promise automatically
+2. **`await`** can only be used inside `async` functions (or at the top level in modules)
+3. `await` pauses execution until the Promise settles, then returns the fulfilled value
+
+```js
+// Both are equivalent:
+async function fn1() {
+  return 42; // wrapped in Promise.resolve(42)
+}
+
+function fn2() {
+  return Promise.resolve(42);
+}
+
+// fn1() returns a Promise, not 42
+fn1().then(console.log); // 42
+```
+
+### Parallel Operations with Async/Await
+
+Don't serialize independent operations — run them in parallel:
+
+```js
+// ❌ BAD — runs sequentially (slow)
+async function loadBad() {
+  const user = await fetchUser(1);
+  const posts = await getPosts(1); // starts after user finishes
+  return { user, posts };
+}
+
+// ✅ GOOD — runs in parallel (fast)
+async function loadGood() {
+  const [user, posts] = await Promise.all([
+    fetchUser(1),
+    getPosts(1)
+  ]);
+  return { user, posts };
+}
+```
+
+### Error Handling Patterns
+
+**Try/catch for specific errors:**
+
+```js
+async function getData() {
+  try {
+    const result = await riskyOperation();
+    return result;
+  } catch (err) {
+    if (err instanceof NetworkError) {
+      return fallbackData;
+    }
+    if (err instanceof ValidationError) {
+      return defaultData;
+    }
+    throw err; // unknown error — let caller handle it
+  }
+}
+```
+
+**Global error handler pattern:**
+
+```js
+async function safeExecute(fn) {
+  try {
+    return { success: true, data: await fn() };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+const result = await safeExecute(() => fetchUser(1));
+if (result.success) {
+  console.log(result.data);
+}
+```
+
+## The Event Loop (Simplified)
+
+JavaScript's event loop is how it handles asynchronous operations on a single thread:
+
+```
+Call Stack → Web APIs → Callback Queue → Event Loop → Call Stack
+```
+
+```
+console.log("Start");
+
+setTimeout(() => {
+  console.log("Timeout");
+}, 0);
+
+Promise.resolve().then(() => {
+  console.log("Promise");
+});
+
+console.log("End");
+
+// Output:
+// "Start"
+// "End"
+// "Promise"  ← microtask queue (higher priority)
+// "Timeout"  ← callback/task queue
+```
+
+**Priority order:**
+1. **Call Stack** — synchronous code
+2. **Microtask Queue** — Promise `.then()`/`.catch()`, `queueMicrotask()`
+3. **Callback (Task) Queue** — `setTimeout`, `setInterval`, DOM events
+
+## Converting Callbacks to Promises
+
+Many older libraries use callbacks. You can "promisify" them:
+
+```js
+function readFilePromise(path) {
+  return new Promise((resolve, reject) => {
+    fs.readFile(path, "utf8", (err, data) => {
+      if (err) reject(err);
+      else resolve(data);
+    });
+  });
+}
+
+// Or use Node's built-in promisify for callback-based functions
+// const readFile = require("fs").promises.readFile;
+```
+
+## Quick Reference
+
+| Pattern | When to Use |
+|---------|-------------|
+| `.then()` | Simple promise consumption, chaining |
+| `.catch()` | Error handling at end of chain |
+| `.finally()` | Cleanup (always runs) |
+| `Promise.all()` | Multiple parallel, all must succeed |
+| `Promise.race()` | First to settle (timeouts, racing) |
+| `Promise.allSettled()` | All results needed regardless of failure |
+| `Promise.any()` | First success, ignore failures |
+| `async/await` | Readable sequential async code |
+| `async/await + Promise.all` | Parallel async with readable syntax |
+
+## Practice Exercises
+
+1. **Build a `sleep` function**: Create a function that returns a Promise that resolves after N milliseconds. Use it to delay execution.
+
+2. **Sequential vs parallel**: Write a function that fetches todos for 5 users. First do it sequentially (one after another), then in parallel with `Promise.all`. Measure the time difference.
+
+3. **Retry pattern**: Create a `fetchWithRetry(url, maxRetries)` function that attempts a fetch and retries up to `maxRetries` times if it fails, with an exponential backoff delay between attempts.

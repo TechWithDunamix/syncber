@@ -1,0 +1,345 @@
+---
+title: "Scope, Hoisting & Closure"
+description: "JavaScript scope types (global, function, block), hoisting behaviour for var/let/const/function declarations, closures with practical examples, IIFE patterns, and the lexical environment."
+sidebar:
+  order: 1
+  label: "Scope, Hoisting & Closure"
+tab: "full-stack-development"
+---
+
+Scope determines **where** variables are accessible in your code. JavaScript has three scope levels and a special hoisting behaviour that moves declarations to the top of their scope before execution.
+
+## Global Scope
+
+Variables declared outside any function or block belong to the **global scope**. They are accessible everywhere in your program.
+
+```js
+// global scope
+const appName = "Weather App";
+
+function showName() {
+  console.log(appName); // "Weather App" — accessible inside functions
+}
+
+showName();
+console.log(appName); // "Weather App" — accessible globally
+```
+
+In browsers, global variables become properties of the `window` object. In Node.js, they belong to the `global` object.
+
+<Aside variant="caution">
+Global variables are convenient but dangerous. Any script on the page can read or overwrite them. Use global scope only for values that are truly application-wide (config objects, constant enums).
+</Aside>
+
+## Function Scope
+
+Variables declared with `var` inside a function are scoped to that function — they cannot be accessed outside it.
+
+```js
+function greet() {
+  var message = "Hello!";
+  console.log(message); // "Hello!"
+}
+
+greet();
+console.log(message); // ❌ ReferenceError: message is not defined
+```
+
+This creates a **safety boundary** — function internals don't leak to the outside world.
+
+## Block Scope (`let` / `const`)
+
+`let` and `const` are scoped to the nearest **block** — any code between `{ }`.
+
+```js
+if (true) {
+  let blockScoped = "I'm trapped";
+  var functionScoped = "I escape!";
+}
+
+console.log(functionScoped); // "I escape!"
+console.log(blockScoped);    // ❌ ReferenceError
+```
+
+The same applies to `for` loops — using `let` creates a new binding for each iteration:
+
+```js
+for (let i = 0; i < 3; i++) {
+  setTimeout(() => console.log(i), 100); // 0, 1, 2
+}
+
+for (var i = 0; i < 3; i++) {
+  setTimeout(() => console.log(i), 100); // 3, 3, 3
+}
+```
+
+## Hoisting
+
+JavaScript's engine **hoists** (moves) declarations to the top of their scope during compilation. The behaviour differs by keyword:
+
+| Declaration | Hoisted? | Initialized? | Temporal Dead Zone? |
+|-------------|----------|--------------|---------------------|
+| `function` | ✅ Yes | ✅ Yes (with definition) | ❌ No |
+| `var` | ✅ Yes | ✅ Yes (`undefined`) | ❌ No |
+| `let` | ✅ Yes | ❌ No | ✅ Yes |
+| `const` | ✅ Yes | ❌ No | ✅ Yes |
+
+### Function Hoisting
+
+Function declarations are hoisted entirely — you can call them before they appear in code:
+
+```js
+sayHello(); // "Hi there!" — works because of hoisting
+
+function sayHello() {
+  console.log("Hi there!");
+}
+```
+
+### `var` Hoisting
+
+`var` declarations are hoisted but initialized to `undefined`:
+
+```js
+console.log(age); // undefined (not an error!)
+var age = 25;
+```
+
+This is why `var` is considered confusing — the code reads as if `age` exists before its assignment.
+
+### `let` / `const` Hoisting & TDZ
+
+`let` and `const` are hoisted but not initialised. Accessing them before their declaration throws a `ReferenceError` because of the **Temporal Dead Zone (TDZ)**:
+
+```js
+console.log(city); // ❌ ReferenceError: Cannot access 'city' before initialization
+let city = "London";
+```
+
+The TDZ lasts from the start of the block until the declaration is encountered:
+
+```js
+{
+  // TDZ starts here for 'name'
+  const fn = () => console.log(name); // still TDZ
+  let name = "Alice";
+  // TDZ ends here
+  fn(); // "Alice"
+}
+```
+
+## Closures
+
+A **closure** is a function that "remembers" the variables from its lexical scope even after that scope has exited.
+
+```js
+function createCounter() {
+  let count = 0;
+
+  return function() {
+    count++;
+    return count;
+  };
+}
+
+const counter = createCounter();
+console.log(counter()); // 1
+console.log(counter()); // 2
+console.log(counter()); // 3
+```
+
+The inner function **closes over** the `count` variable. Even though `createCounter` has finished executing, the returned function keeps a reference to `count` in its closure scope.
+
+### How Closures Work
+
+Every function has a hidden property called `[[Environment]]` that stores a reference to the **lexical environment** where the function was created. When the function is called, this environment is used as the outer scope reference, forming a **scope chain**:
+
+1. Local scope (the function's own variables)
+2. Closure scope (outer function's variables)
+3. Module/global scope
+
+### Practical Closure Patterns
+
+**1. Data Privacy (Factory Functions)**
+
+```js
+function createBankAccount(initialBalance) {
+  let balance = initialBalance;
+
+  return {
+    deposit(amount) {
+      balance += amount;
+      return balance;
+    },
+    withdraw(amount) {
+      if (amount > balance) return "Insufficient funds";
+      balance -= amount;
+      return balance;
+    },
+    getBalance() {
+      return balance;
+    }
+  };
+}
+
+const account = createBankAccount(1000);
+account.deposit(500);
+console.log(account.getBalance()); // 1500
+console.log(account.balance);      // undefined — truly private
+```
+
+**2. Partial Application / Currying**
+
+```js
+function multiply(a) {
+  return function(b) {
+    return a * b;
+  };
+}
+
+const double = multiply(2);
+const triple = multiply(3);
+
+console.log(double(5));  // 10
+console.log(triple(5));  // 15
+```
+
+**3. Module Pattern (Pre-ES6)**
+
+```js
+const UserModule = (function() {
+  const users = [];
+
+  function addUser(name) {
+    users.push({ name, id: users.length + 1 });
+  }
+
+  function listUsers() {
+    return [...users];
+  }
+
+  return { addUser, listUsers };
+})();
+
+UserModule.addUser("Alice");
+console.log(UserModule.listUsers()); // [{ name: "Alice", id: 1 }]
+```
+
+## The Lexical Environment
+
+Every time a function runs, JavaScript creates a new **lexical environment** containing:
+
+- An **environment record** — the local variables, parameters, and inner function declarations
+- A reference to the **outer environment** (parent scope)
+
+```js
+const global = "global";
+
+function outer() {
+  const outerVar = "outer";
+
+  function inner() {
+    const innerVar = "inner";
+    console.log(innerVar); // from inner's environment record
+    console.log(outerVar); // from outer's environment record (via reference)
+    console.log(global);   // from global environment record
+  }
+
+  inner();
+}
+
+outer();
+```
+
+The **scope chain** is this linked list of environments. When resolving a variable, JavaScript walks up this chain until it finds the variable or reaches the global scope.
+
+## IIFE (Immediately Invoked Function Expression)
+
+An IIFE is a function that runs as soon as it's defined. It creates a private scope:
+
+```js
+(function() {
+  const privateData = "secret";
+  console.log("IIFE ran:", privateData);
+})();
+// privateData is not accessible here
+```
+
+Modern JavaScript rarely needs IIFEs because `let`/`const` provide block scoping. However, you still see them in legacy code and some build tools.
+
+## Common Pitfalls
+
+### Loop + Closure (Classic Problem)
+
+```js
+// Problem: all buttons log 5
+for (var i = 0; i < 5; i++) {
+  document.querySelectorAll("button")[i].onclick = function() {
+    console.log(i); // always 5
+  };
+}
+
+// Fix 1: Use let (block scope)
+for (let i = 0; i < 5; i++) { /* ... */ }
+
+// Fix 2: IIFE closure
+for (var i = 0; i < 5; i++) {
+  (function(index) {
+    document.querySelectorAll("button")[index].onclick = function() {
+      console.log(index);
+    };
+  })(i);
+}
+```
+
+### Accidental Global Variable
+
+```js
+function bad() {
+  leaked = "I'm global!"; // no var/let/const — becomes global!
+}
+bad();
+console.log(leaked); // "I'm global!" — probably unintended
+```
+
+Always use strict mode (`"use strict"`) to catch this:
+
+```js
+"use strict";
+function good() {
+  leaked = "error!"; // ❌ ReferenceError
+}
+```
+
+## Quick Reference
+
+| Concept | Keyword | Scope | Hoisting | TDZ |
+|---------|---------|-------|----------|-----|
+| Global | none | Everywhere | N/A | N/A |
+| Function | `var` | Function | `undefined` | No |
+| Block | `let` | Block | Hoisted | Yes |
+| Block | `const` | Block | Hoisted | Yes |
+| Closure | `function` | Lexical | Definition | No |
+
+## Practice Exercises
+
+1. **Predict the output**: What will `console.log(x)` show at each labelled point?
+   ```js
+   var x = 1;
+   function test() {
+     console.log(x); // ?
+     var x = 2;
+     console.log(x); // ?
+   }
+   test();
+   console.log(x); // ?
+   ```
+
+2. **Fix the counter**: The following counter should log 0, 1, 2 but doesn't. Why?
+   ```js
+   for (var i = 0; i < 3; i++) {
+     setTimeout(() => console.log(i), 100);
+   }
+   ```
+
+3. **Build a memoize function**: Create a function `memoize(fn)` that returns a cached version of any pure function using closures.

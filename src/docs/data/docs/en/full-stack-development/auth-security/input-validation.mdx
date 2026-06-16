@@ -1,0 +1,486 @@
+---
+title: "Input Validation & Sanitization"
+description: "Server-side validation with Joi and express-validator, sanitization, XSS prevention, SQL injection defense, and schema validation patterns."
+sidebar:
+  order: 8
+  label: "Input Validation & Sanitization"
+tab: "full-stack-development"
+---
+
+Never trust user input. Validation ensures data is correct (format, type, constraints), while sanitization removes dangerous content. Together they prevent injection attacks, data corruption, and logic bugs.
+
+## Validation vs Sanitization
+
+| Aspect | Validation | Sanitization |
+|--------|-----------|--------------|
+| Purpose | Check if input meets rules | Remove/escape dangerous content |
+| Action | Reject or accept | Transform in place |
+| Example | "Email has @ symbol?" | Strip `<script>` tags from name |
+| When | Before processing | Before storage or rendering |
+
+## Validation with express-validator
+
+```bash
+npm install express-validator
+```
+
+### Basic Validation
+
+```javascript
+const { body, validationResult } = require("express-validator");
+
+app.post(
+  "/api/users",
+  // Validation rules
+  body("email").isEmail().normalizeEmail(),
+  body("password").isLength({ min: 8 }),
+  body("name").trim().isLength({ min: 2, max: 50 }),
+  // Handler
+  (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+    // Process valid data...
+  }
+);
+```
+
+### Error Response Format
+
+```javascript
+// Returns:
+{
+  "errors": [
+    {
+      "value": "bad-email",
+      "msg": "Invalid value",
+      "param": "email",
+      "location": "body"
+    }
+  ]
+}
+```
+
+## Validation Schemas with Joi
+
+[Joi](https://joi.dev/) provides a powerful, declarative schema language for validation.
+
+```bash
+npm install joi
+```
+
+### User Registration Schema
+
+```javascript
+const Joi = require("joi");
+
+const registerSchema = Joi.object({
+  email: Joi.string()
+    .email()
+    .required()
+    .normalize(),
+  password: Joi.string()
+    .min(8)
+    .max(128)
+    .pattern(
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])/,
+      "password must contain uppercase, lowercase, number, and special character"
+    )
+    .required(),
+  name: Joi.string()
+    .trim()
+    .min(2)
+    .max(50)
+    .required(),
+  age: Joi.number()
+    .integer()
+    .min(13)
+    .max(150),
+});
+
+// Validation middleware
+function validate(schema) {
+  return (req, res, next) => {
+    const { error, value } = schema.validate(req.body, {
+      abortEarly: false,      // Return all errors, not just first
+      stripUnknown: true,     // Remove unknown fields
+    });
+
+    if (error) {
+      const errors = error.details.map((d) => ({
+        field: d.path.join("."),
+        message: d.message,
+      }));
+
+      return res.status(400).json({
+        error: "VALIDATION_ERROR",
+        message: "Invalid request data",
+        details: errors,
+      });
+    }
+
+    // Replace req.body with validated + sanitized data
+    req.body = value;
+    next();
+  };
+}
+
+app.post("/api/register", validate(registerSchema), (req, res) => {
+  // req.body is already validated and sanitized
+  res.json({ message: "User created", user: req.body });
+});
+```
+
+## Common Validation Patterns
+
+### Conditional Validation
+
+```javascript
+const schema = Joi.object({
+  role: Joi.string().valid("user", "admin", "moderator"),
+
+  // moderators need a department
+  department: Joi.when("role", {
+    is: "moderator",
+    then: Joi.string().required(),
+    otherwise: Joi.optional(),
+  }),
+
+  // Admin needs clearance level
+  clearanceLevel: Joi.when("role", {
+    is: "admin",
+    then: Joi.number().integer().min(1).max(5).required(),
+  }),
+});
+```
+
+### Nested Object Validation
+
+```javascript
+const orderSchema = Joi.object({
+  customer: Joi.object({
+    name: Joi.string().required(),
+    email: Joi.string().email().required(),
+    address: Joi.object({
+      street: Joi.string().required(),
+      city: Joi.string().required(),
+      zipCode: Joi.string().pattern(/^\d{5}(-\d{4})?$/),
+      country: Joi.string().length(2).uppercase(),
+    }).required(),
+  }).required(),
+  items: Joi.array()
+    .items(
+      Joi.object({
+        productId: Joi.string().uuid().required(),
+        quantity: Joi.number().integer().min(1).max(100).required(),
+        price: Joi.number().precision(2).positive(),
+      })
+    )
+    .min(1)
+    .max(50)
+    .required(),
+  couponCode: Joi.string().alphanum().max(20).optional(),
+});
+```
+
+### Query Parameter Validation
+
+```javascript
+const querySchema = Joi.object({
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(20),
+  sort: Joi.string().valid("name", "date", "price").default("date"),
+  order: Joi.string().valid("asc", "desc").default("desc"),
+  search: Joi.string().trim().max(100).optional(),
+  category: Joi.string().optional(),
+  minPrice: Joi.number().min(0).optional(),
+  maxPrice: Joi.number().min(0).optional(),
+});
+
+app.get("/api/products", validate(querySchema), (req, res) => {
+  // req.body contains validated query params (after schema.validate)
+  const { page, limit, sort, order, search } = req.body;
+  // Run database query with validated params...
+});
+```
+
+### URL Parameter Validation
+
+```javascript
+app.get(
+  "/api/users/:id",
+  validate(Joi.object({
+    id: Joi.string().uuid().required(),
+  }).unknown(true)),  // Allow req.body to contain other fields
+  (req, res) => {
+    // Safe to use req.params.id
+  }
+);
+```
+
+## Sanitization
+
+### HTML Sanitization (XSS Prevention)
+
+```bash
+npm install sanitize-html
+```
+
+```javascript
+const sanitizeHtml = require("sanitize-html");
+
+function sanitize(input) {
+  return sanitizeHtml(input, {
+    allowedTags: ["b", "i", "em", "strong", "a", "p", "br", "ul", "ol", "li"],
+    allowedAttributes: {
+      a: ["href", "target"],
+    },
+    allowedSchemes: ["http", "https", "mailto"],
+    disallowedTagsMode: "escape",  // Escape instead of stripping
+  });
+}
+
+app.post("/api/comments", (req, res) => {
+  const safeComment = sanitize(req.body.comment);
+  // Store safeComment — no script tags, no XSS
+});
+```
+
+### MongoDB NoSQL Injection Prevention
+
+MongoDB is vulnerable to operator injection if you pass raw user input to queries:
+
+```javascript
+// ❌ Vulnerable — attacker can inject $ne, $gt, etc.
+app.post("/api/login", async (req, res) => {
+  const user = await User.findOne({
+    email: req.body.email,
+    password: req.body.password,  // { "$ne": "" } returns first user!
+  });
+});
+
+// ✅ Safe — validate and sanitize first
+app.post("/api/login", async (req, res) => {
+  const { error, value } = Joi.object({
+    email: Joi.string().email().required(),
+    password: Joi.string().required(),
+  }).validate(req.body);
+
+  if (error) return res.status(400).json({ error: error.message });
+
+  const user = await User.findOne({ email: value.email });
+  if (!user || !(await bcrypt.compare(value.password, user.password))) {
+    return res.status(401).json({ error: "Invalid credentials" });
+  }
+});
+```
+
+### SQL Injection Prevention
+
+If using SQL databases, ALWAYS use parameterized queries:
+
+```javascript
+// ❌ Vulnerable — string concatenation
+const query = `SELECT * FROM users WHERE email = '${req.body.email}'`;
+db.execute(query);
+
+// ✅ Safe — parameterized query
+db.execute("SELECT * FROM users WHERE email = ?", [req.body.email]);
+```
+
+### Trim and Normalize
+
+```javascript
+const userSchema = Joi.object({
+  email: Joi.string()
+    .email()
+    .lowercase()      // USER@Example.COM → user@example.com
+    .trim(),
+  name: Joi.string()
+    .trim()           // "  John  " → "John"
+    .replace(/\s+/g, " ")  // "John   Doe" → "John Doe"
+    .max(50),
+  phone: Joi.string()
+    .pattern(/^\+?[\d\s-()]+$/)
+    .replace(/[\s-()]/g, ""),  // "(555) 123-4567" → "5551234567"
+});
+```
+
+## Validation Middleware Architecture
+
+### Centralized Validation
+
+```javascript
+// middleware/validate.js
+const Joi = require("joi");
+
+const schemas = {
+  createUser: Joi.object({
+    email: Joi.string().email().required(),
+    password: Joi.string().min(8).required(),
+    name: Joi.string().min(2).max(50).required(),
+  }),
+  updateUser: Joi.object({
+    name: Joi.string().min(2).max(50),
+    bio: Joi.string().max(500).allow(""),
+  }),
+  createProduct: Joi.object({
+    title: Joi.string().required(),
+    price: Joi.number().positive().required(),
+    description: Joi.string().max(2000),
+    category: Joi.string().required(),
+  }),
+};
+
+function validate(schemaName) {
+  return (req, res, next) => {
+    const schema = schemas[schemaName];
+    if (!schema) {
+      return res.status(500).json({ error: "Validation schema not found" });
+    }
+
+    const { error, value } = schema.validate(req.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    });
+
+    if (error) {
+      return res.status(400).json({
+        error: "VALIDATION_ERROR",
+        details: error.details.map((d) => ({
+          field: d.path.join("."),
+          message: d.message.replace(/"/g, ""),
+        })),
+      });
+    }
+
+    req.body = value;
+    next();
+  };
+}
+
+module.exports = { validate, schemas };
+```
+
+### Usage in Routes
+
+```javascript
+const { validate } = require("../middleware/validate");
+
+router.post("/users", validate("createUser"), createUserHandler);
+router.put("/users/:id", validate("updateUser"), updateUserHandler);
+router.post("/products", validate("createProduct"), createProductHandler);
+```
+
+## File Upload Validation
+
+```javascript
+const multer = require("multer");
+const upload = multer({
+  dest: "uploads/",
+  limits: {
+    fileSize: 5 * 1024 * 1024,  // 5 MB
+    files: 1,
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+
+    if (!allowedTypes.includes(file.mimetype)) {
+      cb(new Error("Invalid file type. Only JPEG, PNG, and WebP allowed."));
+      return;
+    }
+
+    cb(null, true);
+  },
+});
+
+app.post("/api/upload", upload.single("avatar"), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: "No file uploaded" });
+  }
+  res.json({ filename: req.file.filename });
+}, (err, req, res, next) => {
+  // Multer error handler
+  if (err instanceof multer.MulterError) {
+    if (err.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({ error: "File too large. Max 5MB." });
+    }
+  }
+  res.status(400).json({ error: err.message });
+});
+```
+
+## Validation Error Best Practices
+
+```javascript
+// Custom error class
+class ValidationError extends Error {
+  constructor(errors) {
+    super("Validation failed");
+    this.statusCode = 422;  // Unprocessable Entity
+    this.errors = errors;
+  }
+}
+
+// Validation middleware that throws
+function validateOrThrow(schema) {
+  return (req, res, next) => {
+    const { error, value } = schema.validate(req.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    });
+
+    if (error) {
+      throw new ValidationError(
+        error.details.map((d) => ({
+          field: d.path.join("."),
+          code: d.type,
+          message: d.message,
+        }))
+      );
+    }
+
+    req.body = value;
+    next();
+  };
+}
+
+// Error handler
+app.use((err, req, res, next) => {
+  if (err instanceof ValidationError) {
+    return res.status(err.statusCode).json({
+      error: "VALIDATION_ERROR",
+      message: "Request data failed validation",
+      details: err.errors,
+    });
+  }
+  next(err);
+});
+```
+
+## Quick Reference
+
+```javascript
+// Joi basics
+Joi.string().email().required()
+Joi.number().integer().min(1).max(100)
+Joi.array().items(Joi.string()).min(1)
+Joi.boolean().default(false)
+Joi.date().iso().min("now")
+Joi.object({ name: Joi.string() })
+
+// Common patterns
+.trim()               // Remove whitespace
+.lowercase()          // Convert to lowercase
+.stripUnknown()       // Remove extra fields
+.abortEarly(false)    // Return all errors
+```
+
+## Practice Exercises
+
+1. **User registration validation**: Create a validation schema for user registration with email, password (min 8, uppercase + number + special), username (alphanumeric, 3-20 chars), and age (13+). Return detailed error messages.
+
+2. **Product API validation**: Build validation for a product creation endpoint. Validate title (required, 3-100 chars), price (positive number, 2 decimal places), category (must be from allowed list), and tags (array of strings, max 5). Strip unknown fields.
+
+3. **Comment sanitization**: Implement an endpoint that accepts HTML comments. Sanitize the input to only allow safe tags (`b`, `i`, `em`, `p`, `a`). Strip script tags and event handlers. Store the sanitized version.

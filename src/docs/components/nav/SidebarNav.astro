@@ -4,10 +4,9 @@
  */
 import { getCollection } from "astro:content";
 
-import { getSectionTitle, processDocsBySection } from "@/docs/js/docsUtils";
+import { getSectionTitle, processDocsBySection, getTabById } from "@/docs/js/docsUtils";
 import { filterCollectionByLanguage } from "@/docs/js/localeUtils";
 import { getLocaleFromUrl } from "@/docs/js/localeUtils";
-import { getTranslatedData } from "@/docs/js/translationUtils";
 
 import SidebarLink from "./SidebarLink.astro";
 
@@ -28,26 +27,36 @@ const filteredDocs = filterCollectionByLanguage(allDocs, currLocale);
 const tabFilteredDocs = filteredDocs.filter((doc) => doc.data.tab === tabId);
 
 // Process documents by section for the current tab
-const { docsBySection, sections } = processDocsBySection(tabFilteredDocs, currLocale, tabId);
+const { docsBySection } = processDocsBySection(tabFilteredDocs, currLocale, tabId);
+
+// Get the full section structure from config
+const currentTab = getTabById(tabId, currLocale);
+const tabSections = currentTab?.sections || [];
 ---
 
 <nav class="sidebar-nav space-y-8">
   <slot name="before-links" />
 
-  {/* Course Sidebar Content (no tab selector - each course has its own URL) */}
-  <div>
-    {sections.map((section) => (
-      <details class="sidebar-section group" open>
-        <summary class="font-heading mb-2 flex cursor-pointer items-center text-lg font-medium tracking-wide md:text-base">
-          {getSectionTitle(section, tabId, currLocale)}
-        </summary>
-        <ul class="space-y-2 border-l">
-          {docsBySection[section].map((doc) => (
-            <SidebarLink link={doc.link} text={doc.text} badge={doc.badge} />
-          ))}
-        </ul>
-      </details>
-    ))}
+  <div class="space-y-6">
+    {
+      tabSections.map((section) => {
+        const sectionDocs = docsBySection[section.id] || [];
+        if (sectionDocs.length === 0) return null;
+
+        return (
+          <details class="sidebar-section group" open>
+            <summary class="font-heading mb-2 flex cursor-pointer items-center text-lg font-medium tracking-wide md:text-base">
+              {section.title || getSectionTitle(section.id, tabId, currLocale)}
+            </summary>
+            <ul class="space-y-2 border-l">
+              {sectionDocs.map((doc) => (
+                <SidebarLink link={doc.link} text={doc.text} badge={doc.badge} />
+              ))}
+            </ul>
+          </details>
+        );
+      })
+    }
   </div>
 
   <slot name="after-links" />

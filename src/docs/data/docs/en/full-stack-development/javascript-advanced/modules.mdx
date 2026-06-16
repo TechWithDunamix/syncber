@@ -1,0 +1,344 @@
+---
+title: "ES6+ Modules"
+description: "JavaScript modules — import/export syntax, default vs named exports, module scope, dynamic imports, module bundlers overview, and best practices for organising code."
+sidebar:
+  order: 7
+  label: "ES6+ Modules"
+tab: "full-stack-development"
+---
+
+Modules let you split your code into separate files, each with its own scope. Before ES6 modules, JavaScript had no built-in module system — developers relied on scripts, IIFEs, or third-party solutions like CommonJS (Node.js) and AMD.
+
+## Module Basics
+
+A JavaScript file using the `export` or `import` keyword becomes a **module**. Module scopes are isolated — variables and functions are private by default.
+
+### Exporting
+
+**Named exports** — export multiple values from a module:
+
+```js
+// math.js
+export const PI = 3.14159;
+
+export function add(a, b) {
+  return a + b;
+}
+
+export function multiply(a, b) {
+  return a * b;
+}
+```
+
+**Default export** — export a single main value:
+
+```js
+// logger.js
+export default function log(message) {
+  console.log(`[LOG] ${message}`);
+}
+// Can also export default an object or class:
+// export default class Logger { ... }
+```
+
+**Combined** — both default and named in one module:
+
+```js
+// utils.js
+export default function debounce(fn, delay) {
+  let timeout;
+  return (...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => fn(...args), delay);
+  };
+}
+
+export const VERSION = "1.0.0";
+export function formatDate(date) { /* ... */ }
+```
+
+### Importing
+
+```js
+// Import named exports
+import { add, multiply, PI } from "./math.js";
+console.log(add(2, 3)); // 5
+
+// Import with alias
+import { add as sum, multiply as mult } from "./math.js";
+
+// Import default export
+import log from "./logger.js";
+log("Hello"); // [LOG] Hello
+
+// Import default + named
+import debounce, { VERSION, formatDate } from "./utils.js";
+
+// Import everything as a namespace
+import * as math from "./math.js";
+console.log(math.add(2, 3)); // 5
+console.log(math.PI);        // 3.14159
+```
+
+## Named vs Default Exports
+
+| Feature | Named Export | Default Export |
+|---------|-------------|----------------|
+| Syntax | `export const X = ...` | `export default X` |
+| Import syntax | `import { X } from ...` | `import X from ...` |
+| Alias | `import { X as Y }` | `import { default as X }` |
+| Per module | Unlimited | One per module |
+| Auto-complete | ✅ IDE friendly | ❌ Can be ambiguous |
+| Re-export | `export { X } from ...` | `export { default } from ...` |
+
+<Aside variant="tip">
+Prefer **named exports** for libraries and utilities (clearer imports, better IDE support). Use **default exports** for the main "purpose" of a file (a single class, component, or function).
+</Aside>
+
+## Module Scope (Strict Mode)
+
+Modules are automatically in **strict mode** — no `"use strict"` declaration needed:
+
+```js
+// module.js
+x = 10; // ❌ ReferenceError in strict mode (no var/let/const)
+```
+
+Top-level `this` in modules is `undefined`, not the global object:
+
+```js
+// module.js
+console.log(this); // undefined (not Window/global)
+```
+
+## Re-exporting (Barrel Pattern)
+
+Re-export to create cleaner public APIs:
+
+```js
+// index.js — barrel file
+export { default as Button } from "./Button.js";
+export { default as Input } from "./Input.js";
+export { default as Modal } from "./Modal.js";
+export { useTheme } from "./hooks/useTheme.js";
+```
+
+Consumers import from the barrel:
+
+```js
+// Instead of:
+import Button from "./components/Button/Button.js";
+import Input from "./components/Input/Input.js";
+
+// You can do:
+import { Button, Input } from "./components/index.js";
+```
+
+### Selective Re-export
+
+```js
+// Re-export only specific named exports
+export { login, logout, register } from "./auth/index.js";
+```
+
+## Dynamic Imports
+
+Dynamic imports load modules **on demand** at runtime. They return a Promise:
+
+```js
+// Static import (eager — always loads)
+import { format } from "date-fns";
+
+// Dynamic import (lazy — loads when called)
+async function loadChart() {
+  const chartModule = await import("./charts/Chart.js");
+  const chart = new chartModule.Chart();
+  chart.render();
+}
+```
+
+### Use Cases for Dynamic Imports
+
+**1. Code splitting** — load large libraries only when needed:
+
+```js
+async function showEditor() {
+  const { default: Editor } = await import("./Editor.js");
+  const editor = new Editor("content");
+}
+```
+
+**2. Conditional loading** — platform or feature-specific code:
+
+```js
+if (navigator.userAgent.includes("Chrome")) {
+  const { useChromeFeature } = await import("./chrome-features.js");
+  useChromeFeature();
+}
+```
+
+**3. Lazy routes** — in frameworks like React, load page components on demand:
+
+```js
+// Framework pattern — not actual React
+const routes = {
+  "/dashboard": () => import("./pages/Dashboard.js"),
+  "/settings": () => import("./pages/Settings.js"),
+};
+```
+
+## Module vs Script Behaviour
+
+| Feature | Module (`type="module"`) | Regular Script |
+|---------|--------------------------|----------------|
+| Default mode | Strict | Non-strict |
+| Top-level `this` | `undefined` | `window` |
+| Scoping | File-scoped | Global |
+| `import`/`export` | ✅ | ❌ |
+| Deferred by default | ✅ (like `defer`) | ❌ (blocking) |
+| Top-level `await` | ✅ | ❌ |
+
+In HTML, use `<script type="module">`:
+
+```html
+<script type="module">
+  import { greet } from "./utils.js";
+  greet();
+</script>
+
+<!-- Regular script — cannot use import/export -->
+<script>
+  // import { greet } from "./utils.js"; // ❌ SyntaxError
+</script>
+```
+
+## CommonJS vs ES Modules
+
+Node.js originally used **CommonJS** (`require`/`module.exports`). Modern Node.js supports both:
+
+```js
+// CommonJS (Node.js default before v14)
+const fs = require("fs");
+module.exports = { myFunction };
+
+// ES Modules (package.json needs "type": "module")
+import fs from "fs";
+export const myFunction = () => {};
+```
+
+### Mixing CommonJS and ES Modules
+
+```js
+// Import CommonJS from ES Module
+import fs from "fs"; // works — default import gets the whole module
+
+// Import ES Module from CommonJS (use dynamic import)
+async function load() {
+  const esModule = await import("./es-module.mjs");
+}
+```
+
+| Aspect | CommonJS | ES Modules |
+|--------|----------|------------|
+| Syntax | `require()` / `module.exports` | `import` / `export` |
+| Loading | Synchronous | Asynchronous |
+| Scope | Runtime | Static (analyzable) |
+| Tree-shakeable | ❌ | ✅ |
+| Top-level `await` | ❌ | ✅ |
+| File extension | `.js`, `.cjs` | `.js` (`"type": "module"`), `.mjs` |
+
+## Module Bundlers
+
+Bundlers like **Webpack**, **Vite**, **Rollup**, and **esbuild** take your module files and combine them into optimised bundles for production:
+
+```
+Development:        Production:
+math.js ─┐
+logger.js ─┤        bundle.js (minified)
+utils.js ─┼──────→  (single file)
+app.js ───┤
+styles.css ┘
+```
+
+Bundlers enable:
+
+- **Tree shaking** — remove unused exports
+- **Code splitting** — split into multiple bundles loaded on demand
+- **Minification** — compress code for faster downloads
+- **Asset handling** — import CSS, images, fonts as modules
+
+**Vite** is the modern standard for frontend projects:
+
+```bash
+npm create vite@latest my-app -- --template vanilla
+```
+
+## Module Organisation Best Practices
+
+### 1. Single Responsibility
+
+Each module should have one clear purpose:
+
+```js
+// ✅ Good
+auth.js          — login, logout, register
+validation.js    — input validation functions
+api.js           — HTTP request helpers
+
+// ❌ Avoid
+utils.js         — random collection of helpers
+helpers.js       — same problem
+```
+
+### 2. Clear Public API
+
+Export only what consumers need. Keep internals private:
+
+```js
+// auth.js
+// Private — not exported
+const sessions = new Map();
+function generateToken() { /* ... */ }
+
+// Public — exported API
+export async function login(email, password) { /* ... */ }
+export async function logout(sessionId) { /* ... */ }
+export function getCurrentUser() { /* ... */ }
+```
+
+### 3. Avoid Circular Dependencies
+
+Module A imports from Module B which imports from Module A:
+
+```js
+// a.js
+import { B } from "./b.js";
+export const A = "A";
+
+// b.js
+import { A } from "./a.js"; // ❌ Circular!
+export const B = "B";
+```
+
+Refactor to extract shared dependencies into a third module.
+
+## Quick Reference
+
+| Syntax | Description |
+|--------|-------------|
+| `export const X = ...` | Named export |
+| `export default X` | Default export |
+| `import { X } from "./file.js"` | Named import |
+| `import X from "./file.js"` | Default import |
+| `import * as X from "./file.js"` | Namespace import |
+| `import("./file.js")` | Dynamic import (Promise) |
+| `export { X } from "./file.js"` | Re-export |
+| `import { X as Y } from "./file.js"` | Aliased import |
+
+## Practice Exercises
+
+1. **Create a math library module**: Export `add`, `subtract`, `multiply`, `divide`, and a default export `createCalculator()`. Import and use them in another file.
+
+2. **Barrel exports**: Create a `shapes/` directory with `circle.js`, `rectangle.js`, and `triangle.js`. Each exports area/perimeter functions. Create an `index.js` barrel that re-exports all of them.
+
+3. **Dynamic import for i18n**: Write a `setLanguage(lang)` function that dynamically imports `./i18n/en.js`, `./i18n/fr.js`, or `./i18n/es.js` based on the parameter and calls a `translate(key)` function from the loaded module.

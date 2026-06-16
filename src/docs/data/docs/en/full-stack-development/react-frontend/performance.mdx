@@ -1,0 +1,366 @@
+---
+title: "Performance & Best Practices"
+description: "React performance optimisation — useMemo, useCallback, React.memo, code splitting, lazy loading, bundle analysis, and common performance pitfalls."
+sidebar:
+  order: 10
+  label: "Performance & Best Practices"
+tab: "full-stack-development"
+---
+
+React is fast by default, but as your app grows, you'll encounter performance challenges. This page covers the tools and patterns for keeping your React app fast.
+
+## When to Optimise
+
+<Aside variant="tip">
+**Profile first, optimise second.** Don't add optimisations prematurely — they add complexity. Use React DevTools Profiler to identify real bottlenecks before reaching for `useMemo` or `React.memo`.
+</Aside>
+
+## React.memo
+
+`React.memo` is a higher-order component that prevents re-renders when props haven't changed (by shallow comparison):
+
+```jsx
+import { memo } from "react";
+
+const ExpensiveChart = memo(function ExpensiveChart({ data, title }) {
+  console.log("Rendering chart...");
+  return (
+    <div>
+      <h3>{title}</h3>
+      <Chart data={data} />
+    </div>
+  );
+});
+
+// Parent — won't re-render ExpensiveChart unless data or title reference changes
+function Dashboard({ chartData }) {
+  const [filter, setFilter] = useState("all");
+
+  return (
+    <div>
+      <button onClick={() => setFilter("active")}>Filter</button>
+      <ExpensiveChart data={chartData} title="Revenue" />
+    </div>
+  );
+}
+```
+
+### When to Use React.memo
+
+| Use It | Don't Use It |
+|--------|--------------|
+| Pure presentational components | Components with cheap renders |
+| Components that re-render often with same props | Components with children that change |
+| Heavy render logic (charts, tables) | Simple elements (divs, spans) |
+| Large lists | Components with dynamic props every render |
+
+### Custom Comparison Function
+
+By default, `React.memo` does a shallow comparison. For custom logic, pass a second argument:
+
+```jsx
+const UserCard = memo(
+  ({ user }) => <div>{user.name}</div>,
+  (prevProps, nextProps) => {
+    // Only re-render if user.id changed
+    return prevProps.user.id === nextProps.user.id;
+  }
+);
+```
+
+## useMemo
+
+Memoizes the result of a computation. Only recalculates when dependencies change:
+
+```jsx
+import { useMemo } from "react";
+
+function Analytics({ transactions, filter }) {
+  // ❌ Expensive calculation on every render
+  const filteredData = transactions.filter((t) => t.type === filter);
+  const totals = calculateTotals(filteredData); // expensive
+
+  // ✅ Only recalculates when transactions or filter changes
+  const memoisedTotals = useMemo(
+    () => calculateTotals(transactions.filter((t) => t.type === filter)),
+    [transactions, filter]
+  );
+
+  return <Chart data={memoisedTotals} />;
+}
+```
+
+### When to Use useMemo
+
+1. **Expensive computations** — filtering large arrays, complex math, data transformation
+2. **Stabilising references** — objects passed to memoised children
+3. **Avoiding expensive recalculations** — but only if the calculation actually costs something
+
+```jsx
+// ✅ Good: expensive computation
+const sortedItems = useMemo(
+  () => [...items].sort((a, b) => expensiveCompare(a, b)),
+  [items]
+);
+
+// ✅ Good: stabilise object reference for memoised child
+const config = useMemo(
+  () => ({ theme: "dark", fontSize: 14 }),
+  []
+);
+
+// ❌ Unnecessary: simple operations
+const fullName = useMemo(() => `${first} ${last}`, [first, last]);
+```
+
+## useCallback
+
+Memoizes a function reference. Prevents child components from re-rendering when a callback is passed as prop:
+
+```jsx
+import { useCallback } from "react";
+
+function ProductList({ products, onAddToCart }) {
+  // ❌ New function every render → memoised children re-render
+  const handleClick = (id) => {
+    onAddToCart(id);
+  };
+
+  // ✅ Same function reference when deps don't change
+  const handleClickMemo = useCallback(
+    (id) => onAddToCart(id),
+    [onAddToCart]
+  );
+
+  return products.map((p) => (
+    <ProductCard key={p.id} product={p} onBuy={handleClickMemo} />
+  ));
+}
+```
+
+### When to Use useCallback
+
+- Passing callbacks to `React.memo` children
+- Functions in `useEffect` dependency arrays
+- Custom hooks that return functions
+
+```jsx
+function useDebouncedSearch() {
+  const [query, setQuery] = useState("");
+
+  // Stable function reference for the custom hook API
+  const search = useCallback((q) => {
+    setQuery(q);
+  }, []);
+
+  return { query, search };
+}
+```
+
+## Code Splitting with Lazy + Suspense
+
+Split your bundle so users only download code they need:
+
+```jsx
+import { lazy, Suspense } from "react";
+
+// Dynamic import — webpack/vite creates a separate chunk
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Analytics = lazy(() => import("./pages/Analytics"));
+
+function App() {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <Routes>
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/analytics" element={<Analytics />} />
+      </Routes>
+    </Suspense>
+  );
+}
+
+function PageLoader() {
+  return <div className="page-loader">Loading page...</div>;
+}
+```
+
+### Component-Level Splitting
+
+```jsx
+// For large components used conditionally
+function Editor({ isOpen }) {
+  return (
+    <Suspense fallback={<EditorSkeleton />}>
+      {isOpen ? <RichEditor /> : null}
+    </Suspense>
+  );
+}
+
+const RichEditor = lazy(() => import("./RichEditor"));
+```
+
+## Performance Profiling
+
+### React DevTools Profiler
+
+1. Open React DevTools → **Profiler** tab
+2. Click the record button (⚫)
+3. Interact with your app
+4. Stop recording
+
+Look for:
+- **Flamegraph**: Wide bars = slow components
+- **Ranked**: Components that re-rendered, sorted by time
+- **Causes**: Why a component re-rendered (props changed, state changed, context changed)
+
+### Identifying Unnecessary Re-renders
+
+```jsx
+// Add a console.log to see when components render
+function MyComponent() {
+  console.log(`Rendering: MyComponent`);
+  return <div>...</div>;
+}
+```
+
+### Common Performance Issues
+
+1. **Inline objects/arrays in props**
+
+```jsx
+// ❌ New object every render
+<MemoisedChild config={{ theme: "dark" }} />
+
+// ✅ Stable reference
+const config = useMemo(() => ({ theme: "dark" }), []);
+<MemoisedChild config={config} />
+```
+
+2. **Anonymous functions in JSX**
+
+```jsx
+// ❌ New function every render
+<button onClick={() => handleClick(id)} />
+
+// ✅ Stable function
+const handleClick = useCallback(() => clicked(id), [id]);
+<button onClick={handleClick} />
+```
+
+3. **Prop spreading unnecessary data**
+
+```jsx
+// ❌ Passes entire user object (any change causes re-render)
+<Profile {...user} />
+
+// ✅ Pass only what's needed
+<Profile name={user.name} avatar={user.avatar} />
+```
+
+4. **Lifting state too high**
+
+```jsx
+// ❌ State in App causes entire tree to re-render
+function App() {
+  const [count, setCount] = useState(0);
+  return (
+    <div>
+      <Counter count={count} setCount={setCount} />
+      <ExpensiveSidebar />  {/* Re-renders unnecessarily */}
+    </div>
+  );
+}
+
+// ✅ Keep state close to where it's used
+function App() {
+  return (
+    <div>
+      <Counter />
+      <ExpensiveSidebar />
+    </div>
+  );
+}
+```
+
+## Virtualisation
+
+For long lists, only render what's visible. Use libraries like `react-window` or `react-virtuoso`:
+
+```bash
+npm install react-window
+```
+
+```jsx
+import { FixedSizeList } from "react-window";
+
+function VirtualList({ items }) {
+  const Row = ({ index, style }) => (
+    <div style={style}>
+      {items[index].name}
+    </div>
+  );
+
+  return (
+    <FixedSizeList
+      height={500}
+      itemCount={items.length}
+      itemSize={50}
+      width="100%"
+    >
+      {Row}
+    </FixedSizeList>
+  );
+}
+```
+
+## Bundle Analysis
+
+Check what's in your production bundle:
+
+```bash
+# Vite
+npm run build && npx vite-bundle-analyzer
+
+# Create React App
+npm run build && npx source-map-explorer build/static/js/*.js
+```
+
+### Reducing Bundle Size
+
+```jsx
+// ❌ Importing entire library
+import { debounce } from "lodash";
+
+// ✅ Import only what you need
+import debounce from "lodash/debounce";
+
+// ❌ Large library when a simple function would do
+import { formatDistance } from "date-fns";
+
+// ✅ Small alternatives
+const timeAgo = (date) => {
+  const seconds = Math.floor((Date.now() - new Date(date)) / 1000);
+  // simple implementation
+};
+```
+
+## Quick Reference
+
+| Tool | Purpose | When |
+|------|---------|------|
+| `React.memo` | Prevent re-render on same props | Pure components |
+| `useMemo` | Memoize computed values | Expensive calculations |
+| `useCallback` | Memoize function references | Callbacks passed to children |
+| `lazy` + `Suspense` | Code splitting | Large/rarely-used components |
+| `react-window` | Virtualisation | 1000+ item lists |
+| Profiler | Find bottlenecks | Before optimising |
+
+## Practice Exercises
+
+1. **Profile and optimise**: Build a component that renders a list of 500 items with a filter input. Use the React Profiler to measure render times. Apply `useMemo` for the filtered list and `React.memo` for list items. Measure the improvement.
+
+2. **Code splitting**: Create an app with a heavy component (e.g., a chart library) that's only shown when a button is clicked. Use `lazy` and `Suspense` to split it into a separate chunk. Verify the separate chunk is created in the build output.
+
+3. **Virtualised list**: Generate an array of 10000 items and render them using `react-window`. Compare memory usage and render time against a regular `map` rendering.

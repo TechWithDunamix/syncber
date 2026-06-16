@@ -1,0 +1,293 @@
+---
+title: "The Box Model"
+description: "Understanding the CSS box model — content, padding, border, margin, box-sizing, display types, and how elements occupy space on the page."
+sidebar:
+  order: 3
+  label: "Box Model"
+tab: "full-stack-development"
+---
+
+Every HTML element is a rectangular box. The CSS box model defines how these boxes are sized and how they interact with neighboring elements.
+
+## The Four Layers
+
+Every element's box consists of four concentric layers:
+
+```
+─────────────────────────────────────────────
+│                  MARGIN                      │
+│  ──────────────────────────────────────────  │
+│  │              BORDER                      │  │
+│  │  ──────────────────────────────────────  │  │
+│  │  │            PADDING                   │  │  │
+│  │  │  ┌─────────────────────────────────┐  │  │  │
+│  │  │  │           CONTENT               │  │  │  │
+│  │  │  │                                 │  │  │  │
+│  │  │  └─────────────────────────────────┘  │  │  │
+│  │  └──────────────────────────────────────  │  │
+│  └──────────────────────────────────────────  │
+└───────────────────────────────────────────────
+```
+
+| Layer | Description | Background |
+|-------|-------------|------------|
+| **Content** | The actual content (text, image, child elements) | `background-color` applies here (and extends through padding) |
+| **Padding** | Space between content and border | Same background as content |
+| **Border** | Visible edge around the element | `border-color` |
+| **Margin** | Space outside the border (invisible) | Transparent |
+
+## Box Properties
+
+```css
+.box {
+  /* Content dimensions */
+  width: 200px;
+  height: 100px;
+
+  /* Padding */
+  padding-top: 10px;
+  padding-right: 20px;
+  padding-bottom: 10px;
+  padding-left: 20px;
+  /* Shorthand: padding: top right bottom left */
+  padding: 10px 20px 10px 20px;
+  /* Two values: top/bottom left/right */
+  padding: 10px 20px;
+  /* One value: all sides */
+  padding: 10px;
+
+  /* Border */
+  border-width: 2px;
+  border-style: solid;   /* solid, dashed, dotted, double, none */
+  border-color: #333;
+  /* Shorthand: width style color */
+  border: 2px solid #333;
+  /* Individual sides */
+  border-bottom: 3px dashed red;
+
+  /* Margin */
+  margin: 20px;           /* All sides */
+  margin: 10px 20px;      /* top/bottom left/right */
+  margin: 0 auto;         /* Center block elements horizontally */
+  margin-top: -10px;      /* Negative margins pull elements closer */
+}
+```
+
+## Box Sizing
+
+This is the most important CSS concept for layout. `box-sizing` controls how `width` and `height` are calculated:
+
+```css
+/* Default: width = content width ONLY */
+/* Total width = width + padding + border */
+.box-content {
+  box-sizing: content-box;
+  width: 200px;
+  padding: 20px;
+  border: 2px solid black;
+  /* Total width: 200 + 40 + 4 = 244px */
+}
+
+/* Preferred: width INCLUDES padding and border */
+/* Total width = width (padding and border inside) */
+.box-border {
+  box-sizing: border-box;
+  width: 200px;
+  padding: 20px;
+  border: 2px solid black;
+  /* Total width: 200px (padding and border pushed inward) */
+  /* Content width: 200 - 40 - 4 = 156px */
+}
+```
+
+<Aside variant="caution">
+Always use `border-box` globally. It makes sizing predictable — a 200px wide element is always 200px wide, regardless of padding and border.
+</Aside>
+
+```css
+/* Global reset — put this at the top of every stylesheet */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+```
+
+## Display Types
+
+The `display` property controls how an element's box behaves in the layout:
+
+### Block
+
+```css
+.block-element {
+  display: block;
+}
+```
+
+- Takes up the full width of its parent by default
+- Starts on a new line
+- Respects `width`, `height`, `margin`, `padding`
+- Examples: `<div>`, `<p>`, `<h1>`-`<h6>`, `<section>`, `<ul>`
+
+### Inline
+
+```css
+.inline-element {
+  display: inline;
+}
+```
+
+- Takes up only as much width as its content
+- Does NOT start a new line
+- Does NOT respect `width` or `height`
+- Only respects horizontal `margin` and `padding`
+- Examples: `<span>`, `<a>`, `<strong>`, `<em>`, `<img>`
+
+### Inline-Block
+
+```css
+.inline-block-element {
+  display: inline-block;
+}
+```
+
+- Like inline: sits on the same line as other elements
+- Like block: respects `width`, `height`, `margin`, `padding`
+- Best for: buttons, cards in a row, nav items
+
+```html
+<style>
+  .box { display: inline-block; width: 100px; height: 100px; margin: 10px; }
+</style>
+<div class="box" style="background: red;"></div>
+<div class="box" style="background: blue;"></div>
+<div class="box" style="background: green;"></div>
+```
+
+## Width and Height
+
+```css
+.element {
+  /* Fixed sizes */
+  width: 300px;
+
+  /* Relative sizes */
+  width: 50%;             /* 50% of parent */
+
+  /* Constraint-based sizing */
+  min-width: 200px;       /* Won't shrink below this */
+  max-width: 800px;       /* Won't grow beyond this */
+  min-height: 100px;
+  max-height: 500px;      /* Content can overflow! */
+
+  /* Auto (default) */
+  width: auto;            /* Fills available space (block) or content width (inline) */
+  height: auto;           /* Natural height based on content */
+}
+```
+
+### Centering with auto Margins
+
+```css
+.block-element {
+  width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+  /* Shorthand: margin: 0 auto; */
+}
+```
+
+This works only on block elements with an explicit width. Flexbox provides better centering (next lesson).
+
+## Margin Collapsing
+
+Adjacent vertical margins collapse (combine) into a single margin:
+
+```css
+/* Both elements have 20px margin */
+h2 { margin-bottom: 20px; }
+p  { margin-top: 20px; }
+
+/* The space between h2 and p is 20px, NOT 40px */
+/* The larger margin wins */
+```
+
+Margin collapsing happens:
+1. Between adjacent siblings (vertical)
+2. Between parent and first/last child (if no border/padding)
+3. With empty elements
+
+To prevent collapse, add `overflow: auto` or `border: 1px solid transparent` to the parent.
+
+## Border Radius and Box Shadow
+
+```css
+.card {
+  /* Rounded corners */
+  border-radius: 8px;           /* All corners */
+  border-radius: 8px 0 8px 0;  /* top-left top-right bottom-right bottom-left */
+
+  /* Circular element (square + 50% radius) */
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+
+  /* Box shadow: offset-x offset-y blur spread color */
+  box-shadow: 2px 4px 8px rgba(0, 0, 0, 0.2);
+
+  /* Multiple shadows */
+  box-shadow:
+    0 2px 4px rgba(0,0,0,0.1),
+    0 8px 16px rgba(0,0,0,0.1);
+
+  /* Inner shadow */
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+}
+```
+
+## Visual Examples
+
+```css
+.card {
+  /* Content */
+  width: 300px;
+  padding: 24px;
+
+  /* Border */
+  border: 1px solid #ddd;
+  border-radius: 8px;
+
+  /* Margin */
+  margin: 16px;
+
+  /* Visual */
+  background: white;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+```
+
+This creates a modern card with:
+- Content inside: 300px - 48px (padding) - 2px (border) = 250px
+- Outer size: 300px + 2px (border) + 32px (margin) = 334px total
+- Rounded corners and subtle shadow
+
+## Try It Yourself
+
+Create a page with:
+
+1. Three cards in a row, each 250px wide with padding, border, and margin
+2. Apply `box-sizing: border-box` globally
+3. Make the cards `inline-block` so they sit side by side
+4. Center the card container with `margin: 0 auto`
+5. Give each card different padding amounts and observe how the content area shrinks
+6. Experiment with border-radius to make a completely round element
+7. Add box-shadow to see how it extends outside the border
+
+## Key Takeaways
+
+- Every element is a box with content → padding → border → margin (inside to outside)
+- Always use `*, *::before, *::after { box-sizing: border-box; }` — it makes sizing predictable
+- Block elements fill their parent's width; inline elements flow with text; inline-block is both
+- Adjacent vertical margins collapse — the larger margin wins
+- `margin: 0 auto` centers block elements with an explicit width
+- `border-radius` creates rounded corners; `50%` creates circles
+- `box-shadow` adds depth with offset, blur, spread, and color controls

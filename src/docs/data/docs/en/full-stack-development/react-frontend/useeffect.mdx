@@ -1,0 +1,372 @@
+---
+title: "Effects & Side Effects"
+description: "The useEffect hook — running effects, dependency arrays, cleanup functions, data fetching, race conditions, and common effect patterns."
+sidebar:
+  order: 4
+  label: "Effects & Side Effects"
+tab: "full-stack-development"
+---
+
+Side effects are anything that affects something outside the component — fetching data, subscribing to events, manipulating the DOM directly, or setting timers. The `useEffect` hook lets you perform these side effects in a predictable way.
+
+## Basic useEffect
+
+```jsx
+import { useEffect } from "react";
+
+function Logger() {
+  useEffect(() => {
+    console.log("Component rendered or updated");
+  });
+
+  return <p>Check the console</p>;
+}
+```
+
+By default, effects run **after every render** (including the first one).
+
+## The Dependency Array
+
+The second argument to `useEffect` controls when the effect runs:
+
+```jsx
+// Runs after EVERY render (no dependency array)
+useEffect(() => {
+  console.log("Runs on every render");
+});
+
+// Runs ONCE after initial render (empty array)
+useEffect(() => {
+  console.log("Runs only once — on mount");
+}, []);
+
+// Runs when specific values change
+useEffect(() => {
+  console.log("Runs when count changes");
+}, [count]);
+
+// Runs when any dependency changes
+useEffect(() => {
+  console.log("Runs when count or name changes");
+}, [count, name]);
+```
+
+### Mount, Update, Unmount
+
+| Dependency Array | Runs on Mount | Runs on Update | Runs on Unmount |
+|-----------------|---------------|----------------|-----------------|
+| (none) | ✅ | ✅ (every render) | ✅ (with cleanup) |
+| `[]` | ✅ | ❌ | ✅ (with cleanup) |
+| `[dep]` | ✅ | ✅ (when dep changes) | ✅ (with cleanup) |
+
+## Data Fetching Pattern
+
+The most common use of `useEffect` is fetching data:
+
+```jsx
+import { useState, useEffect } from "react";
+
+function UserProfile({ userId }) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    async function fetchUser() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const response = await fetch(
+          `https://api.example.com/users/${userId}`
+        );
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        setUser(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchUser();
+  }, [userId]); // Re-fetch when userId changes
+
+  if (loading) return <div className="spinner" />;
+  if (error) return <div className="error">Error: {error}</div>;
+  if (!user) return <p>No user data</p>;
+
+  return (
+    <div className="profile">
+      <h2>{user.name}</h2>
+      <p>{user.email}</p>
+    </div>
+  );
+}
+```
+
+<Aside variant="caution">
+The effect function itself cannot be `async`. Create an `async` function **inside** the effect and call it immediately.
+</Aside>
+
+## Cleanup Functions
+
+Return a function from your effect to **clean up** when the component unmounts or before the effect re-runs:
+
+```jsx
+useEffect(() => {
+  const timer = setInterval(() => {
+    console.log("Tick");
+  }, 1000);
+
+  // Cleanup function
+  return () => {
+    clearInterval(timer);
+    console.log("Timer cleaned up");
+  };
+}, []);
+```
+
+### Common Cleanup Scenarios
+
+**Event listeners:**
+
+```jsx
+useEffect(() => {
+  const handleResize = () => {
+    setWindowWidth(window.innerWidth);
+  };
+
+  window.addEventListener("resize", handleResize);
+
+  return () => {
+    window.removeEventListener("resize", handleResize);
+  };
+}, []);
+```
+
+**Subscriptions:**
+
+```jsx
+useEffect(() => {
+  const subscription = someAPI.subscribe((data) => {
+    setData(data);
+  });
+
+  return () => {
+    subscription.unsubscribe();
+  };
+}, []);
+```
+
+**WebSocket connections:**
+
+```jsx
+useEffect(() => {
+  const ws = new WebSocket("wss://example.com/feed");
+
+  ws.onmessage = (event) => {
+    setMessages((prev) => [...prev, JSON.parse(event.data)]);
+  };
+
+  return () => {
+    ws.close();
+  };
+}, []);
+```
+
+## Preventing Race Conditions
+
+When fetching data in effects, responses may arrive in the wrong order:
+
+```jsx
+useEffect(() => {
+  let cancelled = false;
+
+  async function fetchData() {
+    const response = await fetch(`/api/items/${id}`);
+    const data = await response.json();
+
+    if (!cancelled) {
+      setData(data); // Only update if this is still the active request
+    }
+  }
+
+  fetchData();
+
+  return () => {
+    cancelled = true; // Mark as cancelled if id changes or component unmounts
+  };
+}, [id]);
+```
+
+Or use `AbortController`:
+
+```jsx
+useEffect(() => {
+  const controller = new AbortController();
+
+  async function fetchData() {
+    try {
+      const response = await fetch(`/api/items/${id}`, {
+        signal: controller.signal,
+      });
+      const data = await response.json();
+      setData(data);
+    } catch (err) {
+      if (err.name !== "AbortError") {
+        setError(err.message);
+      }
+    }
+  }
+
+  fetchData();
+
+  return () => {
+    controller.abort(); // Cancel the request on cleanup
+  };
+}, [id]);
+```
+
+## Effect Patterns
+
+### Debounced Search
+
+```jsx
+function SearchResults() {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+
+  useEffect(() => {
+    if (query.length < 3) {
+      setResults([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      const response = await fetch(`/api/search?q=${query}`);
+      const data = await response.json();
+      setResults(data);
+    }, 500); // Wait 500ms after user stops typing
+
+    return () => clearTimeout(timer); // Clear timer if query changes
+  }, [query]);
+
+  return (
+    <div>
+      <input value={query} onChange={(e) => setQuery(e.target.value)} />
+      <ul>
+        {results.map((r) => <li key={r.id}>{r.name}</li>)}
+      </ul>
+    </div>
+  );
+}
+```
+
+### Synchronising with Browser APIs
+
+```jsx
+function OnlineStatus() {
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  return <div>{isOnline ? "✅ Online" : "❌ Offline"}</div>;
+}
+```
+
+### Document Title
+
+```jsx
+function Page({ title }) {
+  useEffect(() => {
+    const prevTitle = document.title;
+    document.title = `${title} | My App`;
+
+    return () => {
+      document.title = prevTitle; // Restore on unmount
+    };
+  }, [title]);
+
+  return <div>{/* page content */}</div>;
+}
+```
+
+## When NOT to Use useEffect
+
+Not everything needs an effect. Some things should happen during **rendering**:
+
+```jsx
+// ❌ Unnecessary effect
+const [fullName, setFullName] = useState("");
+useEffect(() => {
+  setFullName(`${firstName} ${lastName}`);
+}, [firstName, lastName]);
+
+// ✅ Compute during render
+const fullName = `${firstName} ${lastName}`;
+
+// ❌ Unnecessary effect for event handlers
+useEffect(() => {
+  if (isSubmitted) {
+    sendData(data);
+  }
+}, [isSubmitted, data]);
+
+// ✅ Handle in the event handler
+function handleSubmit() {
+  sendData(data);
+  setIsSubmitted(true);
+}
+```
+
+## Quick Reference
+
+```jsx
+// Basic effect
+useEffect(() => { /* effect */ });
+
+// With dependencies
+useEffect(() => { /* effect */ }, [dep1, dep2]);
+
+// Run once (mount only)
+useEffect(() => { /* effect */ }, []);
+
+// With cleanup
+useEffect(() => {
+  /* effect */
+  return () => { /* cleanup */ };
+}, [dep]);
+
+// Async effect (function inside)
+useEffect(() => {
+  async function fn() {
+    await fetchData();
+  }
+  fn();
+}, []);
+```
+
+## Practice Exercises
+
+1. **Auto-refreshing data**: Build a component that fetches data from an API every 30 seconds. Display the data and show "Updated just now" with a timestamp. Use `setInterval` in an effect with proper cleanup.
+
+2. **Mouse position tracker**: Create a component that displays the current mouse position (X, Y coordinates). Use a `mousemove` event listener with cleanup. Optimise so it only updates the DOM when the component is visible.
+
+3. **Stopwatch with controls**: Build a stopwatch with Start, Stop, and Reset buttons. Use `useEffect` with `setInterval`. The interval should be active only while running. Implement proper cleanup.

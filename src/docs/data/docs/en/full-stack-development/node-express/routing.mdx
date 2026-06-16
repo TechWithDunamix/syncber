@@ -1,0 +1,280 @@
+---
+title: "Routing & Parameters"
+description: "Route methods (GET, POST, PUT, DELETE), route parameters, query strings, modular routers, chaining, and advanced routing patterns."
+sidebar:
+  order: 3
+  label: "Routing & Parameters"
+tab: "full-stack-development"
+---
+
+Routing determines how an application responds to client requests for specific endpoints (URIs) and HTTP methods.
+
+## Route Methods
+
+Express supports all HTTP methods:
+
+```javascript
+const express = require("express");
+const app = express();
+
+app.get("/resource", (req, res) => {
+  res.send("GET — retrieve resource");
+});
+
+app.post("/resource", (req, res) => {
+  res.send("POST — create resource");
+});
+
+app.put("/resource/:id", (req, res) => {
+  res.send(`PUT — replace resource ${req.params.id}`);
+});
+
+app.patch("/resource/:id", (req, res) => {
+  res.send(`PATCH — partial update ${req.params.id}`);
+});
+
+app.delete("/resource/:id", (req, res) => {
+  res.send(`DELETE — remove resource ${req.params.id}`);
+});
+```
+
+### Method Chaining
+
+Chain multiple methods on the same path:
+
+```javascript
+app.route("/api/items")
+  .get((req, res) => {
+    res.json([{ id: 1, name: "Item 1" }]);
+  })
+  .post((req, res) => {
+    const item = { id: Date.now(), ...req.body };
+    res.status(201).json(item);
+  })
+  .put((req, res) => {
+    res.json({ message: "Replace all items" });
+  })
+  .delete((req, res) => {
+    res.json({ message: "Delete all items" });
+  });
+```
+
+## Route Parameters
+
+Named segments in the URL path, prefixed with `:`:
+
+```javascript
+// Single parameter
+app.get("/users/:userId", (req, res) => {
+  res.json({ userId: req.params.userId });
+});
+
+// Multiple parameters
+app.get("/users/:userId/posts/:postId", (req, res) => {
+  res.json({
+    userId: req.params.userId,
+    postId: req.params.postId,
+  });
+});
+
+// Optional parameter (use ?)
+app.get("/products/:category?/:id?", (req, res) => {
+  // /products         → category=undefined, id=undefined
+  // /products/books   → category="books", id=undefined
+  // /products/books/5 → category="books", id="5"
+  res.json(req.params);
+});
+```
+
+### Parameter Validation
+
+Use regex patterns in route parameters:
+
+```javascript
+// Only match numeric IDs
+app.get("/users/:id(\\d+)", (req, res) => {
+  // Matches /users/123 but NOT /users/abc
+  res.json({ id: parseInt(req.params.id) });
+});
+
+// Match specific string patterns
+app.get("/files/:type(pdf|jpg|png)/:name", (req, res) => {
+  // Matches /files/pdf/report but NOT /files/doc/report
+  res.json({ type: req.params.type, name: req.params.name });
+});
+```
+
+## Query Parameters
+
+Data appended to the URL after `?`:
+
+```javascript
+// URL: /api/users?role=admin&page=2&sort=name
+app.get("/api/users", (req, res) => {
+  const { role, page = "1", sort = "createdAt", limit = "10" } = req.query;
+
+  res.json({
+    filters: { role },
+    pagination: {
+      page: parseInt(page),
+      limit: parseInt(limit),
+    },
+    sort,
+  });
+});
+
+// Array query params: /api/users?roles=admin&roles=editor
+app.get("/api/users/roles", (req, res) => {
+  const roles = req.query.roles; // "admin" (single) or ["admin", "editor"] (multiple)
+  const roleArray = Array.isArray(roles) ? roles : [roles];
+
+  res.json({ roles: roleArray });
+});
+```
+
+## Modular Routers
+
+Split routes into separate files using `express.Router()`:
+
+```javascript
+// src/routes/users.js
+const router = require("express").Router();
+
+// Middleware specific to this router
+router.use((req, res, next) => {
+  console.log(`[Users] ${req.method} ${req.path}`);
+  next();
+});
+
+router.get("/", (req, res) => {
+  res.json([{ id: 1, name: "Alice" }]);
+});
+
+router.get("/:id", (req, res) => {
+  res.json({ id: req.params.id, name: "Alice" });
+});
+
+module.exports = router;
+```
+
+```javascript
+// src/routes/products.js
+const router = require("express").Router();
+
+router.get("/", (req, res) => {
+  res.json([{ id: 1, product: "Widget" }]);
+});
+
+router.get("/:id", (req, res) => {
+  res.json({ id: req.params.id, product: "Widget" });
+});
+
+module.exports = router;
+```
+
+```javascript
+// src/app.js
+const express = require("express");
+const app = express();
+
+app.use("/api/users", require("./routes/users"));
+app.use("/api/products", require("./routes/products"));
+
+// The router paths are PREFIXED:
+// GET /api/users
+// GET /api/users/:id
+// GET /api/products
+// GET /api/products/:id
+```
+
+## Route Groups with Prefix
+
+```javascript
+const router = require("express").Router();
+
+// All routes have /v1 prefix
+app.use("/v1", router);
+
+router.get("/users", (req, res) => { /* ... */ });    // GET /v1/users
+router.get("/posts", (req, res) => { /* ... */ });    // GET /v1/posts
+router.post("/users", (req, res) => { /* ... */ });   // POST /v1/users
+
+// Multiple versions
+const v1Router = require("./routes/v1");
+const v2Router = require("./routes/v2");
+
+app.use("/api/v1", v1Router);
+app.use("/api/v2", v2Router);
+```
+
+## Wildcard Routes
+
+```javascript
+// Catch-all for a segment
+app.get("/users/*", (req, res) => {
+  // Matches /users/anything/here
+  res.json({ path: req.path });
+});
+
+// 404 handler (must be last)
+app.use("*", (req, res) => {
+  res.status(404).json({
+    error: "Not Found",
+    message: `Route ${req.method} ${req.originalUrl} not found`,
+  });
+});
+```
+
+## Route Listing with express-list-endpoints
+
+```bash
+npm install express-list-endpoints
+```
+
+```javascript
+const listEndpoints = require("express-list-endpoints");
+
+app.listen(3000, () => {
+  console.log("Available routes:");
+  console.table(listEndpoints(app));
+});
+
+// Output:
+// ┌─────────┬──────────┬──────────────────┐
+// │ (index) │ methods  │ path             │
+// ├─────────┼──────────┼──────────────────┤
+// │ 0       │ ['GET']  │ '/api/users'     │
+// │ 1       │ ['POST'] │ '/api/users'     │
+// │ 2       │ ['GET']  │ '/api/users/:id' │
+// └─────────┴──────────┴──────────────────┘
+```
+
+## Quick Reference
+
+```javascript
+// Route patterns
+app.get("/path", handler);             // static
+app.get("/:param", handler);           // parameter
+app.get("/:id(\\d+)", handler);        // parameter with regex
+app.get("/path?", handler);            // optional segment
+app.get("/*", handler);                // wildcard (catch-all)
+
+// Multiple handlers
+app.get("/path", handler1, handler2);
+
+// Router
+const router = express.Router();
+router.get("/", handler);
+app.use("/prefix", router);
+
+// Chaining
+app.route("/path").get(handler).post(handler);
+```
+
+## Practice Exercises
+
+1. **RESTful task routes**: Create a router for `/api/tasks` with `GET /`, `GET /:id`, `POST /`, `PUT /:id`, and `DELETE /:id`. Use query parameters for filtering (by status) and pagination (page, limit).
+
+2. **Nested routing**: Create `/api/users/:userId/posts` and `/api/users/:userId/posts/:postId/comments`. Each should use Express Router and have full CRUD.
+
+3. **API versioning**: Set up two route versions — `/api/v1` and `/api/v2`. V1 returns data in one format, V2 in an enhanced format. Both should use modular routers.

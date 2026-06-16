@@ -1,0 +1,390 @@
+---
+title: "Browser APIs"
+description: "Browser APIs beyond the DOM — Geolocation, Notifications, Clipboard, IntersectionObserver, ResizeObserver, Drag and Drop, fullscreen, and network detection."
+sidebar:
+  order: 9
+  label: "Browser APIs"
+tab: "full-stack-development"
+---
+
+Modern browsers provide a rich set of APIs that go beyond simple DOM manipulation. These APIs let you access device features, observe element changes, and create richer user experiences.
+
+## Geolocation API
+
+Get the user's current position:
+
+```js
+// Check if supported
+if ("geolocation" in navigator) {
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      console.log("Latitude:", position.coords.latitude);
+      console.log("Longitude:", position.coords.longitude);
+      console.log("Accuracy:", position.coords.accuracy, "meters");
+    },
+    (error) => {
+      switch (error.code) {
+        case error.PERMISSION_DENIED:
+          console.log("User denied location access");
+          break;
+        case error.POSITION_UNAVAILABLE:
+          console.log("Location unavailable");
+          break;
+        case error.TIMEOUT:
+          console.log("Location request timed out");
+          break;
+      }
+    },
+    {
+      enableHighAccuracy: true, // use GPS if available
+      timeout: 10000,
+      maximumAge: 300000, // cache for 5 minutes
+    }
+  );
+}
+```
+
+**Watch position (track movement):**
+
+```js
+const watchId = navigator.geolocation.watchPosition(
+  (position) => {
+    console.log("New position:", position.coords);
+  },
+  (error) => console.error(error)
+);
+
+// Stop watching
+navigator.geolocation.clearWatch(watchId);
+```
+
+<Aside variant="tip">
+Geolocation requires HTTPS (except for localhost). The browser prompts the user for permission on first use. Always handle the "denied" case gracefully.
+</Aside>
+
+## Notifications API
+
+Send system-level notifications:
+
+```js
+// Check support and permission
+if ("Notification" in window) {
+  // Request permission (triggers browser prompt)
+  const permission = await Notification.requestPermission();
+
+  if (permission === "granted") {
+    new Notification("Hello!", {
+      body: "This is a notification from your web app",
+      icon: "/icon.png",
+      tag: "welcome", // replaces previous notification with same tag
+    });
+  }
+}
+```
+
+**Notification with click handler:**
+
+```js
+function notifyUser(title, options = {}) {
+  if (Notification.permission === "granted") {
+    const notification = new Notification(title, {
+      body: options.body || "",
+      icon: options.icon || "/favicon.ico",
+      ...options,
+    });
+
+    notification.onclick = () => {
+      window.focus();
+      notification.close();
+      // Navigate or open content
+      if (options.url) {
+        window.location.href = options.url;
+      }
+    };
+
+    // Auto-close after 5 seconds
+    setTimeout(() => notification.close(), 5000);
+  }
+}
+```
+
+## Clipboard API
+
+Read and write clipboard content (requires HTTPS or localhost):
+
+```js
+// Write to clipboard
+async function copyToClipboard(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    console.log("Copied!");
+  } catch (err) {
+    console.error("Copy failed:", err);
+  }
+}
+
+// Read from clipboard
+async function pasteFromClipboard() {
+  try {
+    const text = await navigator.clipboard.readText();
+    console.log("Pasted:", text);
+    return text;
+  } catch (err) {
+    console.error("Paste failed:", err);
+  }
+}
+
+// Copy rich content (HTML)
+async function copyRichContent(html) {
+  try {
+    const blob = new Blob([html], { type: "text/html" });
+    const clipboardItem = new ClipboardItem({ "text/html": blob });
+    await navigator.clipboard.write([clipboardItem]);
+  } catch (err) {
+    console.error("Rich copy failed:", err);
+  }
+}
+```
+
+## IntersectionObserver
+
+Detect when an element enters or exits the viewport — perfect for lazy loading and infinite scroll:
+
+```js
+const observer = new IntersectionObserver(
+  (entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        // Element is visible
+        console.log("Element visible:", entry.target);
+
+        // Lazy load the content
+        entry.target.src = entry.target.dataset.src;
+        entry.target.classList.add("loaded");
+
+        // Stop observing once loaded
+        observer.unobserve(entry.target);
+      }
+    });
+  },
+  {
+    root: null, // viewport (default)
+    rootMargin: "200px", // trigger 200px before element enters viewport
+    threshold: 0.1, // 10% of element must be visible
+  }
+);
+
+// Observe elements
+document.querySelectorAll("[data-src]").forEach((img) => observer.observe(img));
+```
+
+### Infinite Scroll
+
+```js
+const sentinel = document.getElementById("scroll-sentinel");
+let page = 1;
+
+const observer = new IntersectionObserver(async (entries) => {
+  if (entries[0].isIntersecting) {
+    page++;
+    const posts = await fetchPosts(page);
+    appendPosts(posts);
+  }
+}, { rootMargin: "100px" });
+
+observer.observe(sentinel);
+```
+
+### Animation on Scroll
+
+```js
+const fadeObserver = new IntersectionObserver((entries) => {
+  entries.forEach((entry) => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add("fade-in");
+      fadeObserver.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.2 });
+
+document.querySelectorAll(".fade-on-scroll").forEach((el) => {
+  fadeObserver.observe(el);
+});
+```
+
+## ResizeObserver
+
+Respond to element size changes (not just window resize):
+
+```js
+const container = document.querySelector(".responsive-container");
+
+const resizeObserver = new ResizeObserver((entries) => {
+  for (const entry of entries) {
+    const { width, height } = entry.contentRect;
+
+    console.log(`Container: ${width}x${height}`);
+
+    // Adapt layout based on available space
+    if (width < 400) {
+      container.classList.add("compact");
+      container.classList.remove("expanded");
+    } else {
+      container.classList.remove("compact");
+      container.classList.add("expanded");
+    }
+  }
+});
+
+resizeObserver.observe(container);
+```
+
+### Use Cases
+
+- Adaptive components (responsive to parent, not viewport)
+- Text area auto-resize
+- Dashboard widgets that reflow based on available space
+- Canvas/video sizing
+
+## Drag and Drop
+
+```html
+<div class="drag-container">
+  <div class="drag-item" draggable="true">Item 1</div>
+  <div class="drag-item" draggable="true">Item 2</div>
+  <div class="drag-item" draggable="true">Item 3</div>
+</div>
+<div class="drop-zone">Drop Here</div>
+```
+
+```js
+const items = document.querySelectorAll(".drag-item");
+const dropZone = document.querySelector(".drop-zone");
+
+// Drag source events
+items.forEach((item) => {
+  item.addEventListener("dragstart", (event) => {
+    event.dataTransfer.setData("text/plain", item.textContent);
+    item.classList.add("dragging");
+  });
+
+  item.addEventListener("dragend", () => {
+    item.classList.remove("dragging");
+  });
+});
+
+// Drop target events
+dropZone.addEventListener("dragover", (event) => {
+  event.preventDefault(); // required for drop to work
+  dropZone.classList.add("drag-over");
+});
+
+dropZone.addEventListener("dragleave", () => {
+  dropZone.classList.remove("drag-over");
+});
+
+dropZone.addEventListener("drop", (event) => {
+  event.preventDefault();
+  dropZone.classList.remove("drag-over");
+  const data = event.dataTransfer.getData("text/plain");
+  dropZone.textContent = `Dropped: ${data}`;
+});
+```
+
+## Fullscreen API
+
+```js
+// Enter fullscreen
+function enterFullscreen(element = document.documentElement) {
+  if (element.requestFullscreen) {
+    element.requestFullscreen();
+  } else if (element.webkitRequestFullscreen) {
+    element.webkitRequestFullscreen(); // Safari
+  } else if (element.msRequestFullscreen) {
+    element.msRequestFullscreen(); // IE
+  }
+}
+
+// Exit fullscreen
+function exitFullscreen() {
+  if (document.exitFullscreen) {
+    document.exitFullscreen();
+  } else if (document.webkitExitFullscreen) {
+    document.webkitExitFullscreen();
+  } else if (document.msExitFullscreen) {
+    document.msExitFullscreen();
+  }
+}
+
+// Check state
+document.addEventListener("fullscreenchange", () => {
+  console.log("Fullscreen:", !!document.fullscreenElement);
+});
+```
+
+## Network Detection
+
+```js
+// Check if online/offline
+console.log("Online:", navigator.onLine);
+
+// Listen for changes
+window.addEventListener("online", () => {
+  console.log("Back online");
+  showOnlineNotification();
+});
+
+window.addEventListener("offline", () => {
+  console.log("Lost connection");
+  showOfflineBanner();
+});
+```
+
+## Device Orientation (Mobile)
+
+```js
+window.addEventListener("deviceorientation", (event) => {
+  console.log("Alpha:", event.alpha);   // compass direction (0-360)
+  console.log("Beta:", event.beta);     // front-to-back tilt (-180 to 180)
+  console.log("Gamma:", event.gamma);   // left-to-right tilt (-90 to 90)
+});
+```
+
+## Battery API
+
+```js
+if ("getBattery" in navigator) {
+  const battery = await navigator.getBattery();
+
+  console.log("Level:", battery.level * 100 + "%");
+  console.log("Charging:", battery.charging);
+  console.log("Time until full:", battery.chargingTime, "seconds");
+
+  battery.addEventListener("levelchange", () => {
+    if (battery.level < 0.2) {
+      console.log("Battery low!");
+    }
+  });
+}
+```
+
+## Quick Reference
+
+| API | Feature | Permission Required |
+|-----|---------|-------------------|
+| Geolocation | User's position | ✅ |
+| Notifications | System notifications | ✅ |
+| Clipboard | Read/write clipboard | ✅ (read requires permission) |
+| IntersectionObserver | Element visibility | ❌ |
+| ResizeObserver | Element size changes | ❌ |
+| Drag & Drop | Native drag-and-drop | ❌ |
+| Fullscreen | Fullscreen mode | ❌ (user gesture required) |
+| Network | Online/offline status | ❌ |
+
+## Practice Exercises
+
+1. **Scroll-triggered animations**: Use `IntersectionObserver` to fade in elements as the user scrolls down the page. Each element should animate once when it first becomes visible.
+
+2. **Custom notification system**: Build a "Notify me when..." feature that requests notification permission and sends a notification with a delay. Handle the case where permission was denied.
+
+3. **Image lazy loading gallery**: Create a gallery of images using `data-src` attributes and `IntersectionObserver`. Load images only when they scroll into view (or 200px before). Show a placeholder while loading.

@@ -1,0 +1,405 @@
+---
+title: "RESTful API Design"
+description: "REST principles, CRUD endpoints, HTTP status codes, request validation, API versioning, pagination, filtering, and API documentation."
+sidebar:
+  order: 5
+  label: "RESTful API Design"
+tab: "full-stack-development"
+---
+
+REST (Representational State Transfer) is an architectural style for designing networked APIs. This page covers how to build clean, consistent, and scalable REST APIs with Express.
+
+## REST Principles
+
+1. **Resources**: Everything is a resource (`/users`, `/products`, `/orders`)
+2. **HTTP methods**: Actions on resources use standard HTTP methods
+3. **Stateless**: Each request contains all information needed
+4. **Uniform interface**: Consistent URL patterns and response formats
+5. **Resource representations**: JSON, XML, etc.
+
+## CRUD Endpoint Pattern
+
+| Action | HTTP Method | Endpoint | Status Code |
+|--------|-------------|----------|-------------|
+| Create | POST | `/api/resources` | 201 |
+| Read (all) | GET | `/api/resources` | 200 |
+| Read (one) | GET | `/api/resources/:id` | 200 |
+| Update (full) | PUT | `/api/resources/:id` | 200 |
+| Update (partial) | PATCH | `/api/resources/:id` | 200 |
+| Delete | DELETE | `/api/resources/:id` | 204 |
+
+### Full REST Controller Example
+
+```javascript
+// controllers/taskController.js
+let tasks = [];
+let nextId = 1;
+
+// GET /api/tasks
+exports.getAll = (req, res) => {
+  let result = [...tasks];
+
+  // Filtering
+  const { status, priority, search } = req.query;
+  if (status) {
+    result = result.filter((t) => t.status === status);
+  }
+  if (priority) {
+    result = result.filter((t) => t.priority === priority);
+  }
+  if (search) {
+    result = result.filter((t) =>
+      t.title.toLowerCase().includes(search.toLowerCase())
+    );
+  }
+
+  // Sorting
+  const { sortBy = "createdAt", order = "desc" } = req.query;
+  result.sort((a, b) => {
+    const cmp = a[sortBy] > b[sortBy] ? 1 : -1;
+    return order === "asc" ? cmp : -cmp;
+  });
+
+  // Pagination
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const startIndex = (page - 1) * limit;
+  const paginatedResult = result.slice(startIndex, startIndex + limit);
+
+  res.json({
+    data: paginatedResult,
+    pagination: {
+      page,
+      limit,
+      total: result.length,
+      totalPages: Math.ceil(result.length / limit),
+    },
+  });
+};
+
+// GET /api/tasks/:id
+exports.getById = (req, res) => {
+  const task = tasks.find((t) => t.id === parseInt(req.params.id));
+
+  if (!task) {
+    return res.status(404).json({ error: "Task not found" });
+  }
+
+  res.json({ data: task });
+};
+
+// POST /api/tasks
+exports.create = (req, res) => {
+  const { title, description, priority = "medium" } = req.body;
+
+  const task = {
+    id: nextId++,
+    title,
+    description: description || "",
+    status: "pending",
+    priority,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  tasks.push(task);
+  res.status(201).json({ data: task });
+};
+
+// PUT /api/tasks/:id
+exports.update = (req, res) => {
+  const task = tasks.find((t) => t.id === parseInt(req.params.id));
+
+  if (!task) {
+    return res.status(404).json({ error: "Task not found" });
+  }
+
+  const { title, description, status, priority } = req.body;
+
+  Object.assign(task, {
+    title: title || task.title,
+    description: description !== undefined ? description : task.description,
+    status: status || task.status,
+    priority: priority || task.priority,
+    updatedAt: new Date().toISOString(),
+  });
+
+  res.json({ data: task });
+};
+
+// PATCH /api/tasks/:id
+exports.patch = (req, res) => {
+  const task = tasks.find((t) => t.id === parseInt(req.params.id));
+
+  if (!task) {
+    return res.status(404).json({ error: "Task not found" });
+  }
+
+  // Only update provided fields
+  Object.keys(req.body).forEach((key) => {
+    if (key !== "id" && key !== "createdAt") {
+      task[key] = req.body[key];
+    }
+  });
+
+  task.updatedAt = new Date().toISOString();
+  res.json({ data: task });
+};
+
+// DELETE /api/tasks/:id
+exports.remove = (req, res) => {
+  const index = tasks.findIndex((t) => t.id === parseInt(req.params.id));
+
+  if (index === -1) {
+    return res.status(404).json({ error: "Task not found" });
+  }
+
+  tasks.splice(index, 1);
+  res.status(204).send();
+};
+```
+
+### Task Routes
+
+```javascript
+// routes/tasks.js
+const express = require("express");
+const router = express.Router();
+const taskController = require("../controllers/taskController");
+
+router.get("/", taskController.getAll);
+router.get("/:id", taskController.getById);
+router.post("/", taskController.create);
+router.put("/:id", taskController.update);
+router.patch("/:id", taskController.patch);
+router.delete("/:id", taskController.remove);
+
+module.exports = router;
+```
+
+## HTTP Status Codes
+
+### Success Codes
+
+| Code | Meaning | When to Use |
+|------|---------|-------------|
+| 200 | OK | GET, PUT, PATCH succeed |
+| 201 | Created | POST creates a resource |
+| 204 | No Content | DELETE succeeds (no body) |
+
+### Client Error Codes
+
+| Code | Meaning | When to Use |
+|------|---------|-------------|
+| 400 | Bad Request | Invalid input, missing fields |
+| 401 | Unauthorized | Missing/invalid authentication |
+| 403 | Forbidden | Authenticated but no permission |
+| 404 | Not Found | Resource doesn't exist |
+| 409 | Conflict | Duplicate resource, version conflict |
+| 422 | Unprocessable Entity | Validation failed |
+| 429 | Too Many Requests | Rate limit exceeded |
+
+### Server Error Codes
+
+| Code | Meaning | When to Use |
+|------|---------|-------------|
+| 500 | Internal Server Error | Unexpected server error |
+| 502 | Bad Gateway | Upstream service failed |
+| 503 | Service Unavailable | Server overloaded or down |
+
+## Consistent Response Format
+
+```javascript
+// Success response
+{
+  "data": { ... },
+  "pagination": { "page": 1, "limit": 10, "total": 42, "totalPages": 5 }
+}
+
+// Single resource
+{
+  "data": { "id": 1, "name": "Alice" }
+}
+
+// Collection
+{
+  "data": [ { "id": 1, "name": "Alice" }, { "id": 2, "name": "Bob" } ]
+}
+
+// Error response
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Email is required",
+    "details": [
+      { "field": "email", "message": "Must be a valid email address" }
+    ]
+  }
+}
+```
+
+## Request Validation
+
+### Manual Validation
+
+```javascript
+const validateCreateTask = (req, res, next) => {
+  const errors = [];
+
+  if (!req.body.title || req.body.title.trim().length < 3) {
+    errors.push({
+      field: "title",
+      message: "Title must be at least 3 characters",
+    });
+  }
+
+  if (req.body.priority && !["low", "medium", "high"].includes(req.body.priority)) {
+    errors.push({
+      field: "priority",
+      message: "Priority must be low, medium, or high",
+    });
+  }
+
+  if (errors.length > 0) {
+    return res.status(422).json({ error: { code: "VALIDATION_ERROR", details: errors } });
+  }
+
+  next();
+};
+
+router.post("/", validateCreateTask, taskController.create);
+```
+
+### Validation with express-validator
+
+```bash
+npm install express-validator
+```
+
+```javascript
+const { body, validationResult } = require("express-validator");
+
+const validateUser = [
+  body("name").trim().notEmpty().withMessage("Name is required"),
+  body("email").isEmail().withMessage("Valid email is required"),
+  body("age").optional().isInt({ min: 18 }).withMessage("Must be 18+"),
+];
+
+const handleValidation = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(422).json({
+      error: {
+        code: "VALIDATION_ERROR",
+        details: errors.array().map((e) => ({
+          field: e.path,
+          message: e.msg,
+        })),
+      },
+    });
+  }
+  next();
+};
+
+router.post("/users", validateUser, handleValidation, userController.create);
+```
+
+## Pagination
+
+```javascript
+// Request: GET /api/tasks?page=2&limit=20&sortBy=createdAt&order=desc
+// Response:
+{
+  "data": [...],
+  "pagination": {
+    "page": 2,
+    "limit": 20,
+    "total": 95,
+    "totalPages": 5
+  }
+}
+```
+
+### Pagination Middleware
+
+```javascript
+const paginate = (model) => (req, res, next) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const startIndex = (page - 1) * limit;
+
+  req.pagination = { page, limit, startIndex };
+  req.model = model;
+  next();
+};
+```
+
+## API Versioning
+
+```javascript
+// URL-based versioning (most common)
+app.use("/api/v1/users", v1UserRoutes);
+app.use("/api/v2/users", v2UserRoutes);
+
+// Header-based versioning
+app.use("/api/users", (req, res, next) => {
+  const version = req.headers["accept-version"];
+  req.apiVersion = version || "1";
+  next();
+});
+```
+
+## API Documentation with Swagger
+
+```bash
+npm install swagger-jsdoc swagger-ui-express
+```
+
+```javascript
+const swaggerJsdoc = require("swagger-jsdoc");
+const swaggerUi = require("swagger-ui-express");
+
+const options = {
+  definition: {
+    openapi: "3.0.0",
+    info: {
+      title: "Task API",
+      version: "1.0.0",
+      description: "A RESTful API for managing tasks",
+    },
+  },
+  apis: ["./src/routes/*.js"],
+};
+
+const specs = swaggerJsdoc(options);
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(specs));
+```
+
+## Quick Reference
+
+```javascript
+// RESTful endpoints
+GET    /api/tasks          // List (with filters, pagination)
+GET    /api/tasks/:id      // Single
+POST   /api/tasks          // Create
+PUT    /api/tasks/:id      // Replace
+PATCH  /api/tasks/:id      // Partial update
+DELETE /api/tasks/:id      // Delete
+
+// Status codes
+res.status(200).json(data)     // OK
+res.status(201).json(data)     // Created
+res.status(204).send()         // No Content
+res.status(400).json(error)    // Bad Request
+res.status(404).json(error)    // Not Found
+res.status(422).json(error)    // Validation Error
+res.status(500).json(error)    // Server Error
+```
+
+## Practice Exercises
+
+1. **RESTful products API**: Build a complete CRUD API for products with fields: `name`, `price`, `category`, `inStock`. Include filtering by category, sorting by price, and pagination.
+
+2. **Nested resources**: Create `/api/users/:userId/orders` and `/api/users/:userId/orders/:orderId/items` with full CRUD. Validate that a user exists before accepting orders.
+
+3. **Validation with express-validator**: Add input validation to a registration endpoint. Validate: name (2-50 chars), email (valid format), password (min 8 chars, must contain number), age (optional, 13-120).

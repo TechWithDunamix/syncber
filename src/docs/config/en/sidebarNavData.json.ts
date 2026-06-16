@@ -48,7 +48,7 @@ const sidebarNavData: DocsSidebarNavData = {
     {
       id: "full-stack-development",
       title: "Full Stack Web Development",
-      description: "Build modern web applications",
+      description: "Build modern web applications from scratch",
       icon: "tabler/code",
       sections: [
         {
@@ -56,16 +56,64 @@ const sidebarNavData: DocsSidebarNavData = {
           title: "Course Overview",
         },
         {
-          id: "frontend-basics",
-          title: "Frontend Basics",
+          id: "phase-1-frontend",
+          title: "Phase 1: Frontend Foundations",
+          children: [
+            {
+              id: "html-fundamentals",
+              title: "HTML & Web Fundamentals",
+            },
+            {
+              id: "css-styling",
+              title: "CSS & Styling",
+            },
+            {
+              id: "javascript-basics",
+              title: "JavaScript Basics",
+            },
+          ],
         },
         {
-          id: "backend-development",
-          title: "Backend Development",
+          id: "phase-2-javascript",
+          title: "Phase 2: JavaScript in Depth",
+          children: [
+            {
+              id: "javascript-advanced",
+              title: "Advanced JavaScript",
+            },
+            {
+              id: "dom-browser",
+              title: "DOM & Browser APIs",
+            },
+          ],
         },
         {
-          id: "databases",
-          title: "Databases & APIs",
+          id: "phase-3-frontend",
+          title: "Phase 3: Modern Frontend",
+          children: [
+            {
+              id: "react-frontend",
+              title: "React & Modern Frontend",
+            },
+          ],
+        },
+        {
+          id: "phase-4-backend",
+          title: "Phase 4: Backend Development",
+          children: [
+            {
+              id: "node-express",
+              title: "Node.js & Express",
+            },
+            {
+              id: "auth-security",
+              title: "Authentication & Security",
+            },
+            {
+              id: "mongodb-databases",
+              title: "MongoDB & Databases",
+            },
+          ],
         },
       ],
     },

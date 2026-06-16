@@ -1,0 +1,223 @@
+---
+title: "HTML Document Structure"
+description: "Learn the anatomy of an HTML document — the doctype declaration, html, head, body elements, meta tags, and how browsers interpret your markup."
+sidebar:
+  order: 2
+  label: "Document Structure"
+tab: "full-stack-development"
+---
+
+Every HTML page follows the same basic structure. Understanding this foundation is essential before adding content or styling.
+
+## The Minimal HTML Document
+
+Here is the shortest valid HTML page:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Page Title</title>
+</head>
+<body>
+  <!-- Visible content goes here -->
+</body>
+</html>
+```
+
+Every HTML page has exactly four required structural elements.
+
+## The DOCTYPE Declaration
+
+`<!DOCTYPE html>` is not an HTML element — it's an instruction to the browser about the version of HTML being used.
+
+```html
+<!DOCTYPE html>
+```
+
+- **HTML5** uses `<!DOCTYPE html>` (simple and short)
+- Older versions had complex DOCTYPEs like `<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN">`
+- Always put DOCTYPE as the very first line, before anything else
+- Forgetting it triggers **quirks mode** — browsers behave inconsistently
+
+<Aside variant="caution">
+Always include `<!DOCTYPE html>` at the top. Without it, your page may look different in different browsers because the browser falls back to "quirks mode" emulating 1990s rendering.
+</Aside>
+
+## The `<html>` Element
+
+`<html>` is the **root element** — it wraps all content on the page.
+
+```html
+<html lang="en">
+```
+
+The `lang` attribute tells browsers and screen readers what language the page is written in:
+- `en` for English
+- `fr` for French
+- `es` for Spanish
+- `ar` for Arabic
+
+This is critical for accessibility — screen readers use the correct pronunciation rules, and browsers offer translation based on language.
+
+## The `<head>` Element
+
+`<head>` contains **metadata** — information about the page that is not displayed directly.
+
+```html
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="A free tutorial on HTML fundamentals.">
+  <meta name="keywords" content="HTML, tutorial, web development">
+  <meta name="author" content="Your Name">
+  <title>My Awesome Page</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+```
+
+### Common Meta Tags
+
+| Tag | Purpose |
+|-----|---------|
+| `<meta charset="UTF-8">` | Sets character encoding (supports all languages and symbols) |
+| `<meta name="viewport">` | Controls layout on mobile devices (critical for responsive design) |
+| `<meta name="description">` | The text shown under your link in Google search results |
+| `<meta name="robots">` | Tells search engines whether to index the page |
+
+### The `<title>` Element
+
+`<title>` sets the text shown in the browser tab and is the first line of your search result:
+
+```html
+<title>HTML Fundamentals — Learn Web Development</title>
+```
+
+- Every page should have a unique, descriptive title
+- Search engines show the title in results — make it meaningful
+- 50-60 characters is ideal for search display
+
+### Linking External Resources
+
+The `<head>` also links external files:
+
+```html
+<!-- CSS stylesheet -->
+<link rel="stylesheet" href="styles.css">
+
+<!-- Favicon (browser tab icon) -->
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+```
+
+## The `<body>` Element
+
+`<body>` contains everything visible on the page:
+
+```html
+<body>
+  <h1>Welcome!</h1>
+  <p>This text is visible to the user.</p>
+  <img src="photo.jpg" alt="A scenic view">
+</body>
+```
+
+- Content inside `<body>` renders in the browser window
+- Only one `<body>` per document
+- Everything you learn in this course goes inside `<body>`
+
+## The DOM Tree Concept
+
+When a browser reads your HTML, it creates an internal model called the **DOM (Document Object Model)** — a tree structure of all elements:
+
+```
+html
+├── head
+│   ├── meta (charset)
+│   ├── meta (viewport)
+│   └── title
+└── body
+    ├── h1
+    ├── p
+    └── img
+```
+
+This tree structure matters because:
+- CSS uses it to target elements
+- JavaScript uses it to manipulate the page
+- Screen readers use it to navigate content
+
+## Indentation and Readability
+
+Good indentation makes HTML easier to read and debug:
+
+```html
+<!-- Poor indentation — hard to read -->
+<body>
+<h1>Title</h1>
+<p>Paragraph</p>
+<ul>
+<li>Item</li>
+</ul>
+</body>
+
+<!-- Good indentation — easy to read -->
+<body>
+  <h1>Title</h1>
+  <p>Paragraph</p>
+  <ul>
+    <li>Item</li>
+  </ul>
+</body>
+```
+
+The rule: each time you nest an element inside another, indent one level (2 spaces). VS Code's Prettier extension does this automatically.
+
+## HTML Comments
+
+Comments are ignored by the browser — they help you and other developers understand the code:
+
+```html
+<!-- This is a comment — not visible on the page -->
+
+<!-- Section: Navigation -->
+<nav>
+  <a href="index.html">Home</a>
+  <a href="about.html">About</a>
+</nav>
+<!-- End of navigation -->
+
+<!--
+  Multi-line comments are useful for
+  explaining complex sections or
+  temporarily disabling code.
+-->
+```
+
+- Comments start with `<!--` and end with `-->`
+- Use them to label sections of your page
+- Do NOT put sensitive information in comments (they are visible in the source)
+
+## Try It Yourself
+
+Create a new HTML file and:
+
+1. Write a complete HTML document with DOCTYPE, html, head, and body
+2. Set the title to "About Me"
+3. Add a description meta tag
+4. In the body, add an `<h1>` with your name and a `<p>` with a short bio
+5. Open with Live Server and check the browser tab shows your title
+6. Press F12, go to the Elements tab — you should see your DOM tree
+
+## Key Takeaways
+
+- Every HTML page needs: `<!DOCTYPE html>`, `<html>`, `<head>`, `<body>`
+- `<head>` contains metadata (title, meta tags, CSS links) — not visible on the page
+- `<body>` contains all visible content
+- The browser builds a DOM tree from your HTML — this tree is how CSS and JS interact with your page
+- Proper indentation (2 spaces per nesting level) keeps HTML readable
+- Comments help document your code but are visible in the page source

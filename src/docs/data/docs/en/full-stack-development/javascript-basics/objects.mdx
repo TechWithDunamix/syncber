@@ -1,0 +1,303 @@
+---
+title: "Objects"
+description: "JavaScript objects — object literals, properties, methods, computed properties, destructuring, spread operator, this keyword, and object iteration."
+sidebar:
+  order: 6
+  label: "Objects"
+tab: "full-stack-development"
+---
+
+Objects store collections of key-value pairs. They are the fundamental data structure in JavaScript.
+
+## Object Literals
+
+The simplest way to create an object:
+
+```javascript
+const person = {
+  name: "Alice",
+  age: 30,
+  city: "New York",
+  isEmployed: true
+};
+
+console.log(person.name);     // => "Alice"
+console.log(person.age);      // => 30
+```
+
+## Accessing Properties
+
+```javascript
+// Dot notation (preferred when property name is known)
+console.log(person.name);     // => "Alice"
+
+// Bracket notation (needed for dynamic or invalid identifiers)
+console.log(person["name"]);  // => "Alice"
+
+// Dynamic property access
+const key = "city";
+console.log(person[key]);     // => "New York"
+
+// Bracket notation allows characters that dot notation doesn't
+const obj = {
+  "first name": "Alice",     // Space in property name — must use quotes
+  "123start": "value"        // Starts with a digit — must use quotes
+};
+console.log(obj["first name"]);  // => "Alice"
+// console.log(obj.first name)   // ❌ SyntaxError
+```
+
+## Adding and Updating Properties
+
+```javascript
+const user = { name: "Alice" };
+
+// Add new property
+user.age = 30;
+user["email"] = "alice@example.com";
+
+// Update existing
+user.name = "Bob";
+
+console.log(user);
+// => { name: "Bob", age: 30, email: "alice@example.com" }
+```
+
+## Methods
+
+Functions stored as object properties:
+
+```javascript
+const calculator = {
+  value: 0,
+
+  add(n) {
+    this.value += n;     // `this` refers to the calculator object
+    return this;         // Return `this` for method chaining
+  },
+
+  subtract(n) {
+    this.value -= n;
+    return this;
+  },
+
+  getResult() {
+    return this.value;
+  }
+};
+
+calculator.add(5).subtract(2).add(10);
+console.log(calculator.getResult());  // => 13
+```
+
+## Computed Properties
+
+Use expressions as property names:
+
+```javascript
+const key = "dynamicKey";
+const obj = {
+  [key]: "dynamic value",
+  [`${key}2`]: "also dynamic",
+  [`user_${Math.random()}`]: "random key"
+};
+
+console.log(obj.dynamicKey);    // => "dynamic value"
+console.log(obj.dynamicKey2);   // => "also dynamic"
+```
+
+## Shorthand Properties
+
+When variable name matches property name:
+
+```javascript
+const name = "Alice";
+const age = 30;
+
+// Old way
+const person1 = { name: name, age: age };
+
+// Shorthand (ES6)
+const person2 = { name, age };
+
+console.log(person2);  // => { name: "Alice", age: 30 }
+```
+
+## The `this` Keyword
+
+`this` refers to the object that the function is a method of:
+
+```javascript
+const user = {
+  name: "Alice",
+  greet() {
+    console.log(`Hello, I'm ${this.name}`);
+  }
+};
+
+user.greet();  // => "Hello, I'm Alice"
+
+// Arrow functions do NOT have their own `this` — they inherit from parent scope
+const user2 = {
+  name: "Bob",
+  greet: () => {
+    console.log(`Hello, I'm ${this.name}`);  // `this` is NOT user2! (window/undefined)
+  }
+};
+
+user2.greet();  // => "Hello, I'm undefined"  (or "Hello, I'm " in browser)
+```
+
+<Aside variant="caution">
+Arrow functions inherit `this` from their surrounding scope — they DON'T get their own `this`. This makes them unsuitable for object methods. Use regular functions for methods.
+</Aside>
+
+## Object Destructuring
+
+Extract properties into variables:
+
+```javascript
+const person = { name: "Alice", age: 30, city: "New York" };
+
+// Basic destructuring
+const { name, age } = person;
+console.log(name);  // => "Alice"
+console.log(age);   // => 30
+
+// Rename variables
+const { name: personName, city: location } = person;
+console.log(personName);  // => "Alice"
+console.log(location);    // => "New York"
+
+// Default values
+const { country = "Unknown" } = person;
+console.log(country);  // => "Unknown"
+
+// Nested destructuring
+const user = {
+  id: 1,
+  profile: {
+    displayName: "Alice",
+    avatar: "alice.jpg"
+  }
+};
+const { profile: { displayName } } = user;
+console.log(displayName);  // => "Alice"
+```
+
+## Spread Operator (...)
+
+Copy and merge objects:
+
+```javascript
+// Copy an object
+const original = { a: 1, b: 2 };
+const copy = { ...original };
+console.log(copy);  // => { a: 1, b: 2 }
+
+// Merge objects (later properties override earlier ones)
+const defaults = { theme: "light", showSidebar: true };
+const userPrefs = { theme: "dark" };
+const config = { ...defaults, ...userPrefs };
+console.log(config);  // => { theme: "dark", showSidebar: true }
+
+// Add new properties while copying
+const base = { name: "Alice" };
+const extended = { ...base, age: 30, role: "admin" };
+console.log(extended);  // => { name: "Alice", age: 30, role: "admin" }
+```
+
+## Object.keys(), Object.values(), Object.entries()
+
+```javascript
+const user = { name: "Alice", age: 30, city: "New York" };
+
+console.log(Object.keys(user));     // => ["name", "age", "city"]
+console.log(Object.values(user));   // => ["Alice", 30, "New York"]
+console.log(Object.entries(user));  // => [["name","Alice"], ["age",30], ["city","New York"]]
+
+// Iterate over entries
+for (const [key, value] of Object.entries(user)) {
+  console.log(`${key}: ${value}`);
+}
+// name: Alice
+// age: 30
+// city: New York
+```
+
+## Checking Property Existence
+
+```javascript
+const user = { name: "Alice", age: 30 };
+
+// in operator
+console.log("name" in user);   // => true
+console.log("email" in user);  // => false
+
+// hasOwnProperty
+console.log(user.hasOwnProperty("name"));  // => true
+
+// undefined check (works but can be misleading)
+console.log(user.email === undefined);  // => true
+// BUT: property might exist with value undefined
+const obj = { x: undefined };
+console.log(obj.x === undefined);  // => true (property exists!)
+console.log("x" in obj);           // => true (better check)
+```
+
+## Optional Chaining (?.)
+
+Safely access nested properties without errors:
+
+```javascript
+const user = {
+  name: "Alice",
+  address: {
+    street: "123 Main St"
+    // zipCode is missing
+  }
+};
+
+// Without optional chaining
+console.log(user.address.zipCode);  // => undefined (ok)
+// console.log(user.billing.address); // ❌ TypeError: Cannot read property 'address' of undefined
+
+// With optional chaining
+console.log(user.billing?.address);  // => undefined (safe)
+console.log(user.billing?.address?.street);  // => undefined (safe)
+```
+
+## Try It Yourself
+
+```javascript
+// 1. Create a book object with title, author, year, and a method getSummary()
+// 2. Use destructuring to extract title and author
+// 3. Use spread to merge it with a rating object { rating: 4.5 }
+// 4. Use Object.entries() to log all key-value pairs
+// 5. Use optional chaining to access a nested property safely
+
+const book = {
+  title: "JavaScript Fundamentals",
+  author: "Jane Doe",
+  year: 2026,
+  getSummary() {
+    return `${this.title} by ${this.author} (${this.year})`;
+  }
+};
+
+const { title, author } = book;
+const fullBook = { ...book, rating: 4.5 };
+console.log(fullBook.getSummary());  // => "JavaScript Fundamentals by Jane Doe (2026)"
+```
+
+## Key Takeaways
+
+- Objects store key-value pairs — use dot notation for known keys, bracket notation for dynamic keys
+- Methods are functions stored as object properties — use regular functions, not arrows
+- `this` refers to the object the method belongs to (arrow functions don't have their own `this`)
+- Destructuring extracts properties into variables: `const { name } = obj`
+- Spread operator `...` copies and merges objects
+- `Object.keys()`, `.values()`, `.entries()` iterate over object content
+- `in` operator checks if a property exists (better than `=== undefined`)
+- Optional chaining `?.` safely accesses nested properties
+- Shorthand `{ name, age }` is equivalent to `{ name: name, age: age }`

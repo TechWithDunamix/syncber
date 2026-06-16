@@ -1,0 +1,296 @@
+---
+title: "Environment & Configuration"
+description: "Managing environment variables with dotenv, configuration patterns for development/staging/production, .env files, and environment-specific settings."
+sidebar:
+  order: 8
+  label: "Environment & Configuration"
+tab: "full-stack-development"
+---
+
+Proper configuration management is essential for deploying the same codebase across different environments (development, staging, production) without changes.
+
+## The Twelve-Factor App — Config
+
+One of the twelve factors states: **Store config in the environment**. Code should be the same across all environments, while configuration varies.
+
+## Using dotenv
+
+```bash
+npm install dotenv
+```
+
+```javascript
+// src/index.js — Load at the very top
+require("dotenv").config();
+
+console.log(process.env.NODE_ENV);   // "development" (defaults to undefined)
+console.log(process.env.PORT);       // "3000"
+```
+
+### .env Files
+
+```
+# .env (development — NOT committed)
+PORT=3000
+NODE_ENV=development
+DATABASE_URL=mongodb://localhost:27017/myapp
+JWT_SECRET=dev-secret-key-change-in-production
+JWT_EXPIRES_IN=7d
+LOG_LEVEL=debug
+API_KEY=sk-test-123
+```
+
+```
+# .env.example (committed — placeholder values)
+PORT=3000
+NODE_ENV=development
+DATABASE_URL=your_database_url_here
+JWT_SECRET=your_jwt_secret_here
+JWT_EXPIRES_IN=7d
+LOG_LEVEL=debug
+```
+
+### .gitignore
+
+```
+.env
+.env.local
+.env.production
+```
+
+## Configuration Module Pattern
+
+```javascript
+// src/config/index.js
+require("dotenv").config();
+
+const config = {
+  env: process.env.NODE_ENV || "development",
+
+  server: {
+    port: parseInt(process.env.PORT, 10) || 3000,
+    host: process.env.HOST || "localhost",
+  },
+
+  database: {
+    url: process.env.DATABASE_URL,
+    options: {
+      maxPoolSize: parseInt(process.env.DB_POOL_SIZE, 10) || 10,
+    },
+  },
+
+  auth: {
+    jwtSecret: process.env.JWT_SECRET,
+    jwtExpiresIn: process.env.JWT_EXPIRES_IN || "7d",
+    bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS, 10) || 12,
+  },
+
+  logging: {
+    level: process.env.LOG_LEVEL || "info",
+  },
+
+  upload: {
+    maxFileSize: parseInt(process.env.MAX_FILE_SIZE, 10) || 5 * 1024 * 1024,
+    allowedMimeTypes: (process.env.ALLOWED_MIME_TYPES || "image/jpeg,image/png").split(","),
+  },
+
+  redis: {
+    url: process.env.REDIS_URL || "redis://localhost:6379",
+  },
+
+  // Computed settings
+  get isDevelopment() {
+    return this.env === "development";
+  },
+  get isProduction() {
+    return this.env === "production";
+  },
+  get isTest() {
+    return this.env === "test";
+  },
+};
+
+// Validate required config
+const requiredVars = ["DATABASE_URL", "JWT_SECRET"];
+requiredVars.forEach((key) => {
+  if (!process.env[key]) {
+    throw new Error(`Missing required environment variable: ${key}`);
+  }
+});
+
+module.exports = config;
+```
+
+### Using the Config Module
+
+```javascript
+// src/server.js
+const config = require("./config");
+const app = require("./app");
+
+app.listen(config.server.port, config.server.host, () => {
+  console.log(`Server running in ${config.env} mode on port ${config.server.port}`);
+});
+```
+
+## Environment-Specific Config Files
+
+```
+config/
+├── default.js        # Shared defaults
+├── development.js    # Development overrides
+├── staging.js        # Staging overrides
+├── production.js     # Production overrides
+└── test.js           # Test overrides
+```
+
+```javascript
+// config/default.js
+module.exports = {
+  server: { port: 3000 },
+  logging: { level: "info" },
+};
+
+// config/development.js
+module.exports = {
+  logging: { level: "debug" },
+  database: { url: "mongodb://localhost:27017/dev" },
+};
+
+// config/production.js
+module.exports = {
+  database: { url: process.env.DATABASE_URL },
+  logging: { level: "error" },
+};
+
+// src/config/index.js
+const _ = require("lodash"); // for deep merge
+const defaultConfig = require("../../config/default");
+const envConfig = require(`../../config/${process.env.NODE_ENV || "development"}`);
+const config = _.merge({}, defaultConfig, envConfig);
+
+module.exports = config;
+```
+
+## Database URL Parsing
+
+```javascript
+// src/config/database.js
+const url = require("url");
+
+function parseDatabaseUrl(databaseUrl) {
+  if (!databaseUrl) return {};
+
+  const parsed = new url.URL(databaseUrl);
+
+  return {
+    client: parsed.protocol.replace(":", ""),
+    host: parsed.hostname,
+    port: parseInt(parsed.port, 10),
+    database: parsed.pathname.replace("/", ""),
+    username: parsed.username,
+    password: parsed.password,
+  };
+}
+
+const dbConfig = parseDatabaseUrl(process.env.DATABASE_URL);
+// mongodb://user:pass@localhost:27017/myapp
+// → { client: "mongodb", host: "localhost", port: 27017, database: "myapp", ... }
+```
+
+## Secrets Management
+
+For production secrets, never store them in `.env` files. Use platform-specific solutions:
+
+### Docker Secrets
+
+```bash
+# Docker Swarm
+echo "mysecret" | docker secret create db_password -
+
+# References in docker-compose.yml
+secrets:
+  db_password:
+    external: true
+
+# In the app — read from /run/secrets/
+const fs = require("fs");
+const dbPassword = fs.readFileSync("/run/secrets/db_password", "utf8").trim();
+```
+
+### Cloud Secret Managers
+
+```javascript
+// AWS Secrets Manager example
+const AWS = require("aws-sdk");
+const secretsManager = new AWS.SecretsManager();
+
+async function getSecret(secretName) {
+  try {
+    const data = await secretsManager.getSecretValue({ SecretId: secretName }).promise();
+    return JSON.parse(data.SecretString);
+  } catch (err) {
+    console.error("Failed to retrieve secret:", err);
+    throw err;
+  }
+}
+
+// Usage
+const dbCreds = await getSecret("prod/database");
+```
+
+## Feature Flags
+
+```javascript
+// src/config/features.js
+const config = require("./index");
+
+const features = {
+  newCheckoutFlow: config.env === "development" || process.env.FEATURE_NEW_CHECKOUT === "true",
+  betaSearch: config.env !== "production" || process.env.FEATURE_BETA_SEARCH === "true",
+  exportCSV: true, // always enabled
+};
+
+module.exports = features;
+
+// Usage in routes
+const features = require("../config/features");
+
+router.post("/checkout", (req, res) => {
+  if (features.newCheckoutFlow) {
+    return handleNewCheckout(req, res);
+  }
+  return handleLegacyCheckout(req, res);
+});
+```
+
+## Quick Reference
+
+```javascript
+// Load .env
+require("dotenv").config();
+
+// Access
+process.env.VARIABLE_NAME;
+
+// Config module pattern
+const config = {
+  port: parseInt(process.env.PORT, 10) || 3000,
+  get isDev() { return this.env === "development"; },
+};
+
+// Required vars validation
+if (!process.env.CRITICAL_KEY) throw new Error("Missing CRITICAL_KEY");
+
+// .gitignore
+.env
+.env.*
+```
+
+## Practice Exercises
+
+1. **Config module**: Build a config module that loads environment variables and provides typed defaults. Include validation that crashes the app on startup if required variables are missing.
+
+2. **Multi-environment setup**: Create separate config files for development, staging, and production. Use `NODE_ENV` to select the right file. Each environment should have a different `logLevel` and `databaseUrl`.
+
+3. **Feature flags system**: Implement a feature flags module. Some flags should be environment-based, others env-variable-based. Add a middleware that disables routes for disabled features, returning 404.

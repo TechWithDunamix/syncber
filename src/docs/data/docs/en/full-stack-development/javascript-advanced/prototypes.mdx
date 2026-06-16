@@ -1,0 +1,340 @@
+---
+title: "Prototypes & Inheritance"
+description: "JavaScript's prototype chain, __proto__ vs prototype, Object.create, constructor functions, prototypal vs classical inheritance patterns, and property lookup mechanics."
+sidebar:
+  order: 3
+  label: "Prototypes & Inheritance"
+tab: "full-stack-development"
+---
+
+JavaScript's inheritance system is **prototypal**, not classical. Instead of classes inheriting from other classes, **objects inherit from other objects** through a chain called the prototype chain.
+
+## The Prototype Chain
+
+Every JavaScript object has a hidden internal property called `[[Prototype]]` (accessible via `__proto__` in most environments, or `Object.getPrototypeOf()`). When you access a property on an object, JavaScript:
+
+1. Checks the object's **own properties**
+2. If not found, checks the object's `[[Prototype]]`
+3. If not found, checks the prototype's prototype
+4. Continues up the chain until it reaches `Object.prototype`
+5. If still not found, returns `undefined`
+
+```js
+const animal = {
+  eats: true,
+  walk() {
+    console.log("Animal walks");
+  }
+};
+
+const rabbit = {
+  jumps: true,
+  __proto__: animal // sets animal as rabbit's prototype
+};
+
+console.log(rabbit.jumps); // true — own property
+console.log(rabbit.eats);  // true — found on prototype (animal)
+rabbit.walk();             // "Animal walks" — found on prototype
+
+console.log(rabbit.toString()); // "[object Object]" — from Object.prototype
+```
+
+Visual representation:
+
+```
+rabbit → animal → Object.prototype → null
+         |          |                  |
+       jumps     eats             toString
+       jumps     walk             hasOwnProperty
+```
+
+### Setting Prototypes
+
+**Modern way** (ES6+):
+
+```js
+const parent = { inherited: true };
+const child = Object.create(parent);
+console.log(child.inherited); // true
+```
+
+**Legacy way** (avoid in production):
+
+```js
+child.__proto__ = parent;
+```
+
+**Best practice**:
+
+```js
+const child = {};
+Object.setPrototypeOf(child, parent);
+```
+
+## `__proto__` vs `prototype`
+
+This is the most confusing distinction in JavaScript:
+
+- **`__proto__`** — the actual prototype link of an **instance** (what the engine follows during property lookup)
+- **`prototype`** — a property on **constructor functions** (and classes) that gets assigned as the `__proto__` of new instances
+
+```js
+function Person(name) {
+  this.name = name;
+}
+
+// prototype property — only exists on constructor functions
+Person.prototype.sayName = function() {
+  console.log(this.name);
+};
+
+const alice = new Person("Alice");
+// alice.__proto__ === Person.prototype — this is how instances get methods
+alice.sayName(); // "Alice"
+```
+
+```
+Person.prototype → { sayName, constructor: Person }
+                      ↑ __proto__
+                      |
+                  alice (instance)
+```
+
+## Constructor Functions (Pre-ES6 Classes)
+
+Before ES6 classes, constructor functions were the standard way to create objects with shared methods:
+
+```js
+function User(name, role) {
+  // `this` is the new object created by `new`
+  this.name = name;
+  this.role = role;
+}
+
+// Methods go on the prototype — shared by all instances
+User.prototype.greet = function() {
+  return `Hi, I'm ${this.name} (${this.role})`;
+};
+
+User.prototype.isAdmin = function() {
+  return this.role === "admin";
+};
+
+const alice = new User("Alice", "admin");
+const bob = new User("Bob", "user");
+
+console.log(alice.greet());   // "Hi, I'm Alice (admin)"
+console.log(bob.isAdmin());   // false
+
+// Both share the same methods (memory efficient)
+console.log(alice.greet === bob.greet); // true
+```
+
+### What `new` Does
+
+When you call a function with `new`, JavaScript:
+
+1. Creates a brand-new empty object
+2. Sets the object's `__proto__` to the function's `prototype`
+3. Calls the function with `this` bound to the new object
+4. If the function doesn't return an object, returns the new object
+
+```js
+function Person(name) {
+  // 1. {} created (empty object)
+  // 2. {}.__proto__ = Person.prototype
+  // 3. this = {}
+  this.name = name; // adds property
+  // 4. implicit return of `this`
+}
+```
+
+### Constructor Best Practices
+
+```js
+// ✅ Capitalize constructor names
+function Car(make, model) { /* ... */ }
+
+// ✅ Methods on prototype, not in constructor
+Car.prototype.start = function() { /* ... */ };
+
+// ❌ Don't put methods inside the constructor (creates per-instance copies)
+function BadCar(make) {
+  this.start = function() { /* ... */ }; // new function for every instance
+}
+```
+
+## Prototypal Inheritance (Object to Object)
+
+You can create inheritance chains between objects directly:
+
+```js
+const user = {
+  login() { console.log(`${this.name} logged in`); },
+  logout() { console.log(`${this.name} logged out`); }
+};
+
+const admin = {
+  __proto__: user,
+  deleteUser(id) { console.log(`Deleted user ${id}`); }
+};
+
+const moderator = Object.create(user, {
+  banUser: { value: function(name) {
+    console.log(`Banned ${name}`);
+  }}
+});
+
+admin.login();      // from user prototype
+admin.deleteUser(5); // own method
+```
+
+## Classical vs Prototypal Inheritance
+
+| Classical | Prototypal |
+|-----------|------------|
+| Classes inherit from classes | Objects inherit from objects |
+| Rigid hierarchy | Flexible composition |
+| "Is-a" relationships | "Has-a" or "Is-a" |
+| `extends` keyword | `Object.create()` or `__proto__` |
+| Tight coupling | Loose coupling |
+
+JavaScript's prototypal model is more flexible. You can compose behaviour by mixing prototypes:
+
+```js
+const canEat = {
+  eat() { console.log("Eating"); }
+};
+
+const canWalk = {
+  walk() { console.log("Walking"); }
+};
+
+const canSwim = {
+  swim() { console.log("Swimming"); }
+};
+
+// Composition via prototype mixing
+function createDog(name) {
+  const dog = Object.create(canEat);
+  Object.assign(dog, canWalk);
+  dog.name = name;
+  return dog;
+}
+
+// Or use Object.assign on prototype
+function Animal() {}
+Object.assign(Animal.prototype, canEat, canWalk);
+```
+
+## Property Shadowing
+
+When an object has a property with the same name as one on its prototype, the **own property shadows** the prototype property:
+
+```js
+const parent = { value: 10 };
+const child = Object.create(parent);
+child.value = 20; // shadows parent.value
+
+console.log(child.value);  // 20 (own property)
+console.log(parent.value); // 10 (unaffected)
+
+// Access the prototype property directly
+console.log(Object.getPrototypeOf(child).value); // 10
+```
+
+**Setting** a property on an object never modifies the prototype — it always creates or updates the own property.
+
+## Checking Properties
+
+```js
+const parent = { inherited: true };
+const child = Object.create(parent);
+child.own = "yes";
+
+// Check own properties only
+console.log(child.hasOwnProperty("own"));       // true
+console.log(child.hasOwnProperty("inherited")); // false
+console.log(Object.hasOwn(child, "own"));       // true (ES2022)
+
+// Check entire prototype chain
+console.log("inherited" in child); // true
+console.log("toString" in child);  // true (from Object.prototype)
+```
+
+## Iterating Properties
+
+```js
+for (let key in child) {
+  console.log(key); // "own", "inherited" — includes prototype properties!
+}
+
+// To skip inherited properties:
+for (let key in child) {
+  if (child.hasOwnProperty(key)) {
+    console.log(key); // "own" only
+  }
+}
+
+// Object.keys/values/entries only include own enumerable properties
+console.log(Object.keys(child)); // ["own"]
+```
+
+## The `constructor` Property
+
+Every prototype automatically has a `constructor` property pointing back to the function:
+
+```js
+function Animal() {}
+console.log(Animal.prototype.constructor === Animal); // true
+
+const dog = new Animal();
+console.log(dog.constructor === Animal); // true
+```
+
+When you replace the prototype, you lose the constructor reference:
+
+```js
+function Rabbit() {}
+Rabbit.prototype = { jumps: true }; // constructor is lost!
+console.log(Rabbit.prototype.constructor === Rabbit); // false
+console.log(Rabbit.prototype.constructor === Object); // true
+
+// Fix: explicitly set constructor
+Rabbit.prototype = {
+  constructor: Rabbit,
+  jumps: true
+};
+```
+
+## Quick Reference
+
+| Method / Property | Purpose |
+|---|---|
+| `Object.create(proto)` | Create object with given `[[Prototype]]` |
+| `Object.getPrototypeOf(obj)` | Get an object's prototype (safe) |
+| `Object.setPrototypeOf(obj, proto)` | Set an object's prototype (slow, avoid) |
+| `obj.__proto__` | Legacy getter/setter for prototype |
+| `obj.hasOwnProperty(key)` | Check own property existence |
+| `Object.hasOwn(obj, key)` | Modern `hasOwnProperty` (ES2022) |
+| `key in obj` | Check property in prototype chain |
+| `fn.prototype` | Property on constructors, used by `new` |
+| `instanceof` | Check if prototype is in chain |
+
+## Practice Exercises
+
+1. **Create the chain**: Make `dog` inherit from `animal`, and both inherit from `Object.prototype`. Add a `speak()` method to `animal` that's shared by all instances.
+
+2. **`instanceof` check**: Given `function A() {}; function B() {}; B.prototype = Object.create(A.prototype); const b = new B();`, what does `b instanceof A` return?
+
+3. **Property lookup order**: Given this code, what does each log?
+   ```js
+   const a = { x: 1 };
+   const b = Object.create(a);
+   const c = Object.create(b);
+   c.x = 5;
+   console.log(c.x);
+   delete c.x;
+   console.log(c.x);
+   delete b.x; // wait, can you delete inherited properties?
+   ```
