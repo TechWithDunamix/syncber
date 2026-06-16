@@ -1,0 +1,89 @@
+---
+title: "Capstone Project"
+description: "Comprehensive security assessment — evaluate an organisation, identify gaps, produce a CISO-level security improvement plan."
+sidebar:
+  order: 2
+  label: "Capstone Project"
+tab: "cybersecurity"
+---
+
+## Scenario
+
+You are the newly hired CISO of **FinServ Inc.**, a mid-size financial services company with 1,200 employees, $500M in annual revenue, and 50,000 customers. The CEO has asked you to assess the company's security posture and produce a 90-day improvement plan.
+
+## Organisation Profile
+
+| Aspect | Current State |
+|--------|---------------|
+| **Workforce** | 1,200 employees (60% remote), 200 contractors |
+| **IT infrastructure** | 3,000 endpoints (Windows/Mac), 200 servers, hybrid cloud (AWS + on-prem) |
+| **Applications** | 50 SaaS apps, 15 internal apps, 2 customer-facing web apps |
+| **Data** | Customer PII (50,000 records), financial data, intellectual property |
+| **Regulatory** | Subject to SOX, GDPR (has EU customers), PCI DSS (processes credit cards) |
+| **Security team** | CISO (you), 2 SOC analysts (L1), 1 security engineer |
+| **Current tools** | Microsoft 365 E5, AWS native security tools, basic AV |
+| **Previous incidents** | 2 phishing-based account takeovers in the past year; 1 ransomware attempt (blocked by user reporting) |
+
+## Assessment Deliverables
+
+Using what you have learned across all 12 modules, produce:
+
+### 1. Executive Summary (1 page)
+- Current security maturity level
+- Top 3 risks to the business
+- 90-day improvement priorities
+
+### 2. Gap Analysis
+
+| Domain | Current State | Target State | Gap | Priority | Effort |
+|--------|---------------|-------------|-----|----------|--------|
+| **IAM** | No MFA on most apps; manual deprovisioning; shared admin accounts | MFA everywhere; automated JML; PAM for admins | Critical | P1 | 4 weeks |
+| **Endpoint** | Basic AV only; no EDR | EDR on all endpoints | Critical | P1 | 2 weeks |
+| **Network** | Flat network; no segmentation | Microsegmentation; DMZ; IDS/IPS | High | P2 | 8 weeks |
+| **Detection** | No SIEM; limited logging | SIEM with correlation rules; SOC L1/L2 | Critical | P1 | 6 weeks |
+| **Incident Response** | No IR plan; no playbooks | Documented IR plan with tested playbooks | High | P1 | 3 weeks |
+| **Vulnerability Mgmt** | No scanning | Weekly authenticated scanning; risk-based prioritisation | High | P2 | 4 weeks |
+| **Cloud** | No CSPM; loose IAM roles | CSPM scanning; least-privilege IAM | High | P2 | 4 weeks |
+| **Compliance** | No formal compliance program | SOC 2 Type II; PCI DSS v4.0 | Critical | P1 | 12 weeks |
+
+### 3. 90-Day Improvement Roadmap
+
+```
+Weeks 1-2: Quick Wins (minimal effort, maximum impact)
+  - Enable MFA on all external-facing apps (Azure AD Conditional Access)
+  - Deploy EDR (Microsoft Defender for Endpoint — already licensed)
+  - Disable 50+ stale accounts (manual cleanup + HR process)
+
+Weeks 3-6: Detection & Response
+  - Deploy SIEM (Microsoft Sentinel) and ingest all logs
+  - Build and test 3 incident response playbooks (phishing, ransomware, data breach)
+  - Implement automated account deprovisioning
+
+Weeks 7-12: Foundation
+  - Deploy vulnerability scanner (Tenable or Qualys)
+  - Implement PAM (Azure AD PIM for JIT admin access)
+  - Deploy CSPM (Microsoft Defender for Cloud)
+  - Begin SOC 2 readiness assessment
+```
+
+### 4. Budget Estimate
+
+| Item | Cost | One-time/Recurring |
+|------|------|-------------------|
+| EDR licensing (3,000 endpoints × $5/endpoint/month) | $15,000/month | Recurring |
+| SIEM (Microsoft Sentinel — 5 GB/day ingestion) | $2,500/month | Recurring |
+| Vulnerability scanner | $10,000/year | Recurring |
+| Penetration test (annual) | $50,000 | Annual |
+| SOC 2 readiness + audit | $80,000 | First year |
+| Additional headcount (2 L2 analysts) | $200,000/year | Recurring |
+| **Total Year 1** | **~$450,000** | |
+
+## Scoring Rubric
+
+| Criteria | Weight | Excellent (90-100%) | Good (70-89%) | Needs Improvement (&lt;70%) |
+|----------|--------|-------------------|---------------|------------------------|
+| Executive summary | 10% | Clear, actionable, business-focused | Understandable but lacks specifics | Vague, too technical |
+| Gap analysis | 30% | Comprehensive, prioritised, realistic | Covers major areas, some gaps missed | Superficial, missing critical domains |
+| 90-day roadmap | 30% | Realistic, phased, with clear ownership | Logical but lacks detail or phasing | Unrealistic timing or missing key steps |
+| Budget estimate | 15% | Realistic, justified, with options | Rough estimates, some items missing | No budget or clearly unrealistic |
+| Presentation | 15% | Professional, clear, CISO-ready | Good structure, some formatting issues | Unprofessional, hard to follow |

@@ -1,0 +1,47 @@
+---
+title: "Security Automation Flashcards"
+description: "Test your knowledge of SOAR, DevSecOps, SAST/DAST, SCA, secret scanning, and policy-as-code."
+sidebar:
+  order: 9
+  label: "Flashcards"
+tab: "cybersecurity"
+---
+
+Test your understanding of the Security Automation module. Click a card to flip it between question and answer. Use the arrows, keyboard (&larr; &rarr;), or swipe on mobile to move through the deck.
+
+<FlashCardDeck>
+  <FlashCard question="What does SOAR stand for?" answer="Security Orchestration, Automation, and Response." />
+  <FlashCard question="What are the five core capabilities of a SOAR platform?" answer="Threat Intelligence ingestion, Incident Management, Orchestration (tool APIs), Automation (playbooks), Case Management (collaboration)." />
+  <FlashCard question="What is a SOAR playbook?" answer="An automated workflow defining trigger conditions, decision steps, and response actions — executed automatically or manually approved." />
+  <FlashCard question="By what percentage can SOAR reduce SOC alert volume?" answer="Up to 60% — automated triage handles routine alerts without analyst involvement." />
+  <FlashCard question="What is shift-left security?" answer="Integrating security testing earlier in the development lifecycle — finding vulnerabilities before they reach production." />
+  <FlashCard question="What are the six stages of a DevSecOps pipeline?" answer="Commit → SAST → SCA → Build → Container Scan → Deploy → DAST → Compliance Check." />
+  <FlashCard question="What is an SBOM?" answer="Software Bill of Materials — a machine-readable inventory of all components and dependencies in a software application." />
+  <FlashCard question="What does SAST stand for?" answer="Static Application Security Testing — scanning source code for vulnerabilities without executing it." />
+  <FlashCard question="What does DAST stand for?" answer="Dynamic Application Security Testing — scanning running applications for vulnerabilities." />
+  <FlashCard question="What is the key weakness of SAST?" answer="False positives — SAST can flag code paths that are not actually exploitable in the runtime context." />
+  <FlashCard question="What is the key weakness of DAST?" answer="Limited coverage — DAST can only find issues in code paths that are actually executed during scanning." />
+  <FlashCard question="What does SCA stand for?" answer="Software Composition Analysis — scanning open source dependencies for known vulnerabilities." />
+  <FlashCard question="What is a Semgrep rule?" answer="A pattern-based static analysis rule that matches code patterns to find security vulnerabilities." />
+  <FlashCard question="What does OPA stand for?" answer="Open Policy Agent — an open-source policy engine for cloud-native environments." />
+  <FlashCard question="What language does OPA use for writing policies?" answer="Rego — a declarative policy language designed for cloud-native environments." />
+  <FlashCard question="What is Checkov?" answer="An IaC security scanner that checks Terraform, CloudFormation, and Kubernetes configurations for misconfigurations." />
+  <FlashCard question="What is GitGuardian used for?" answer="Secret scanning — detecting API keys, passwords, tokens, and other credentials committed to code repositories." />
+  <FlashCard question="What does trufflehog scan for?" answer="Secrets in git repositories, including historical commits and branches." />
+  <FlashCard question="What is a security gate in CI/CD?" answer="A decision point in the pipeline that blocks or allows deployment based on security scan results." />
+  <FlashCard question="What severity levels should block a CI/CD pipeline?" answer="Critical and High findings should block; Medium and Low should warn." />
+  <FlashCard question="What is OWASP ZAP?" answer="Zed Attack Proxy — an open-source DAST tool for finding vulnerabilities in web applications." />
+  <FlashCard question="What is Snyk?" answer="A developer security platform for SCA, SAST, and container scanning — integrates into CI/CD pipelines." />
+  <FlashCard question="What is Dependabot?" answer="A GitHub-native dependency update tool that automatically creates PRs when vulnerable dependencies are detected." />
+  <FlashCard question="What is Gitleaks?" answer="An open-source secret scanning tool for git repositories." />
+  <FlashCard question="What is the SolarWinds supply chain attack?" answer="Attackers compromised the SolarWinds Orion build pipeline and injected a backdoor into software updates, affecting 18,000+ customers." />
+  <FlashCard question="What is the purpose of a SAST false positive?" answer="A flagged vulnerability that is not actually exploitable — SAST tools sacrifice precision for coverage." />
+  <FlashCard question="What command runs a Semgrep scan with community rules?" answer="semgrep --config=auto src/ — runs auto-detected community rules against the src/ directory." />
+  <FlashCard question="What command generates an SBOM using CycloneDX?" answer="cyclonedx-bom -o bom.xml — generates a standardised SBOM in CycloneDX format." />
+  <FlashCard question="What does the OPA deny keyword represent?" answer="A policy violation — any rule named deny that evaluates to true generates a denial message." />
+  <FlashCard question="What is branch protection in GitHub?" answer="A repository setting that enforces rules before merging — required reviews, status checks, signed commits." />
+</FlashCardDeck>
+
+<Aside variant="tip">
+Review any cards you got wrong by navigating to the corresponding module page for a deeper explanation.
+</Aside>

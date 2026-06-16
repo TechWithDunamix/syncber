@@ -1,0 +1,253 @@
+---
+title: "SOC Operations"
+description: "Security Operations Center structure, tiered analyst model, shift handover, KPIs, tooling, and building a SOC from scratch."
+sidebar:
+  order: 3
+  label: "SOC Operations"
+tab: "cybersecurity"
+---
+
+A Security Operations Center (SOC) is a centralised team that monitors, detects, analyses, and responds to security incidents. Building and operating a SOC requires structured processes, the right tooling, and skilled analysts.
+
+## SOC Models
+
+| Model | Description | Best For | Example |
+|-------|-------------|----------|---------|
+| **Internal SOC** | Fully in-house team | Large enterprises, critical infra | Bank, government |
+| **MSSP** | Managed Security Service Provider | SMB, no in-house expertise | Small retailer |
+| **Hybrid** | Internal + MSSP co-managed | Mid-size, growing | Tech startup |
+| **Virtual SOC** | Distributed team, remote | Global organisations | SaaS company |
+| **Co-Managed** | MSSP handles Tier 1, internal handles Tier 2-3 | Any size | Regional hospital |
+
+### Staffing Models
+
+```yaml
+24/7 SOC Staffing (Follow-the-Sun):
+  └─ Americas: 8 AM - 6 PM ET (onsite)
+  └─ EMEA: 8 AM - 6 PM CET (onsite)
+  └─ APAC: 8 AM - 6 PM SGT (onsite)
+  └─ Handover between shifts overlaps by 30 minutes
+
+Staffing Ratios:
+  └─ 24/7 SOC: 5-6 analysts per seat (to cover shifts + PTO + sick)
+  └─ Business hours SOC: 1.5 analysts per seat
+  └─ Recommended: 1 analyst per 1,000 EPS (events per second)
+  └─ Minimum viable 24/7 SOC: 8-10 analysts total
+
+Tier Distribution:
+  └─ Tier 1: 50% of team (monitor, triage)
+  └─ Tier 2: 30% of team (investigate, contain)
+  └─ Tier 3: 20% of team (hunt, forensics, advanced analysis)
+```
+
+## SOC Tier Structure
+
+### Tier 1 — Triage (Monitor & Alert)
+
+```yaml
+Role: SOC Analyst L1
+Experience: 0-2 years
+Key Skills: SIEM navigation, alert triage, basic investigation
+Certifications: Security+, GSEC, or equivalent
+
+Responsibilities:
+  └─ Monitor SIEM dashboards continuously
+  └─ Acknowledge and triage alerts within 15 minutes
+  └─ Classify alerts: True Positive, False Positive, Benign
+  └─ Document findings in ticketing system
+  └─ Escalate confirmed incidents to Tier 2
+  └─ Update alert documentation and runbooks
+
+Metrics:
+  └─ Time to acknowledge: < 15 minutes (target: < 5 minutes)
+  └─ Time to triage: < 30 minutes
+  └─ False positive identification rate: > 90%
+  └─ Alerts processed per shift: 50-200 (varies by environment)
+```
+
+### Tier 2 — Investigation (Analyse & Contain)
+
+```yaml
+Role: SOC Analyst L2
+Experience: 2-5 years
+Key Skills: Forensic analysis, malware analysis, network forensics, cloud forensics
+Certifications: CISSP, GCIH, GCFA, or equivalent
+
+Responsibilities:
+  └─ Investigate escalated incidents in depth
+  └─ Perform containment actions (block IP, quarantine host, disable account)
+  └─ Determine scope of compromise
+  └─ Gather forensic evidence for legal proceedings
+  └─ Write incident reports
+  └─ Update detection rules based on investigation findings
+
+Metrics:
+  └─ Time to investigate: < 4 hours (standard), < 1 hour (critical)
+  └─ Containment time: < 2 hours
+  └─ Investigation completion rate: > 95%
+  └─ Quality score (peer review): > 90%
+```
+
+### Tier 3 — Advanced (Hunt & Forensics)
+
+```yaml
+Role: SOC Analyst L3 / Threat Hunter
+Experience: 5+ years
+Key Skills: Advanced forensics, malware reverse engineering, threat intelligence, scripting
+Certifications: GREM, GXPN, OSCP, or equivalent
+
+Responsibilities:
+  └─ Proactive threat hunting (not waiting for alerts)
+  └─ Malware reverse engineering
+  └─ Advanced forensic analysis (memory, disk, network)
+  └─ Detection engineering (create new correlation rules)
+  └─ Threat intelligence integration
+  └─ Mentor L1/L2 analysts
+  └─ Post-incident root cause analysis
+
+Metrics:
+  └─ Hypotheses tested per week: 5-10
+  └─ New detection rules created: 2-5 per month
+  └─ Time to root cause: < 1 week
+  └─ Mentor sessions: 2+ per week
+```
+
+## SOC Processes
+
+### Shift Handover
+
+```yaml
+Mandatory Handover Items:
+  └─ Active incidents (status, next steps, pending actions)
+  └─ Open investigations (findings, leads)
+  └─ Ongoing maintenance (updates, patching, testing)
+  └─ New threat intel received during shift
+  └─ SIEM health issues (data source outages, high latency)
+  └─ Scheduled activities for next shift (pen tests, maintenance windows)
+  └─ Escalation contacts on-call
+
+Handover Format:
+  └─ Time: 30-minute overlap minimum
+  └─ Written: Handover document in ticketing system
+  └─ Verbal: Walk-through of active incidents
+  └─ Confirmation: Both shifts sign off on handover
+```
+
+### Escalation Matrix
+
+```yaml
+Alert Severity → Escalation Path:
+
+P1 (Critical — active breach):
+  └─ 0 min: SIEM alert fires
+  └─ 5 min: Tier 1 acknowledges
+  └─ 15 min: Tier 2 engaged
+  └─ 30 min: Incident Commander assigned
+  └─ 60 min: CISO notified
+  └─ 4 hours: Legal / PR notified (if data breach)
+  └─ 24 hours: Board notified (if material)
+
+P2 (High — suspicious activity):
+  └─ 0 min: Alert fires
+  └─ 15 min: Tier 1 acknowledges
+  └─ 1 hour: Tier 2 investigates (if not resolved by Tier 1)
+  └─ 4 hours: Incident determined yes/no
+
+P3 (Medium — policy violation):
+  └─ 0 min: Alert fires
+  └─ 1 hour: Tier 1 acknowledges
+  └─ 8 hours: Investigation complete
+
+P4 (Low — informational):
+  └─ Next business day: Review and disposition
+```
+
+## SOC Tooling
+
+```yaml
+Essential SOC Tools:
+
+SIEM: Splunk, Elastic Security, Azure Sentinel, QRadar
+  └─ Log aggregation, correlation, alerting
+  
+EDR: CrowdStrike, SentinelOne, Defender for Endpoint
+  └─ Endpoint detection, process telemetry, remote containment
+
+Ticketing: ServiceNow, Jira Service Management
+  └─ Incident tracking, workflow, SLA management
+
+Threat Intel: MISP, Recorded Future, VirusTotal
+  └─ IOC feeds, enrichment, threat scoring
+
+SOAR: Splunk SOAR, Palo Alto XSOAR, Torq
+  └─ Playbook automation, orchestration
+
+Forensics: FTK Imager, Volatility, Autopsy
+  └─ Disk/memory acquisition, analysis
+
+Network: Wireshark, Zeek, Suricata
+  └─ Packet capture, protocol analysis, IDS
+
+Collaboration: Slack/Teams, Confluence
+  └─ Communication, documentation
+```
+
+## SOC Metrics (KPIs)
+
+| KPI | Formula | Target | Reports To |
+|-----|---------|--------|------------|
+| **MTTD** (Mean Time to Detect) | Time from compromise to detection | < 1 hour (critical), < 24 hours (standard) | CISO |
+| **MTTR** (Mean Time to Respond) | Time from detection to containment | < 2 hours (critical), < 8 hours (standard) | SOC Manager |
+| **Alert Volume** | Total alerts received per day | N/A (track trend) | SOC Manager |
+| **False Positive Rate** | False positives / Total alerts | < 30% | Detection Engineering |
+| **Escalation Rate** | Escalated to Tier 2 / Total alerts | 10-20% | SOC Manager |
+| **Time to Triage** | Average time for Tier 1 triage | < 15 minutes | Team Lead |
+| **SIEM Coverage** | Critical sources sending logs / Total critical sources | > 95% | SIEM Admin |
+| **Analyst Satisfaction** | Survey score | > 4/5 | HR / SOC Manager |
+
+## Building a SOC: Timeline
+
+```yaml
+Month 1-2 — Foundation:
+  └─ Define SOC scope (what systems, what threats)
+  └─ Hire SOC manager
+  └─ Select SIEM platform
+  └─ Define initial use cases (top 10 detection rules)
+
+Month 3-4 — Build:
+  └─ Deploy SIEM
+  └─ Onboard critical log sources (firewall, AD, EDR, cloud)
+  └─ Hire Tier 1 analysts
+  └─ Create initial runbooks
+
+Month 5-6 — Operate:
+  └─ Go live with Tier 1 (monitoring hours)
+  └─ Tune rules based on real data
+  └─ Establish shift schedule
+  └─ Create escalation procedures
+
+Month 7-9 — Expand:
+  └─ Hire Tier 2 analysts
+  └─ Onboard additional log sources
+  └─ Implement SOAR for common playbooks
+  └─ Extend to 24/7 if required
+
+Month 10-12 — Mature:
+  └─ Hire Tier 3 (threat hunting)
+  └─ Implement UEBA
+  └─ Tabletop exercises
+  └─ External audit
+```
+
+## Key Takeaways
+
+- SOC tiers separate monitoring (T1) from investigation (T2) from hunting (T3) — each requires different skills and experience levels
+- A 24/7 SOC requires 5-6 analysts per seat for complete coverage — plan staffing accordingly
+- Shift handover is the most critical process — a 30-minute overlap with written + verbal handover prevents incidents from falling through the cracks
+- Escalation paths must be time-bound: P1 = 5min acknowledge, 15min T2, 30min incident commander, 60min CISO
+- MTTD and MTTR are the most important SOC metrics — measure, trend, and improve them
+- Alert volume without tuning destroys SOC effectiveness — a well-tuned SIEM generates fewer but higher-quality alerts
+- Building a SOC takes 12+ months — start with monitoring critical sources, then expand coverage, then add hunting
+- Tooling is secondary to process — a SOC with great tools but no process will fail; a SOC with good process and basic tools will succeed
+- MSSP/co-managed models provide SOC capabilities without full in-house buildout — suitable for many organisations
+- Burnout is high in SOC roles (2-3 year average) — rotation, training, and career paths are essential for retention

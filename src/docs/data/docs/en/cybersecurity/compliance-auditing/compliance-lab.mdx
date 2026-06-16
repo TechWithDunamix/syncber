@@ -1,0 +1,64 @@
+---
+title: "Compliance Lab"
+description: "Hands-on: map security controls to a framework, collect audit evidence, calculate compliance score."
+sidebar:
+  order: 97
+  label: "Compliance Lab"
+tab: "cybersecurity"
+---
+
+## Objective
+
+Map security controls to a compliance framework, collect evidence, and produce a compliance report.
+
+## Step 1: Select a Framework
+
+Choose one: **SOC 2** (Security criteria) or **PCI DSS v4.0** (Requirements 1-4) or **ISO 27001** (Annex A domains).
+
+## Step 2: Map Controls
+
+Take your existing security controls and map them to framework requirements:
+
+| Framework Requirement | Your Control | Evidence | Status |
+|----------------------|-------------|----------|--------|
+| SOC 2: Logical Access | Azure AD with MFA, PIM for admin roles | Access review report, MFA config | Compliant |
+| SOC 2: Encryption at Rest | AWS KMS with AES-256, S3 default encryption | KMS key config, S3 encryption check | Compliant |
+| SOC 2: Change Management | CI/CD pipeline with code review + approval | Pipeline config, sample PR with approvals | Compliant |
+
+## Step 3: Collect Evidence
+
+```bash
+# Evidence collection for SOC 2 Security
+mkdir -p evidence/{iam,encryption,logging,change-mgmt}
+
+# IAM evidence
+aws iam list-users > evidence/iam/users.json
+aws iam list-roles > evidence/iam/roles.json
+
+# Encryption evidence  
+aws ec2 describe-volumes --query 'Volumes[?Encrypted==`false`]' > evidence/encryption/unencrypted-volumes.json
+
+# Access key age
+aws iam list-access-keys --user-name admin > evidence/iam/access-keys.json
+```
+
+## Step 4: Calculate Compliance Score
+
+```
+Total controls in scope:    45
+Passing controls:           42
+Failing controls:            3
+Not applicable:              0
+
+Compliance score:           (42/45) = 93.3%
+
+Failing findings:
+1. Access keys > 90 days old on backup-admin account
+2. No MFA on 3 legacy service accounts
+3. 1 S3 bucket missing default encryption
+```
+
+## Deliverables
+1. Completed control mapping spreadsheet
+2. Evidence collection directory with at least 5 evidence files
+3. Compliance score report with remediation plan

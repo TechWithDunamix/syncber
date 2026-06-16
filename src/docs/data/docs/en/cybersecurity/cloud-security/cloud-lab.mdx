@@ -1,0 +1,362 @@
+---
+title: "Cloud Security Lab"
+description: "Hands-on exercises: AWS IAM least privilege, S3 security audit, GuardDuty analysis, Azure Conditional Access, Terraform IaC compliance, and cloud incident response."
+sidebar:
+  order: 7
+  label: "Cloud Security Lab"
+tab: "cybersecurity"
+---
+
+This lab provides hands-on experience with cloud security across AWS, Azure, and GCP.
+
+## Prerequisites
+
+```bash
+# AWS CLI
+pip install awscli
+aws configure
+
+# Azure CLI
+curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+az login
+
+# GCP CLI (gcloud)
+curl https://sdk.cloud.google.com | bash
+gcloud init
+
+# Terraform
+sudo apt install -y terraform
+
+# Tools
+pip install scoutsuite cloudsploit pacu
+```
+
+## Exercise 1: AWS IAM Least Privilege Audit
+
+### Objective
+Audit IAM policies for over-permissive access and remediate.
+
+```bash
+# 1. Find users with excessive permissions
+echo "=== Users with AdministratorAccess ==="
+aws iam list-attached-user-policies | jq -r '.AttachedPolicies[] | select(.PolicyName == "AdministratorAccess")'
+aws iam list-users | jq -r '.Users[].UserName' | while read user; do
+  policies=$(aws iam list-attached-user-policies --user-name $user 2>/dev/null)
+  inline=$(aws iam list-user-policies --user-name $user 2>/dev/null)
+  if echo "$policies" | grep -q "AdministratorAccess" || echo "$inline" | grep -q "Admin"; then
+    echo "⚠ $user has admin access"
+  fi
+done
+
+# 2. Find IAM roles with trust policies that allow any principal
+echo ""
+echo "=== Roles with wildcard trust policies ==="
+aws iam list-roles | jq -r '.Roles[].RoleName' | while read role; do
+  trust=$(aws iam get-role --role-name $role --query 'Role.AssumeRolePolicyDocument')
+  if echo "$trust" | grep -q '"AWS":\s*"*"'; then
+    echo "⚠ $role trusts ANY AWS account (potential privilege escalation)"
+  fi
+done
+
+# 3. Check for unused IAM credentials
+echo ""
+echo "=== Users with unused access keys ==="
+aws iam list-users | jq -r '.Users[].UserName' | while read user; do
+  keys=$(aws iam list-access-keys --user-name $user 2>/dev/null)
+  echo "$keys" | jq -r '.AccessKeyMetadata[] | select(.Status == "Active") | .AccessKeyId' | while read key; do
+    last_used=$(aws iam get-access-key-last-used --access-key-id $key | jq -r '.AccessKeyLastUsed.LastUsedDate // "never"')
+    echo "$user ($key): last used $last_used"
+  done
+done
+
+# 4. Generate IAM credential report
+aws iam generate-credential-report
+aws iam get-credential-report --output text --query Content | base64 -d | head -20
+```
+
+### Deliverable
+1. List of users/groups with admin access (and whether justified)
+2. Wide-open trust policies identified
+3. Unused or old access keys (90+ days)
+4. Remediation plan for each finding
+
+---
+
+## Exercise 2: S3 Security Audit
+
+### Objective
+Find and fix S3 bucket misconfigurations.
+
+```bash
+# 1. Find publicly accessible buckets
+echo "=== Public S3 Buckets ==="
+aws s3api list-buckets | jq -r '.Buckets[].Name' | while read bucket; do
+  acl=$(aws s3api get-bucket-acl --bucket $bucket 2>/dev/null)
+  policy=$(aws s3api get-bucket-policy --bucket $bucket 2>/dev/null)
+  
+  if echo "$acl" | grep -q "AllUsers\|AuthenticatedUsers"; then
+    echo "⚠ PUBLIC ACL: $bucket"
+  fi
+  if echo "$policy" | grep -q '"Effect":"Allow".*"Principal":"\*"'; then
+    echo "⚠ PUBLIC POLICY: $bucket"
+  fi
+done
+
+# 2. Check encryption status
+echo ""
+echo "=== S3 Bucket Encryption ==="
+aws s3api list-buckets | jq -r '.Buckets[].Name' | while read bucket; do
+  enc=$(aws s3api get-bucket-encryption --bucket $bucket 2>&1)
+  if echo "$enc" | grep -q "ServerSideEncryptionConfigurationNotFoundError"; then
+    echo "⚠ NO ENCRYPTION: $bucket"
+  fi
+done
+
+# 3. Check versioning
+echo ""
+echo "=== S3 Versioning Status ==="
+aws s3api list-buckets | jq -r '.Buckets[].Name' | while read bucket; do
+  versioning=$(aws s3api get-bucket-versioning --bucket $bucket | jq -r '.Status // "Disabled"')
+  echo "$bucket: $versioning"
+done
+
+# 4. Enable security features on a bucket
+aws s3api put-public-access-block \
+  --bucket my-company-data \
+  --public-access-block-configuration \
+    BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+
+aws s3api put-bucket-encryption \
+  --bucket my-company-data \
+  --server-side-encryption-configuration \
+    '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
+
+aws s3api put-bucket-versioning \
+  --bucket my-company-data \
+  --versioning-configuration Status=Enabled
+```
+
+### Deliverable
+1. List of all buckets with public access status
+2. Unencrypted buckets identified
+3. Versioning status for critical buckets
+4. Automated fix script applied to at least one bucket
+
+---
+
+## Exercise 3: GuardDuty Analysis
+
+### Objective
+Review GuardDuty findings and set up automated response.
+
+```bash
+# 1. List GuardDuty findings
+echo "=== GuardDuty Findings ==="
+aws guardduty list-detectors | jq -r '.DetectorIds[]' | while read detector; do
+  aws guardduty list-findings --detector-id $detector \
+    --query 'FindingIds[0:10]' | jq -r '.[]' | while read finding; do
+    aws guardduty get-findings --detector-id $detector \
+      --finding-ids $finding | jq -r '.Findings[] | {
+        type: .Type,
+        severity: .Severity,
+        description: .Description,
+        region: .Region
+      }'
+  done
+done
+
+# 2. Create automated response (EventBridge → Lambda)
+cat > guardduty_auto_response.py << 'PYEOF'
+import boto3
+import json
+
+def lambda_handler(event, context):
+    detail = event['detail']
+    finding_type = detail['type']
+    resource = detail.get('resource', {})
+    
+    if 'UnauthorizedAccess' in finding_type:
+        # Block the offending IP via NACL
+        ec2 = boto3.client('ec2')
+        ip = resource.get('networkInterface', {}).get('publicIp')
+        if ip:
+            ec2.create_network_acl_entry(
+                NetworkAclId='acl-12345',
+                RuleNumber=500,
+                Protocol='-1',
+                PortRange={'From': 0, 'To': 65535},
+                CidrBlock=f'{ip}/32',
+                RuleAction='deny',
+                Egress=False
+            )
+            print(f"Blocked IP {ip} via NACL")
+    
+    return {"status": "remediated", "finding": finding_type}
+PYEOF
+```
+
+### Deliverable
+1. GuardDuty findings summary (types, severities, counts)
+2. Automated response Lambda function code
+3. EventBridge rule configuration
+
+---
+
+## Exercise 4: Azure Conditional Access
+
+### Objective
+Create and test Conditional Access policies.
+
+```powershell
+# 1. List existing policies
+Connect-MgGraph -Scopes "Policy.Read.All"
+Get-MgIdentityConditionalAccessPolicy | Select-Object DisplayName, State
+
+# 2. Create MFA policy for all users
+$body = @{
+    displayName = "Require MFA for All Users"
+    state = "enabled"
+    conditions = @{
+        users = @{ includeUsers = @("All") }
+        applications = @{ includeApplications = @("All") }
+        clientAppTypes = @("all")
+    }
+    grantControls = @{
+        builtInControls = @("mfa")
+        operator = "OR"
+    }
+} | ConvertTo-Json
+
+Invoke-MgGraphRequest -Method POST `
+    -Uri "https://graph.microsoft.com/v1.0/identity/conditionalAccess/policies" `
+    -Body $body -ContentType "application/json"
+
+# 3. Create risk-based policy (requires Azure AD Premium P2)
+$riskBody = @{
+    displayName = "Block High Risk Sign-ins"
+    state = "enabled"
+    conditions = @{
+        users = @{ includeUsers = @("All") }
+        signInRiskLevels = @("high")
+    }
+    grantControls = @{
+        builtInControls = @("block")
+        operator = "OR"
+    }
+} | ConvertTo-Json
+
+# 4. Test what-if analysis
+$testBody = @{
+    signInEvent = @{
+        userId = "user@company.com"
+        appId = "00000003-0000-0000-c000-000000000000"  # Graph API
+        ipAddress = "203.0.113.42"
+        country = "RU"
+    }
+} | ConvertTo-Json
+
+Invoke-MgGraphRequest -Method POST `
+    -Uri "https://graph.microsoft.com/v1.0/identity/conditionalAccess/evaluate" `
+    -Body $testBody
+```
+
+### Deliverable
+1. Two Conditional Access policies: MFA for all + risk-based blocking
+2. Policy test results for different scenarios
+3. Documented policy enforcement effects
+
+---
+
+## Exercise 5: Terraform Compliance Automation
+
+### Objective
+Write Terraform with compliance validation.
+
+```hcl
+# main.tf
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+  required_version = ">= 1.0"
+}
+
+provider "aws" {
+  region = var.region
+}
+
+# S3 bucket with compliance requirements enforced
+resource "aws_s3_bucket" "compliance_bucket" {
+  bucket = "company-compliance-data"
+  
+  # Required: encryption
+  server_side_encryption_configuration {
+    rule {
+      apply_server_side_encryption_by_default {
+        sse_algorithm = "AES256"
+      }
+    }
+  }
+  
+  # Required: versioning
+  versioning {
+    enabled = true
+  }
+  
+  tags = {
+    Environment = var.environment
+    Compliance  = "pci"
+    DataClass   = "restricted"
+  }
+}
+
+# Block public access
+resource "aws_s3_bucket_public_access_block" "compliance_block" {
+  bucket = aws_s3_bucket.compliance_bucket.id
+  
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# Variables
+variable "region" {
+  description = "AWS region"
+  type        = string
+  default     = "us-east-1"
+}
+
+variable "environment" {
+  description = "Environment name"
+  type        = string
+  validation {
+    condition     = contains(["dev", "staging", "production"], var.environment)
+    error_message = "Environment must be dev, staging, or production."
+  }
+}
+
+# Outputs
+output "bucket_arn" {
+  value = aws_s3_bucket.compliance_bucket.arn
+}
+```
+
+### Deliverable
+1. Terraform configuration with compliance controls enforced
+2. Successful `terraform plan` and `terraform apply`
+3. Validation that encryption, versioning, and public access block are set
+
+---
+
+## Lab Completion Checklist
+
+- [ ] Exercise 1: IAM least privilege audit with remediation plan
+- [ ] Exercise 2: S3 security audit with fixes applied
+- [ ] Exercise 3: GuardDuty analysis and automated response Lambda
+- [ ] Exercise 4: Azure Conditional Access policies created and tested
+- [ ] Exercise 5: Terraform compliance configuration validated
+- [ ] All findings documented with commands, outputs, and analysis

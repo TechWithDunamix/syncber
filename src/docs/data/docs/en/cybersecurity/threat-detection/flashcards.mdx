@@ -1,0 +1,89 @@
+---
+title: "Module 4: Threat Detection — Flashcards"
+description: "Review cards for SIEM, SOC operations, threat hunting, detection engineering, log management, and threat intelligence."
+sidebar:
+  order: 9
+  label: "Flashcards"
+tab: "cybersecurity"
+---
+
+## SIEM
+
+**Q: What are the core capabilities of a SIEM?**
+A: Log collection, normalisation, correlation, alerting, dashboards, reporting, retention, and threat intelligence enrichment.
+
+**Q: What was the SIEM failure in the Target 2013 breach?**
+A: FireEye detected the malware in September 2013 but SOC analysts dismissed the alerts. No escalation path existed for unacknowledged alerts. No SIEM correlation linked FireEye alerts to other events.
+
+**Q: What is the difference between rule-based correlation and UEBA?**
+A: Rule-based uses static rules ("if X then Y") to detect known attacks. UEBA uses ML/statistical baselines to detect unknown attacks and insider threats. Best practice: use both.
+
+**Q: What is alert fatigue and how do you fix it?**
+A: When analysts receive too many alerts and begin ignoring them. Fix: tune ruthlessly, target < 500 alerts/day per team, automate response for well-understood alerts.
+
+**Q: What is EPS and why does it matter?**
+A: Events Per Second — measures SIEM throughput. 1 analyst per 1,000 EPS is a rough staffing guideline. EPS determines SIEM licensing cost (most SIEMs license by EPS).
+
+## SOC Operations
+
+**Q: What are the three tiers in a SOC?**
+A: Tier 1 (Triage) — monitor and acknowledge alerts. Tier 2 (Investigation) — analyse and contain incidents. Tier 3 (Advanced/Hunting) — threat hunt, forensics, detection engineering.
+
+**Q: What is the minimum staffing for a 24/7 SOC?**
+A: 5-6 analysts per seat for complete coverage (shifts, PTO, sick). Minimum viable 24/7 SOC: 8-10 analysts total.
+
+**Q: What is the escalation time for a P1 (critical) incident?**
+A: 0 min alert fires → 5 min Tier 1 acknowledges → 15 min Tier 2 engaged → 30 min Incident Commander → 60 min CISO notified.
+
+**Q: What are MTTD and MTTR?**
+A: Mean Time to Detect (compromise → detection) and Mean Time to Respond (detection → containment). Target: MTTD < 1 hour critical, MTTR < 2 hours critical.
+
+## Threat Hunting
+
+**Q: What is threat hunting and how is it different from incident response?**
+A: Hunting proactively searches for threats that evaded automated detection. IR reacts to alerts. Hunting starts with a hypothesis; IR starts with an alert.
+
+**Q: What is the Pyramid of Pain?**
+A: Hierarchy of IOCs by difficulty for attacker to change: Hashes (trivial) → IPs/Domains (easy) → Network/Host Artifacts → Tools → TTPs (hardest). Hunt at the top of the pyramid.
+
+**Q: What are the 4 steps of the hunting process?**
+A: 1) Form hypothesis (from threat intel, ATT&CK, internal intel), 2) Collect and analyse data, 3) Investigate findings, 4) Operationalise (create detection rule).
+
+**Q: What is the Hunting Maturity Model?**
+A: Level 0 (fully reactive) → Level 1 (ad-hoc) → Level 2 (procedural) → Level 3 (innovative, ML) → Level 4 (automated at scale).
+
+## Detection Engineering
+
+**Q: What is Sigma?**
+A: Generic, open-source signature format for log events. Write once, convert to any SIEM (Splunk, ELK, Sentinel, QRadar). Enables detection-as-code with version control and CI/CD.
+
+**Q: What are the phases of the detection lifecycle?**
+A: Intelligence input → Design → Implement → Test → Deploy → Tune → Review → Repeat.
+
+**Q: What false positive rate should a mature detection program target?**
+A: < 30% false positive rate (meaning > 70% of alerts are actionable). Rules with zero true positives in 90 days should be reviewed for removal.
+
+## Log Management
+
+**Q: What is a hot/warm/cold tiered retention strategy?**
+A: Hot (30-90 days, fast storage, full indexing), Warm (6-12 months, standard storage, reduced indexing), Cold (1-7+ years, archive storage, must restore to search).
+
+**Q: How much log volume does a 500-user organisation generate?**
+A: ~155 GB/day (workstations 25GB + servers 10GB + firewalls 4GB + cloud 6GB + EDR 110GB). ~4.6 TB/month.
+
+**Q: How do you protect logs from tampering?**
+A: Forward immediately to central SIEM, use append-only/immutable storage, chain hashing (each log includes hash of previous), separate admin access for SIEM.
+
+## Threat Intelligence
+
+**Q: What are the 6 phases of the intelligence lifecycle?**
+A: Requirements → Collection → Processing → Analysis → Dissemination → Feedback.
+
+**Q: What are the three levels of intelligence products?**
+A: Strategic (board/CISO, monthly), Operational (SOC manager, weekly), Tactical (analysts, daily).
+
+**Q: What is the Cyber Kill Chain?**
+A: Lockheed Martin's 7-stage attack model: Reconnaissance → Weaponisation → Delivery → Exploitation → Installation → C2 → Actions on Objectives.
+
+**Q: What is MITRE ATT&CK?**
+A: Industry standard framework categorising adversary TTPs (Tactics, Techniques, Procedures). Map detection rules to ATT&CK techniques to identify coverage gaps.

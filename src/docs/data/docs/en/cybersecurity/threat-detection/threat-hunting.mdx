@@ -1,0 +1,308 @@
+---
+title: "Threat Hunting"
+description: "Proactive threat hunting methodology, hypotheses generation, Pyramid of Pain, hunting techniques across endpoints/network/cloud, and real hunt case studies."
+sidebar:
+  order: 4
+  label: "Threat Hunting"
+tab: "cybersecurity"
+---
+
+Threat hunting is the proactive search for threats that have evaded existing security controls. Unlike incident response (which reacts to alerts), hunting actively looks for signs of compromise that no automated rule detected.
+
+## Reactive vs. Proactive Security
+
+```yaml
+Reactive Security (SIEM-driven):
+  └─ "The SIEM alerted us" (wait for rule to trigger)
+  └─ Relies on known attack patterns
+  └─ Misses zero-days, novel techniques
+  └─ Attacker has initiative
+
+Proactive Security (Hunting):
+  └─ "We looked for this and found it" (active search)
+  └─ Based on hypotheses, not rules
+  └─ Finds what automated detection misses
+  └─ Defender has initiative
+
+The Hunting Maturity Model:
+  Level 0 — Initial: Relies solely on automated alerts
+  Level 1 — Minimal: Some ad-hoc hunting, no methodology
+  Level 2 — Procedural: Documented hunting process, regular schedules
+  Level 3 — Innovative: Data-driven, analytics, ML-assisted
+  Level 4 — Leading: Automated hunting at scale, predictive
+```
+
+## The Hunting Process
+
+### Step 1: Form a Hypothesis
+
+Hypotheses come from various sources:
+
+```yaml
+Sources of Hunting Hypotheses:
+  
+  Threat Intelligence:
+    └─ New APT group identified — what TTPs do they use?
+    └─ Industry-specific threat report
+    └─ Dark web mentions of your company
+  
+  MITRE ATT&CK Framework:
+    └─ "Are there signs of credential dumping (T1003) in our environment?"
+    └─ "Is anyone using living-off-the-land binaries (T1218)?"
+  
+  Internal Intelligence:
+    └─ Recent vulnerability in a technology we use
+    └─ Pattern observed during incident investigations
+  
+  Business Context:
+    └─ We acquired a company — are there threats in their environment?
+    └─ New product launch — are we being targeted?
+  
+  Gut Feel / Experience:
+    └─ "This normal traffic pattern doesn't feel right"
+    └─ "We haven't looked at this log source in months"
+```
+
+**Example hypotheses**:
+```yaml
+Hypothesis 1: "An attacker may have compromised a user account via credential 
+               stuffing and is using it to access internal resources at unusual times"
+  Data sources: VPN logs, Azure AD sign-in logs, workstation logon events
+  Indicators: Login from unusual IP, login at 3 AM, multiple failed logins followed by success
+
+Hypothesis 2: "An attacker may have deployed a backdoor using scheduled tasks"
+  Data sources: Windows Event ID 4698 (scheduled task created), Sysmon Event 1 (process)
+  Indicators: New scheduled task on server, task running from user's temp directory
+
+Hypothesis 3: "An attacker may be exfiltrating data via DNS tunnelling"
+  Data sources: DNS logs, NetFlow
+  Indicators: High volume of TXT record queries, long subdomain names, unusual domain TLDs
+```
+
+### Step 2: Collect and Analyse Data
+
+```sql
+-- SQL-style hunting query (pseudocode)
+-- Find users who logged in from more than 2 countries in 24 hours
+
+SELECT user_name, 
+       COUNT(DISTINCT country) as countries_visited,
+       MIN(timestamp) as first_login,
+       MAX(timestamp) as last_login
+FROM authentication_logs
+WHERE timestamp > NOW() - INTERVAL '24 hours'
+  AND result = 'SUCCESS'
+GROUP BY user_name
+HAVING COUNT(DISTINCT country) > 2
+ORDER BY countries_visited DESC
+```
+
+```bash
+# Sysmon hunting for suspicious process creation
+# Look for LOLBins (Living Off the Land Binaries)
+
+# PowerShell running from temp directory
+Get-WinEvent -FilterHashtable @{
+  LogName='Microsoft-Windows-Sysmon/Operational'
+  ID=1
+} | Where-Object {
+  $_.Properties[10].Value -match 'temp' -and 
+  $_.Properties[6].Value -match 'powershell'
+} | Select-Object TimeCreated, 
+  @{n='CommandLine';e={$_.Properties[10].Value}},
+  @{n='User';e={$_.Properties[12].Value}}
+
+# Suspicious rundll32 execution (no DLL extension)
+Get-WinEvent -FilterHashtable @{
+  LogName='Microsoft-Windows-Sysmon/Operational'
+  ID=1
+} | Where-Object {
+  $_.Properties[2].Value -match 'rundll32' -and
+  $_.Properties[10].Value -notmatch '\.dll'
+}
+```
+
+```bash
+# Network hunting for beaconing activity
+# Look for connections to known C2 infrastructure
+
+# 1. Find IPs with suspicious connection patterns
+tshark -r capture.pcap -T fields -e ip.src -e ip.dst -e frame.time_delta \
+  | awk '{if ($3 > 10 && $3 < 3600) print $0}' \
+  | sort | uniq -c | sort -rn | head -20
+
+# 2. Look for HTTPS to uncommon destinations
+tshark -r capture.pcap -Y "tls.handshake.extensions_server_name" \
+  -T fields -e tls.handshake.extensions_server_name \
+  | sort | uniq -c | sort -rn | head -50
+```
+
+```python
+# Python-based hunt: DNS anomaly detection
+import numpy as np
+from collections import Counter
+
+def detect_dns_anomaly(dns_queries):
+    """Flag hosts making DNS queries to unusual domains"""
+    
+    # Build baseline of normal domains per host
+    host_domains = {}
+    for query in dns_queries:
+        host = query['client_ip']
+        domain = query['domain']
+        if host not in host_domains:
+            host_domains[host] = Counter()
+        host_domains[host][domain] += 1
+    
+    # Flag new domains that deviate from baseline
+    anomalies = []
+    for host, domains in host_domains.items():
+        total = sum(domains.values())
+        for domain, count in domains.most_common():
+            # If a host queries a domain it has never queried before
+            # AND the count is suspiciously high
+            if count > 0.1 * total and count < 5:
+                anomalies.append({
+                    'host': host,
+                    'domain': domain,
+                    'count': count,
+                    'total': total
+                })
+    
+    return anomalies
+```
+
+### Step 3: Investigate Findings
+
+```yaml
+When a hunt hypothesis produces a hit:
+  └─ Is this an existing known activity?
+     → Check ticketing system: known pen test, approved maintenance?
+  └─ Is this a true positive?
+     → Correlate with other data sources
+  └─ What is the scope?
+     → How many hosts? How many users? How long?
+  └─ What is the impact?
+     → Data accessed? Systems compromised? Persistence established?
+  └─ What is the urgency?
+     → Active exfiltration → immediate containment
+     → Historical compromise → investigation and remediation
+
+Documentation:
+  └─ Hypothesis tested
+  └─ Data sources queried
+  └─ Findings (if any)
+  └─ IOCs identified
+  └─ TTPs observed
+  └─ Remediation steps
+  └─ Detection rule created/updated
+```
+
+### Step 4: Operationalise Findings
+
+```yaml
+Every successful hunt should produce:
+  └─ New detection rule in SIEM (automated detection for next time)
+  └─ Updated threat intelligence
+  └─ Runbook update (if new TTP observed)
+  └─ Lessons learned
+  └─ Metric: Hunts completed, hunts with findings, mean time to find
+```
+
+## The Pyramid of Pain
+
+Understanding what types of IOCs cause attackers the most pain:
+
+```
+            ┌─────────────────────────┐
+            │                         │
+            │     TTPs (Tactics,      │  ← Hardest for attacker to change
+            │  Techniques, Procedures)│    (fundamental to their operation)
+            │                         │
+            ├─────────────────────────┤
+            │                         │
+            │       Tools             │  ← Medium (attacker must replace tool)
+            │                         │
+            ├─────────────────────────┤
+            │                         │
+            │  Network/Host Artifacts │  ← Medium-low (changeable)
+            │                         │
+            ├─────────────────────────┤
+            │                         │
+            │   Domain Names / IPs    │  ← Low (easily changed)
+            │                         │
+            ├─────────────────────────┤
+            │                         │
+            │     Hash Values         │  ← Trivial (attacker recompiles)
+            │                         │
+            └─────────────────────────┘
+```
+
+**Hunting at the top of the pyramid**: Instead of hunting for specific hashes (which change with every recompile), hunt for TTPs — the behaviours and patterns attackers use. A specific hash changes every build; a TTP (like "uses WMI for lateral movement") persists across campaigns.
+
+## Hunting Techniques by Data Source
+
+### Endpoint Hunting
+
+| Data Source | Tool | What to Look For |
+|-------------|------|------------------|
+| Process creation | Sysmon Event 1 | LOLBins, untrusted paths, suspicious parent-child relationships |
+| Network connections | Sysmon Event 3 | Outbound to unusual ports, long-running connections |
+| File creation | Sysmon Event 11 | Dropped executables (exe/dll/ps1) in temp directories |
+| Registry changes | Sysmon Event 13 | Persistence via Run keys, service installs |
+| DNS queries | Sysmon Event 22 | DGA domains, tunnelling, unusual TLDs |
+| PowerShell | Event 4104 | Encoded commands, obfuscated scripts, unusual modules |
+
+### Network Hunting
+
+| Technique | Tool | What to Look For |
+|-----------|------|------------------|
+| Beacon detection | Zeek/NetFlow | Regular small connections to same IP (every 60s) |
+| DNS analysis | Zeek DNS | Long subdomains, high TXT record volume |
+| TLS fingerprinting | JA3 hashes | Known malicious TLS implementations |
+| Traffic baselines | Zeek conn.log | Unusual protocols on standard ports |
+
+### Cloud Hunting
+
+| Data Source | What to Look For |
+|-------------|------------------|
+| CloudTrail (AWS) | IAM role assume from unusual IP, S3 bucket policy change to public |
+| Azure AD sign-ins | MFA prompt from unusual location, legacy auth attempts |
+| GCP audit logs | Service account key creation, privileged role assignment |
+| Cloud IAM | Granting admin permissions to external users |
+
+## Real Hunt: Operation RYDE (2017)
+
+```
+  └─ An organisation noticed unusual DNS queries from a few workstations
+  └─ The domains were legitimate-looking: microsoft-verify.com, outlook-check.net
+  └─ No SIEM rule triggered (no known IOC match)
+  └─ Analyst investigation: these domains were registered 2 days ago
+  └─ Further hunt: 12 more hosts with similar DNS queries
+  └─ Malware analysis: Downloaded executable posing as Adobe update
+  └─ C2 protocol: HTTPS to the fake domains (appeared normal in proxy logs)
+  └─ Scope: 12 hosts infected, 2 C2 domains
+  
+  Why SIEM didn't catch it:
+    └─ Domains were not in any threat intel feed (newly registered)
+    └─ Traffic was HTTPS (looked normal)
+    └─ No malware signature existed
+  
+  What the hunt found:
+    └─ DNS queries to lookalike domains was the only anomaly
+    └─ A proactive DNS baseline would have flagged these as new domains
+    └─ Automated detection rule created: alert on domains < 30 days old
+```
+
+## Key Takeaways
+
+- Threat hunting proactively searches for threats that automated detection misses — it is not incident response (which reacts to alerts)
+- The Hunting Maturity Model ranges from Level 0 (fully reactive) to Level 4 (automated hunting at scale) — most organisations are Level 1-2
+- Every hunt starts with a hypothesis — sources include threat intelligence, MITRE ATT&CK, internal incidents, and business context
+- The Pyramid of Pain shows that hunting at the TTP level (behaviours) is more effective than hunting at the hash level (which changes with every recompile)
+- Endpoint hunting (Sysmon, EDR telemetry) provides the richest data for hunting — process creation, network connections, file/registry changes
+- DNS anomalies are a common hunting starting point — C2 communication, data exfiltration, and DGA domains all generate unusual DNS patterns
+- A successful hunt produces a new detection rule — if you found something manually, it should be detected automatically next time
+- Cloud hunting requires different data sources (CloudTrail, Azure AD, IAM) than traditional on-premises hunting
+- The Operation RYDE example shows that newly registered lookalike domains are a reliable hunting indicator — SIEMs miss them without proactive DNS baselining
+- Hunting is a skill that develops with experience — regular practice and methodology (hypothesis → data → investigation → operationalise) produces results

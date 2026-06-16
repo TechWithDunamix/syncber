@@ -1,0 +1,161 @@
+---
+title: "Cloud Compliance & Governance"
+description: "Cloud compliance frameworks, cloud-specific regulations, compliance automation tools, cloud audit preparation, and shared compliance responsibilities."
+sidebar:
+  order: 6
+  label: "Cloud Compliance"
+tab: "cybersecurity"
+---
+
+Cloud compliance means meeting regulatory and industry standards while using cloud services. The shared responsibility model applies to compliance too — the provider certifies the platform, but the customer must configure their workloads correctly.
+
+## Provider Compliance Certifications
+
+```yaml
+AWS Compliance:
+  └─ SOC 1/2/3: All regions
+  └─ PCI DSS Level 1: All regions
+  └─ ISO 27001/27017/27018: All commercial regions
+  └─ HIPAA BAA: Available (must sign BAA)
+  └─ FedRAMP: 50+ services authorised
+  └─ GDPR: Data Processing Agreement available
+  └─ IRAP (Australia): Available
+
+Azure Compliance:
+  └─ SOC 1/2/3: All regions
+  └─ PCI DSS Level 1: All commercial regions
+  └─ ISO 27001/27017/27018: All commercial regions
+  └─ HIPAA BAA: Available
+  └─ FedRAMP: 100+ services authorised (most of any provider)
+  └─ GDPR: Data Processing Agreement
+
+GCP Compliance:
+  └─ SOC 1/2/3: All regions
+  └─ PCI DSS Level 1: All commercial regions
+  └─ ISO 27001/27017/27018: All commercial regions
+  └─ HIPAA BAA: Available
+  └─ FedRAMP: Authorised (15+ services)
+  └─ GDPR: Data Processing Agreement
+```
+
+## Cloud Compliance Challenges
+
+```yaml
+Common Cloud Compliance Gaps:
+
+Data Residency:
+  └─ Challenge: Data may be replicated across regions automatically
+  └─ Fix: Use data residency controls (AWS: regions, Azure: policy, GCP: constraints)
+  └─ Example: GDPR requires EU data stay in EU — disable cross-region replication
+
+Encryption:
+  └─ Challenge: Customer data not encrypted by default
+  └─ Fix: Enable encryption on every service that supports it
+  └─ Example: EBS volumes are unencrypted by default — enable EBS encryption
+
+Access Logging:
+  └─ Challenge: Many services don't log by default
+  └─ Fix: Enable CloudTrail (AWS), Activity Log (Azure), Audit Logs (GCP)
+  └─ Example: Without CloudTrail, you cannot prove who accessed which resource
+
+Shared Responsibility Gap:
+  └─ Challenge: Customers assume provider handles everything
+  └─ Fix: Understand what is customer responsibility
+  └─ Example: You sign HIPAA BAA with AWS, but you still must configure IAM correctly
+```
+
+## Cloud Compliance Automation
+
+```yaml
+Tools for Cloud Compliance:
+
+AWS:
+  └─ AWS Config: Continuous resource compliance monitoring
+  └─ AWS Audit Manager: Automate evidence collection
+  └─ AWS Artifact: Self-service compliance reports portal
+  └─ AWS Security Hub: Aggregate findings + compliance status
+
+Azure:
+  └─ Azure Policy: Enforce compliance rules at scale
+  └─ Azure Blueprints: Pre-configured compliant environments
+  └─ Microsoft Purview: Compliance portal, risk management
+  └─ Azure Compliance Manager: Track compliance progress
+
+GCP:
+  └─ Assured Workloads: Pre-configured compliance controls
+  └─ Security Command Center: Compliance dashboard
+  └─ Access Transparency: Provider access logs
+  └─ VPC Service Controls: Prevent data exfiltration
+```
+
+### Infrastructure as Code (IaC) Compliance
+
+```hcl
+# Terraform — enforce encryption on all resources
+resource "aws_s3_bucket" "data" {
+  bucket = "company-data"
+  
+  # Fails validation if not set (pre-deployment compliance)
+  server_side_encryption_configuration {
+    rule {
+      apply_server_side_encryption_by_default {
+        sse_algorithm = "AES256"
+      }
+    }
+  }
+}
+
+# Terraform — require specific tags
+resource "aws_instance" "server" {
+  ami           = "ami-123456"
+  instance_type = "t3.medium"
+  
+  tags = {
+    Environment = "production"
+    Owner       = "security-team"
+    Compliance  = "pci"
+  }
+}
+```
+
+## Cloud Audit Preparation
+
+```yaml
+Cloud Audit Checklist:
+
+3-6 Months Before:
+  └─ Review cloud provider's compliance certifications (AWS Artifact, Azure Compliance)
+  └─ Identify scope: which accounts, services, regions are in scope
+  └─ Map shared responsibility: customer vs. provider controls
+  └─ Enable all required logging (CloudTrail, Config, GuardDuty)
+
+1-3 Months Before:
+  └─ Run pre-audit assessment tool (AWS: Well-Architected, Azure: Defender for Cloud)
+  └─ Remediate any failing controls
+  └─ Gather evidence (screenshots, config exports, policy definitions)
+  └─ Test your incident response procedure
+
+During Audit:
+  └─ Provide evidence package: IAM policies, encryption configs, network diagrams
+  └─ Demonstrate: "This is how we ensure only authorised access"
+  └─ Show: "This is how we detect and respond to incidents"
+  └─ Be transparent: "These are the controls we have, here is the evidence"
+
+After Audit:
+  └─ Address any findings within the specified timeline
+  └─ Update compliance automation based on lessons learned
+  └─ Schedule next audit
+```
+
+## Key Takeaways
+
+- Cloud providers hold certifications (SOC 2, ISO 27001, PCI DSS) for their infrastructure — but customers must configure their own workloads to be compliant
+- Data residency is the most common cloud compliance gap — cloud services can replicate data across regions; controls must be implemented to prevent this
+- Logging must be explicitly enabled — CloudTrail, Activity Log, and Audit Logs are not on by default in most cases
+- Compliance automation tools (AWS Config, Azure Policy, Security Command Center) continuously monitor compliance posture
+- Infrastructure as Code (Terraform, Pulumi) enables pre-deployment compliance validation — misconfigured resources are blocked before creation
+- Pre-audit assessments (AWS Well-Architected, Defender for Cloud secure score) identify gaps before the auditor does
+- Prepare an evidence package in advance — having screenshots, policies, and config exports ready makes the audit smoother
+- The shared compliance responsibility means you cannot rely solely on the provider's certifications — your configuration matters
+- Cloud compliance is not a one-time activity — continuous monitoring and automated enforcement are essential
+- Provider compliance portals (AWS Artifact, Microsoft Service Trust Portal) provide self-service access to certifications and reports

@@ -1,0 +1,421 @@
+---
+title: "Network Security Lab"
+description: "Hands-on exercises: VLAN segmentation, firewall rules, IDS/IPS configuration, wireless audit, VPN setup, and network monitoring."
+sidebar:
+  order: 8
+  label: "Network Security Lab"
+tab: "cybersecurity"
+---
+
+This lab applies network security concepts through practical exercises. Work through each exercise sequentially — they build on each other.
+
+## Prerequisites
+
+```bash
+# Tools needed for this lab
+sudo apt install -y nmap netcat-openbsd tcpdump iptables iproute2 curl wget openssl
+# For wireless exercises (requires wireless card)
+sudo apt install -y aircrack-ng # Use only on your own equipment!
+
+# Python
+pip install scapy requests
+```
+
+## Exercise 1: Network Segmentation Design
+
+### Objective
+Design a segmented network for a three-tier web application.
+
+### Scenario
+Your company hosts a web application with:
+- **Web tier**: Public-facing servers (TCP/80, 443)
+- **App tier**: Application servers that need outbound internet access
+- **DB tier**: Database servers accessible only from app tier
+- **Admin tier**: Management workstations for IT staff
+- **Guest tier**: Guest Wi-Fi (internet only, no internal access)
+
+### Step 1: Draw the network
+
+```
+Internet
+   │
+┌──┴──────────────┐
+│   Firewall        │
+└──┬────────┬───────┘
+   │        │
+┌──┴──┐  ┌──┴────────┐
+│ DMZ │  │ Internal    │
+│ Web │  │ ┌────────┐ │
+│     │  │ │ App     │ │
+│     │  │ │ Servers │ │
+└─────┘  │ └────────┘ │
+         │ ┌────────┐ │
+         │ │ DB      │ │
+         │ │ Servers │ │
+         │ └────────┘ │
+         │ ┌────────┐ │
+         │ │ Admin   │ │
+         │ └────────┘ │
+         └────────────┘
+```
+
+### Step 2: Write firewall rules (iptables)
+
+```bash
+#!/bin/bash
+# Three-tier segmentation with iptables
+
+# Flush existing rules
+iptables -F
+iptables -X
+iptables -t nat -F
+
+# Default policies: DROP everything
+iptables -P INPUT DROP
+iptables -P FORWARD DROP
+iptables -P OUTPUT DROP
+
+# Allow loopback
+iptables -A INPUT -i lo -j ACCEPT
+iptables -A OUTPUT -o lo -j ACCEPT
+
+# --- WEB TIER (DMZ) ---
+# Allow HTTP/HTTPS from internet to web servers
+iptables -A FORWARD -i eth0 -o eth1 -p tcp --dport 80 -j ACCEPT
+iptables -A FORWARD -i eth0 -o eth1 -p tcp --dport 443 -j ACCEPT
+
+# Web servers can talk to app servers on port 8080
+iptables -A FORWARD -i eth1 -o eth2 -p tcp --dport 8080 -j ACCEPT
+
+# --- APP TIER ---
+# App servers can talk to database servers on 3306
+iptables -A FORWARD -i eth2 -o eth3 -p tcp --dport 3306 -j ACCEPT
+
+# App servers need outbound internet (e.g., API calls, updates)
+iptables -A FORWARD -i eth2 -o eth0 -m state --state ESTABLISHED,RELATED -j ACCEPT
+iptables -A FORWARD -i eth2 -o eth0 -p tcp --dport 443 -j ACCEPT
+
+# --- DB TIER ---
+# Database servers: no outbound internet (prevent data exfiltration)
+iptables -A FORWARD -i eth3 -o eth0 -j DROP
+
+# --- ADMIN TIER ---
+# Admin jump box can SSH to all servers
+iptables -A FORWARD -i eth4 -o eth1 -p tcp --dport 22 -j ACCEPT
+iptables -A FORWARD -i eth4 -o eth2 -p tcp --dport 22 -j ACCEPT
+iptables -A FORWARD -i eth4 -o eth3 -p tcp --dport 22 -j ACCEPT
+
+# --- GUEST TIER ---
+# Guest Wi-Fi: internet only, no internal access
+iptables -A FORWARD -i eth5 -o eth0 -j ACCEPT
+iptables -A FORWARD -i eth5 -o eth1 -j DROP
+iptables -A FORWARD -i eth5 -o eth2 -j DROP
+iptables -A FORWARD -i eth5 -o eth3 -j DROP
+iptables -A FORWARD -i eth5 -o eth4 -j DROP
+
+# Log denied traffic
+iptables -A FORWARD -j LOG --log-prefix "FW-DENY: " --log-level 4
+
+# Save rules
+iptables-save > /etc/iptables/rules.v4
+
+echo "✓ Three-tier firewall rules applied"
+echo "  Web tier: HTTP/HTTPS from internet"
+echo "  App tier: Internal, outbound HTTPS only"
+echo "  DB tier: No outbound internet"
+echo "  Admin: SSH access only from jump box"
+echo "  Guest: Internet only"
+```
+
+### Step 3: Test the segmentation
+
+```bash
+# Test from each segment
+echo "=== Testing Web Tier (DMZ) ==="
+# Should work: Web server can reach app server
+nc -zv 10.0.2.10 8080  # App server on 8080
+# Should fail: Web server cannot reach database
+nc -zv 10.0.3.10 3306  # DB server on 3306
+
+echo ""
+echo "=== Testing DB Tier ==="
+# Should fail: DB server cannot reach internet
+nc -zv 8.8.8.8 443      # Google DNS
+# Should fail: DB server cannot initiate SSH outbound
+nc -zv 10.0.1.10 22     # Web server SSH
+
+echo ""
+echo "=== Testing Guest Wi-Fi ==="
+# Should work: Guest can reach internet
+curl -I https://google.com
+# Should fail: Guest cannot reach internal
+curl -I http://10.0.1.10  # Web server
+```
+
+### Step 4: Deliverable
+
+Submit a network diagram with:
+1. IP ranges for each segment
+2. Firewall rule table (source, dest, port, action)
+3. Test results (which traffic is allowed/blocked)
+
+---
+
+## Exercise 2: Snort IDS Rule Writing
+
+### Objective
+Write custom Snort/Suricata rules to detect specific attacks.
+
+### Setup
+
+```bash
+# If Suricata is not installed
+sudo apt install -y suricata
+
+# Enable community rules
+sudo suricata-update
+sudo suricata-update enable-source oisf/trafficid
+sudo suricata-update enable-source et/open
+sudo suricata-update enable-source pt/securityonion
+
+# Test configuration
+sudo suricata -T -c /etc/suricata/suricata.yaml
+```
+
+### Task A: Write rules for these scenarios
+
+```bash
+cat > /tmp/custom.rules << 'RULES'
+# 1. Detect HTTP requests to /admin (unauthorised admin access attempt)
+alert tcp $EXTERNAL_NET any -> $HOME_NET $HTTP_PORTS (
+  msg:"Web: Unauthorised admin access attempt";
+  content:"GET";
+  http_method;
+  content:"/admin";
+  http_uri;
+  nocase;
+  classtype:attempted-recon;
+  sid:2000001;
+  rev:1;
+)
+
+# 2. Detect DNS request to known malware domain
+alert udp $HOME_NET any -> any 53 (
+  msg:"MALWARE: DNS query to known C2 domain evil-malware.com";
+  content:"|04|evil|07|malware|03|com|00|";
+  classtype:trojan-activity;
+  sid:2000002;
+  rev:1;
+)
+
+# 3. Detect SSH brute force (10+ connections in 60 seconds from same IP)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 22 (
+  msg:"SSH: Potential brute force attack detected";
+  flow:to_server;
+  threshold:type both, track by_src, count 10, seconds 60;
+  classtype:attempted-admin;
+  sid:2000003;
+  rev:1;
+)
+
+# 4. Detect SQL injection via ' OR 1=1
+alert tcp $EXTERNAL_NET any -> $HOME_NET $HTTP_PORTS (
+  msg:"SQLi: Classic ' OR 1=1 -- injection attempt";
+  content:"' OR '1'='1";
+  http_client_body;
+  nocase;
+  classtype:web-application-attack;
+  sid:2000004;
+  rev:1;
+)
+
+# 5. Detect outbound connection on non-standard port (potential C2)
+alert tcp $HOME_NET any -> $EXTERNAL_NET !443 !80 !53 (
+  msg:"C2: Outbound connection on non-standard port";
+  flow:to_server;
+  threshold:type both, track by_src, count 5, seconds 60;
+  classtype:policy-violation;
+  sid:2000005;
+  rev:2;
+)
+RULES
+
+# Load custom rules
+sudo cp /tmp/custom.rules /etc/suricata/rules/
+sudo sed -i 's|default-rule-path: /etc/suricata/rules|default-rule-path: /etc/suricata/rules\nrule-files:\n  - custom.rules|' /etc/suricata/suricata.yaml
+```
+
+### Task B: Generate test traffic and verify detection
+
+```bash
+# Generate SQLi test traffic
+curl "http://testphp.vulnweb.com/artists.php?artist=' OR '1'='1"
+
+# Generate SSH brute force simulation
+for i in {1..15}; do
+  ssh -o ConnectTimeout=1 -o StrictHostKeyChecking=no invalid@localhost 2>/dev/null
+done
+
+# Check Suricata alerts
+sudo tail -f /var/log/suricata/fast.log
+```
+
+### Deliverable
+
+1. Five working custom rules with explanations
+2. Evidence that each rule triggered (fast.log output)
+3. Tuning suggestions for reducing false positives
+
+---
+
+## Exercise 3: Wireless Security Audit
+
+### Objective
+Audit a Wi-Fi network for security weaknesses.
+
+⚠ **Warning**: Only perform this audit on your own network or with written permission.
+
+```bash
+# Step 1: Enable monitor mode on wireless interface
+sudo ip link set wlan0 down
+sudo iw dev wlan0 set type monitor
+sudo ip link set wlan0 up
+
+# Step 2: Discover nearby networks
+sudo iw dev wlan0 scan | grep -E "SSID|freq|signal|WPA|RSN|WEP"
+
+# Step 3: Capture beacon frames for analysis
+sudo tcpdump -i wlan0 -e -c 100 -w wifi-capture.pcap
+
+# Step 4: Analyse captured frames
+tcpdump -r wifi-capture.pcap -e -vv -X | head -50
+
+# Step 5: Security assessment checklist
+echo "=== Wireless Security Audit ==="
+echo ""
+echo "Check 1: WEP networks?"
+sudo iw dev wlan0 scan | grep -B5 "WEP" && echo "⚠ WEP detected — CRITICAL" || echo "✓ No WEP networks"
+echo ""
+echo "Check 2: WPA3 support?"
+sudo iw dev wlan0 scan | grep -B5 "RSN:.*AKM.*SAE" && echo "✓ WPA3 available" || echo "No WPA3 networks"
+echo ""
+echo "Check 3: Open networks?"
+sudo iw dev wlan0 scan | grep -B3 "capability:.*Privacy" | grep -v Privacy && echo "⚠ Open networks detected" || echo "✓ All have encryption"
+echo ""
+echo "Check 4: Signal strength anomalies"
+sudo iw dev wlan0 scan | grep "signal:" | sort -n | head -5
+```
+
+### Deliverable
+1. List of discovered SSIDs with security protocols
+2. Identified vulnerabilities (WEP, WPA-TKIP, no management frame protection)
+3. Recommendations for remediation
+
+---
+
+## Exercise 4: VPN Setup (WireGuard)
+
+### Objective
+Set up a WireGuard VPN between two machines.
+
+```bash
+# On Server:
+# Step 1: Install WireGuard
+sudo apt install -y wireguard
+
+# Step 2: Generate keys
+wg genkey | tee /etc/wireguard/server_private.key | wg pubkey > /etc/wireguard/server_public.key
+chmod 600 /etc/wireguard/server_private.key
+
+# Step 3: Create configuration
+cat > /etc/wireguard/wg0.conf << 'WGEOF'
+[Interface]
+Address = 10.0.0.1/24
+ListenPort = 51820
+PrivateKey = [SERVER_PRIVATE_KEY]
+
+# Client
+[Peer]
+PublicKey = [CLIENT_PUBLIC_KEY]
+AllowedIPs = 10.0.0.2/32
+WGEOF
+
+# Step 4: Start WireGuard
+sudo systemctl enable wg-quick@wg0
+sudo systemctl start wg-quick@wg0
+
+# On Client:
+# Step 1: Generate keys
+wg genkey | tee client_private.key | wg pubkey > client_public.key
+
+# Step 2: Create configuration
+cat > /etc/wireguard/wg0.conf << 'WGEOF'
+[Interface]
+PrivateKey = [CLIENT_PRIVATE_KEY]
+Address = 10.0.0.2/24
+DNS = 10.0.0.53
+
+[Peer]
+PublicKey = [SERVER_PUBLIC_KEY]
+Endpoint = [SERVER_PUBLIC_IP]:51820
+AllowedIPs = 10.0.0.0/24, 192.168.1.0/24
+PersistentKeepalive = 25
+WGEOF
+
+# Step 3: Test connectivity
+ping 10.0.0.1
+```
+
+### Deliverable
+1. Working WireGuard VPN connection
+2. Ping test results confirming encrypted tunnel
+3. `wg show` output showing handshake and transfer stats
+
+---
+
+## Exercise 5: Network Monitoring Setup (LibreNMS)
+
+### Objective
+Set up a network monitoring server and add devices.
+
+```bash
+# Install LibreNMS (Ubuntu/Debian)
+sudo apt install -y librenms
+
+# Configure SNMP on monitored devices
+# On each device:
+sudo apt install -y snmpd
+cat > /etc/snmp/snmpd.conf << 'SNMP'
+agentaddress 0.0.0.0:161
+view systemonly included .1.3.6.1.2.1.1
+view systemonly included .1.3.6.1.2.1.25.1
+rocommunity public default -V systemonly
+SNMP
+
+# Add device to LibreNMS via CLI
+./addhost.php localhost public v2c
+
+# Verify monitoring
+# Check device is polling
+ls -la /opt/librenms/rrd/localhost/
+
+# Generate test alert (stop SNMP)
+sudo systemctl stop snmpd
+# Wait for polling cycle — alert should fire
+```
+
+### Deliverable
+1. Screenshot of dashboard showing monitored devices
+2. Alert configuration (at least 3 meaningful alerts)
+3. Baseline traffic graph for a 24-hour period
+
+---
+
+## Lab Completion Checklist
+
+- [ ] Exercise 1: Three-tier firewall rules tested — verify segmentation works
+- [ ] Exercise 2: At least 5 custom Suricata rules triggering on test traffic
+- [ ] Exercise 3: Wireless audit completed with security assessment
+- [ ] Exercise 4: WireGuard VPN tunnel established and tested
+- [ ] Exercise 5: LibreNMS monitoring devices with alerts configured
+- [ ] All exercises documented with screenshots/logs

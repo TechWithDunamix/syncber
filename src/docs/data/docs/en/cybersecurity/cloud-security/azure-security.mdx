@@ -1,0 +1,171 @@
+---
+title: "Azure Security"
+description: "Azure security services: Entra ID (Azure AD), Defender for Cloud, Key Vault, Policy, RBAC, NSGs, and best practices for securing Azure subscriptions."
+sidebar:
+  order: 4
+  label: "Azure Security"
+tab: "cybersecurity"
+---
+
+Microsoft Azure provides comprehensive security services integrated deeply with the Microsoft ecosystem. Azure's security model is identity-centric, reflecting Microsoft's "Zero Trust" approach.
+
+## Azure Security Services
+
+| Service | Category | What It Does |
+|---------|----------|-------------|
+| **Entra ID (Azure AD)** | Identity | SSO, MFA, Conditional Access, Identity Protection |
+| **Defender for Cloud** | Posture | CSPM, workload protection, compliance assessment |
+| **Key Vault** | Secrets | Manage keys, secrets, certificates |
+| **Policy** | Governance | Enforce compliance rules across subscriptions |
+| **RBAC** | Access | Role-based access control for Azure resources |
+| **NSG/ASG** | Network | Network security groups, application security groups |
+| **Azure Firewall** | Network | Managed cloud firewall with FQDN filtering |
+| **DDoS Protection** | DDoS | Standard tier for DDoS mitigation |
+| **Sentinel** | SIEM | Cloud-native SIEM + SOAR |
+| **Information Protection** | Data | Classify, label, and protect sensitive data |
+
+## Entra ID (Azure AD) Security
+
+Azure AD is the identity backbone for Azure and Microsoft 365.
+
+```yaml
+Azure AD Security Best Practices:
+  └─ Enable MFA for ALL users (Conditional Access policy)
+  └─ Enable Identity Protection (risk-based policies)
+  └─ Enable Privileged Identity Management (PIM) — JIT admin access
+  └─ Enable security defaults for small organisations
+  └─ Register all applications with proper permissions
+  └─ Review third-party application permissions quarterly
+  └─ Enable audit logging (Azure AD Premium P1/P2)
+  └─ Use managed identities for Azure resources (no service principals)
+```
+
+```powershell
+# Connect to Azure AD
+Connect-AzureAD
+
+# Get sign-in logs for suspicious activity
+Get-AzureADAuditSignInLogs -Filter "status/errorCode eq 50057" # User account disabled
+Get-AzureADAuditSignInLogs -Filter "createdDateTime ge 2024-01-01" | 
+  Where-Object {$_.riskLevelDuringSignIn -eq "high"} |
+  Select-Object UserPrincipalName, CreatedDateTime, Location, RiskLevelDuringSignIn
+
+# Enable MFA via Conditional Access
+$policy = New-Object -TypeName Microsoft.Open.MSGraph.Model.ConditionalAccessPolicy
+$policy.DisplayName = "Require MFA for All Users"
+$policy.State = "enabled"
+
+$conditions = New-Object -TypeName Microsoft.Open.MSGraph.Model.ConditionalAccessConditionSet
+$conditions.Users.IncludeUsers = @("All")
+$conditions.Applications.IncludeApplications = @("All")
+$policy.Conditions = $conditions
+
+$controls = New-Object -TypeName Microsoft.Open.MSGraph.Model.ConditionalAccessGrantControls
+$controls._Operator = "OR"
+$controls.BuiltInControls = @("mfa")
+$policy.GrantControls = $controls
+
+New-AzureADMSConditionalAccessPolicy -Policy $policy
+```
+
+## Defender for Cloud
+
+Microsoft Defender for Cloud provides unified security management across Azure, on-premises, and other clouds.
+
+```yaml
+Capabilities:
+  └─ CSPM (Cloud Security Posture Management): Continuous assessment
+  └─ Regulatory compliance: PCI DSS, ISO 27001, SOC 2, NIST
+  └─ Workload protection: Servers, databases, storage, containers, Key Vault
+  └─ Just-in-time VM access: Reduce attack surface
+  └─ File integrity monitoring: Detect changes to sensitive files
+  └─ Adaptive application controls: Whitelist allowed applications
+
+Defender Plans:
+  └─ Defender for Servers: $15/server/month
+  └─ Defender for SQL: $15/server/month
+  └─ Defender for Storage: $10/storage account/month
+  └─ Defender for Containers: Free (with AKS)
+  └─ Defender for Key Vault: Free (with Key Vault)
+```
+
+```bash
+# Enable Defender for Cloud via Azure CLI
+az security auto-provisioning-setting update \
+  --name default \
+  --auto-provision On
+
+# View security alerts
+az security alert list --query "[?severity=='High']" \
+  -o table
+
+# View secure score
+az security secure-score list -o table
+```
+
+## Azure Network Security
+
+```yaml
+Network Security Controls:
+  
+  NSG (Network Security Groups):
+    └─ Stateful firewall rules per subnet or NIC
+    └─ Default-deny inbound, default-allow outbound
+    └─ Can reference service tags (e.g., Internet, AzureLoadBalancer)
+    └─ Application Security Groups: group VMs logically, reference in NSG rules
+  
+  Azure Firewall:
+    └─ Managed cloud firewall with threat intelligence
+    └─ FQDN filtering (allow/deny outbound to specific domains)
+    └─ SNAT/DNAT support
+    └─ Availability Zones support
+  
+  DDoS Protection:
+    └─ Standard: $3,000/month subscription + data processing
+    └─ Automatic attack mitigation
+    └─ 24/7 DDoS response team
+    └─ Real-time metrics and alerts
+```
+
+## Azure Policy
+
+Azure Policy enforces compliance rules across your subscription.
+
+```json
+{
+  "properties": {
+    "displayName": "Require SQL Server encryption",
+    "policyType": "BuiltIn",
+    "mode": "Indexed",
+    "description": "Audit SQL servers without TDE enabled",
+    "policyRule": {
+      "if": {
+        "field": "type",
+        "equals": "Microsoft.Sql/servers/databases"
+      },
+      "then": {
+        "effect": "audit",
+        "details": {
+          "existenceCondition": {
+            "field": "Microsoft.Sql/transparentDataEncryption.state",
+            "equals": "Enabled"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## Key Takeaways
+
+- Azure's security model is identity-centric — Azure AD (Entra ID) is the control plane for all security decisions
+- Conditional Access is Azure's most powerful security control — enforce MFA, device compliance, and location-based policies
+- Defender for Cloud provides CSPM + workload protection + compliance monitoring in a single platform
+- Azure Policy enforces compliance at scale — no resource should be deployed without policy enforcement
+- NSGs are Azure's fundamental network security control — default-deny inbound, use ASGs for logical grouping
+- Azure Key Vault is essential for secrets management — never store secrets in code, configuration files, or CI/CD variables
+- PIM (Privileged Identity Management) provides JIT admin access — eliminates standing admin privileges
+- Azure Sentinel is the cloud-native SIEM/SOAR — integrates deeply with Microsoft security stack (MDE, MCAS, Azure AD)
+- The Well-Architected Framework Security Pillar provides structured guidance for Azure security
+- Managed identities eliminate the need for service principals and credentials — use them wherever possible

@@ -1,0 +1,397 @@
+---
+title: "Authorisation & Access Control"
+description: "RBAC, ABAC, PBAC, ACLs, least privilege, zero standing privileges, access control policy design, and implementation guidance."
+sidebar:
+  order: 3
+  label: "Authorisation & Access Control"
+tab: "cybersecurity"
+---
+
+Authorisation determines what an authenticated user is allowed to do — which resources they can access, what actions they can take, and under what conditions. While authentication answers "who are you?", authorisation answers "what are you allowed to do?"
+
+## Access Control Models
+
+### Discretionary Access Control (DAC)
+
+The resource owner decides who can access their resources:
+
+```
+User creates a file → User sets permissions → Owner controls access
+Example: Linux file permissions (chmod, chown), Windows NTFS permissions
+Weakness: Users may grant excessive access; no central policy enforcement
+Strength: Flexible, easy to implement for small environments
+```
+
+### Mandatory Access Control (MAC)
+
+Access is based on clearance levels and classifications:
+
+```
+Labels: Top Secret > Secret > Confidential > Unclassified
+User has "Secret" clearance → Can access Secret and below
+Cannot write down (write Secret data to Unclassified system)
+Example: SELinux, AppArmor, government classified systems
+Strength: Centralised, non-bypassable policy
+Weakness: Complex to manage, requires strict labelling
+```
+
+### Role-Based Access Control (RBAC)
+
+Access is granted based on job roles:
+
+```
+Role: "Finance Manager"
+  → Parent role: "Finance User" (inherits all Finance User permissions)
+  → Has permissions: Approve invoices up to $50k, view P&L reports, approve expense reports
+  → Cannot: Create vendor accounts, process payroll, modify GL codes
+
+Implementation: Active Directory groups, Azure AD roles, AWS IAM roles
+```
+
+### Attribute-Based Access Control (ABAC)
+
+Access is granted based on user, resource, and environment attributes:
+
+```
+POLICY: "Managers can view employee salary data IF 
+  department matches AND time is business hours AND device is managed"
+
+Attributes:
+  User: role=manager, department=engineering
+  Resource: type=salary_data, department=engineering
+  Environment: time=14:30, day=Tuesday, device=COMPANY-LAPTOP-01
+  → ACCESS GRANTED
+
+  User: role=manager, department=engineering
+  Resource: type=salary_data, department=engineering
+  Environment: time=02:30, day=Saturday, device=COMPANY-LAPTOP-01
+  → ACCESS DENIED (time condition not met)
+```
+
+### Policy-Based Access Control (PBAC)
+
+An evolution of ABAC with centralised policy management:
+
+```
+POLICY: "Emergency responders can override normal access controls
+  during declared incidents"
+  
+POLICY: "Contractors can access project resources only between 8AM-6PM
+  and only from managed devices"
+```
+
+### Model Comparison
+
+| Model | Granularity | Complexity | Scalability | Best For |
+|-------|-------------|------------|-------------|----------|
+| **DAC** | Coarse (per-object) | Low | Low (up to ~100 users) | Small teams, personal files |
+| **MAC** | Medium (label-based) | High | Medium | Classified environments, military |
+| **RBAC** | Medium (role-based) | Medium | High (100-100,000+ users) | Enterprises, most common model |
+| **ABAC** | Fine (attribute-based) | High | High | Complex environments, cloud-native |
+| **PBAC** | Finest (policy-based) | Highest | Highest | Zero Trust, dynamic environments |
+
+## RBAC Design
+
+### Role Hierarchy Example
+
+```
+Global Admin
+├── Security Admin
+│   ├── SOC Analyst L3
+│   ├── SOC Analyst L2
+│   └── SOC Analyst L1
+├── Network Admin
+│   ├── Network Engineer
+│   └── Network Technician
+├── Application Admin
+│   ├── DevOps Engineer
+│   └── Developer
+└── Helpdesk Admin
+    ├── Senior Helpdesk
+    └── Helpdesk L1
+```
+
+### RBAC Implementation Steps
+
+1. **Discover**: Identify all business functions and current access patterns — interview business units, review current group memberships
+2. **Define**: Create roles based on job functions (not individual users) — aim for 20-50 roles per organisation
+3. **Design**: Map roles to permissions (what each role can access) — start with minimal permissions
+4. **Assign**: Assign users to roles based on their job responsibilities — automate via HR system integration
+5. **Certify**: Periodically review role memberships and permissions — quarterly certification
+6. **Audit**: Monitor for role misuse and privilege creep — automated alerts on anomalous access patterns
+
+### RBAC Anti-Patterns
+
+```yaml
+Anti-Pattern 1 — Role Explosion:
+  Problem: Creating a unique role for every user (defeats purpose of RBAC)
+  Solution: Use groups + ABAC for fine-grained control, keep roles coarse
+
+Anti-Pattern 2 — Orphan Roles:
+  Problem: Roles created for projects, never removed after project ends
+  Solution: Time-bound roles with expiry, annual role review
+
+Anti-Pattern 3 — Permission Creep:
+  Problem: Employees accumulate permissions through role changes, never lose old ones
+  Solution: Quarterly access certification, remove unused permissions (90+ days)
+
+Anti-Pattern 4 — Fat Roles:
+  Problem: "Everyone gets everything" role to avoid access requests
+  Solution: Start with minimal permissions, JIT elevation for additional needs
+```
+
+### Least Privilege with RBAC
+
+```yaml
+# Good: Base role with minimal permissions
+Base-Employee:
+  permissions:
+    - email: read/write
+    - intranet: read
+    - hr-portal: read own data only
+
+# Better: Role with time-bound escalation
+Finance-Auditor:
+  inherits: [Base-Employee]
+  permissions:
+    - financial-system: read
+    - audit-logs: read
+  constraints:
+    - duration: 90 days
+    - requires: manager approval for renewal
+```
+
+### RBAC in Cloud Environments
+
+Each cloud provider implements RBAC differently:
+
+```bash
+# AWS IAM Role
+aws iam create-role --role-name EC2-ReadOnly \
+  --assume-role-policy-document '{
+    "Version": "2012-10-17",
+    "Statement": [{
+      "Effect": "Allow",
+      "Principal": {"Service": "ec2.amazonaws.com"},
+      "Action": "sts:AssumeRole"
+    }]
+  }'
+
+aws iam attach-role-policy \
+  --role-name EC2-ReadOnly \
+  --policy-arn arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess
+
+# Azure RBAC Role Assignment
+az role assignment create \
+  --assignee user@example.com \
+  --role "Reader" \
+  --scope "/subscriptions/123/resourceGroups/prod"
+
+# GCP IAM Role
+gcloud projects add-iam-policy-binding my-project \
+  --member "user:user@example.com" \
+  --role "roles/storage.objectViewer"
+```
+
+## Zero Standing Privileges (ZSP)
+
+ZSP is the most important access control evolution in recent years:
+
+| Model | Traditional | Zero Standing Privileges |
+|-------|-------------|-------------------------|
+| **Admin access** | Permanent Domain Admin | JIT elevation with approval |
+| **Approval** | Once (provisioning) | Per-elevation request |
+| **Duration** | Until revoked (often never) | Hours or less (auto-expires) |
+| **Audit** | Who HAD access | Who USED access, for how long |
+| **Incident risk** | Compromised DA = full breach | Temporary token expires |
+| **Attack surface** | 100+ privileged accounts always enabled | 0 privileged accounts standing |
+
+### JIT Access Implementation
+
+```bash
+# AWS: Just-in-time access via IAM Identity Center
+aws sso-admin create-permission-set \
+  --name "JIT-Admin-Access" \
+  --session-duration "PT1H"
+
+aws sso-admin put-inline-policy-to-permission-set \
+  --instance-arn "arn:aws:sso:::instance/ssoins-..." \
+  --permission-set-arn "arn:aws:sso:::permissionSet/..." \
+  --inline-policy '{
+    "Version": "2012-10-17",
+    "Statement": [{
+      "Effect": "Allow",
+      "Action": "ec2:*",
+      "Resource": "*"
+    }]
+  }'
+
+# Azure AD: Privileged Identity Management (PIM)
+# Enable JIT for Azure AD roles:
+# Azure AD → Privileged Identity Management → Azure AD roles
+# Configure:
+#   - Activation requires: MFA + justification + ticket number
+#   - Maximum activation duration: 4 hours
+#   - Requires approval: Security Team
+#   - Notification: Send alert to security team on activation
+
+# PIM Activation Script (Azure CLI)
+az role assignment create \
+  --assignee user@example.com \
+  --role "Contributor" \
+  --scope "/subscriptions/123" \
+  --start-time "2024-01-15T10:00:00Z" \
+  --end-time "2024-01-15T14:00:00Z"
+```
+
+### ZSP Implementation Roadmap
+
+```yaml
+Phase 1 — Audit existing privileged access:
+  └─ List all users with privileged roles (Domain Admin, AWS Admin, Azure Admin)
+  └─ Identify permanent privileged access that should be JIT
+  └─ Discover privileged service accounts (non-human)
+
+Phase 2 — Pilot JIT for critical roles:
+  └─ Enable Azure AD PIM for Global Administrator role
+  └─ Require MFA + justification for elevation
+  └─ Set max elevation duration: 4 hours
+
+Phase 3 — Expand to all privileged roles:
+  └─ All admin roles use JIT (cloud, on-prem, applications)
+  └─ Service accounts: use short-lived tokens (AWS STS, Azure Managed Identity)
+  └─ Emergency break-glass: offline, audited, time-limited accounts
+
+Phase 4 — Continuous verification:
+  └─ Monitor: Any permanent privileged access is a finding
+  └─ Certify: Monthly review of JIT activation requests
+  └─ Automate: Remove users from privileged groups automatically
+```
+
+## Access Control List (ACL) Management
+
+File system and network ACLs:
+
+```bash
+# Linux filesystem ACL
+setfacl -m u:john:rwx /shared/project-dir
+setfacl -m g:finance:r-x /shared/project-dir
+getfacl /shared/project-dir
+
+# AWS S3 bucket policy (IAM-based ACL)
+aws s3api put-bucket-policy --bucket example-bucket --policy '{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": {"AWS": "arn:aws:iam::123456789:role/DataAnalyst"},
+    "Action": ["s3:GetObject", "s3:ListBucket"],
+    "Resource": ["arn:aws:s3:::example-bucket", "arn:aws:s3:::example-bucket/*"]
+  }]
+}'
+```
+
+### ACL Best Practices
+
+```yaml
+Filesystem ACLs:
+  └─ Avoid recursive permissions where possible (set at root + inherit)
+  └─ Use groups, not individual users (manage group membership, not ACLs)
+  └─ Document ACL changes (who changed what, when, why)
+  └─ Audit ACLs quarterly (find and remove excessive permissions)
+  └─ Prefer RBAC over filesystem ACLs for shared resources
+
+Network ACLs:
+  └─ Default deny (whitelist model — allow specific, deny everything else)
+  └─ Stateful firewalls are preferred over stateless ACLs
+  └─ Review and remove unused rules (stale allow rules are security holes)
+  └─ Order rules: most specific first, least specific last
+  └─ Use change management for all network ACL modifications
+```
+
+## Authorisation: the OWASP Perspective
+
+For web applications, broken access control is the **#1 risk** (OWASP Top 10:2021 — A01):
+
+| Vulnerability | Description | Prevention |
+|---------------|-------------|------------|
+| **IDOR** (Insecure Direct Object Reference) | User can access another user's data by changing an ID | Server-side authorisation check on every resource access |
+| **Privilege Escalation** | User performs actions beyond their role | Enforce role checks on every API call (not just in UI) |
+| **Missing Function-Level Access Control** | Admin APIs are accessible to non-admin users | Centralised authorisation middleware that checks roles for every endpoint |
+
+### Authorisation Bypass Examples
+
+```javascript
+// BAD: No server-side authorisation check
+app.get('/api/user/:id', (req, res) => {
+  const user = db.findUser(req.params.id);
+  res.json(user);  // ❌ Any authenticated user can access any user's data
+});
+
+// GOOD: Server-side authorisation check
+app.get('/api/user/:id', (req, res) => {
+  const requestingUser = req.user;
+  const targetUser = req.params.id;
+  
+  if (requestingUser.role !== 'admin' && requestingUser.id !== targetUser) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  
+  const user = db.findUser(targetUser);
+  res.json(user);  // ✅ Only admins or the user themselves can access
+});
+```
+
+```python
+# BAD: Relying on UI hiding for access control
+@app.route('/api/admin/users')
+def admin_list_users():
+    # ❌ No server-side role check!
+    users = db.query("SELECT * FROM users")
+    return jsonify(users)
+
+# GOOD: Centralised authorisation decorator
+@app.route('/api/admin/users')
+@require_role('admin')  # ✅ Server-side check
+def admin_list_users():
+    users = db.query("SELECT * FROM users")
+    return jsonify(users)
+```
+
+### Authorisation Architecture Patterns
+
+```yaml
+Centralised Authorisation (Recommended):
+  └─ All API requests pass through an authorisation gateway
+  └─ Policy Decision Point (PDP): Evaluates access policies
+  └─ Policy Enforcement Point (PEP): Enforces the decision
+  └─ Tools: OPA (Open Policy Agent), AuthzForce, AWS Verified Permissions
+
+Decentralised Authorisation:
+  └─ Each service implements its own authorisation checks
+  └─ Consistent policy is harder to maintain
+  └─ Suitable for: Small teams, simple applications
+  └─ Risk: Inconsistent enforcement, gaps in coverage
+
+Fine-Grained Authorisation (FGAC):
+  └─ Row-level security in databases
+  └─ Attribute-based policies
+  └─ Example: "User can view orders they created OR orders assigned to their team"
+  └─ Tools: PostgreSQL Row-Level Security, AWS Cedar
+```
+
+<Aside variant="tip">
+The most common access control failure is not the model you choose — it's inconsistent enforcement. Whether you use RBAC or ABAC, every API endpoint MUST check authorisation server-side. Client-side hiding (disabling buttons, hiding links) is NOT access control — it's cosmetic.
+</Aside>
+
+## Key Takeaways
+
+- Four main access control models: DAC (owner-decides), MAC (label-based), RBAC (role-based), ABAC (attribute-based) — RBAC is the most common enterprise model, ABAC offers the most flexibility for complex environments
+- RBAC design requires: discover → define → design → assign → certify → audit — skipping any step leads to privilege creep and role explosion
+- RBAC anti-patterns: role explosion, orphan roles, permission creep, fat roles — each has known mitigations
+- Zero Standing Privileges (ZSP) eliminates permanent privileged access — all admin access is JIT, time-bound, and audited; this is the single most impactful access control improvement for most organisations
+- JIT access (AWS IAM Identity Center, Azure AD PIM) dramatically reduces the risk of compromised privileged accounts — a JIT token expires in hours; a standing admin account is always available to an attacker
+- Broken access control is the #1 OWASP web application risk — every API call must verify authorisation server-side (client-side hiding is not access control)
+- Authorisation architecture should centralise policy evaluation (PDP/PEP model) rather than embedding checks in each service — OPA (Open Policy Agent) is the leading open-source policy engine
+- Least privilege is not a one-time configuration — it requires continuous certification (quarterly), auditing (continuous), and adjustment (as roles change)
+- Cloud RBAC implementations differ (AWS IAM roles, Azure RBAC assignments, GCP IAM policies) — understand the model for each provider
+- The shift from permanent roles to JIT + ABAC is the industry direction — Zero Trust architectures require dynamic, context-aware access decisions, not static role assignments

@@ -1,0 +1,59 @@
+---
+title: "SAST & DAST"
+description: "Static and dynamic application security testing — tools, integration, rules, and false positive management."
+sidebar:
+  order: 3
+  label: "SAST & DAST"
+tab: "cybersecurity"
+---
+
+## SAST vs DAST
+
+| Factor | SAST | DAST |
+|--------|------|------|
+| **When** | Pre-commit / CI | Post-deploy / staging |
+| **Access needed** | Source code | Running application URL |
+| **What it finds** | Injection, XSS, hardcoded secrets, insecure crypto | Runtime issues, auth flaws, business logic |
+| **False positives** | Higher (source code without context) | Lower (validated against running app) |
+| **Speed** | Fast (seconds to minutes) | Slower (minutes to hours) |
+
+## SAST: Semgrep Rules
+
+```yaml
+# semgrep rule: detect SQL injection
+rules:
+  - id: sql-injection-detected
+    patterns:
+      - pattern: |
+          $DB.execute("SELECT ..." + $QUERY)
+      - message: "Potential SQL injection — use parameterised queries"
+      - severity: ERROR
+      - languages: [python, javascript]
+```
+
+## DAST: OWASP ZAP Configuration
+
+```bash
+# CI-integrated DAST scan
+zap-cli quick-scan \
+  --spider \
+  --scanners all \
+  -l https://staging.example.com \
+  --fail-on-severity HIGH
+```
+
+## Combined Pipeline
+
+```yaml
+security-checks:
+  stage: security
+  parallel:
+    - name: SAST
+      script: semgrep scan --config=auto --error .
+    - name: API Security
+      script: |
+        # Validate OpenAPI spec for security issues
+        spectral lint openapi.yaml
+    - name: INFRA Security
+      script: checkov -d terraform/
+```

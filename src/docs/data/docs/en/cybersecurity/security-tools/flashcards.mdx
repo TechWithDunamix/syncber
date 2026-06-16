@@ -1,0 +1,58 @@
+---
+title: "Flashcards"
+description: "Review questions."
+sidebar:
+  order: 99
+  label: "Flashcards"
+tab: "cybersecurity"
+---
+
+**Q1:** What is the difference between EDR and XDR?
+<Aside variant="tip">
+**A:** EDR (Endpoint Detection and Response) monitors endpoints only. XDR (Extended Detection and Response) correlates across endpoints, network, email, cloud, and identity — providing broader visibility and better detection through cross-domain correlation.
+</Aside>
+
+**Q2:** What is the difference between SAST and DAST?
+<Aside variant="tip">
+**A:** SAST (Static Application Security Testing) scans source code without executing it — finds issues early in development. DAST (Dynamic Application Security Testing) scans running applications — finds runtime issues (more accurate but later in the pipeline). Shift left with SAST, validate with DAST.
+</Aside>
+
+**Q3:** What is SCA in the context of DevSecOps?
+<Aside variant="tip">
+**A:** Software Composition Analysis — scans open-source dependencies for known vulnerabilities (CVEs). Tools: Snyk, Dependabot, Trivy, OWASP Dependency-Check. Critical for supply chain security.
+</Aside>
+
+**Q4:** What is Zeek and how does it differ from Suricata?
+<Aside variant="tip">
+**A:** Zeek is a network monitoring framework that analyses traffic and produces detailed logs (connections, HTTP, DNS, SSL). Suricata is an IDS/IPS that inspects packets against signatures. Use Zeek for visibility and Suricata for threat detection.
+</Aside>
+
+**Q5:** What is an SBOM?
+<Aside variant="tip">
+**A:** Software Bill of Materials — a formal, machine-readable inventory of all components in a software application. Includes libraries, versions, licenses, and dependencies. Essential for supply chain risk management and vulnerability tracking.
+</Aside>
+
+**Q6:** What is the primary difference between CrowdStrike Falcon and traditional antivirus?
+<Aside variant="tip">
+**A:** Traditional AV uses signature-based detection. CrowdStrike uses cloud-based behavioural analysis, ML, and IoA (Indicators of Attack) — detecting malicious behaviour rather than known file signatures. This enables detection of novel/unknown malware.
+</Aside>
+
+**Q7:** What is ScoutSuite?
+<Aside variant="tip">
+**A:** An open-source multi-cloud security auditing tool. It checks AWS, Azure, and GCP configurations against security best practices and CIS benchmarks. Think of it as "Nessus for cloud configuration."
+</Aside>
+
+**Q8:** What is the difference between SAML and OAuth?
+<Aside variant="tip">
+**A:** SAML 2.0 is an XML-based protocol for SSO authentication (federation). OAuth 2.0 is a JSON-based protocol for delegated authorisation (API access). They solve different problems: SAML = "log me in", OAuth = "let this app access my data."
+</Aside>
+
+**Q9:** What are the three detection sources in an EDR?
+<Aside variant="tip">
+**A:** 1. Signature-based (known malware hashes/patterns). 2. Behavioural/ML (anomalous process behaviour, script execution patterns). 3. IoA (Indicators of Attack — chains of events that indicate an attack in progress, e.g., office app spawning PowerShell).
+</Aside>
+
+**Q10:** What is the difference between active and passive network scanning?
+<Aside variant="tip">
+**A:** Active scanning sends probes and analyses responses (nmap) — reveals open ports, services, and vulnerabilities but creates detectable traffic. Passive monitoring listens to existing traffic (Zeek) — no detectable footprint but only sees what's already communicating.
+</Aside>

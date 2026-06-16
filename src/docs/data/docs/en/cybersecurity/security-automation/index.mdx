@@ -1,0 +1,43 @@
+---
+title: "Security Automation & DevSecOps"
+description: "Learn how to automate security operations — SOAR platforms, DevSecOps pipelines, SAST/DAST, SCA, secret scanning, and policy-as-code."
+sidebar:
+  order: 3
+  label: "Security Automation"
+tab: "cybersecurity"
+---
+
+Security automation is the practice of using technology to perform security tasks with minimal human intervention. As organisations scale, the volume of security alerts, the speed of development, and the complexity of infrastructure make manual security operations unsustainable. This module covers the tools, platforms, and practices that enable security teams to automate detection, response, and compliance at scale.
+
+<Aside variant="info">
+This module includes a **[hands-on automation lab](/learn/cybersecurity/security-automation/automation-lab/)** where you will build a complete security pipeline with SAST, SCA, and policy-as-code checks.
+</Aside>
+
+## Why Security Automation Matters
+
+| Challenge | Manual Approach | Automated Approach |
+|-----------|----------------|-------------------|
+| Alert volume (SOC) | Analysts triage 50-200 alerts/day each | SOAR handles 80% of alerts automatically |
+| Vulnerability remediation | Weeks to patch critical CVEs | Automated patching within hours via CI/CD |
+| Compliance evidence | Quarterly scramble for screenshots | Continuous evidence collection |
+| Incident response | 4-8 hours to contain a breach | Minutes with automated playbooks |
+| Code security | Security reviews before release | Continuous scanning in CI/CD pipeline |
+
+According to the 2024 IBM Cost of a Data Breach Report, organisations with fully deployed security automation experienced **$1.76 million less** in breach costs compared to those without automation. The average breach lifecycle was reduced by **74 days** in organisations with automated response capabilities.
+
+## Module Pages
+
+| Page | Covers |
+|------|--------|
+| **SOAR Platforms** | SOAR capabilities, Splunk SOAR, Palo Alto XSOAR, phishing playbook |
+| **DevSecOps** | Shift-left security, CI/CD security gates, SBOM, supply chain security |
+| **SAST & DAST** | Static and dynamic analysis, Semgrep rules, OWASP ZAP |
+| **SCA & Secret Scanning** | Dependency scanning, Snyk, Dependabot, GitGuardian, TruffleHog |
+| **Policy as Code** | OPA/Rego, Checkov, tfsec, Terraform scanning |
+| **Security Pipelines** | GitHub Actions security workflows, GitLab CI templates, gate decisions |
+| **Hands-On Lab** | Build a security pipeline with SAST, SCA, OPA, and branch protection |
+| **Flashcards** | Test your knowledge |
+
+## Key Takeaways
+
+By the end of this module, you should understand SOAR platforms and playbook automation, how to embed security into CI/CD pipelines, the difference between SAST and DAST, how to scan for vulnerable dependencies and secrets, how to enforce cloud security policies with code, and how to build secure pipelines with automated gate decisions.

@@ -1,0 +1,62 @@
+---
+title: "Automation Lab"
+description: "Hands-on: build a security pipeline with SAST, SCA, OPA, and branch protection rules."
+sidebar:
+  order: 97
+  label: "Hands-On Lab"
+tab: "cybersecurity"
+---
+
+## Objective
+
+Build a complete CI/CD security pipeline with automated gates.
+
+## Step 1: Configure Branch Protection
+
+```bash
+# GitHub CLI: Require status checks before merging
+gh api repos/:owner/:repo/branches/main/protection \
+  --method PUT \
+  --field required_status_checks='{"strict":true,"contexts":["security-checks"]}' \
+  --field enforce_admins=true
+```
+
+## Step 2: Add Security Workflow
+
+Create `.github/workflows/security.yml` with SAST, SCA, secret scanning, and policy-as-code checks (use the template from the Security Pipelines page).
+
+## Step 3: Test the Pipeline
+
+```bash
+# Create a branch with deliberate vulnerabilities
+git checkout -b test-vulnerable-branch
+
+# Add a file with a secret
+echo "API_KEY=sk-live-abc123" >> .env
+
+# Add a Terraform file with a security issue
+echo 'resource "aws_security_group" "open" {
+  ingress {
+    from_port = 22
+    to_port = 22
+    protocol = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}' >> main.tf
+
+git add . && git commit -m "test: add vulnerable file"
+git push origin test-vulnerable-branch
+
+# Create PR
+gh pr create --title "Test security pipeline" --body "Testing automation"
+```
+
+## Step 4: Verify the PR Is Blocked
+
+Check that the PR shows failed security checks and cannot be merged.
+
+## Deliverables
+1. Screenshot of branch protection rules
+2. Screenshot of security workflow running
+3. Screenshot of PR blocked by security gate
+4. Screenshot of PR passing after fixing vulnerabilities

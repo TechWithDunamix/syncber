@@ -1,0 +1,303 @@
+---
+title: "Endpoint Security"
+description: "EDR, XDR, traditional AV, CrowdStrike Falcon, SentinelOne, Microsoft Defender — detection capabilities, deployment, evasion techniques, and SOC workflow integration."
+sidebar:
+  order: 1
+  label: "Endpoint Security"
+tab: "cybersecurity"
+---
+
+Endpoint security protects individual devices (workstations, servers, mobile devices) from cyber threats. Endpoints are the most targeted attack surface — every device connected to your network is a potential entry point for an attacker.
+
+## EDR vs XDR vs AV vs MDR
+
+| Tool | Scope | Approach | Staff Required | Detection Rate |
+|------|-------|----------|----------------|----------------|
+| **AV (Antivirus)** | Single endpoint | Signature-based | Minimal | ~45-60% of modern threats |
+| **EPP (Endpoint Protection)** | Single endpoint | Signature + heuristics | Low | ~60-75% |
+| **EDR (Endpoint Detection & Response)** | Single endpoint | Behavioural + ML + IoA | SOC analysts (L2/L3) | ~85-95% |
+| **XDR (Extended Detection & Response)** | Cross-domain: endpoint + network + email + cloud | Cross-correlation | SOC analysts + threat hunters | ~90-98% |
+| **MDR (Managed Detection & Response)** | Outsource to MSSP | Full-service SOC-as-a-service | None (you buy the service) | Varies by provider |
+
+### Why AV Is No Longer Sufficient
+
+Modern malware uses polymorphism, fileless execution, and living-off-the-land binaries (LOLBins) that signature-based AV cannot detect. EDR addresses these gaps through behavioural analysis:
+
+```yaml
+AV Detection:
+  └─ Hash matching: Does the file hash match a known malware hash?
+  └─ Signature matching: Does the file byte sequence match a known pattern?
+  └─ Limitation: A 1-byte change to the file bypasses hash-based detection
+
+EDR Detection:
+  └─ Process ancestry: Is PowerShell spawning from Word normal?
+  └─ Behavioural patterns: Is a process accessing LSASS memory?
+  └─ Chain analysis: Are several LOW-severity events forming a HIGH-severity attack chain?
+  └─ Machine learning: Does this behaviour deviate from the endpoint's baseline?
+```
+
+## EDR Detection Capabilities
+
+Modern EDR platforms detect across the entire MITRE ATT&CK kill chain:
+
+### Initial Access & Execution
+
+| Technique | Detection Signal | EDR Telemetry Source |
+|-----------|-----------------|---------------------|
+| **Phishing (macro-enabled document)** | Office app spawning wscript/powershell | Process tree, script block logging |
+| **Drive-by compromise** | Browser child process (unusual) | Process ancestry, command-line capture |
+| **USB drop (BadUSB)** | New USB device + autorun triggered | Device insertion events, process creation |
+| **Exploit public-facing app** | Unusual process crash patterns + shell spawn | Crash dumps, process ancestry |
+| **External remote services (RDP)** | Multiple failed logins + successful login from unusual geo | Windows Event ID 4625, 4624, network logs |
+
+### Persistence & Privilege Escalation
+
+```yaml
+Common Persistence Detections:
+  └─ Registry Run keys: New or modified HKCU\Software\Microsoft\Windows\CurrentVersion\Run
+  └─ Scheduled tasks: Task created by non-admin user pointing to unusual binary
+  └─ Startup folder: .lnk or .vbs file added to Startup folder
+  └─ WMI persistence: WMI event subscription to run on system start
+  └─ DLL search order hijacking: DLL planted in a path searched before the legitimate one
+  └─ Service creation: New service with path to %TEMP% or non-standard directory
+
+Common Privilege Escalation Detections:
+  └─ Token manipulation: SeDebugPrivilege enabled on non-admin process
+  └─ UAC bypass: Event ID 4907 (audit policy change) followed by silent process creation
+  └─ DLL sideloading: Legitimate EXE loads DLL from attacker-controlled path
+  └─ Named pipe impersonation: Pipe creation followed by privileged process connection
+  └─ Exploit: Known vulnerable driver loaded (CVE-2021-1675, CVE-2022-21894)
+```
+
+### Defense Evasion & Credential Access
+
+```yaml
+Defense Evasion Detections:
+  └─ Process injection: CreateRemoteThread, QueueUserAPC, SetThreadContext calls
+  └─ AMSI bypass: PowerShell attempting to patch or disable AMSI
+  └─ Disabling security tools: Stop-Service, killing EDR/AV processes
+  └─ Binary padding: Executable padded to exceed typical size threshold
+  └─ Signed binary abuse: Sigcheck bypass using revoked-but-signed binaries (LOLDrivers)
+  └─ Obfuscation: Base64-encoded commands, multiple encoding layers
+
+Credential Access Detections:
+  └─ LSASS dump: Procdump, Task Manager, or custom tool reading lsass.exe memory
+  └─ SAM registry hive access: reg save hklm\sam
+  └─ Kerberos ticket theft: Using Mimikatz sekurlsa::tickets
+  └─ Credential manager access: vaultcmd /list credentials
+  └─ NTDS.dit access: Volume Shadow Copy + ntdsutil
+  └─ Keylogging: SetWindowsHookEx for keyboard/mouse input
+```
+
+### Lateral Movement & C2
+
+| Technique | Detection Signal | Example Alert |
+|-----------|-----------------|---------------|
+| **Pass-the-Hash** | NTLM authentication using hash from another host | Windows Event ID 4624 (logon type 3) with network logon |
+| **RDP brute force** | Multiple failed RDP logins from same source | Windows Event ID 4625 (logon type 10) × N in timeframe |
+| **PsExec** | Service creation + IPC$ connection from admin workstation | Event ID 7045 (service install) + 5140 (IPC share access) |
+| **WMI lateral movement** | WMI process creation on remote host | Microsoft-Windows-WMI-Activity/Operational Event ID 5861 |
+| **SMB/WMI lateral** | Scheduled task creation on remote host via WMI | Event ID 4698 (scheduled task created) |
+| **C2 beaconing** | Periodic HTTPS connections to unusual domain | Network telemetry: same payload size at regular intervals |
+
+## CrowdStrike Falcon
+
+CrowdStrike is the market-leading EDR platform with cloud-native architecture:
+
+```bash
+# Falcon sensor installation (Linux)
+sudo rpm -ivh falcon-sensor-7.11.0-13206.el7.x86_64.rpm
+sudo /opt/CrowdStrike/falconctl -s --cid=ABCDEFGHIJKLMNOP
+sudo systemctl start falconsensor
+
+# Verify sensor is connected
+sudo /opt/CrowdStrike/falconctl -g --aid
+
+# Contain a host (isolate from network)
+csfalcon contain start --hostname WS-FINANCE-01
+csfalcon contain check --hostname WS-FINANCE-01
+csfalcon contain stop --hostname WS-FINANCE-01
+
+# Real-time response (RTR) — execute commands on endpoint
+csfalcon rtr --hostname WS-FINANCE-01 --command "ps aux | grep suspicious"
+csfalcon rtr --hostname WS-FINANCE-01 --command "cat /var/log/syslog | grep error"
+csfalcon rtr --hostname WS-FINANCE-01 --put suspicious_file.exe
+
+# Advanced hunting via API
+curl -s -X POST "https://api.crowdstrike.com/detects/entities/summaries/GET/v1" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "filter": "status:new+severity:critical",
+    "sort": "timestamp.desc",
+    "limit": 100
+  }'
+```
+
+### Key Features
+
+- **Cloud-native architecture**: No on-premises infrastructure needed — scales instantly
+- **Single lightweight agent**: One sensor for EDR, AV, firewall, and device control (~50MB RAM)
+- **Threat Graph**: Cloud-scale graph database of all telemetry — 1+ trillion events per week
+- **Falcon OverWatch**: 24/7 managed hunting (MDR add-on) — proactive threat detection
+- **IOA (Indicator of Attack)**: Behaviour-based detection that catches novel attacks, not just known malware
+
+### CrowdStrike Detection Example
+
+```yaml
+Detection: "Process Rollup with SMB Write to Admin Share"
+Severity: Critical
+Technique: Lateral Movement (PsExec-like behaviour)
+
+Indicators:
+  └─ Process: services.exe created svchost.exe → cmd.exe
+  └─ Network: SMB write to ADMIN$ share on remote host 10.0.2.50
+  └─ File: PSEXESVC.exe written to \\10.0.2.50\ADMIN$\
+  └─ Registry: Service created: PSEXESVC on remote host
+
+Suggested Actions:
+  └─ Contain the source host immediately
+  └─ Check if lateral movement succeeded → check remote host for access
+  └─ Review RDP/network logs for source of initial compromise
+  └─ Escalate to incident response
+```
+
+## Microsoft Defender for Endpoint
+
+```powershell
+# Onboard a Windows endpoint
+# Download the onboarding script from:
+# Microsoft 365 Defender → Settings → Endpoints → Onboarding
+
+# Run the onboarding package
+.\WindowsDefenderATPOnboardingScript.cmd
+
+# Verify onboarded state
+Get-MpComputerStatus | Select-Object AMRunningMode, AMProductVersion
+
+# Initiate scan
+Start-MpScan -ScanType QuickScan
+
+# Isolate device
+Start-MpComputerIsolation -Reason "Suspected malware" -Duration 24
+
+# Run a hunting query in Advanced Hunting (KQL)
+# DeviceProcessEvents
+# | where Timestamp > ago(7d)
+# | where ProcessCommandLine contains_any("powershell", "cmd", "wscript", "cscript")
+# | where ProcessCommandLine contains_any("-enc", "-e", "IEX", "Invoke-Expression")
+# | project Timestamp, DeviceName, ProcessCommandLine
+```
+
+### Microsoft Defender Alert Example
+
+```yaml
+Alert: "Suspicious PowerShell command line"
+Severity: High
+Category: Execution
+
+Attack chain:
+  └─ User opened malicious email attachment (Word document)
+  └─ Word spawned PowerShell with obfuscated command
+  └─ PowerShell downloaded and executed Cobalt Strike beacon
+  └─ Beacon established HTTPS connection to 185.xxx.xxx (malicious IP)
+
+Hunting KQL:
+DeviceProcessEvents
+| where Timestamp > ago(24h)
+| where FileName == "powershell.exe"
+| where ProcessCommandLine contains "-enc"
+| summarize count() by DeviceName, InitiatingProcessCommandLine
+| order by count_ desc
+```
+
+## EDR Bypass Techniques
+
+Understanding EDR bypass helps you evaluate tool effectiveness:
+
+| Technique | Description | Mitigation |
+|-----------|-------------|------------|
+| **DLL unhooking** | Remove EDR hooks from ntdll.dll in memory | EDR monitors for NT API call pattern changes; some use kernel callbacks |
+| **ETW patching** | Disable Event Tracing for Windows (ETW) to hide events | Enable ETW protection (Windows 10+ ETW security mitigation) |
+| **Syscall direct invocation** | Bypass user-mode hooks by calling syscalls directly | Kernel-mode callbacks, stack trace verification |
+| **Process hollowing** | Inject code into a suspended legitimate process | EDR monitors process creation for hollowing patterns |
+| **AMSI bypass** | Patch AMSI.dll to allow malicious scripts | Enable AMSI for all script types, use AMSI provider |
+| **EDR uninstall** | Stop or remove EDR sensor service | Tamper protection, controlled admin access, device isolation |
+
+## EDR Visibility Comparison
+
+| Capability | CrowdStrike | Microsoft Defender | SentinelOne |
+|-----------|-------------|-------------------|-------------|
+| **Process creation** | ✓ Full command-line | ✓ Full command-line | ✓ Full command-line |
+| **Network connections** | ✓ | ✓ | ✓ |
+| **File operations** | ✓ | ✓ | ✓ |
+| **Registry operations** | ✓ | ✓ | ✓ |
+| **Script content** | ✓ (PowerShell) | ✓ (full script block) | ✓ |
+| **DNS queries** | ✓ (agent-level) | ✓ (MDE sensor) | ✓ |
+| **LSASS protection** | ✓ (sensor-level) | ✓ (PPL + MDE) | ✓ |
+| **Kernel callbacks** | ✓ | ✓ | ✓ |
+| **ETW consumers** | Partial | Full (Microsoft owns ETW) | Partial |
+| **Mac support** | ✓ | Limited | ✓ |
+| **Linux support** | ✓ | ✓ | ✓ |
+
+## XDR — Extended Detection and Response
+
+XDR correlates across multiple security layers:
+
+```
+Endpoint (EDR) ←→ Network (NDR) ←→ Email ←→ Cloud ←→ Identity
+                        ↓
+                   XDR Platform
+                        ↓
+            Cross-Domain Detection Rules
+            Unified Alerting
+            Automated Response
+```
+
+| XDR Platform | Endpoint | Network | Email | Cloud | Identity |
+|-------------|----------|---------|-------|-------|----------|
+| CrowdStrike Falcon | ✓ | ✓ (acquisitions) | ✓ | ✓ | ✓ |
+| Microsoft 365 Defender | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Palo Alto Cortex XDR | ✓ | ✓ (with PANW NGFW) | ✓ | ✓ | ✓ |
+| SentinelOne Singularity | ✓ | ✓ (acquisitions) | - | ✓ | - |
+| Elastic Security | ✓ | ✓ | ✓ | ✓ | ✓ |
+
+<Aside variant="tip">
+EDR is non-negotiable for any organisation with more than 50 endpoints. If you can only buy one security tool, buy an EDR. It provides more detection value per dollar than any other control. XDR adds value if you have the maturity to use cross-domain correlation, but a good EDR is the foundation.
+</Aside>
+
+## EDR Deployment Architecture
+
+```yaml
+Deployment Considerations:
+
+Phased Rollout:
+  └─ Phase 1: Pilot on 5-10% of endpoints (IT team + security team workstations)
+  └─ Phase 2: Roll out to internet-facing servers and critical workstations
+  └─ Phase 3: All endpoints (servers, workstations, laptops) — 90% within 30 days
+  └─ Phase 4: Exceptions (legacy systems, air-gapped, specialised equipment)
+
+Performance Testing:
+  └─ CPU baseline before/after installation (expect 1-5% CPU usage)
+  └─ Boot time impact (expect 0-5 second increase)
+  └─ Application compatibility (test with critical business applications)
+  └─ Network throughput impact (negligible for agent-based EDR)
+
+Exclusions:
+  └─ Microsoft Defender + CrowdStrike: Add mutual exclusions
+  └─ High-volume database servers: Exclude specific database temp directories
+  └─ Development tools: Exclude compilers, debuggers from real-time scanning
+  └─ Backup software: Ensure backup processes are not blocked
+```
+
+## Key Takeaways
+
+- Endpoint security has evolved from signature-based AV (detects known malware, ~45-60% detection rate) to EDR (behavioural detection, ~85-95%) to XDR (cross-domain correlation, ~90-98%) — each generation provides broader and more accurate detection
+- EDR detects across the entire MITRE ATT&CK kill chain: initial access → execution → persistence → privilege escalation → defense evasion → credential access → lateral movement → C2 → exfiltration
+- CrowdStrike Falcon is the market-leading EDR with cloud-native architecture, single lightweight agent (~50MB RAM), and Threat Graph for advanced hunting
+- Microsoft Defender for Endpoint is included with many Microsoft enterprise licenses — strong capability with no additional cost for existing Microsoft customers and deep Windows integration
+- XDR adds value by correlating endpoint, network, email, cloud, and identity telemetry for cross-domain detection that no single tool can provide — especially valuable for detecting attack chains that span multiple layers
+- EDR bypass techniques exist (DLL unhooking, syscall invocation, process hollowing) — defence-in-depth with kernel callbacks and tamper protection mitigates these risks
+- EDR deployment should be phased (pilot → critical assets → all endpoints → exceptions) with performance testing and application compatibility validation
+- EDR is not "set and forget" — it requires tuned detection rules, regular review of missed detections (false negatives), and integration with SIEM and SOAR for full value
+- MDR services (CrowdStrike OverWatch, Arctic Wolf, eSentire) provide 24/7 SOC coverage if your organisation cannot staff its own — priced per endpoint per month
+- When evaluating EDR vendors, test with real attack simulations (not just malware samples) — a good EDR catches novel behaviours, not just known malware families

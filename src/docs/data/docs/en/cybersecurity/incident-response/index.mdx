@@ -1,0 +1,48 @@
+---
+title: "Incident Response"
+description: "Master incident response — NIST SP 800-61 lifecycle, CSIRT models, IR preparation, containment strategies, digital forensics, malware analysis, and ransomware response."
+sidebar:
+  order: 5
+  label: "Incident Response"
+tab: "cybersecurity"
+---
+
+**Incident response (IR)** is the structured approach to managing and resolving security incidents. When detection identifies a potential threat, incident response determines the scope, contains the damage, eradicates the adversary, and restores normal operations. Effective IR can mean the difference between a minor disruption and a catastrophic breach.
+
+According to the **2024 Ponemon Cost of a Data Breach Report**, organisations with a formal incident response team and tested IR plan save an average of **$2.66 million per breach** compared to those without. Yet only **39%** of organisations have a formal IR plan that is tested at least annually.
+
+## Core Concepts
+
+### The IR Lifecycle (NIST SP 800-61 Rev 2)
+
+The NIST framework defines four phases of incident response that form a continuous cycle:
+
+**Preparation → Detection & Analysis → Containment, Eradication & Recovery → Post-Incident Activity**
+
+Each phase feeds into the next, and lessons learned from post-incident activity improve preparation for future incidents.
+
+### CSIRT Models
+
+| Model | Description | Best For | Example |
+|-------|-------------|----------|---------|
+| **Internal CSIRT** | Dedicated in-house IR team | Large enterprises, critical infrastructure | Major bank IR team |
+| **Outsourced CSIRT** | MSSP/MDR provider handles IR | SMBs, orgs without in-house security | CrowdStrike Falcon OverWatch |
+| **Hybrid CSIRT** | Internal team + external augmentation | Mid-large enterprises | Internal L1-L2 + external L3/MDR |
+| **Coordinating CSIRT** | Coordinates response across multiple orgs | ISACs, government | FS-ISAC, CERT/CC |
+
+## Module Pages
+
+| Page | Covers |
+|------|--------|
+| **IR Lifecycle** | NIST SP 800-61 deep dive — Preparation, Detection, Containment, Eradication, Recovery, Post-Incident. Real: Mandiant + SolarWinds case study |
+| **IR Preparation** | Building the IR plan, roles, communication plan, playbooks, tools, tabletop exercises. Phishing playbook excerpt |
+| **Containment Strategies** | Immediate, network, cloud, and host containment. AWS Lambda auto-containment. Real: Colonial Pipeline containment |
+| **Digital Forensics** | Forensics methodology, order of volatility, tools (FTK Imager, Autopsy, Volatility, dd). Chain of custody |
+| **Malware Analysis** | Static and dynamic analysis, YARA rules, sandboxing (Cuckoo, ANY.RUN), reverse engineering (Ghidra). Real: TrickBot analysis |
+| **Ransomware Response** | Step-by-step ransomware response. Colonial Pipeline case study ($4.4M ransom). Identifying ransomware strains |
+| **IR Lab (Tabletop Exercise)** | **Hands-on** — Conduct a tabletop exercise. Spear-phishing → QuasarRAT → ransomware scenario. Call tree, evidence collection, communication templates |
+| **Flashcards** | Test your knowledge |
+
+## Key Takeaways
+
+By the end of this module, you should understand the full incident response lifecycle, be able to build and execute an IR plan, apply containment strategies across on-premises and cloud environments, collect forensic evidence following chain of custody, and respond effectively to ransomware incidents. The tabletop exercise lab will give you practical experience in IR decision-making under pressure.

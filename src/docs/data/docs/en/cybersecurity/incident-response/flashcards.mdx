@@ -1,0 +1,32 @@
+---
+title: "Incident Response Flashcards"
+description: "Test your knowledge of incident response — NIST IR lifecycle, preparation, containment, forensics, malware analysis, and ransomware response."
+sidebar:
+  order: 9
+  label: "Flashcards"
+tab: "cybersecurity"
+---
+
+Test your understanding of the Incident Response module. Click a card to flip it between question and answer.
+
+<FlashCardDeck>
+  <FlashCard question="What are the four phases of the NIST SP 800-61 Rev 2 incident response lifecycle?" answer="1. Preparation. 2. Detection & Analysis. 3. Containment, Eradication & Recovery. 4. Post-Incident Activity." />
+  <FlashCard question="What is the difference between a security event and a security incident?" answer="An event is any observable occurrence (e.g., a failed logon). An incident is an event that violates security policy or threatens confidentiality, integrity, or availability." />
+  <FlashCard question="What are the three CSIRT service models?" answer="Internal (in-house team), Outsourced (MSSP/MDR), and Hybrid (internal + external augmentation)." />
+  <FlashCard question="What is a tabletop exercise?" answer="A facilitated discussion-based exercise where team members walk through an incident scenario to test plans, roles, and decision-making without actually deploying tools or touching systems." />
+  <FlashCard question="Name five common incident response playbook scenarios." answer="Ransomware, Phishing, DDoS, Data Exfiltration, Insider Threat, Malware Outbreak, Unauthorised Access." />
+  <FlashCard question="What is the difference between isolation and network containment?" answer="Isolation disconnects a single host (disable NIC). Network containment blocks traffic at firewall/ACL level, which can be more targeted and reversible." />
+  <FlashCard question="What is the Order of Volatility?" answer="The sequence in which evidence should be collected based on how quickly it changes: CPU registers > RAM > network connections > running processes > disk > backups." />
+  <FlashCard question="What is the first command to run when collecting evidence from a live Linux system?" answer="`sudo dd if=/dev/sda of=/evidence/image.dd bs=4M conv=noerror,sync` — creates a forensic bit-for-bit disk image with error handling." />
+  <FlashCard question="What tool is recommended for memory analysis on a Windows system?" answer="Volatility — used to analyse RAM dumps for processes, network connections, loaded DLLs, injected code, and registry hives." />
+  <FlashCard question="What is the difference between static and dynamic malware analysis?" answer="Static analysis examines the malware without executing it (file type, hashes, strings, PE headers, YARA). Dynamic analysis executes the malware in a sandbox to observe its behaviour (network traffic, process creation, registry changes)." />
+  <FlashCard question="What was the ransom amount paid by Colonial Pipeline in 2021?" answer="$4.4 million (75 Bitcoin). The pipeline was shut down for 6 days, causing fuel shortages across the US East Coast." />
+  <FlashCard question="What are the six steps of ransomware response?" answer="1. Isolate affected systems. 2. Identify ransomware strain. 3. Preserve evidence. 4. Determine patient zero and infection vector. 5. Eradicate. 6. Restore from clean backups." />
+  <FlashCard question="What is a chain of custody form and why is it important?" answer="A document that tracks evidence from collection through analysis to court presentation. It records who handled the evidence, when, and what was done — critical for admissibility in legal proceedings." />
+  <FlashCard question="How long did the SolarWinds attackers maintain covert access before discovery?" answer="Approximately 8-14 months. The supply chain compromise was discovered by FireEye/Mandiant in December 2020, with the earliest known compromise dating back to March 2020." />
+  <FlashCard question="What are the three components of the IR communication plan?" answer="1. Internal communication (leadership, legal, HR). 2. External communication (customers, partners, regulators). 3. Media/PR communication (press statements, social media)." />
+</FlashCardDeck>
+
+<Aside variant="tip">
+Review any cards you got wrong by navigating to the corresponding module page for a deeper explanation.
+</Aside>

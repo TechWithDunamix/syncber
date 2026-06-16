@@ -1,0 +1,60 @@
+---
+title: "Security Pipelines"
+description: "GitHub Actions security workflows, GitLab CI templates, gate decisions, and branch protection."
+sidebar:
+  order: 6
+  label: "Security Pipelines"
+tab: "cybersecurity"
+---
+
+## Security Gate Decision Matrix
+
+| Gate | Condition | Pass | Fail |
+|------|-----------|------|------|
+| **SAST** | No critical/high findings | Continue | Block PR |
+| **SCA** | No critical CVEs in direct dependencies | Continue | Block PR |
+| **Secrets** | No secrets detected | Continue | Block PR |
+| **IaC** | No critical misconfigurations | Continue | Block PR |
+| **License** | No forbidden licenses | Continue | Block PR |
+| **SBOM** | SBOM generated and stored | Continue | Warning only |
+
+## GitHub Actions Workflow
+
+```yaml
+name: Security Pipeline
+on: [pull_request]
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: SAST
+        uses: semgrep/semgrep-action@v1
+        continue-on-error: true
+      
+      - name: SCA
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        continue-on-error: true
+      
+      - name: Secret Scanning
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: .
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+      
+      - name: Fail on Critical
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.setFailed("Security checks failed — review findings before merging")
+```

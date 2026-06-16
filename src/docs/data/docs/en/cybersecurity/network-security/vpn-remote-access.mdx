@@ -1,0 +1,293 @@
+---
+title: "VPN & Remote Access Security"
+description: "IPsec, SSL VPN, WireGuard protocols, remote access architecture, the Colonial Pipeline case study, and zero trust alternative."
+sidebar:
+  order: 5
+  label: "VPN & Remote Access"
+tab: "cybersecurity"
+---
+
+A Virtual Private Network (VPN) creates an encrypted tunnel between a remote device and a corporate network. VPNs have been the standard remote access technology for 25+ years, but are increasingly being replaced by Zero Trust Network Access (ZTNA).
+
+## How VPNs Work
+
+Without a VPN, traffic between a remote user and the corporate network traverses the public internet in cleartext. A VPN encrypts this traffic and encapsulates it inside a tunnel.
+
+```
+Remote User                   Internet (Encrypted)              Corporate Network
+┌──────────────┐    ┌──────────────────────────────────┐    ┌──────────────────┐
+│ Laptop        │────│  ======== VPN Tunnel ==========  │────│ Internal Resources│
+│ VPN Client    │    │  (AES-256 encrypted packets)     │    │ File Server       │
+│ (WireGuard/   │    │                                  │    │ Intranet          │
+│  OpenVPN)     │    │                                  │    │ Email             │
+└──────────────┘    └──────────────────────────────────┘    └──────────────────┘
+```
+
+## VPN Protocols Compared
+
+| Protocol | Encryption | Speed | Security | Ease of Use | Best For |
+|----------|-----------|-------|----------|-------------|----------|
+| **IPsec IKEv2** | AES-256-GCM | Fast | High | Moderate | Site-to-site, mobile devices |
+| **OpenVPN** | AES-256-CBC | Moderate | High | Easy | Cross-platform remote access |
+| **WireGuard** | ChaCha20-Poly1305 | Fastest | High | Easy | Modern, lightweight deployments |
+| **SSL VPN (TLS)** | AES-256 | Moderate | Moderate | Very easy | Browser-based, no client needed |
+| **PPTP** | MPPE-128 | Fast | Very low | Easy | DEPRECATED — do not use |
+| **L2TP/IPsec** | AES-256 | Moderate | High | Moderate | Legacy compatibility |
+
+### WireGuard — The Modern Standard
+
+WireGuard is significantly simpler than IPsec and OpenVPN:
+
+```bash
+# WireGuard server configuration (/etc/wireguard/wg0.conf)
+[Interface]
+Address = 10.0.0.1/24
+ListenPort = 51820
+PrivateKey = [SERVER_PRIVATE_KEY]
+
+# Allow forwarding
+PostUp = iptables -A FORWARD -i wg0 -j ACCEPT
+PostUp = iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+PostDown = iptables -D FORWARD -i wg0 -j ACCEPT
+PostDown = iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE
+
+[Peer]
+# Remote user laptop
+PublicKey = [USER_PUBLIC_KEY]
+PresharedKey = [PSK]  # Optional: adds layer of post-quantum resistance
+AllowedIPs = 10.0.0.2/32
+
+[Peer]
+# Another user
+PublicKey = [ANOTHER_USER_PUBLIC_KEY]
+AllowedIPs = 10.0.0.3/32
+```
+
+```bash
+# WireGuard client configuration
+[Interface]
+PrivateKey = [USER_PRIVATE_KEY]
+Address = 10.0.0.2/24
+DNS = 10.0.0.53
+
+[Peer]
+PublicKey = [SERVER_PUBLIC_KEY]
+Endpoint = vpn.company.com:51820
+AllowedIPs = 10.0.0.0/24, 192.168.1.0/24
+PersistentKeepalive = 25
+```
+
+### OpenVPN Configuration
+
+```bash
+# OpenVPN server config (/etc/openvpn/server.conf)
+port 1194
+proto udp
+dev tun
+ca ca.crt
+cert server.crt
+key server.key
+dh dh.pem
+server 10.8.0.0 255.255.255.0
+push "route 10.0.0.0 255.255.255.0"
+push "dhcp-option DNS 10.0.0.53"
+keepalive 10 120
+tls-version-min 1.2
+cipher AES-256-GCM
+auth SHA256
+max-clients 100
+user nobody
+group nogroup
+status openvpn-status.log
+log-append /var/log/openvpn.log
+verb 3
+```
+
+## Split Tunneling vs. Full Tunnel
+
+| Aspect | Split Tunnel | Full Tunnel |
+|--------|-------------|-------------|
+| **Corporate traffic** | Through VPN | Through VPN |
+| **Internet traffic** | Direct (not through VPN) | Through VPN and out corporate egress |
+| **Performance** | Faster — less overhead | Slower — all traffic double-encrypted |
+| **Security** | Internet traffic not inspected | Corporate security inspects all traffic |
+| **Corporate egress cost** | Low | High (all traffic uses corporate bandwidth) |
+| **Data exfiltration risk** | Lower (less data in tunnel) | Higher (all data accessible if VPN compromised) |
+| **Best for** | Performance-sensitive users | Regulated environments requiring full inspection |
+
+### When Split Tunneling Is Appropriate
+
+```yaml
+Allow split tunnel for:
+  - General employees (web browsing, streaming)
+  - Contractors (limited internal access)
+  - SaaS-based companies (most apps are internet-based)
+  - Video conferencing (low latency required)
+
+Require full tunnel for:
+  - PCI/SOX regulated roles
+  - Access to sensitive databases
+  - Legal and HR departments
+  - All privileged accounts (admin access)
+```
+
+## Authentication Methods
+
+VPN access is only as secure as the authentication method.
+
+| Method | Security Level | User Experience | Notes |
+|--------|---------------|-----------------|-------|
+| **Username + password** | Low | Simple | Breached: every VPN vendor has had credential stuffing |
+| **Certificate-based** | High | Seamless | Must be combined with device compliance check |
+| **MFA (TOTP)** | High | Moderate | Most common: Google Auth, Microsoft Auth |
+| **MFA (Push notification)** | High | Good | Duo, Okta Verify |
+| **MFA (U2F/WebAuthn)** | Very high | Best (tap key) | Phishing-resistant |
+| **Certificate + MFA** | Very high | Moderate | Defense in depth — strongly recommended |
+| **Device posture check** | High | Transparent | Check OS patch level, AV running, disk encryption |
+
+## Real-World Case: Colonial Pipeline Ransomware (2021)
+
+The Colonial Pipeline attack led to a 5-day shutdown of the largest fuel pipeline in the US. The root cause: a compromised VPN without MFA.
+
+### Timeline
+
+```
+April 29, 2021:
+  └─ DarkSide ransomware group gains access to Colonial Pipeline network
+  └─ Entry vector: Compromised VPN credential for an old VPN account
+  └─ Account was no longer in active use but still enabled
+  └─ VPN did NOT require MFA (single-factor authentication only)
+
+May 4, 2021 (6 days later):
+  └─ Attackers deploy ransomware on Colonial Pipeline billing systems
+  └─ Operations systems (pipeline control) are isolated — NOT affected
+  └─ But billing systems taken offline → cannot invoice customers
+  └─ Decision: shut down pipeline operations as a precaution
+
+May 7, 2021:
+  └─ Colonial Pipeline publicly discloses ransomware attack
+  └─ Fuel panic buying begins across US East Coast
+
+May 8, 2021:
+  └─ Jet fuel shortage at major airports (Atlanta, Charlotte)
+  └─ States of emergency declared in 17 states + DC
+
+May 9, 2021:
+  └─ Colonial pays $4.4M ransom in Bitcoin
+  └─ FBI later recovers $2.3M of the ransom
+
+May 12, 2021:
+  └─ Pipeline operations fully restored
+  └─ Total cost: $4.4M ransom + millions in operational losses
+```
+
+### Root Causes
+
+```yaml
+Technical Failures:
+  └─ VPN without MFA
+  └─ Old/unused VPN account was still active
+  └─ VPN credential found in a prior breach (credential stuffing)
+  └─ No anomaly detection on VPN login (3 AM login from unusual IP)
+  └─ No lateral movement detection after VPN access
+
+Governance Failures:
+  └─ No quarterly account review (orphan accounts)
+  └─ No MFA policy for remote access
+  └─ TSA had flagged pipeline cybersecurity gaps — no action taken
+  └─ No mandatory cybersecurity standards for critical infrastructure
+```
+
+### Aftermath
+
+```
+Regulatory Response:
+  └─ TSA issued Security Directives for pipelines:
+      1. Mandatory MFA for all remote access
+      2. 24/7 incident monitoring
+      3. Vulnerability assessment within 30 days
+      4. Cyber coordinator designated for each pipeline
+  └─ CISA established Joint Cyber Defense Collaborative
+  └─ Biden Executive Order on Improving Cybersecurity (May 2021)
+```
+
+## The Zero Trust Alternative (ZTNA)
+
+ZTNA (Zero Trust Network Access) is increasingly replacing VPNs. Instead of placing users on the corporate network, ZTNA grants access to specific applications.
+
+### VPN vs ZTNA
+
+```
+Traditional VPN:
+  User → VPN → Internal Network → All Resources
+  └─ User gets full network access (over-privileged)
+  └─ Once on VPN, lateral movement is possible
+  └─ VPN is easy target for attackers (wide attack surface)
+
+ZTNA (Zero Trust):
+  User → Authentication → Application Proxy → Specific App
+  └─ User gets access to specific app, not entire network
+  └─ No lateral movement (no network layer)
+  └─ Application never exposed to internet (hidden)
+```
+
+| Feature | VPN | ZTNA |
+|---------|-----|------|
+| **Network access** | Full subnet | None (app-level only) |
+| **Lateral movement** | Possible | Impossible |
+| **Internet exposure** | VPN endpoint exposed | No exposed ports |
+| **Performance** | Tunneling overhead | Application-level proxy |
+| **User experience** | Must connect/disconnect | Always-on, seamless |
+| **Scalability** | Hardware-bound | Cloud-native |
+| **MFA** | Optional (often not enforced) | Mandatory per-session |
+| **Device posture** | Not checked | Checked per request |
+| **Cost** | Hardware + licensing | Per-user subscription |
+
+### ZTNA Products
+
+| Product | Type | Key Feature |
+|---------|------|-------------|
+| Cloudflare Access | Cloud | Integrated with CDN, WAF |
+| Zscaler Private Access | Cloud | Global presence, SSE platform |
+| Perimeter 81 | Cloud | Simple setup, good for SMB |
+| Twingate | Cloud | Developer-friendly, open-source core |
+| NetFoundry | Cloud | Open-source Ziti project |
+| Tailscale | Cloud | Based on WireGuard, mesh networking |
+| Appgate SDP | On-prem/Cloud | Mature SDP vendor |
+
+## VPN Security Checklist
+
+```yaml
+Immediate (fix today):
+  └─ Enable MFA on ALL VPN connections
+  └─ Disable inactive/orphan VPN accounts
+  └─ Review VPN connection logs for anomalies
+
+Short-term (this quarter):
+  └─ Enforce device posture checks (OS patch, AV, disk encryption)
+  └─ Implement certificate-based auth
+  └─ Deploy VPN with split tunnel for general users, full tunnel for sensitive roles
+  └─ Set up VPN concentrator high availability
+
+Medium-term (this year):
+  └─ Migrate from legacy protocols (PPTP, L2TP) to WireGuard or OpenVPN
+  └─ Implement anomaly detection on VPN logins
+  └─ Consider ZTNA for high-risk or privileged access
+
+Advanced:
+  └─ Deploy ZTNA as VPN replacement for all users
+  └─ Implement continuous authentication (beyond initial login)
+  └─ Zero standing privileges — JIT (just-in-time) VPN access
+```
+
+## Key Takeaways
+
+- VPNs create encrypted tunnels but typically grant full network access — this is the fundamental security weakness exploited in the Colonial Pipeline attack ($4.4M ransom paid)
+- WireGuard is the modern VPN standard — simpler, faster, and more secure than IPsec or OpenVPN
+- Split tunneling improves performance but bypasses corporate security inspection — use full tunnel for sensitive roles
+- MFA is non-negotiable for VPN access — credential-stuffed VPN accounts were the entry vector for Colonial Pipeline, and dozens of other breaches
+- ZTNA is the evolution: grant access to specific applications, not to the entire network — this eliminates lateral movement as a concern
+- Orphan accounts (old/unused VPN accounts) are a common blind spot — the Colonial Pipeline breach used an old account
+- Certificate + MFA + device posture check provides defense-in-depth for remote access authentication
+- VPN logs are underutilised — anomaly detection on login times, locations, and devices can detect compromised credentials
+- The TSA now mandates MFA for all critical infrastructure remote access — this will become the standard across all industries

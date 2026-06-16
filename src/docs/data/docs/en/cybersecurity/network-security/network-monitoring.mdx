@@ -1,0 +1,297 @@
+---
+title: "Network Monitoring"
+description: "SNMP, NetFlow, packet capture, network baselining, alerting thresholds, and real-world detection case studies."
+sidebar:
+  order: 7
+  label: "Network Monitoring"
+tab: "cybersecurity"
+---
+
+Network monitoring is the practice of continuously observing a network for problems such as failures, congestion, and security incidents. Without monitoring, you are operating blind — attacks can run for months undiscovered.
+
+## What to Monitor
+
+| Layer | What to Monitor | Why It Matters |
+|-------|-----------------|----------------|
+| **Availability** | Device up/down, link status, routing protocol state | If a firewall goes down, traffic flows without inspection |
+| **Utilisation** | Bandwidth usage per link, per protocol | Sudden spike may indicate data exfiltration or DDoS |
+| **Latency** | Round-trip time, jitter | Degradation may indicate network issues or attacks |
+| **Errors** | CRC errors, collisions, drops | Physical layer issues or misconfigured devices |
+| **Flows** | NetFlow/sFlow/IPFIX records | Who talked to whom, how much, on what ports |
+| **DNS queries** | All DNS lookups | C2 communication, data exfiltration via DNS tunnelling |
+| **TLS certificates** | Certificate expiry, validity | Expired certs cause outages; suspicious certs may indicate MITM |
+| **DHCP** | IP address assignments | Rogue DHCP servers, IP exhaustion |
+| **Authentication** | Login attempts, failures | Brute force detection, compromised credentials |
+
+## Monitoring Protocols
+
+### SNMP (Simple Network Management Protocol)
+
+The standard protocol for collecting device information.
+
+```yaml
+SNMP Versions:
+  v1: No security (community string in cleartext) — DEPRECATED
+  v2c: Community string still in cleartext — DISCOURAGED
+  v3: Authentication + encryption — RECOMMENDED
+
+SNMP v3 Configuration (Cisco IOS):
+  snmp-server group ADMIN v3 priv read ADMINVIEW write ADMINVIEW
+  snmp-server user monitoring ADMIN v3 auth sha s3cur3Pa55 priv aes 256 An0th3rPa55
+  snmp-server host 10.0.0.50 version 3 priv monitoring
+  snmp-server enable traps syslog
+  snmp-server enable traps bgp
+  snmp-server enable traps config
+```
+
+```bash
+# Querying SNMP devices
+# Get system information
+snmpwalk -v3 -l authPriv -u monitoring -a SHA -A "s3cur3Pa55" -x AES -X "An0th3rPa55" 10.0.0.1 system
+
+# Get interface utilization
+snmpget -v3 -l authPriv -u monitoring -a SHA -A "s3cur3Pa55" -x AES -X "An0th3rPa55" 10.0.0.1 IF-MIB::ifInOctets.1
+
+# Get CPU load on Cisco device
+snmpwalk -v3 -l authPriv -u monitoring -a SHA -A "s3cur3Pa55" -x AES -X "An0th3rPa55" 10.0.0.1 CISCO-PROCESS-MIB::cpmCPUTotal5sec
+```
+
+**Common SNMP OIDs**:
+
+| OID | Description |
+|-----|-------------|
+| `1.3.6.1.2.1.1.1.0` | System description |
+| `1.3.6.1.2.1.1.3.0` | System uptime |
+| `1.3.6.1.2.1.2.2.1.10` | Interface input bytes |
+| `1.3.6.1.2.1.2.2.1.16` | Interface output bytes |
+| `1.3.6.1.2.1.2.2.1.20` | Interface errors |
+| `1.3.6.1.2.1.25.3.3.1.2` | CPU utilization |
+
+### NetFlow / sFlow / IPFIX
+
+Flow protocols record metadata about network conversations.
+
+| Protocol | Standard | Sampling | Detail Level |
+|----------|----------|----------|--------------|
+| **NetFlow v5** | Cisco proprietary | Sampled | Basic (src/dst IP, port, protocol, packets, bytes) |
+| **NetFlow v9** | Template-based | Sampled | Flexible (configurable fields) |
+| **sFlow** | RFC 3176 | Sampled | Packet headers + counter polling |
+| **IPFIX** | RFC 7011 | Configurable | NetFlow v9 evolution, standardised |
+
+```bash
+# NetFlow configuration (Cisco IOS)
+ip flow-export source Loopback0
+ip flow-export version 9
+ip flow-export destination 10.0.0.50 2055
+
+! Enable NetFlow on interfaces
+interface GigabitEthernet0/0
+ ip flow ingress
+ ip flow egress
+
+! Flexible NetFlow (more detailed)
+flow record NETFLOW-RECORD
+ match ipv4 source address
+ match ipv4 destination address
+ match ipv4 protocol
+ match transport source-port
+ match transport destination-port
+ match interface input
+ collect counter bytes long
+ collect counter packets long
+ collect timestamp sys-uptime first
+ collect timestamp sys-uptime last
+
+flow exporter NETFLOW-EXPORTER
+ destination 10.0.0.50
+ source Loopback0
+ transport udp 2055
+ template data timeout 60
+
+flow monitor NETFLOW-MONITOR
+ exporter NETFLOW-EXPORTER
+ record NETFLOW-RECORD
+
+interface GigabitEthernet0/0
+ ip flow monitor NETFLOW-MONITOR input
+ ip flow monitor NETFLOW-MONITOR output
+```
+
+## Alerting Thresholds
+
+### What Good Alerting Looks Like
+
+```yaml
+Alert Severity Levels:
+  
+  P1 — Critical (Immediate response, 24/7):
+    └─ Firewall down (no traffic flowing)
+    └─ Core switch CPU > 90%
+    └─ Link saturation > 95% for > 5 minutes
+    └─ SIEM correlation triggered (indicator of compromise)
+
+  P2 — High (Respond within 1 hour):
+    └─ Backup link active (primary failed)
+    └─ BGP session down
+    └─ DNS resolution failure rate > 10%
+    └─ Authentication failure spike > 5x baseline
+
+  P3 — Medium (Respond within 8 hours):
+    └─ Link utilization > 80% (capacity planning)
+    └─ TLS cert expiring within 30 days
+    └─ Device with high error rate > 1%
+    └─ DHCP pool > 90% exhausted
+
+  P4 — Low (Respond within 1 week):
+    └─ Device firmware outdated
+    └─ Non-critical device unreachable
+    └─ SNMP polling errors
+    └─ Small authentication failures
+```
+
+### Common Alerting Mistakes
+
+```yaml
+Mistake 1: Alerting on everything
+  └─ "Interface Gi0/1 went up" — Who cares? This is noise.
+  └─ Fix: Only alert on state changes that require action.
+
+Mistake 2: Static thresholds that never adjust
+  └─ "CPU > 80%" might be normal during business hours
+  └─ Fix: Use dynamic baselines (e.g., Zabbix, Prometheus adaptive thresholds)
+
+Mistake 3: No de-duplication
+  └─ Down switch triggers alerts for all 48 connected devices
+  └─ Fix: Alert correlation (parent-child dependency mapping)
+
+Mistake 4: Alert fatigue
+  └─ 1,000 alerts per day → analysts ignore them all
+  └─ Fix: Tune relentlessly. Every alert should require action.
+
+Mistake 5: No runbook
+  └─ Alert fires. Nobody knows what to do.
+  └─ Fix: Every alert has a linked runbook with response steps.
+```
+
+## Network Baselining
+
+Before you can detect anomalies, you must understand what "normal" looks like.
+
+### Baseline Metrics to Establish
+
+```yaml
+Weekly Traffic Baseline:
+  └─ Peak hours vs off-peak (e.g., 2 Gbps at noon vs 200 Mbps at 2 AM)
+  └─ Protocol distribution (80% HTTPS, 10% DNS, 5% SSH, 5% other)
+  └─ Top talkers (which IPs consume the most bandwidth)
+  └─ Top conversations (client-server pairs)
+  └─ New connection rate per second
+  └─ DNS query rate per second
+
+Monthly Baseline:
+  └─ Business day pattern vs weekend pattern
+  └─ Patterns around month-end (financial reporting increases traffic)
+  └─ Backup window traffic patterns
+
+Quarterly Baseline:
+  └─ Organic growth rate (traffic increases 5% per quarter)
+  └─ New application deployment traffic signatures
+```
+
+### How to Baseline
+
+```bash
+# Using tshark (command-line Wireshark) to capture baseline
+tshark -i eth0 -a duration:3600 -w /tmp/baseline.pcap
+
+# Analyze protocol distribution
+tshark -r /tmp/baseline.pcap -q -z io,phs
+
+# ====================================================================
+# Protocol Hierarchy Statistics
+# filter: none
+# eth                                      frames:452340 bytes:482MB
+#   ip                                     frames:450100 bytes:480MB
+#     tcp                                  frames:380200 bytes:440MB
+#       http                               frames:1200 bytes:2MB
+#       tls                                frames:365000 bytes:420MB
+#       ssh                                frames:8000 bytes:10MB
+#     udp                                  frames:69900 bytes:40MB
+#       dns                                frames:65000 bytes:8MB
+#       ntp                                frames:4900 bytes:0.3MB
+
+# Top talkers by bytes
+tshark -r /tmp/baseline.pcap -q -z conv,ip
+
+# ====================================================================
+# IPv4 Conversations
+# Filter: none
+#                                        |       <-      | |       ->      | |     Total     |    Relative    |
+#                                        Frames  Bytes   | Frames  Bytes   | Frames  Bytes   |    start       |
+# 192.168.1.100    <-> 10.0.0.50        12000   45MB      18000   60MB      30000   105MB     0.000000
+# 192.168.1.101    <-> 10.0.0.52         8000   30MB      12000   40MB      20000    70MB     0.015000
+```
+
+## Real Case: Monitoring Failure at Target (2013)
+
+The Target breach detection failure was partly a monitoring failure:
+
+```
+What Happened:
+  └─ FireEye (Target's security vendor) detected the malware in September 2013
+  └─ FireEye alerted Target's security team in Bangalore, India
+  └─ The security team evaluated the alert and decided it was not a threat
+  └─ FireEye continued alerting for weeks — each alert ignored
+  └─ No automated action or escalation was triggered
+
+Why Monitoring Failed:
+  └─ No SIEM correlation (alerts were isolated, not aggregated)
+  └─ Alert fatigue (too many alerts, too few analysts)
+  └─ No escalation if alert not acknowledged within time window
+  └─ No integration between detection tools and response workflow
+  └─ Management had no visibility into alert volume or response metrics
+
+What Should Have Happened:
+  └─ Automated response: FireEye alerts → SIEM correlation → block traffic → page on-call
+  └─ Escalation: Alert not reviewed within 15 minutes → escalate to senior analyst → then CISO
+  └─ Metrics: Track time-to-acknowledge and time-to-respond for every alert
+  └─ Runbooks: Every alert type has a documented response procedure
+```
+
+## Monitoring Architecture
+
+```
+Network Devices ──SNMP──┐
+Switches       ──NetFlow┼───> Monitoring Server ──> Alerting (PagerDuty/OpsGenie)
+Firewalls      ──Syslog─┤       (Zabbix/Prometheus/  ──> Dashboard (Grafana)
+Routers        ──SNMP──┘        LibreNMS)             ──> SIEM (Splunk/ELK)
+Wireless APs   ──SNMP──┐                              ──> Ticketing (Jira/ServiceNow)
+Load Balancers ──Syslog─┼───> Log Aggregator
+Cloud APIs     ──API───┘       (ELK/Loki)
+```
+
+### Recommended Monitoring Stack
+
+| Tool | Purpose | License |
+|------|---------|---------|
+| **LibreNMS** | SNMP-based device monitoring, auto-discovery | Open source |
+| **Prometheus** | Metrics collection, alerting | Open source |
+| **Grafana** | Dashboards, visualisation | Open source |
+| **ELK Stack** | Log aggregation, search, visualisation | Open source |
+| **ntopng** | NetFlow/IPFIX analysis | Open source |
+| **Wireshark/TShark** | Deep packet inspection | Open source |
+| **Nagios/Icinga** | Legacy monitoring (still widely used) | Open source |
+| **Zabbix** | Enterprise monitoring, auto-discovery | Open source |
+| **SolarWinds Orion** | Commercial NMS | Commercial |
+
+## Key Takeaways
+
+- Network monitoring is essential for security detection — without baselines, you cannot identify anomalous traffic that indicates compromise
+- SNMP v3 must be used (v1/v2c send community strings in cleartext) — configure authentication and encryption
+- Flow data (NetFlow/sFlow/IPFIX) provides conversation-level visibility — who talked to whom, when, how much, on what ports — critical for incident investigation
+- Alert thresholds must be dynamic and baselined — static thresholds generate noise or miss genuine issues
+- The Target breach persists as a monitoring failure case: alerts were generated but ignored due to lack of escalation, SIEM correlation, and response automation
+- Alert fatigue is managed by ruthlessly tuning: every alert must require action, have a runbook, and have an owner
+- Network baselines must be established per time window (peak/off-peak, weekday/weekend, month-end) before anomaly detection can work
+- A monitoring stack should cover SNMP (device health), NetFlow (conversations), Syslog (events), and API (cloud) — no single tool covers everything
+- Every alert needs an escalation path: no acknowledgment in X minutes → escalate to senior → management

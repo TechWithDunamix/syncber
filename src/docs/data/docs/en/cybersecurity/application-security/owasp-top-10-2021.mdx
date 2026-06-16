@@ -1,0 +1,276 @@
+---
+title: "OWASP Top 10 — 2021"
+description: "Deep dive into the OWASP Top 10 web application security risks with real exploitation examples, code snippets, and mitigation strategies for each category."
+sidebar:
+  order: 2
+  label: "OWASP Top 10 2021"
+tab: "cybersecurity"
+---
+
+The OWASP Top 10 is the definitive list of the most critical security risks to web applications. Published by the Open Web Application Security Project, it is updated every 3-4 years based on data from hundreds of organisations and millions of applications.
+
+## Overview of the 2021 List
+
+The 2021 edition introduced significant changes: categories were renamed and reorganised, and data was gathered from over 500,000 applications.
+
+### The Complete List
+
+| Rank | Risk | Change from 2017 | Key Stat |
+|------|------|-------------------|----------|
+| A01 | **Broken Access Control** | ⬆ #1 (up from #5) | 94% of applications tested had some form of broken access control |
+| A02 | **Cryptographic Failures** | ⬆ #2 (was Sensitive Data Exposure) | 49% of violations relate to crypto — also former #3 |
+| A03 | **Injection** | ⬇ #3 (was #1) | 274,000+ occurrences found across tested apps |
+| A04 | **Insecure Design** | 🆕 New category | Focuses on architecture-level flaws |
+| A05 | **Security Misconfiguration** | ⬇ #5 (was #6) | 90% of applications had some misconfiguration |
+| A06 | **Vulnerable & Outdated Components** | ⬇ #6 (was #9) | Known vulnerability in 84% of codebases (Snyk 2024) |
+| A07 | **Identification & Authentication Failures** | ⬇ #7 (was #2) | 6 million+ credential stuffing attacks daily |
+| A08 | **Software & Data Integrity Failures** | 🆕 New category | Supply chain, CI/CD pipeline attacks |
+| A09 | **Security Logging & Monitoring Failures** | ⬇ #9 | Average detection time: 207 days |
+| A10 | **SSRF — Server-Side Request Forgery** | 🆕 New category | Promoted from community survey |
+
+## A01 — Broken Access Control
+
+**What it is**: When users can perform actions or access data beyond their intended permissions.
+
+### Real-World Examples
+
+```
+1. IDOR (Insecure Direct Object Reference)
+   └─ User changes URL from /api/users/123 to /api/users/456
+   └─ Sees another user's personal data
+   └─ No authorisation check on the backend
+
+2. Privilege Escalation
+   └─ Normal user sends POST /admin/deleteUser
+   └─ Server doesn't verify admin role
+   └─ Regular user deletes admin accounts
+
+3. Missing Access Control on APIs
+   └─ Mobile app calls GET /api/orders
+   └─ Backend returns all orders (not just user's)
+   └─ No filtering by authenticated user ID
+```
+
+### Prevention
+
+```python
+# BROKEN — No access control check
+@app.route('/api/users/<int:user_id>')
+def get_user(user_id):
+    user = db.query(f"SELECT * FROM users WHERE id = {user_id}")
+    return jsonify(user)
+
+# FIXED — Verify the requesting user owns the resource
+@app.route('/api/users/<int:user_id>')
+def get_user(user_id):
+    current_user_id = get_current_user_id()
+    if current_user_id != user_id and not is_admin():
+        return jsonify({"error": "Forbidden"}), 403
+    user = db.query("SELECT * FROM users WHERE id = ?", (user_id,))
+    return jsonify(user)
+```
+
+## A02 — Cryptographic Failures (formerly Sensitive Data Exposure)
+
+**What it is**: When sensitive data is not properly encrypted or protected.
+
+### Common Failures
+
+| Failure | Example | Impact |
+|---------|---------|--------|
+| Weak encryption algorithm | Using MD5 for passwords | Passwords cracked in seconds |
+| No encryption in transit | HTTP instead of HTTPS | Traffic sniffable on same network |
+| Hardcoded keys | API key in source code | Keys exposed in GitHub |
+| Predictable IV | Static IV in AES-CBC | Chosen-plaintext attacks |
+| Improper certificate validation | Self-signed certs accepted | MITM attacks possible |
+
+### Prevention
+
+```yaml
+Minimum Crypto Standards:
+  └─ Passwords: bcrypt (cost 10+), Argon2, PBKDF2
+  └─ TLS: v1.2 minimum, v1.3 preferred
+  └─ Symmetric: AES-256-GCM (not CBC)
+  └─ Asymmetric: RSA-2048+ or ECDSA P-256
+  └─ Hashing: SHA-256 minimum (not MD5, not SHA-1)
+  └─ Key storage: HSM or key management service (AWS KMS, Azure Key Vault)
+  └─ Perfect Forward Secrecy: Required for TLS
+```
+
+## A03 — Injection
+
+**What it is**: Untrusted data sent to an interpreter (SQL, NoSQL, OS command, LDAP, etc.) as part of a command or query.
+
+### SQL Injection Deep Dive
+
+```sql
+-- VULNERABLE: String concatenation
+query = "SELECT * FROM users WHERE email = '" + email + "' AND password = '" + password + "'"
+
+-- Input: email = "admin@test.com' -- "
+-- Result: SELECT * FROM users WHERE email = 'admin@test.com' -- ' AND password = 'anything'
+-- The -- comments out the password check. Logged in as admin!
+
+-- Input: email = "' OR 1=1 -- "
+-- Result: SELECT * FROM users WHERE email = '' OR 1=1 -- '
+-- Returns all users. Logged in as the first user.
+```
+
+```python
+# FIXED: Parameterised query (SQL injection impossible)
+cursor.execute(
+    "SELECT * FROM users WHERE email = ? AND password = ?",
+    (email, password)
+)
+```
+
+## A04 — Insecure Design
+
+**What it is**: Architecture-level flaws that cannot be fixed with code changes alone. The most costly category to remediate because it requires redesign.
+
+### Examples
+
+| Design Flaw | Description | Fix |
+|------------|-------------|-----|
+| Missing rate limiting | API allows unlimited login attempts | Implement rate limiting per IP and per user |
+| Trusting client-side access control | UI hides admin button but API has no check | Server-side authorisation for every request |
+| No abuse case modelling | Only considered "happy path" in design | Threat model during design phase |
+| Credit: store before validate | Application charges card before validating | Validate before processing payment |
+
+## A05 — Security Misconfiguration
+
+**What it is**: Missing security hardening, unnecessary features enabled, default accounts unchanged, overly permissive CORS, verbose error messages.
+
+### Common Misconfigurations
+
+```yaml
+Cloud Misconfigurations:
+  └─ AWS S3 bucket set to public (most common cloud breach cause)
+  └─ Default security group allows all traffic (0.0.0.0/0)
+  └─ Database publicly accessible from internet
+
+Web Server Misconfigurations:
+  └─ Directory listing enabled (attacker sees file structure)
+  └─ Default admin credentials (admin:admin)
+  └─ Error pages revealing stack traces
+  └─ Sample applications left deployed (/admin, /test)
+
+Framework Misconfigurations:
+  └─ Debug mode enabled in production (Django DEBUG=True)
+  └─ CORS set to Access-Control-Allow-Origin: *
+  └─ HSTS not enabled
+```
+
+## A06 — Vulnerable & Outdated Components
+
+**What it is**: Using libraries, frameworks, and dependencies with known vulnerabilities.
+
+```
+The Log4Shell vulnerability (CVE-2021-44228, December 2021):
+  └─ CVSS 10.0 (maximum severity)
+  └─ Remote code execution in Apache Log4j logging library
+  └─ Affected millions of applications (every Java app using Log4j)
+  └─ Exploitation began within hours of disclosure
+  └─ Some organisations still unpatched 6+ months later
+
+Why it keeps happening:
+  └─ Developers don't track dependency versions
+  └─ No automated vulnerability scanning in CI/CD
+  └─ Transitive dependencies (library includes vulnerable sub-library)
+  └─ "It works, don't touch it" mentality
+```
+
+**Prevention**: SCA (Software Composition Analysis) tools like Snyk, Dependabot, OWASP Dependency-Check.
+
+## A07 — Identification & Authentication Failures
+
+**What it is**: Weak authentication mechanisms, session management flaws, and credential-related vulnerabilities.
+
+| Issue | Example | Impact |
+|-------|---------|--------|
+| Weak passwords | No complexity requirements | Easily guessed |
+| No MFA | Single-factor only | Credential stuffing works |
+| Credential stuffing | No rate limiting | Automated attacks succeed |
+| Session fixation | Session ID not regenerated on login | Attacker can hijack session |
+| Weak session IDs | Predictable session tokens | Session prediction attack |
+
+## A08 — Software & Data Integrity Failures
+
+**What it is**: Failing to verify the integrity of software/data from untrusted sources.
+
+**The SolarWinds case (2020)**:
+```
+  └─ Attackers compromised the SolarWinds build pipeline
+  └─ Signed malicious code with SolarWinds certificate
+  └─ 18,000 customers installed the backdoored update
+  └─ Including US federal government agencies
+  └─ Undetected for 9+ months
+
+  Prevention:
+  └─ Signed code: Verify digital signatures of all dependencies
+  └─ SBOM: Software Bill of Materials for every application
+  └─ Reproducible builds: Build from source, not precompiled binaries
+  └─ CI/CD security: Protect build pipeline, limit who can push
+```
+
+## A09 — Security Logging & Monitoring Failures
+
+**What it is**: Not logging security-relevant events, or having logs that nobody monitors.
+
+### What Should Be Logged
+
+```yaml
+Must Log:
+  └─ All authentication attempts (success + failure)
+  └─ Privileged operations (admin actions, role changes)
+  └─ Data access to sensitive records
+  └─ Configuration changes
+  └─ Error conditions (especially 403, 500 errors)
+  └─ Input validation failures
+
+Must NOT Log:
+  └─ Passwords (even hashed during transmission)
+  └─ Credit card numbers (PCI violation)
+  └─ PII without business justification (GDPR violation)
+  └─ Session tokens (privilege escalation risk)
+```
+
+## A10 — SSRF (Server-Side Request Forgery)
+
+**What it is**: Attacker makes the server send requests to internal resources that should not be publicly accessible.
+
+```python
+# VULNERABLE: Application fetches a URL provided by the user
+url = request.args.get('url')
+response = requests.get(url)  # User can pass file:///etc/passwd or http://169.254.169.254/ (AWS metadata)
+
+# Exploitation:
+# SSRF to AWS metadata endpoint:
+# GET /fetch?url=http://169.254.169.254/latest/meta-data/iam/security-credentials/admin
+# Returns AWS access keys allowing full cloud account access
+
+# SSRF to internal service:
+# GET /fetch?url=http://internal-admin-panel/deleteUser?id=admin
+# Exploits internal service that has no authentication
+```
+
+**Capital One 2019 Breach (SSRF case study)**:
+```
+  └─ Attacker exploited SSRF in a WAF misconfiguration
+  └─ Accessed AWS metadata service from a web server
+  └─ Stole IAM role credentials for the server
+  └─ Used those credentials to exfiltrate S3 data
+  └─ 106 million customer records compromised
+  └─ $190M in fines and settlements
+```
+
+## Key Takeaways
+
+- Broken Access Control is now #1 — most common and most impactful web vulnerability
+- Injection dropped to #3 but remains critical — parameterised queries prevent it entirely
+- Insecure Design (A04) is new — architecture-level flaws are the most expensive to fix
+- SSRF (A10) is new — Capital One breach demonstrated its devastating potential
+- Supply chain attacks (A08) are exploding — SolarWinds, Log4j, 3CX
+- Security misconfiguration (A05) affects 90% of applications — automate hardening with CIS benchmarks
+- Logging (A09) is the silent killer — without it, breaches go undetected for months
+- OWASP Top 10 is a starting point, not a comprehensive list — real-world threat modelling goes deeper

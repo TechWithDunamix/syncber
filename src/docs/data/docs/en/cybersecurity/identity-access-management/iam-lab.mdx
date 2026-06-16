@@ -1,0 +1,195 @@
+---
+title: "IAM Lab"
+description: "Hands-on: configure SSO in Azure AD or Okta, implement RBAC, set up a JIT access policy, and run an access certification campaign."
+sidebar:
+  order: 97
+  label: "IAM Lab"
+tab: "cybersecurity"
+---
+
+## Objective
+
+Configure core IAM controls in a cloud identity provider: SSO, RBAC, JIT privileged access, and an access certification campaign.
+
+## Option A: Azure AD / Entra ID Lab
+
+### Prerequisites
+- Azure subscription (free trial: azure.com/free)
+- Global Admin access to Azure AD tenant
+
+### Step 1: Configure SSO with a Sample Application
+
+```powershell
+# Register a test enterprise application
+Connect-MgGraph -Scopes "Application.ReadWrite.All", "Directory.ReadWrite.All"
+
+# Create a test application
+$app = New-MgApplication -DisplayName "FinanceApp-Test" `
+  -Web @{ RedirectUris = @("https://localhost:3000/auth/callback") }
+
+# Enable it for SSO
+New-MgServicePrincipal -AppId $app.AppId -DisplayName "FinanceApp-Test"
+
+# Assign users to the application
+New-MgServicePrincipalAppRoleAssignment `
+  -ServicePrincipalId $sp.Id `
+  -PrincipalId "user@domain.com" `
+  -AppRoleId ($sp.AppRoles | Where-Object { $_.AllowedMemberTypes -contains "User" }).Id `
+  -ResourceId $sp.Id
+```
+
+### Step 2: Implement RBAC
+
+```powershell
+# Create custom Azure AD roles
+# Azure AD → Roles and administrators → New custom role
+
+# Role: Finance Reader
+$role = @{
+  "displayName" = "Finance Reader"
+  "description" = "Read-only access to financial applications"
+  "permissions" = @(
+    @{ "allowedResourceActions" = @("microsoft.directory/applications/standard/read") }
+  )
+}
+
+# Assign role to Finance team members
+Add-MgRoleManagementDirectoryRoleAssignment `
+  -PrincipalId "user@domain.com" `
+  -RoleDefinitionId $roleDefinition.Id `
+  -DirectoryScopeId "/"
+```
+
+### Step 3: Configure JIT Access with PIM
+
+```powershell
+# Enable Azure AD Privileged Identity Management
+# Azure AD → Privileged Identity Management → Azure AD roles → Settings
+
+# Configure JIT for Global Administrator role:
+$settings = @{
+  "approvalRequired" = $true
+  "approvers" = @("security-admin@domain.com")
+  "maximumDuration" = "PT4H"  # 4 hours max
+  "requireMfaOnActivation" = $true
+  "requireTicketInfoOnActivation" = $true
+  "requireJustification" = $true
+}
+
+# Apply to Global Administrator role
+Set-MgRoleManagementDirectoryRoleEligibilityScheduleRequest -RoleDefinitionId "62e90394-69f5-4237-9190-012177145e10" `
+  -PrincipalId "user@domain.com" `
+  -Action "AdminAssign" `
+  -Justification "Lab exercise - testing JIT access"
+```
+
+### Step 4: Run an Access Certification
+
+```powershell
+# Azure AD → Identity Governance → Access Reviews → New access review
+
+# Create a review of all users with Global Admin access
+$review = @{
+  "displayName" = "Q1 2026 — Global Admin Access Review"
+  "description" = "Quarterly review of all Global Administrators"
+  "scope" = @{
+    "@odata.type" = "#microsoft.graph.accessReviewScope"
+    "query" = "/administrativeUnits/{id}/members"
+  }
+  "reviewers" = @(@{ "query" = "/users/{security-admin-id}" })
+  "settings" = @{
+    "mailNotificationsEnabled" = $true
+    "reminderNotificationsEnabled" = $true
+    "autoApplyDecisionsEnabled" = $true
+    "defaultDecisionEnabled" = $false
+    "instanceDurationInDays" = 14
+  }
+}
+
+New-MgIdentityGovernanceAccessReviewDefinition -BodyParameter $review
+```
+
+## Option B: Okta Lab
+
+### Prerequisites
+- Okta Developer account (developer.okta.com — free)
+
+### Step 1: Configure SSO
+
+```bash
+# Create an OIDC application in Okta
+curl -X POST "https://${OKTA_DOMAIN}/api/v1/apps" \
+  -H "Authorization: SSWS ${API_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "oidc_client",
+    "label": "Finance App",
+    "signOnMode": "OPENID_CONNECT",
+    "credentials": {
+      "oauthClient": {
+        "client_uris": ["https://localhost:3000"],
+        "token_endpoint_auth_method": "client_secret_basic"
+      }
+    }
+  }'
+```
+
+### Step 2: Implement Group-Based RBAC
+
+```bash
+# Create Okta groups
+curl -X POST "https://${OKTA_DOMAIN}/api/v1/groups" \
+  -H "Authorization: SSWS ${API_TOKEN}" \
+  -d '{"profile": {"name": "Finance-Admin", "description": "Finance administrators"}}'
+
+curl -X POST "https://${OKTA_DOMAIN}/api/v1/groups" \
+  -H "Authorization: SSWS ${API_TOKEN}" \
+  -d '{"profile": {"name": "Finance-ReadOnly", "description": "Finance read-only users"}}'
+
+# Assign app to group with specific role
+# Okta → Applications → Finance App → Assignments → Assign to Group
+# Select group "Finance-Admin" with role "admin"
+# Select group "Finance-ReadOnly" with role "read-only"
+```
+
+### Step 3: Configure MFA Policy
+
+```bash
+# Create MFA policy for finance app
+curl -X POST "https://${OKTA_DOMAIN}/api/v1/policies" \
+  -H "Authorization: SSWS ${API_TOKEN}" \
+  -d '{
+    "type": "MFA_ENROLL",
+    "name": "Finance App MFA Policy",
+    "conditions": {
+      "app": {"appfilter": {"filter": "app.id eq \"0oa...\""}}
+    },
+    "settings": {
+      "factors": [
+        {"factorType": "password"},
+        {"factorType": "webauthn"},
+        {"factorType": "token:software:totp"}
+      ]
+    }
+  }'
+```
+
+## Deliverables
+
+1. **SSO Configuration**: Screenshot of SSO login flow (user authenticates at IdP, redirected to app)
+2. **RBAC Implementation**: Screenshot of role/group assignments showing different access levels for different users
+3. **JIT Access Policy**: Screenshot of PIM configuration showing approval workflow and time limits
+4. **Access Certification**: Screenshot of an access review campaign with at least one access right certified and one revoked
+
+## Bonus Challenge
+
+Configure a "break glass" emergency access account:
+- Create a separate Global Admin account with 25+ character password
+- Store the password in a sealed envelope in a safe (or PAM emergency code)
+- The account has no MFA (by design — it's for when MFA is unavailable)
+- Document the procedure for when and how to use it
+- Show the audit trail of when the account is used
+
+<Aside variant="tip">
+The break glass account is an important IAM concept — it exists for literal emergencies (e.g., MFA system is down). It MUST have compensating controls: physical security (sealed envelope/safe), documented procedure, alerting on use, and mandatory password rotation after each use.
+</Aside>

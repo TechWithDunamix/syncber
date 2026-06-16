@@ -1,0 +1,300 @@
+---
+title: "Network Segmentation"
+description: "Network segmentation principles, VLANs, micro-segmentation, zero trust network access, and the Target 2013 breach case study."
+sidebar:
+  order: 2
+  label: "Network Segmentation"
+tab: "cybersecurity"
+---
+
+Network segmentation divides a computer network into smaller sub-networks, each with its own security controls. It is one of the most effective controls for limiting lateral movement — the ability of an attacker to spread from one compromised system to others.
+
+## What Is Network Segmentation?
+
+Segmentation is the practice of creating security boundaries within a network. Traffic crossing a boundary must pass through a controlled chokepoint (firewall, router ACL, security group) where it can be inspected and filtered.
+
+### Flat vs. Segmented Network
+
+```
+Flat Network (Unsegmented):
+┌─────────────────────────────────────────────┐
+│  Same Broadcast Domain / Same Subnet         │
+│                                               │
+│  [Web Server]───[Database]───[HR System]      │
+│       │             │            │            │
+│  [Printer]────[Employee PC]──[CEO Laptop]     │
+│       │             │            │            │
+│  [Guest WiFi]───[IoT Device]──[AD Server]    │
+└─────────────────────────────────────────────┘
+  ❌ If any device is compromised → attacker can reach everything
+
+Segmented Network:
+┌─────────┐  ┌──────────┐  ┌────────────┐
+│ Public   │  │ Private  │  │ Management │
+│ (DMZ)    │  │ (Internal)│ │ (Admin)    │
+├─────────┤  ├──────────┤  ├────────────┤
+│ Web     │  │ Database │  │ AD Domain  │
+│ Server 1│  │ Primary  │  │ Controller │
+│ Web     │  │ App      │  │ Jump Box   │
+│ Server 2│  │ Servers  │  │ SIEM       │
+└────┬────┘  └────┬─────┘  └─────┬──────┘
+     │            │              │
+     └─────Firewall──────────────┘
+         (inspect, filter, log)
+  ✅ Compromise in DMZ → attacker cannot reach database
+```
+
+## Why Segment?
+
+| Reason | Explanation | Example |
+|--------|-------------|---------|
+| **Limit lateral movement** | Attacker compromising one zone cannot freely access others | Web server breach cannot reach database segment |
+| **Compliance** | PCI DSS req 1.2 — cardholder data must be on isolated network segment | PCI environment separated from corporate network |
+| **Performance** | Reduced broadcast traffic, less noise | VoIP traffic isolated from data traffic |
+| **Access control** | Granular controls per segment | HR systems only accessible from HR subnet |
+| **Monitoring** | Chokepoints for traffic inspection | All traffic crossing segments inspected by IPS |
+| **Attack surface reduction** | Internal systems not visible from untrusted networks | Database servers have no public IP |
+
+## Segmentation Techniques
+
+### 1. Physical Segmentation (Air Gaps)
+
+The most absolute form — physically separate networks with no electronic connection.
+
+| Pros | Cons |
+|------|------|
+| Absolute isolation | Expensive (separate cabling, switches, routers) |
+| No risk of VLAN hopping | Maintenance overhead |
+| Compliance requirement for highest-security environments | Inconvenient for users |
+
+**Real use**: Military classified networks (SIPRNet vs NIPRNet) use physical separation.
+
+### 2. VLAN Segmentation (Virtual LANs)
+
+Logical separation using IEEE 802.1Q VLAN tagging on the same physical switch.
+
+```bash
+# VLAN Configuration (Cisco IOS)
+interface GigabitEthernet0/1
+ description Web Server DMZ
+ switchport mode access
+ switchport access vlan 10
+
+interface GigabitEthernet0/2  
+ description Database Private
+ switchport mode access
+ switchport access vlan 20
+
+interface GigabitEthernet0/24
+ description Trunk to Firewall
+ switchport mode trunk
+ switchport trunk allowed vlan 10,20,30
+
+! VLAN routing — Inter-VLAN Routing (Router-on-a-Stick)
+interface GigabitEthernet0/0.10
+ encapsulation dot1Q 10
+ ip address 10.0.10.1 255.255.255.0
+
+interface GigabitEthernet0/0.20
+ encapsulation dot1Q 20
+ ip address 10.0.20.1 255.255.255.0
+```
+
+**Security considerations**: VLANs alone are not security boundaries. An attacker who compromises a router or uses VLAN hopping (DTP attacks, double-tagging) can bypass VLAN isolation.
+
+### 3. ACL-Based Segmentation (Access Control Lists)
+
+Using router/firewall ACLs to control traffic between segments.
+
+```bash
+# Standard ACL example (Cisco IOS)
+access-list 100 permit tcp 10.0.10.0 0.0.0.255 10.0.20.0 0.0.0.255 eq 443
+access-list 100 permit tcp 10.0.10.0 0.0.0.255 10.0.30.0 0.0.0.255 eq 22
+access-list 100 deny ip any any log
+
+# Apply to interface
+interface GigabitEthernet0/0.10
+ ip access-group 100 in
+```
+
+### 4. Firewall Zones
+
+Dedicated firewalls with different security levels for each zone.
+
+| Zone | Security Level | Example Systems | Internet Access |
+|------|---------------|-----------------|-----------------|
+| Untrusted (Internet) | 0 | — | Full |
+| DMZ (Public Services) | 50 | Web servers, mail relays, VPN | Limited inbound |
+| Internal (Corporate) | 70 | Employee workstations, file servers | Outbound only |
+| Restricted (Sensitive) | 90 | Database servers, AD, HR/Payroll | No direct, via jump box |
+| Management (Admin) | 100 | Network admin terminals | No direct access |
+
+### 5. Micro-Segmentation
+
+Software-defined, host-level segmentation. Each workload gets its own security policy regardless of physical or logical location.
+
+**Technologies**: VMware NSX, Cisco ACI, AWS Security Groups, Calico/Kubernetes Network Policies
+
+```yaml
+# Kubernetes Network Policy — Micro-segmentation example
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-isolation
+spec:
+  podSelector:
+    matchLabels:
+      app: database
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: api-server
+      ports:
+        - protocol: TCP
+          port: 5432
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: api-server
+      ports:
+        - protocol: TCP
+          port: 443
+```
+
+**Key difference**: Traditional segmentation is network-centric (based on IP/subnet). Micro-segmentation is workload-centric (based on identity/labels).
+
+## Real-World Case Study: Target 2013 Breach
+
+The Target breach ($300M+ total cost) was enabled by **lack of network segmentation**.
+
+### Timeline
+
+```
+Pre-Breach:
+  └─ Target has a network for POS (payment) systems
+  └─ Target has a network for HVAC (heating/cooling) systems
+  └─ These networks are NOT segmented — systems can communicate freely
+  
+September 2013:
+  └─ Attackers compromise Fazio Mechanical (Target's HVAC vendor)
+  └─ Phishing email sent to Fazio employee
+  └─ Malware installed on Fazio's systems
+  └─ Fazio had remote access to Target's network for HVAC monitoring
+
+October 2013:
+  └─ Attackers use Fazio's remote access to enter Target's network
+  └─ From the HVAC segment, attackers move laterally to POS segment
+  └─ NO FIREWALL between HVAC and POS — no chokepoint
+  └─ Attackers deploy RAM-scraping malware on POS terminals
+
+November-December 2013:
+  └─ 40 million credit card numbers stolen
+  └─ 70 million customer records exfiltrated
+  └─ Data exfiltrated via FTP from POS segment to external servers
+  └─ NO EGRESS FILTERING — POS systems could send data to the internet
+
+December 2013:
+  └─ US Department of Justice alerts Target
+  └─ Breach disclosed
+  └─ Stock drops 46%
+  └─ CEO resigns
+  └─ $300M+ in settlements, legal fees, remediation
+```
+
+### Root Cause Analysis
+
+| Failure | Detail |
+|---------|--------|
+| **No segmentation between HVAC and POS** | Third-party vendor had unfettered network access |
+| **No egress filtering** | POS systems could send data to any internet destination |
+| **No DMZ for vendor access** | Vendors connected directly to internal network |
+| **Flat network design** | Once inside, attacker could reach any system |
+| **No network monitoring** | Lateral movement and data exfiltration went undetected |
+
+### What Proper Segmentation Would Have Prevented
+
+```
+  HVAC Vendor ───→ HVAC Network ───→ [FIREWALL] ───→ POS Network
+                      │                    │              │
+                  (Compromised)          BLOCKED      (Protected)
+                    
+  Result: Attacker confined to HVAC segment
+  POS data remains protected
+  Breach prevented or drastically limited
+```
+
+## Zero Trust Network Access (ZTNA)
+
+The modern evolution of network segmentation. "Never trust, always verify."
+
+| Traditional Segmentation | Zero Trust Segmentation |
+|-------------------------|------------------------|
+| Trust based on location (inside/outside) | Trust based on identity + device + context |
+| Once inside network, free movement | Every access request is verified |
+| Perimeter-based (castle-and-moat) | Identity-based (perimeterless) |
+| VLANs and firewalls | Micro-segmentation per workload |
+| Static rules | Dynamic policies based on risk |
+
+### ZTNA Implementation Principles
+
+```
+1. All resources are private — no public IPs
+2. Access is granted per-connection, not per-network
+3. User identity + device posture verified for every request
+4. Least privilege — only what's needed, nothing more
+5. All traffic is inspected (no implicit trust)
+6. Continuous verification (not just at login)
+```
+
+## Segmentation Best Practices
+
+```yaml
+Minimum Segmentation Standards (Any Organisation):
+
+Tier 1 — Critical (MANDATORY):
+  └─ Separate VLAN for all servers vs. endpoints
+  └─ DMZ for internet-facing services
+  └─ PCI DSS cardholder data environment isolated
+  └─ Management network (OOB management)
+
+Tier 2 — Strongly Recommended:
+  └─ Separate voice/video VLAN
+  └─ Guest WiFi on isolated VLAN with internet-only access
+  └─ IoT/OT devices on separate network
+  └─ Database servers on their own segment
+
+Tier 3 — Advanced (Mature Organisations):
+  └─ Micro-segmentation per application tier
+  └─ Zero Trust architecture
+  └─ Automated policy enforcement (CSP)
+  └─ Dynamic segmentation based on user/device risk
+```
+
+## Segmentation Audit Checklist
+
+| Check | Method | Pass/Fail |
+|-------|--------|-----------|
+| Can a workstation reach the database subnet? | `ping db-server`, `telnet db-server 5432` | Should FAIL |
+| Can a web server initiate outbound SSH? | `nmap -p 22 external-server` | Should FAIL |
+| Is guest WiFi isolated from internal? | Connect to guest WiFi, ping internal IP | Should FAIL |
+| Can vendor access reach internal systems? | Review VPN/firewall rules | Should FAIL |
+| Is there a DMZ for public services? | Check public-facing server IP assignments | Should PASS |
+| Is PCI/CDE segmented? | Verify firewall between CDE and corp net | Should PASS |
+| Are management interfaces on separate VLAN? | Check switch/router management IPs | Should PASS |
+| Is egress filtering active? | Attempt FTP/SMTP outbound from web server | Should FAIL |
+
+## Key Takeaways
+
+- Network segmentation is the single most effective control against lateral movement — without it, one compromised system leads to total compromise
+- The Target 2013 breach ($300M) is the textbook example of why segmentation matters — HVAC vendor access to POS network with no firewall
+- Segmentation can be physical, logical (VLAN), ACL-based, firewall-zone-based, or micro-segmentation — the right approach depends on risk
+- VLANs alone are not security — they lack the access control enforcement of firewalls and can be bypassed via VLAN hopping
+- Micro-segmentation (host-level policies) is the modern approach — each workload gets its own policy regardless of network topology
+- Zero Trust Network Access eliminates the concept of a trusted internal network — every access request is verified
+- Egress filtering is as important as ingress filtering — prevent data exfiltration
+- Audit your segmentation quarterly — rules drift, new systems get added without proper placement

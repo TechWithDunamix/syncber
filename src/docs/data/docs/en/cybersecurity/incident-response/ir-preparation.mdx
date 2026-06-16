@@ -1,0 +1,258 @@
+---
+title: "Incident Response Preparation"
+description: "Building the IR plan — scope, roles, communication plan, call tree, playbooks, tools, and tabletop exercises. Includes a phishing playbook excerpt."
+sidebar:
+  order: 2
+  label: "IR Preparation"
+tab: "cybersecurity"
+---
+
+Preparation determines the success or failure of every incident response. The **2024 Ponemon Cost of a Data Breach Report** found that organisations with a tested IR plan contain breaches **54 days faster** and save **$2.66 million** compared to those without. Yet only **39%** of organisations test their IR plan annually.
+
+This page covers the practical components of IR preparation: the plan itself, team roles, communication, playbooks, tools, and exercises.
+
+## The IR Plan Document
+
+The incident response plan is the foundational document that defines how the organisation will handle security incidents. It should be:
+
+- **Executive-approved** — has organisational authority
+- **Practical** — usable under pressure, not a theoretical document
+- **Concise** — core plan is 5-10 pages; appendices contain details
+- **Tested** — validated through exercises, not just reviewed in meetings
+
+### IR Plan Outline
+
+| Section | Content | Why It Matters |
+|---------|---------|----------------|
+| **1. Purpose & Scope** | Why the plan exists, what it covers (systems, data, locations) | Defines the boundaries of IR responsibility |
+| **2. Roles & Responsibilities** | IR team members, their roles, and authorities | Ensures everyone knows what to do |
+| **3. Severity Classification** | Definition of Critical/High/Medium/Low incidents | Enables consistent triage and escalation |
+| **4. Escalation & Communication** | Call tree, communication channels, notification templates | Ensures the right people are informed at the right time |
+| **5. Incident Response Procedures** | Phased response steps (Detect → Triage → Contain → Eradicate → Recover) | Provides the operational playbook |
+| **6. Post-Incident Activity** | Post-mortem process, improvement tracking | Closes the learning loop |
+| **7. Appendices** | Contact lists, playbooks, tool guides, regulatory obligations | Reference material for during-incident use |
+
+### Roles and Responsibilities
+
+| Role | Responsibility | Primary | Alternate |
+|------|----------------|---------|-----------|
+| **IR Lead** | Overall incident management, decisions, escalation | Director of Security | Security Manager |
+| **Triage Lead (L2)** | Technical analysis, scoping, containment | Sr. Security Analyst | Security Analyst |
+| **L1 Analysts** | Initial alert triage, monitoring | SOC Analyst (2) | SOC Analyst (1) |
+| **Forensic Examiner** | Evidence collection, preservation, analysis | Forensics Lead | External Forensics |
+| **Legal Counsel** | Legal guidance, privilege, regulatory notification | General Counsel | External Counsel |
+| **Communications Lead** | Internal/external communications, PR | PR Director | Marketing Lead |
+| **Executive Sponsor** | Business decisions, resource approval | CISO | CIO |
+| **HR Liaison** | Personnel actions (if insider involved) | HR Director | HR Manager |
+| **IT Operations** | System restoration, network changes | IT Director | Sr. Engineer |
+
+## Communication Plan
+
+A communication plan defines who needs to be notified, when, and through what channel. The key principle: **communicate early and often**, even if the full picture is not yet clear.
+
+### Internal Communication
+
+| Trigger | Notify | Channel | Timing |
+|---------|--------|---------|--------|
+| Critical incident detected | IR Lead, L2 Lead, Legal | Phone call | Immediately (< 5 min) |
+| Confirmed breach | Executive Sponsor, CISO, CIO | Phone call | Within 15 min |
+| Containment decision needed | IR Lead + Executive Sponsor | Phone or secure meeting | Within 30 min |
+| Business impact assessment | Department heads, IT Ops | Secure chat + email | Within 1 hour |
+| Employee notification (if affected) | HR + Legal + Communications | Email + intranet | After containment |
+| Board notification | CISO → CEO → Board | Secure report | Per governance schedule |
+
+### External Communication
+
+| Audience | Message Type | Approval | Timing |
+|----------|-------------|----------|--------|
+| **Regulators** (ICO, SEC, CISA) | Mandatory breach notification | Legal + Executive | Per regulatory timeline (e.g., GDPR: 72 hours) |
+| **Law enforcement** (FBI, CISA) | Voluntary or mandatory reporting | Legal + Executive | During/after containment |
+| **Customers** (if PII affected) | Breach notification | Legal + PR + Executive | Per regulatory + PR strategy |
+| **Partners/Vendors** | Operational impact notice | Business owner | After containment |
+| **Media/Public** | Press statement | PR + Legal + Executive | Coordinated — single voice |
+
+### Call Tree
+
+The call tree is the structured escalation path used to activate the IR team. Every member must have primary and alternate contact methods:
+
+```
+IR Lead
+  ├── L2 Lead
+  │     ├── L1 Analyst 1
+  │     │    └── L1 Analyst 2 (backup)
+  │     ├── L1 Analyst 3 (off-hours)
+  │     └── Forensic Examiner
+  ├── Legal Counsel
+  ├── Communications Lead
+  ├── IT Operations Lead
+  └── Executive Sponsor (CISO)
+        └── CIO / CEO (on CISO's judgement)
+```
+
+<Aside variant="tip">
+Test your call tree quarterly. In one real-world exercise, 40% of IR team members had outdated phone numbers. A broken call tree means a delayed response — and delayed response means deeper compromise.
+</Aside>
+
+## IR Playbooks
+
+Playbooks (also called runbooks or SOPs) provide step-by-step procedures for handling specific incident types. They ensure consistent, repeatable response regardless of which analyst is on shift.
+
+### Phishing Incident Playbook
+
+```
+# PHISHING INCIDENT PLAYBOOK
+# Version: 2.1
+# Last Reviewed: 2026-01-16
+
+## Step 1: User Reports Suspicious Email
+- [ ] Acknowledge receipt of the report within 5 minutes
+- [ ] Instruct user not to click any links or reply to the email
+- [ ] If user clicked the link: escalate to Step 2b (confirmed compromise)
+- [ ] If user did not click: proceed to Step 2a (suspected phishing)
+
+## Step 2a: Suspected Phishing (No Click)
+- [ ] Extract headers and forward to SOC (Phish@org.com)
+- [ ] SOC analyst extracts URLs from email body
+- [ ] Submit URLs to VirusTotal for analysis
+- [ ] Check URLs against threat intelligence feeds
+- [ ] Check email authentication (SPF, DKIM, DMARC) in headers
+- [ ] Determine if this is a targeted (spear) or mass phishing campaign
+- [ ] If mass phishing: search mail logs for same email sent to other users
+- [ ] Block sender domain at email gateway
+- [ ] If URLs are malicious: block at proxy/web gateway
+- [ ] Report to employees via internal communication
+- [ ] Close ticket as "Suspected Phishing — Blocked"
+
+## Step 2b: Confirmed Compromise (User Clicked Link)
+- [ ] IMMEDIATE: Isolate affected user workstation (via EDR)
+- [ ] IMMEDIATE: Disable user account (prevent lateral movement)
+- [ ] IMMEDIATE: Reset user's Active Directory password
+- [ ] IMMEDIATE: Revoke all active session tokens (O365, SaaS apps)
+- [ ] Determine if user entered credentials on phishing page
+- [ ] If credentials were entered:
+      - [ ] Check for unusual email forwarding rules
+      - [ ] Check for mailbox login from unusual IPs
+      - [ ] Search sent items for replies to attacker
+      - [ ] Review OAuth application grants
+      - [ ] Check for access to sensitive data (finance, HR, IP)
+- [ ] If malware was downloaded/executed:
+      - [ ] Capture the sample for analysis
+      - [ ] Run EDR full scan on affected host
+      - [ ] Check for lateral movement from the host
+      - [ ] Check for persistence mechanisms
+      - [ ] Escalate to L3 for deep analysis
+- [ ] Document all findings in incident ticket
+- [ ] Determine escalation to IR Lead for broader containment
+
+## Step 3: Remediation
+- [ ] Remove phishing email from all affected mailboxes
+- [ ] Update email security rules to block similar campaigns
+- [ ] Deploy IoCs (domains, hashes, IPs) to detection systems
+- [ ] If malware: reimage the affected workstation(s)
+- [ ] Notify affected users of account actions taken
+
+## Step 4: Post-Incident
+- [ ] Conduct post-mortem within 5 business days
+- [ ] Update phishing playbook based on lessons learned
+- [ ] Report metrics to security leadership
+- [ ] Add phishing simulation training for affected department
+```
+
+### Playbook Coverage
+
+| Playbook | Priority | Test Frequency | Last Updated |
+|----------|----------|----------------|--------------|
+| Phishing / Email Compromise | P1 | Quarterly | 2026-01-16 |
+| Ransomware | P1 | Quarterly | 2026-01-10 |
+| Data Exfiltration | P1 | Semi-annual | 2025-11-20 |
+| Unauthorised Access | P2 | Semi-annual | 2025-10-15 |
+| DDoS | P2 | Annual | 2025-09-01 |
+| Insider Threat | P2 | Annual | 2025-08-15 |
+| Malware Outbreak | P1 | Quarterly | 2026-01-05 |
+| Supply Chain Compromise | P3 | Annual | 2025-07-01 |
+
+## IR Tools
+
+Every IR team needs a toolkit pre-deployed and tested before an incident occurs:
+
+| Tool Category | Tool | Purpose | Pre-Deploy Required? |
+|---------------|------|---------|---------------------|
+| **EDR** | CrowdStrike Falcon, SentinelOne, Defender for Endpoint | Endpoint visibility, isolation, response | Yes — agent on all endpoints |
+| **SIEM** | Splunk, Sentinel, Elastic | Log aggregation, correlation, alerting | Yes — all logs ingested |
+| **SOAR** | Splunk SOAR, Palo Alto XSOAR, Tines | Playbook automation, case management | Yes — playbooks pre-built |
+| **Forensics** | FTK Imager, Autopsy, Volatility | Memory and disk analysis | Yes — on forensic workstation |
+| **Network capture** | Wireshark, tcpdump, netsh trace | Packet capture and analysis | Yes — on forensic workstation |
+| **Secure comms** | Signal, Wickr, Teams private channel | Encrypted communication during IR | Yes — channels pre-created |
+| **Ticket system** | ServiceNow, Jira, RT | Incident tracking, evidence logging | Yes — integrated with SOAR |
+| **Knowledge base** | Confluence, SharePoint, GitBook | Playbooks, procedures, reference | Yes — playbooks accessible offline |
+| **Hash database** | VirusTotal, Team Cymru, local hash repo | File reputation lookups | Yes — API keys configured |
+| **Threat intel** | Recorded Future, MISP, OTX | IoC enrichment | Yes — feeds integrated with SIEM |
+
+## Tabletop Exercises
+
+A tabletop exercise (TTX) is a discussion-based simulation where the IR team walks through an incident scenario without touching production systems. TTX is the most cost-effective way to validate IR readiness.
+
+### Sample Tabletop Scenario Card
+
+```
+# SCENARIO CARD: RANSOMWARE — FINANCE DEPARTMENT
+
+## Background
+It's 9:00 AM on a Monday. Your organisation (a mid-size financial services 
+firm with 2,000 employees) has just completed a busy quarter-end close.
+
+## Trigger
+The SOC L1 analyst calls you (IR Lead) with the following:
+- 20 servers in the finance department are showing mass file rename events
+- Files are being renamed with extension .encrypted
+- Ransom notes named "READ_ME_NOW.html" appearing on shared drives
+- The CFO's executive assistant reports she cannot open her Excel files
+
+## Questions for the Team
+1. What is your immediate action? (first 5 minutes)
+2. Activate the call tree — who do you call first?
+3. Do you isolate the affected servers or investigate first?
+4. Do you shut down the network to prevent spread?
+5. How do you communicate with the CFO who is demanding answers?
+6. When do you notify law enforcement?
+7. Does your cyber insurance policy require specific actions?
+8. How do you determine if clean backups exist?
+
+## Inject (10 minutes into scenario)
+The attacker has posted 5GB of stolen data to a ransomware leak site.
+The stolen data includes customer PII.
+
+## Questions Part 2
+9. How does this change your response?
+10. Do you pay the ransom? Who makes that decision?
+11. What do you tell customers? When?
+12. What regulators must you notify? (GDPR? SEC? CISA?)
+13. How do you communicate externally without tipping off the attacker?
+
+## Hotwash (Debrief Questions)
+- Did the call tree work? Were alternates reachable?
+- Were the playbooks followed? Did they help or hinder?
+- What decisions required information you didn't have?
+- What would you do differently?
+```
+
+### TTX Schedule
+
+| Type | Frequency | Duration | Participants | Focus |
+|------|-----------|----------|-------------|-------|
+| **Discussion-based TTX** | Quarterly | 1-2 hours | IR team + key stakeholders | Process and decision-making |
+| **Functional TTX** | Semi-annual | 2-4 hours | IR team + IT ops | Technical response steps |
+| **Full-scale simulation** | Annual | 4-8 hours | Full organisation | End-to-end IR with live tools |
+
+<Aside variant="caution">
+A tabletop exercise that everyone agrees went perfectly means you didn't push hard enough. The purpose of TTX is to find gaps — not to validate that everything works. If you didn't find at least three improvement items, your scenario was too easy.
+</Aside>
+
+## Key Takeaways
+
+- The IR plan is the foundational document — concise, practical, and approved by leadership. It defines scope, roles, severity, escalation, and procedures
+- Roles must be defined with primary and alternate contacts — every role needs a trained backup
+- Communication plans cover internal (leadership, legal, HR) and external (regulators, customers, media) audiences with specific timelines
+- Playbooks provide step-by-step procedures for common incident types — test them quarterly
+- Tools must be pre-deployed and pre-integrated — during an incident is not the time to discover that the SOAR doesn't talk to the SIEM
+- Tabletop exercises are the most effective way to validate IR readiness — run them quarterly and make them challenging enough to find gaps

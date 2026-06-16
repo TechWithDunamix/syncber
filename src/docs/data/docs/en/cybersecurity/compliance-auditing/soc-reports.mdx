@@ -1,0 +1,72 @@
+---
+title: "SOC Reports"
+description: "SOC 1, SOC 2, SOC 3 — Type I vs Type II, trust service criteria, report structure, and how to use them."
+sidebar:
+  order: 2
+  label: "SOC Reports"
+tab: "cybersecurity"
+---
+
+System and Organization Controls (SOC) reports are audit reports issued by CPA firms assessing controls at service organisations. They are the most widely accepted form of vendor security assessment.
+
+## SOC Report Types
+
+| Type | Focus | Users | Contains |
+|------|-------|-------|----------|
+| **SOC 1** | Controls over financial reporting | User entities' auditors (SOX) | Control description, testing results |
+| **SOC 2** | Controls over security, availability, processing integrity, confidentiality, privacy | Customers, vendors, regulators | Control description, testing results, trust services criteria |
+| **SOC 3** | General use report (public) | General public, marketing | Summary of SOC 2 without detailed testing |
+
+## Type I vs Type II
+
+| Factor | Type I | Type II |
+|--------|--------|---------|
+| **What it assesses** | Design of controls | Design AND operating effectiveness |
+| **Time period** | Point in time | Period of time (6-12 months) |
+| **Evidence** | Descriptions, interviews | Descriptions + testing over time |
+| **Value** | Lower (checks for existence) | Higher (checks for effectiveness) |
+| **Typical use** | Initial audit, new service | Ongoing vendor assessment |
+
+## SOC 2 Trust Service Criteria
+
+The five TSC categories are defined by AICPA (American Institute of CPAs):
+
+| Category | Description | Example Control |
+|----------|-------------|-----------------|
+| **Security** | Protected against unauthorised access | Firewalls, IAM, MFA, encryption, intrusion detection |
+| **Availability** | Available for operation and use | Redundancy, failover, disaster recovery, uptime monitoring |
+| **Processing Integrity** | Processing is complete, accurate, timely | Input validation, reconciliation, error handling |
+| **Confidentiality** | Confidential information is protected | Data classification, access controls, encryption |
+| **Privacy** | Personal information is handled in accordance with commitments | Consent, notice, collection limits, data retention |
+
+## Reading a SOC 2 Report
+
+A SOC 2 report has four main sections:
+
+```
+Section 1: Independent Service Auditor's Report (opinion)
+  → "In our opinion, the controls were fairly described and operated effectively"
+
+Section 2: Management's Assertion
+  → Management states they designed and implemented controls effectively
+
+Section 3: Description of the System
+  → Infrastructure, software, data, people, procedures, monitoring
+
+Section 4: Testing of Controls (Type II)
+  | Control | Description | Tested By | Result |
+  |---------|-------------|-----------|--------|
+  | Access reviews | Quarterly review of privileged access | CPA firm | No exceptions |
+  | Encryption | AES-256 enabled on all storage | CPA firm | No exceptions |
+  | Patching | Critical patches within 48 hours | CPA firm | 1 exception |
+```
+
+### Red Flags in SOC Reports
+
+| Finding | Implication |
+|---------|-------------|
+| **Exceptions in testing** | Controls did not operate effectively for some period |
+| **Qualifications in opinion** | Auditor could not fully verify controls |
+| **"Complementary user entity controls"** | Your organisation must implement specific controls for the provider's SOC to be valid |
+| **Report date > 12 months old** | Report is likely stale — SOC reports are typically valid for 12 months |
+| **Scope excludes critical services** | Important systems were not in scope |

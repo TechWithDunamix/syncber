@@ -1,0 +1,347 @@
+---
+title: "API Security"
+description: "REST API security, authentication methods (JWT, API keys, OAuth 2.0), rate limiting, input validation, GraphQL security, and real API breach case studies."
+sidebar:
+  order: 6
+  label: "API Security"
+tab: "cybersecurity"
+---
+
+APIs are the backbone of modern applications. Mobile apps, SPAs, microservices, and third-party integrations all communicate via APIs. API security is fundamentally different from web application security because APIs are designed for programmatic access — there is no human in the loop to make security decisions.
+
+## Why API Security Is Different
+
+| Aspect | Traditional Web App | API |
+|--------|-------------------|-----|
+| **Consumer** | Human (browser) | Machine (code, script, automated tool) |
+| **Rate of requests** | Tens per minute | Millions per hour |
+| **Authentication** | Session cookie (browser-managed) | API key, JWT, OAuth token |
+| **Input format** | HTML forms | JSON, XML, binary |
+| **Error handling** | User-friendly error pages | Verbose JSON error messages |
+| **Session management** | Server-side sessions | Stateless (JWT) or token-based |
+| **Attack surface** | Limited to visible pages | All endpoints immediately discoverable |
+
+## API Authentication
+
+### API Keys
+
+Simplest form — a static string sent in the header or query parameter.
+
+```bash
+# API key in header
+curl -H "X-API-Key: abc123def456" https://api.example.com/v1/users
+
+# API key in query parameter (less secure — logged in URLs)
+curl https://api.example.com/v1/users?api_key=abc123def456
+```
+
+| Pros | Cons |
+|------|------|
+| Simple to implement | Key rotation is difficult |
+| Fast (no crypto overhead) | If leaked, anyone can use it |
+| Easy for developers | No identity binding (all keys look same) |
+| Good for internal services | No expiry by default |
+
+**Best practices for API keys**:
+```yaml
+  └─ Generate keys with cryptographic randomness (not sequential)
+  └─ Store hashed (like passwords) — only show once on creation
+  └─ Support multiple keys per customer (rotation without downtime)
+  └─ Bind keys to IP ranges or referrer domains
+  └─ Enable key expiry and rotation policies
+  └─ Log all API key usage for audit
+  └─ Rate limit per key
+```
+
+### JWT (JSON Web Tokens)
+
+JWTs are self-contained tokens that carry claims. A JWT contains a header, payload, and signature — all Base64-encoded.
+
+```javascript
+// JWT Structure
+// header.payload.signature
+
+// Header
+{
+  "alg": "RS256",
+  "typ": "JWT",
+  "kid": "key-id-1"
+}
+
+// Payload (claims)
+{
+  "sub": "user_12345",
+  "name": "John Doe",
+  "iat": 1516239022,
+  "exp": 1516242622,
+  "scope": "read:orders write:orders",
+  "iss": "https://auth.company.com"
+}
+
+// Signature — prevents tampering
+// RS256(private_key, header + "." + payload)
+```
+
+**JWT Security Checklist**:
+```yaml
+✅ MUST DO:
+  └─ Use RS256 or ES256 (asymmetric) — never HS256 (symmetric) for multi-service
+  └─ Validate signature with trusted public key
+  └─ Check 'exp' (expiration) — reject expired tokens
+  └─ Check 'nbf' (not before) if present
+  └─ Validate 'iss' (issuer) — only accept tokens from your issuer
+  └─ Validate 'aud' (audience) — token is for this API
+  └─ Use short expiry (15-30 minutes for access tokens)
+  └─ Implement token revocation for high-value actions
+
+❌ MUST NOT DO:
+  └─ Never set 'alg' to 'none' (signature bypass attack)
+  └─ Never accept HS256 with a weak/guessed secret
+  └─ Never store sensitive data in payload (only Base64, not encrypted)
+  └─ Never use JWT as session replacement without revocation mechanism
+  └─ Never accept tokens with alg=RS256 but use HS256 key confusion
+```
+
+**Common JWT attack — alg confusion**:
+```python
+# Attacker changes header from RS256 to HS256
+# Server decodes: alg=HS256 (symmetric)
+# Server uses PUBLIC key as HMAC secret
+# Attacker knows public key (it's public!)
+# Attacker signs arbitrary payloads with public_key as HMAC secret
+# Server accepts forged tokens
+
+# Prevention: Always validate against allowed algorithms
+# On server: verify if alg in allowed list (e.g., only RS256)
+```
+
+## Input Validation for APIs
+
+### JSON Schema Validation
+
+```python
+from jsonschema import validate, ValidationError
+
+# Define expected schema
+user_schema = {
+    "type": "object",
+    "properties": {
+        "email": {"type": "string", "format": "email"},
+        "name": {"type": "string", "minLength": 1, "maxLength": 100},
+        "age": {"type": "integer", "minimum": 0, "maximum": 150},
+        "role": {"type": "string", "enum": ["user", "admin", "viewer"]}
+    },
+    "required": ["email", "name"],
+    "additionalProperties": False  # Reject unknown fields!
+}
+
+@app.route('/api/users', methods=['POST'])
+def create_user():
+    try:
+        validate(request.json, user_schema)
+        # Process validated data
+    except ValidationError as e:
+        return jsonify({"error": str(e)}), 400
+```
+
+### Rate Limiting
+
+```python
+# Flask-Limiter example
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
+limiter = Limiter(
+    app,
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"]
+)
+
+@app.route("/api/login")
+@limiter.limit("5 per minute", override_defaults=False)
+def login():
+    # Strict rate limit for authentication endpoints
+    pass
+
+@app.route("/api/search")
+@limiter.limit("30 per minute")
+def search():
+    # Moderate rate limit for search
+    pass
+
+@app.route("/api/public-info")
+@limiter.limit("100 per minute")
+def public_info():
+    # Generous rate limit for public data
+    pass
+```
+
+### Mass Assignment Prevention
+
+```python
+# ❌ DANGEROUS: Accepting all request fields
+@app.route('/api/users', methods=['PATCH'])
+def update_user(user_id):
+    user = User.query.get(user_id)
+    for key, value in request.json.items():
+        setattr(user, key, value)  # User can set is_admin=True
+    db.session.commit()
+
+# ✅ SAFE: Explicit allowed fields
+ALLOWED_FIELDS = {'name', 'email', 'phone'}
+@app.route('/api/users', methods=['PATCH'])
+def update_user(user_id):
+    user = User.query.get(user_id)
+    for key, value in request.json.items():
+        if key in ALLOWED_FIELDS:
+            setattr(user, key, value)
+    db.session.commit()
+```
+
+## API-Specific Attacks
+
+### 1. Broken Object Level Authorization (BOLA) — #1 API Risk
+
+```python
+# ❌ VULNERABLE: No ownership check
+@app.route('/api/orders/<int:order_id>')
+def get_order(order_id):
+    order = Order.query.get(order_id)  # No check: does user own this order?
+    return jsonify(order.to_dict())
+
+# ✅ FIXED: Ownership enforced
+@app.route('/api/orders/<int:order_id>')
+def get_order(order_id):
+    order = Order.query.filter_by(
+        id=order_id, user_id=current_user.id  # Must own the order
+    ).first_or_404()
+    return jsonify(order.to_dict())
+```
+
+### 2. Broken User Authentication
+
+```yaml
+API Authentication Gaps:
+  └─ No authentication on certain endpoints ("it's internal")
+  └─ Weak password recovery (security questions — verifiable via API)
+  └─ No account lockout — unlimited brute force attempts
+  └─ JWT without expiry — valid forever
+  └─ API keys with no rotation or revocation
+```
+
+### 3. Excessive Data Exposure
+
+```python
+# ❌ VULNERABLE: Returning full database object
+@app.route('/api/users/me')
+def get_profile():
+    return jsonify(user.to_dict())
+    # Returns: {id, email, name, hashed_password, ssn, created_at, is_admin, ...}
+
+# ✅ FIXED: Return only needed fields
+@app.route('/api/users/me')
+def get_profile():
+    return jsonify({
+        "name": user.name,
+        "email": user.email,
+        "created_at": user.created_at.isoformat()
+    })
+```
+
+### 4. Rate Limiting Failures
+
+```
+Without rate limiting, a single API key can:
+  └─ Brute force passwords (1,000 attempts/second)
+  └─ Scrape all user data (mass assignment vulnerability)
+  └─ Exhaust database connections (DoS)
+  └─ Run up huge cloud bills (cost attack)
+  └─ Trigger SMS/email send (cost + spam)
+```
+
+### 5. GraphQL-Specific Risks
+
+```graphql
+# GraphQL introspection — reveals entire schema
+# Anyone can query:
+query {
+  __schema {
+    types {
+      name
+      fields {
+        name
+        type {
+          name
+        }
+      }
+    }
+  }
+}
+
+# GraphQL batch query — attacker requests 10,000 users at once
+query {
+  user1: user(id: 1) { name email ssn }
+  user2: user(id: 2) { name email ssn }
+  # ...
+  user10000: user(id: 10000) { name email ssn }
+}
+```
+
+## Real Case: Facebook API Breach (2018)
+
+```
+  └─ Facebook's "View As" feature had an API vulnerability
+  └─ The "View As" feature generates a access token with limited scope
+  └─ Bug: The token generation endpoint did not validate the 'access_token' field
+  └─ Combined with a video uploader flaw in the API
+  └─ Attacker could steal access tokens for any Facebook account
+  └─ 50 million accounts affected
+  └─ 90 million accounts force-logged-out
+  └─ Stock dropped 3% ($18B market cap loss)
+  └─ FTC fine: $5B (related to multiple privacy violations)
+
+Lesson: Complex API interactions (composing features) create
+logic-level vulnerabilities that scanners cannot detect.
+```
+
+## API Security Checklist
+
+```yaml
+Design Phase:
+  └─ Authentication: OAuth 2.0 + PKCE, short-lived tokens
+  └─ Authorisation: Object-level permissions enforced
+  └─ Input validation: JSON schema with additionalProperties: false
+  └─ Rate limiting: Per-endpoint, per-key, per-IP
+  └─ Output: Minimal data exposure (never return raw DB objects)
+
+Implementation Phase:
+  └─ HTTPS only (HTTP → HTTPS redirect)
+  └─ Security headers (CORS, CSP, HSTS)
+  └─ Audit logging for all state-changing operations
+  └─ Request ID for tracking (trace ID through all services)
+  └─ Webhook signing (verify webhook authenticity)
+
+Testing Phase:
+  └─ Automated API security scanning (OWASP ZAP, 42Crunch)
+  └─ Fuzz testing with invalid/malformed inputs
+  └─ Rate limit testing (verify limits actually apply)
+  └─ BOLA testing (try accessing other users' data by changing IDs)
+
+Operations Phase:
+  └─ Monitor for unusual API patterns (high error rates, unusual IPs)
+  └─ Deprecate old API versions (v1 → v2 → sunset)
+  └─ API key rotation enforcement
+  └─ Periodic security review
+```
+
+## Key Takeaways
+
+- APIs are fundamentally different from web apps — no human in the loop, higher request rates, broader attack surface
+- BOLA (Broken Object Level Authorization) is the #1 API risk — every access to user-specific data must verify ownership
+- JWT requires careful validation: algorithm restriction (never `alg: none`), expiry, issuer, audience, and signature
+- Rate limiting is essential for APIs — without it, brute force, scraping, and DoS are trivial
+- GraphQL introspection should be disabled in production (it reveals the entire data schema)
+- Mass assignment (allowing users to modify fields they shouldn't) is a common API vulnerability — always whitelist allowed fields
+- The 2018 Facebook API breach (50M accounts) demonstrates that API logic flaws (composing features) create vulnerabilities that automated scanners miss
+- Input validation for APIs should use JSON Schema validation with `additionalProperties: false` to reject unexpected fields
+- At minimum, APIs need: authentication, authorisation (per-object), rate limiting, input validation, output filtering, audit logging, and CORS restrictions

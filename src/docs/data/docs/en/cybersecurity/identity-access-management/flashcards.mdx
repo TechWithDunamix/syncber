@@ -1,0 +1,58 @@
+---
+title: "Flashcards"
+description: "Review questions."
+sidebar:
+  order: 99
+  label: "Flashcards"
+tab: "cybersecurity"
+---
+
+**Q1:** What are the five pillars of IAM?
+<Aside variant="tip">
+**A:** 1. Identity lifecycle (provisioning, deprovisioning). 2. Authentication (verify who you are). 3. Authorisation (determine what you can access). 4. Governance (policies, certifications, audits). 5. Privileged access (admin accounts, JIT, credential vaulting).
+</Aside>
+
+**Q2:** What is the difference between authentication and authorisation?
+<Aside variant="tip">
+**A:** Authentication verifies identity ("who are you?"). Authorisation determines access rights ("what are you allowed to do?"). Authentication happens first; authorisation happens after. Authentication ≠ authorisation.
+</Aside>
+
+**Q3:** What is the principle of least privilege?
+<Aside variant="tip">
+**A:** Users and systems should have the minimum level of access required to perform their job functions. No more, no less. Violations create unnecessary risk. Least privilege is enforced through RBAC, ABAC, and JIT access.
+</Aside>
+
+**Q4:** What is Zero Standing Privileges (ZSP)?
+<Aside variant="tip">
+**A:** A security model where no user has permanent privileged access. Privileges are granted just-in-time (JIT) for a specific task duration, then automatically revoked. ZSP eliminates the attack surface of always-on admin accounts.
+</Aside>
+
+**Q5:** What is the difference between RBAC and ABAC?
+<Aside variant="tip">
+**A:** RBAC (Role-Based Access Control) grants access based on job role — simpler but coarser. ABAC (Attribute-Based Access Control) grants access based on user, resource, and environment attributes — more flexible but more complex. ABAC enables policies like "managers can access employee records during business hours from corporate devices."
+</Aside>
+
+**Q6:** What is a PAM solution?
+<Aside variant="tip">
+**A:** Privileged Access Management — a set of tools and processes for securing, managing, and monitoring privileged accounts. Core capabilities: credential vaulting, session recording, JIT access, password rotation, and privileged session isolation.
+</Aside>
+
+**Q7:** What is Segregation of Duties (SoD)?
+<Aside variant="tip">
+**A:** A control that prevents a single person from performing conflicting tasks that could enable fraud or error. Example: The person who requests a vendor payment should not be the same person who approves it. SoD is enforced through access controls and monitored through certification campaigns.
+</Aside>
+
+**Q8:** What is an access certification campaign?
+<Aside variant="tip">
+**A:** A periodic review process where managers certify that their team members' access rights are appropriate. Typical cadence: quarterly for privileged access, annually for standard access. Uncertified access is automatically revoked.
+</Aside>
+
+**Q9:** What was the root cause of the Target 2013 breach from an IAM perspective?
+<Aside variant="tip">
+**A:** A third-party HVAC vendor had excessive network access (no least privilege for vendors). Attackers compromised the vendor's credentials, then used that overprivileged access to pivot to Target's POS systems. Root cause: no vendor IAM controls, no network segmentation, no JIT access.
+</Aside>
+
+**Q10:** What is federation?
+<Aside variant="tip">
+**A:** Federation enables identity portability across organisations using standards like SAML 2.0, OAuth 2.0, and OpenID Connect. A user authenticates at their home organisation (IdP) and accesses resources at a partner organisation (SP) without creating a separate account. Example: logging into a partner SaaS app with your corporate Microsoft/Google account.
+</Aside>

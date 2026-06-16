@@ -289,16 +289,76 @@ const sidebarNavData: DocsSidebarNavData = {
           title: "Aperçu du Cours",
         },
         {
-          id: "security-fundamentals",
-          title: "Fondamentaux de la Sécurité",
+          id: "phase-1-security-foundations",
+          title: "Phase 1 : Fondamentaux de la Sécurité",
+          children: [
+            {
+              id: "security-fundamentals",
+              title: "Fondamentaux de la Sécurité",
+            },
+            {
+              id: "network-security",
+              title: "Sécurité Réseau",
+            },
+            {
+              id: "application-security",
+              title: "Sécurité des Applications",
+            },
+          ],
         },
         {
-          id: "threat-detection",
-          title: "Détection & Réponse aux Menaces",
+          id: "phase-2-threat-management",
+          title: "Phase 2 : Gestion des Menaces",
+          children: [
+            {
+              id: "threat-detection",
+              title: "Détection & Renseignement sur les Menaces",
+            },
+            {
+              id: "incident-response",
+              title: "Réponse aux Incidents & Forensique",
+            },
+            {
+              id: "vulnerability-management",
+              title: "Gestion des Vulnérabilités",
+            },
+          ],
         },
         {
-          id: "security-tools",
-          title: "Outils et Pratiques de Sécurité",
+          id: "phase-3-defense-tools",
+          title: "Phase 3 : Défense & Outils",
+          children: [
+            {
+              id: "identity-access-management",
+              title: "Gestion des Identités & Accès",
+            },
+            {
+              id: "security-tools",
+              title: "Outils de Sécurité & Pentesting",
+            },
+            {
+              id: "cloud-security",
+              title: "Sécurité du Cloud",
+            },
+          ],
+        },
+        {
+          id: "phase-4-governance-operations",
+          title: "Phase 4 : Gouvernance & Opérations",
+          children: [
+            {
+              id: "compliance-auditing",
+              title: "Conformité & Audit",
+            },
+            {
+              id: "security-automation",
+              title: "Automatisation & DevSecOps",
+            },
+            {
+              id: "cybersecurity-capstone",
+              title: "Projet de Fin de Parcours",
+            },
+          ],
         },
       ],
     },

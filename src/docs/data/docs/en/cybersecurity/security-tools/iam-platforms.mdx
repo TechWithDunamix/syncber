@@ -1,0 +1,296 @@
+---
+title: "IAM Platforms"
+description: "Okta, Azure AD, Keycloak, Ping Identity — SSO, MFA, lifecycle management, and feature comparison."
+sidebar:
+  order: 3
+  label: "IAM Platforms"
+tab: "cybersecurity"
+---
+
+IAM platforms are the central infrastructure for managing identities, authentication, and access policies across an organisation. They serve as the identity provider (IdP) for SSO, enforce MFA policies, manage user lifecycle, and provide the foundation for Zero Trust.
+
+## Platform Comparison
+
+| Feature | Okta | Azure AD / Entra ID | Keycloak | Ping Identity |
+|---------|------|-------------------|----------|---------------|
+| **Type** | Cloud (SaaS) | Cloud (PaaS) | Open-source (self-hosted) | Cloud + On-prem |
+| **SSO (SAML/OIDC)** | ✓ | ✓ | ✓ | ✓ |
+| **MFA** | ✓ (Okta Verify, TOTP, YubiKey) | ✓ (MS Authenticator, TOTP, FIDO2) | ✓ (TOTP only, extensible) | ✓ |
+| **Lifecycle Mgmt** | ✓ (Okta Lifecycle Management) | ✓ (Identity Governance) | Limited | ✓ (PingOne) |
+| **API Access Mgmt** | ✓ (API Access Management) | ✓ (Azure AD App Registrations) | ✓ | ✓ |
+| **PAM** | Limited (Okta PAM add-on) | ✓ (PIM — Privileged Identity Management) | Limited | ✓ (PingFederate) |
+| **Adaptive MFA** | ✓ (Okta Risk-based Authn) | ✓ (Conditional Access) | Manual/scripted | ✓ |
+| **On-prem AD sync** | ✓ (Okta AD/LDAP Agent) | ✓ (Azure AD Connect) | LDAP sync | ✓ |
+| **SCIM provisioning** | ✓ | ✓ | ✓ (extensions) | ✓ |
+| **Free tier** | Developer (free, limited) | Free with O365 | Completely free (open-source) | No |
+| **Ideal for** | Cloud-first orgs, heterogeneous environments | Microsoft-centric orgs | Custom, self-hosted, cost-sensitive | Large enterprise, hybrid |
+
+## Okta
+
+Okta is the leading independent cloud IAM platform:
+
+```bash
+# Okta API — Create a user
+curl -X POST "https://${OKTA_DOMAIN}/api/v1/users" \
+  -H "Authorization: SSWS ${API_TOKEN}" \
+  -d '{
+    "profile": {
+      "firstName": "Alice",
+      "lastName": "Wang",
+      "email": "alice.wang@example.com",
+      "login": "alice.wang@example.com"
+    },
+    "credentials": {
+      "password": {"value": "TemporaryPassword1!"},
+      "recovery_question": {"question": "What is your pet name?", "answer": "Fluffy"}
+    }
+  }'
+
+# Push user to Active Directory (via Okta AD Agent)
+# Okta → Directory → Directory Integrations → AD → Push
+```
+
+### Key Okta Features
+
+- **Universal Directory**: Cloud directory that syncs from HR, AD, and other sources
+- **Lifecycle Management**: Automated provisioning/deprovisioning based on HR events
+- **Okta Workflows**: No-code automation for identity processes
+- **ThreatInsight**: IP reputation and brute-force detection
+- **Okta Access Gateway**: Reverse proxy for on-prem apps
+
+## Azure AD / Entra ID
+
+Azure AD (now Microsoft Entra ID) is Microsoft's cloud IAM platform:
+
+```powershell
+# Connect to Azure AD
+Connect-MgGraph -Scopes "User.ReadWrite.All", "Policy.ReadWrite.ConditionalAccess"
+
+# Create a conditional access policy (require MFA for all external access)
+$policy = @{
+  displayName = "Require MFA for External Access"
+  conditions = @{
+    locations = @{
+      includeLocations = @("AllTrusted")  # All locations except corporate
+      excludeLocations = @("AllTrusted")
+    }
+  }
+  grantControls = @{
+    builtInControls = @("mfa")
+    operator = "OR"
+  }
+}
+
+New-MgIdentityConditionalAccessPolicy -BodyParameter $policy
+```
+
+### Key Azure AD Features
+
+- **Deep Microsoft integration**: Native integration with Office 365, Azure, Dynamics, Teams
+- **Conditional Access**: Granular risk-based policies (location, device, app, risk level)
+- **Identity Protection**: Risk-based user and sign-in detection (leveraging Microsoft Threat Intelligence)
+- **PIM (Privileged Identity Management)**: JIT access for Azure AD roles and Azure resources
+- **Identity Governance**: Access reviews, entitlement management (requests/approvals), and terms of use
+
+## Keycloak
+
+Keycloak is the leading open-source IAM platform:
+
+```bash
+# Deploy Keycloak via Docker
+docker run -d --name keycloak \
+  -p 8080:8080 \
+  -e KC_BOOTSTRAP_ADMIN_USERNAME=admin \
+  -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
+  quay.io/keycloak/keycloak:24.0 start-dev
+
+# Access: http://localhost:8080 (admin/admin)
+
+# Create a realm
+# Keycloak → Master Realm → Add Realm → "example-org"
+
+# Create a client (application)
+# Keycloak → Clients → Create → Client ID: "finance-app"
+
+# Create a user
+# Keycloak → Users → Add User → username: "alice.wang"
+
+# Configure OIDC flow
+# Clients → finance-app → Client Scopes → Add predefined mapper
+```
+
+### Keycloak Features
+
+- **Full-featured IdP**: SAML 2.0, OAuth 2.0, OpenID Connect support
+- **User federation**: LDAP/AD integration with Kerberos support
+- **Social login**: Google, GitHub, Facebook, Twitter login integration
+- **Customisable themes**: White-label login pages
+- **Event logging**: Full audit trail of authentication events
+- **Free and open-source**: No licensing costs
+
+<Aside variant="tip">
+Choose your IAM platform based on your environment: if you're a Microsoft shop, Azure AD is the obvious choice (deepest integration, no additional cost). If you have a heterogeneous environment or cloud-first, Okta is the best independent platform. If you need cost-effective self-hosted IAM with full control, Keycloak is the standard.
+</Aside>
+
+## Key Takeaways
+
+- Okta is the leading independent cloud IAM platform — best for heterogeneous environments with deep lifecycle management and workflow automation
+- Azure AD / Entra ID is deeply integrated with Microsoft ecosystem — best for Microsoft-centric organisations with Conditional Access and PIM
+- Keycloak is the leading open-source IAM platform — best for cost-sensitive or self-hosted deployments with full customisation control
+- All platforms support core IAM capabilities: SSO (SAML/OIDC), MFA, user lifecycle management, and SCIM provisioning
+- Platform selection should be driven by existing infrastructure (Microsoft vs heterogeneous), compliance requirements, and budget
+- Regardless of platform, the security outcomes depend on configuration quality — a poorly configured IdP is worse than no IdP (single point of failure)
+
+## Platform Deep Dives
+
+### Okta
+
+Okta is the leading independent cloud IAM platform:
+
+```yaml
+Key Strengths:
+  └─ Universal Directory: Single directory for users, groups, and devices
+  └─ Lifecycle Management: Automated provisioning/deprovisioning via SCIM
+  └─ 7,000+ pre-built integrations: Broadest app catalog
+  └─ Workflows: No-code automation for identity processes
+  └─ Adaptive MFA: Risk-based authentication policies
+
+Common Use Cases:
+  └─ SSO for SaaS applications (Salesforce, Slack, GitHub, AWS)
+  └─ MFA enforcement for all applications
+  └─ Automated user lifecycle from HR system (Workday, BambooHR)
+  └─ API access management with OAuth 2.0 / OIDC
+  └─ B2B federation (Org2Org)
+
+Common Misconfigurations:
+  └─ Weak sign-on policy: Not requiring MFA for all apps
+  └─ Over-permissive API scopes: Granting more than needed
+  └─ No session timeout: Users stay logged in indefinitely
+  └─ Super admin over-provisioning: Too many users with full admin
+```
+
+### Azure AD / Entra ID
+
+Azure AD (now Entra ID) is deeply integrated with Microsoft's ecosystem:
+
+```yaml
+Key Strengths:
+  └─ Deep integration: Native with Office 365, Azure, Windows, Defender
+  └─ Conditional Access: Granular access policies (location, device, risk)
+  └─ PIM (Privileged Identity Management): JIT for privileged roles
+  └─ Identity Protection: Risk-based detection of compromised accounts
+  └─ Access Reviews: Built-in certification campaigns
+
+Common Use Cases:
+  └─ SSO for Microsoft 365 (Exchange, SharePoint, Teams)
+  └─ MFA for all cloud applications
+  └─ Conditional Access policies (managed device + MFA = full access)
+  └─ PIM for Azure admin roles
+  └─ B2B collaboration (guest users)
+
+Common Misconfigurations:
+  └─ Conditional Access not configured: Default = allow all
+  └─ Legacy auth enabled: POP3, IMAP, SMTP bypass MFA
+  └─ Admin roles over-assigned: Exchange Admin for all IT staff
+  └─ Self-service group management enabled: Users can add themselves to admin groups
+```
+
+### Okta vs Azure AD: Selection Guide
+
+```yaml
+Choose Okta when:
+  └─ Heterogeneous environment: Mix of SaaS, on-prem, and custom apps
+  └─ Microsoft is not your primary stack (Google Workspace, Salesforce-centric)
+  └─ Need advanced lifecycle workflows (ITSM integration, custom logic)
+  └─ Require the broadest pre-built integration catalog
+
+Choose Azure AD when:
+  └─ Microsoft-centric organisation (M365, Azure, Windows)
+  └─ Need deep Windows/Office/Exchange integration
+  └─ Conditional Access is a priority (device compliance, location, risk)
+  └─ Budget is a factor (included with M365 E3/E5)
+
+Use BOTH when:
+  └─ Azure AD for Microsoft resources, Okta for everything else
+  └─ Long migration phase (moving from one to the other)
+  └─ Mergers and acquisitions (different companies on different platforms)
+```
+
+### Keycloak — Open-Source Alternative
+
+Keycloak is the leading open-source IAM platform:
+
+```yaml
+Key Strengths:
+  └─ Free and open-source (Apache 2.0 license)
+  └─ Full control: Self-hosted, customisable
+  └─ Standards-compliant: SAML 2.0, OAuth 2.0, OIDC 1.0
+  └─ Social login: Built-in Google, Facebook, GitHub, Twitter providers
+  └─ User federation: Connect to LDAP/Active Directory
+
+Considerations:
+  └─ Self-hosted: You manage infrastructure, upgrades, and security patching
+  └─ Limited lifecycle management: No SCIM provisioning outbound
+  └─ Limited MFA: TOTP only (extensible via SPI)
+  └─ Community support: No vendor SLA
+
+Deployment:
+```bash
+# Keycloak Docker deployment
+docker run -d \
+  --name keycloak \
+  -p 8080:8080 \
+  -e KEYCLOAK_ADMIN=admin \
+  -e KEYCLOAK_ADMIN_PASSWORD=admin \
+  -e KC_DB=postgres \
+  -e KC_DB_URL=jdbc:postgresql://postgres:5432/keycloak \
+  -e KC_DB_USERNAME=keycloak \
+  -e KC_DB_PASSWORD=password \
+  quay.io/keycloak/keycloak:22.0 start-dev
+
+# Create realm
+kcadm.sh create realms -s realm=mycompany -s enabled=true
+
+# Create client
+kcadm.sh create clients -r mycompany \
+  -s clientId=my-app \
+  -s publicClient=true \
+  -s redirectUris='["https://my-app.example.com/*"]'
+
+# Create user
+kcadm.sh create users -r mycompany \
+  -s username=john \
+  -s email=john@example.com \
+  -s enabled=true
+```
+
+## IAM Platform Security Hardening
+
+Regardless of platform, these best practices apply:
+
+```yaml
+General IAM Platform Hardening:
+  └─ Admin accounts:
+    └─ Separate admin accounts from daily use accounts (no shared admin/personal)
+    └─ Require phishing-resistant MFA (FIDO2/WebAuthn) for all admin roles
+    └─ JIT activation for admin roles (PIM or equivalent)
+    └─ Monitor and alert on admin activity
+
+  └─ Application integration:
+    └─ Use SAML/OIDC for SSO (avoid proxy-based integrations where possible)
+    └─ Validate SAML assertions: signature, audience, recipient, timestamps
+    └─ Use PKCE for OAuth public clients
+    └─ Rotate client secrets regularly
+
+  └─ User lifecycle:
+    └─ Automate deprovisioning (HR trigger → account disabled within 4 hours)
+    └─ Review guest/B2B users quarterly
+    └─ Inactive user detection: disable after 90 days without login
+    └─ Orphan account detection: accounts for departed users
+
+  └─ Security monitoring:
+    └─ Failed login attempts: alert on > 10 in 5 minutes
+    └─ Impossible travel: login from geographically distant locations in short time
+    └─ Suspicious admin activity: unusual time, location, or device
+    └─ Token theft indicators: token used from different IP than issued
+```

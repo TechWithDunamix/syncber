@@ -1,0 +1,93 @@
+---
+title: "Compliance Automation"
+description: "Policy-as-code, continuous monitoring, automated evidence collection, and compliance-as-code tools."
+sidebar:
+  order: 4
+  label: "Compliance Automation"
+tab: "cybersecurity"
+---
+
+## Policy-as-Code
+
+Write policies as machine-enforceable rules:
+
+```python
+# AWS Config rule as code (Python + c7n)
+from c7n_resources import resources
+from c7n import policy
+
+@resources('aws.s3')
+class S3PublicAccessBlock(policy.Policy):
+    name = 's3-public-access-block'
+    resource = 'aws.s3'
+    
+    def process(self, resources):
+        for bucket in resources:
+            result = self.client.get_public_access_block(Bucket=bucket['Name'])
+            if not result['PublicAccessBlockConfiguration']['BlockPublicAcls']:
+                self.deny(bucket, "BlockPublicAcls not enabled")
+```
+
+## Automated Evidence Collection
+
+```yaml
+# Compliance evidence pipeline (GitHub Actions)
+name: Compliance Evidence Collection
+on:
+  schedule:
+    - cron: '0 6 * * 1'  # Every Monday
+  workflow_dispatch:
+
+jobs:
+  collect-evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Collect AWS evidence
+        run: |
+          aws iam list-users > evidence/iam-users.json
+          aws configservice describe-config-rules > evidence/config-rules.json
+      
+      - name: Collect Azure evidence
+        run: |
+          az policy state list > evidence/azure-policy-compliance.json
+          az role assignment list > evidence/azure-role-assignments.json
+      
+      - name: Upload to evidence repository
+        uses: actions/upload-artifact@v4
+        with:
+          name: compliance-evidence-$(date +%Y-%m-%d)
+          path: evidence/
+```
+
+## Compliance Monitoring Tools
+
+| Tool | Purpose | Type |
+|------|---------|------|
+| **AWS Config** | AWS resource configuration monitoring | Managed |
+| **Azure Policy** | Azure resource policy enforcement | Managed |
+| **GCP Org Policies** | GCP organisation-wide constraints | Managed |
+| **Cloud Custodian** | Multi-cloud policy engine | Open-source |
+| **OpenPolicyAgent** | General-purpose policy engine (Rego) | Open-source |
+| **StrongDM** | Database access compliance | Commercial |
+| **Vanta** | Automated SOC 2 evidence | Commercial |
+| **Drata** | Automated SOC 2 + compliance monitoring | Commercial |
+
+## Sample Compliance Dashboard
+
+```sql
+-- Compliance status query
+SELECT 
+  framework,
+  COUNT(*) as total_controls,
+  SUM(CASE WHEN status = 'passing' THEN 1 ELSE 0 END) as passing,
+  SUM(CASE WHEN status = 'failing' THEN 1 ELSE 0 END) as failing,
+  ROUND(100.0 * SUM(CASE WHEN status = 'passing' THEN 1 ELSE 0 END) / COUNT(*), 1) as pass_rate
+FROM compliance_controls
+GROUP BY framework;
+```
+
+| Framework | Total | Passing | Failing | Pass Rate |
+|-----------|-------|---------|---------|-----------|
+| SOC 2 | 120 | 115 | 5 | 95.8% |
+| PCI DSS | 256 | 249 | 7 | 97.3% |
+| ISO 27001 | 114 | 112 | 2 | 98.2% |

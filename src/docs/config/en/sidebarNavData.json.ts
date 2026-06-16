@@ -296,16 +296,76 @@ const sidebarNavData: DocsSidebarNavData = {
           title: "Course Overview",
         },
         {
-          id: "security-fundamentals",
-          title: "Security Fundamentals",
+          id: "phase-1-security-foundations",
+          title: "Phase 1: Security Foundations",
+          children: [
+            {
+              id: "security-fundamentals",
+              title: "Security Fundamentals",
+            },
+            {
+              id: "network-security",
+              title: "Network Security",
+            },
+            {
+              id: "application-security",
+              title: "Application Security",
+            },
+          ],
         },
         {
-          id: "threat-detection",
-          title: "Threat Detection & Response",
+          id: "phase-2-threat-management",
+          title: "Phase 2: Threat Management",
+          children: [
+            {
+              id: "threat-detection",
+              title: "Threat Detection & Intelligence",
+            },
+            {
+              id: "incident-response",
+              title: "Incident Response & Forensics",
+            },
+            {
+              id: "vulnerability-management",
+              title: "Vulnerability Management",
+            },
+          ],
         },
         {
-          id: "security-tools",
-          title: "Security Tools & Practices",
+          id: "phase-3-defense-tools",
+          title: "Phase 3: Defense & Tools",
+          children: [
+            {
+              id: "identity-access-management",
+              title: "Identity & Access Management",
+            },
+            {
+              id: "security-tools",
+              title: "Security Tools & Pentesting",
+            },
+            {
+              id: "cloud-security",
+              title: "Cloud Security",
+            },
+          ],
+        },
+        {
+          id: "phase-4-governance-operations",
+          title: "Phase 4: Governance & Operations",
+          children: [
+            {
+              id: "compliance-auditing",
+              title: "Compliance & Auditing",
+            },
+            {
+              id: "security-automation",
+              title: "Security Automation & DevSecOps",
+            },
+            {
+              id: "cybersecurity-capstone",
+              title: "Capstone Project",
+            },
+          ],
         },
       ],
     },

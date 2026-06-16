@@ -1,0 +1,210 @@
+---
+title: "AWS Security"
+description: "AWS security services: IAM, KMS, CloudTrail, GuardDuty, Security Hub, Config, WAF, Shield. Best practices for securing AWS accounts and workloads."
+sidebar:
+  order: 3
+  label: "AWS Security"
+tab: "cybersecurity"
+---
+
+Amazon Web Services offers the broadest set of cloud security services. Properly configuring them is essential for securing AWS workloads.
+
+## AWS Security Services Overview
+
+| Service | Category | What It Does |
+|---------|----------|-------------|
+| **IAM** | Identity | Users, groups, roles, policies, permission boundaries |
+| **KMS** | Encryption | Key management, envelope encryption |
+| **CloudTrail** | Audit | API activity logging across all services |
+| **CloudWatch** | Monitoring | Metrics, logs, alarms |
+| **GuardDuty** | Detection | Threat detection using ML and threat intel |
+| **Security Hub** | Posture | Aggregate security findings, compliance checks |
+| **Config** | Compliance | Resource configuration tracking and compliance |
+| **WAF** | Application security | Web application firewall (Layer 7) |
+| **Shield** | DDoS protection | Layer 3/4 DDoS protection (Standard free, Advanced paid) |
+| **Inspector** | Vulnerability scanning | Automated vulnerability assessment for EC2/containers |
+| **Macie** | Data protection | Discover and protect sensitive data in S3 |
+| **Network Firewall** | Network security | Managed firewall with stateful inspection |
+| **RAM** | Resource sharing | Share resources across accounts securely |
+| **Secrets Manager** | Secrets | Rotate and manage database credentials, API keys |
+
+## IAM Best Practices
+
+```yaml
+Root User:
+  └─ Enable MFA on root account IMMEDIATELY
+  └─ Never create access keys for root user
+  └─ Never use root for daily operations
+  └─ Monitor root user activity (CloudTrail + alarm)
+
+User Management:
+  └─ Use IAM roles (temporary credentials) instead of long-term access keys
+  └─ Use SSO / IAM Identity Center for human users
+  └─ Groups for permissions, not individual user policies
+  └─ Least privilege: start with deny-all, add only what's needed
+
+IAM Policies (Tips):
+  └─ Use managed policies where possible (AWS-managed, job function)
+  └─ Use permission boundaries to limit maximum permissions
+  └─ Use conditions: aws:SourceIp, aws:MultiFactorAuthPresent
+  └─ Use NotAction sparingly (easy to get wrong)
+  └─ Validate policies with IAM Access Analyzer
+```
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject"
+      ],
+      "Resource": "arn:aws:s3:::company-data/*",
+      "Condition": {
+        "IpAddress": {
+          "aws:SourceIp": "10.0.0.0/16"
+        },
+        "Bool": {
+          "aws:MultiFactorAuthPresent": "true"
+        }
+      }
+    }
+  ]
+}
+```
+
+## S3 Security
+
+S3 misconfigurations are the most common cloud security incident.
+
+```yaml
+S3 Security Checklist:
+  └─ Block Public Access at account level
+  └─ Enable S3 server access logging
+  └─ Enable S3 Object Lock (immutable storage for critical data)
+  └─ Enable default encryption (SSE-S3, SSE-KMS, or SSE-C)
+  └─ Use bucket policies with conditions (VPC endpoint, source IP)
+  └─ Enable versioning (protect against accidental deletion)
+  └─ Use S3 Intelligent-Tiering for cost-effective retention
+  └─ Enable MFA Delete for critical buckets
+  └─ Use S3 Access Points for granular access control
+  └─ Enable Macie for sensitive data discovery
+```
+
+```bash
+# S3 security audit commands
+# Check public access settings
+aws s3control get-public-access-block --account-id 123456789012
+
+# List buckets with public ACLs
+aws s3api list-buckets | jq -r '.Buckets[].Name' | while read bucket; do
+  acl=$(aws s3api get-bucket-acl --bucket $bucket 2>/dev/null)
+  if echo "$acl" | grep -q "AllUsers\|AuthenticatedUsers"; then
+    echo "⚠ PUBLIC ACL: $bucket"
+  fi
+done
+
+# Check bucket encryption
+aws s3api get-bucket-encryption --bucket company-data
+```
+
+## CloudTrail & Monitoring
+
+```bash
+# Enable CloudTrail across all regions
+aws cloudtrail create-trail --name company-trail \
+  --s3-bucket-name company-cloudtrail-logs \
+  --is-multi-region-trail \
+  --enable-log-file-validation \
+  --cloud-watch-logs-log-group-arn arn:aws:logs:us-east-1:123456789012:log-group:cloudtrail:* \
+  --cloud-watch-logs-role-arn arn:aws:iam::123456789012:role/CloudTrailRole
+
+# Create metric filter for root activity
+aws logs put-metric-filter \
+  --log-group-name cloudtrail \
+  --filter-name RootActivity \
+  --filter-pattern '{$.userIdentity.type = "Root"}' \
+  --metric-transformations \
+    metricName=RootActivityCount,metricNamespace=CloudTrail,metricValue=1
+
+# Create alarm for root usage
+aws cloudwatch put-metric-alarm \
+  --alarm-name RootActivityAlarm \
+  --alarm-description "Root user activity detected" \
+  --metric-name RootActivityCount \
+  --namespace CloudTrail \
+  --statistic Sum \
+  --period 300 \
+  --threshold 1 \
+  --comparison-operator GreaterThanThreshold \
+  --evaluation-periods 1 \
+  --alarm-actions arn:aws:sns:us-east-1:123456789012:soc-alerts
+```
+
+## GuardDuty
+
+AWS GuardDuty continuously monitors for malicious activity using ML and integrated threat intelligence.
+
+```yaml
+What GuardDuty Detects:
+  └─ Recon: Port scanning, brute force attempts
+  └─ Compromise: Crypto mining, unusual outbound traffic
+  └─ Persistence: IAM key creation, unusual API calls
+  └─ Privilege escalation: AssumeRole from unusual entity
+  └─ Exfiltration: Unusual S3 data access patterns
+
+Key Findings (examples):
+  └─ UnauthorizedAccess:IAMUser/ConsoleLoginSuccess
+  └─ CryptoCurrency:EC2/BitcoinTool.B!DNS
+  └─ Backdoor:EC2/C&CActivity.B!DNS
+  └─ Unusual:EC2/UnusualDNSResolvers
+  └─ Recon:IAMUser/TorIPCaller
+  └─ Stealth:IAMUser/PasswordChange
+
+Best Practices:
+  └─ Enable GuardDuty in every region (including future regions)
+  └─ Automated response: GuardDuty → EventBridge → Lambda → Remediation
+  └─ Integrate with Security Hub for centralised findings
+  └─ Set up notifications for critical findings (SNS → PagerDuty)
+  └─ Archive known false positives
+```
+
+## AWS Security Automation
+
+```python
+# Automated remediation: Remove public S3 access
+import boto3
+
+def lambda_handler(event, context):
+    s3 = boto3.client('s3control')
+    account_id = context.invoked_function_arn.split(':')[4]
+    
+    # Block public access at account level
+    s3.put_public_access_block(
+        AccountId=account_id,
+        PublicAccessBlockConfiguration={
+            'BlockPublicAcls': True,
+            'IgnorePublicAcls': True,
+            'BlockPublicPolicy': True,
+            'RestrictPublicBuckets': True
+        }
+    )
+    
+    print(f"Blocked public access for account {account_id}")
+    return {"status": "success", "account": account_id}
+```
+
+## Key Takeaways
+
+- IAM is the cornerstone of AWS security — least privilege, roles over users, MFA on root, permission boundaries, and conditions on policies
+- S3 remains the most common source of cloud breaches — Block Public Access at account level, enable logging and encryption, use Macie for sensitive data discovery
+- CloudTrail must be enabled in all regions for comprehensive audit trail — create metric filters and alarms for critical events (root activity, IAM changes)
+- GuardDuty provides automated threat detection using ML and threat intel — enable in all regions and automate response
+- The Capital One breach (2019, $190M fine) involved SSRF to EC2 metadata, overly permissive IAM roles, and unmonitored S3 access
+- AWS Security Hub aggregates findings from GuardDuty, Inspector, Macie, Config, and Firewall Manager for a single-pane-of-glass view
+- Automate remediation wherever possible: detect misconfiguration → trigger Lambda → fix the issue — this reduces mean time to remediate from days to seconds
+- AWS WAF + Shield Advanced provides application-level and infrastructure-level DDoS protection
+- Use AWS Config rules to enforce compliance (e.g., "required tags on resources", "S3 bucket not publicly accessible")
+- The AWS Well-Architected Framework Security Pillar provides a structured approach to evaluating cloud security posture

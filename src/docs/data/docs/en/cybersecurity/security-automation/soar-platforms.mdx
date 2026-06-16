@@ -1,0 +1,82 @@
+---
+title: "SOAR Platforms"
+description: "SOAR capabilities, Splunk SOAR, Palo Alto XSOAR, playbook automation, and phishing response playbook."
+sidebar:
+  order: 1
+  label: "SOAR Platforms"
+tab: "cybersecurity"
+---
+
+SOAR (Security Orchestration, Automation, and Response) platforms connect security tools, automate response actions, and manage incidents through playbooks.
+
+## SOAR Core Capabilities
+
+| Capability | Description | Example |
+|------------|-------------|---------|
+| **Orchestration** | Connect disparate security tools via APIs | SIEM triggers alert → SOAR queries EDR → SOAR blocks IP in firewall |
+| **Automation** | Execute predefined response actions automatically | Phishing alert → quarantine email → disable user account → open ticket |
+| **Response** | Manage incidents with case management, collaboration | Ticket creation, analyst assignment, SLA tracking, reporting |
+| **Playbooks** | Visual or code-based workflows for incident response | Conditional logic, approval gates, parallel actions |
+
+## Phishing Playbook Example
+
+```yaml
+name: Phishing Response Playbook
+trigger:
+  - source: SIEM
+    condition: alert.type == "phishing" AND alert.severity >= "high"
+steps:
+  - id: enrich_ioc
+    action: query_virustotal
+    params:
+      hash: "{{alert.file_hash}}"
+  
+  - id: check_reputation
+    action: query_domain_reputation
+    params:
+      domain: "{{alert.url_domain}}"
+  
+  - id: decision
+    condition: steps.enrich_ioc.malicious == true OR steps.check_reputation.malicious == true
+    
+    true:
+      - id: isolate_host
+        action: edr_isolate
+        target: edr
+        params:
+          host: "{{alert.source_host}}"
+      
+      - id: block_domain
+        action: firewall_block_domain
+        target: firewall
+        params:
+          domain: "{{alert.url_domain}}"
+      
+      - id: disable_user
+        action: ad_disable_account
+        params:
+          username: "{{alert.target_user}}"
+      
+      - id: notify_ir
+        action: create_ticket
+        target: service_now
+        params:
+          title: "Phishing incident - {{alert.target_user}}"
+          priority: "P1"
+    
+    false:
+      - id: close_alert
+        action: close_ticket
+        params:
+          reason: "False positive - IOC not confirmed"
+```
+
+## SOAR Playbook Metrics
+
+| Metric | Manual | With SOAR |
+|--------|--------|-----------|
+| Phishing triage time | 15-30 minutes | 2-5 minutes |
+| Host isolation | 10-20 minutes | 30 seconds |
+| Block IOC across all firewalls | 1-2 hours | 2-3 minutes |
+| Incident report generation | 1 hour | 5 minutes |
+| Alert fatigue (alerts/analyst/day) | 50-200 | 10-30 (SOAR handles 80%) |

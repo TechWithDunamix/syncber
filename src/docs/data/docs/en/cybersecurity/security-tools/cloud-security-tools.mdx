@@ -1,0 +1,481 @@
+---
+title: "Cloud Security Tools"
+description: "ScoutSuite, Prowler, CloudSploit, AWS Config, Azure Policy, CSPM tools, cloud security posture management, and infrastructure-as-code security."
+sidebar:
+  order: 4
+  label: "Cloud Security Tools"
+tab: "cybersecurity"
+---
+
+Cloud security tools help organisations maintain visibility, enforce compliance, and detect misconfigurations across multi-cloud environments. As organisations adopt AWS, Azure, and GCP, the attack surface expands exponentially — and traditional perimeter-based security tools cannot see cloud-native risks.
+
+## CSPM — Cloud Security Posture Management
+
+CSPM tools continuously assess cloud environments against compliance frameworks and security best practices:
+
+| Feature | Description | Why It Matters |
+|---------|-------------|----------------|
+| **Configuration assessment** | Checks cloud resources against benchmarks (CIS, NIST, SOC 2) | Catches misconfigurations before they are exploited |
+| **Compliance reporting** | Maps findings to regulatory frameworks (PCI DSS, HIPAA, GDPR) | Evidence for auditors without manual effort |
+| **IAM analysis** | Identifies over-permissive roles, unused credentials | Reduces blast radius of compromised accounts |
+| **Network visibility** | Maps VPC configurations, open security groups | Detects exposed services, unintended internet access |
+| **Data exposure detection** | Finds publicly accessible S3 buckets, unencrypted databases | Prevents data breaches (Capital One 2019 — $190M) |
+| **Remediation automation** | Auto-fix common misconfigurations via policy as code | Reduces mean time to remediate (MTTR) |
+
+### Leading CSPM Tools
+
+| Tool | Type | Cloud Coverage | Pricing |
+|------|------|---------------|---------|
+| **AWS Config** | Native (AWS) | AWS only | Per configuration item recorded |
+| **Azure Policy** | Native (Azure) | Azure only | Free (included with Azure) |
+| **GCP Asset Inventory** | Native (GCP) | GCP only | Free |
+| **ScoutSuite** | Open-source | Multi-cloud (AWS, Azure, GCP) | Free |
+| **Prowler** | Open-source | AWS (primary), Azure, GCP | Free |
+| **Checkov** | Open-source | IaC scanning (multi-cloud) | Free (CLI), paid (platform) |
+| **Wiz** | Commercial | Multi-cloud | Per-resource |
+| **Prisma Cloud** | Commercial | Multi-cloud | Per-workload |
+| **Orca Security** | Commercial | Multi-cloud | Per-resource |
+
+## ScoutSuite — Open-Source Multi-Cloud Auditing
+
+ScoutSuite is the leading open-source multi-cloud security auditing tool:
+
+```bash
+# ScoutSuite installation
+pip install scoutsuite
+
+# AWS audit
+scout aws --profile my-aws-profile
+
+# Azure audit
+scout azure --cli
+
+# GCP audit (with service account key)
+scout gcp --service-account /path/to/key.json
+
+# Output
+# Generates an HTML report in scoutsuite-report/scoutsuite-report.html
+# Contains: findings summary, compliance mapping, IAM analysis, network analysis
+```
+
+### ScoutSuite AWS Findings Example
+
+```yaml
+AWS IAM Findings (ScoutSuite):
+  └─ Root account MFA not enabled: MFA not configured for root AWS account (CRITICAL)
+  └─ IAM user with full admin: user "ci-user" has AdministratorAccess policy (HIGH)
+  └─ Unused IAM user: user "legacy-user" — no access in 180+ days (MEDIUM)
+  └─ Password policy: no password expiration required (MEDIUM)
+  └─ Access key rotation: key for user "deploy-user" is 2+ years old (HIGH)
+
+AWS S3 Findings:
+  └─ S3 bucket publicly readable: bucket "logs-backup" allows List access to * (CRITICAL)
+  └─ S3 bucket without encryption: bucket "data-lake" has no default encryption (HIGH)
+  └─ S3 bucket without versioning: bucket "critical-data" versioning disabled (MEDIUM)
+```
+
+## Prowler — AWS Security Best Practices
+
+Prowler is the gold standard for AWS security assessment:
+
+```bash
+# Quick assessment against CIS benchmarks
+prowler aws -M html
+# Generates HTML report
+
+# Check specific service
+prowler aws --services s3
+
+# Compliance frameworks
+prowler aws --compliance cis_1.4_aws
+prowler aws --compliance pci_3.2
+prowler aws --compliance soc2
+
+# Output formats
+prowler aws -M html,json,csv
+
+# Continuous monitoring mode
+prowler aws -M json -o /var/log/prowler/
+```
+
+### Prowler Key Checks
+
+```yaml
+Prowler 400+ Checks (example highlights):
+  └─ [check53] S3 buckets with public access (CRITICAL)
+  └─ [check11] IAM password policy (HIGH)
+  └─ [check21] CloudTrail enabled in all regions (HIGH)
+  └─ [check31] CloudTrail log file validation enabled (MEDIUM)
+  └─ [check40] Security groups with unrestricted ingress (HIGH)
+  └─ [check111] EBS volumes encrypted (MEDIUM)
+  └─ [check73] RDS instances publicly accessible (CRITICAL)
+  └─ [check42] VPC Flow Logs enabled (MEDIUM)
+  └─ [check38] Root account MFA (CRITICAL)
+  └─ [check320] ECR repositories private (HIGH)
+```
+
+## Checkov — Infrastructure-as-Code Security
+
+Checkov scans Terraform, CloudFormation, Kubernetes, and ARM templates for misconfigurations before deployment:
+
+```bash
+# Scan Terraform directory
+checkov -d terraform/
+
+# Scan specific file
+checkov -f main.tf
+
+# Multi-cloud IaC scanning
+checkov -d . --framework terraform,cloudformation,kubernetes
+
+# Output formats
+checkov -d terraform/ -o json > checkov-report.json
+
+# Skip specific checks (after review)
+checkov -d terraform/ --skip-check CKV_AWS_52
+
+# Soft fail (don't exit non-zero on findings)
+checkov -d terraform/ --soft-fail
+```
+
+### Checkov Detection Examples
+
+```yaml
+Terraform Misconfigurations Detected by Checkov:
+  └─ CKV_AWS_1: IAM password policy lacks uppercase letter requirement
+  └─ CKV_AWS_2: EBS volume encryption is disabled
+  └─ CKV_AWS_3: EBS volume encryption key is not managed by KMS
+  └─ CKV_AWS_7: S3 bucket does not have logging enabled
+  └─ CKV_AWS_16: RDS instance does not have deletion protection
+  └─ CKV_AWS_20: S3 bucket does not have block public access settings
+  └─ CKV_AWS_21: S3 bucket ACL grants public read access
+  └─ CKV_AWS_23: Security group rule allows unrestricted egress
+  └─ CKV_AWS_24: Security group rule allows unrestricted SSH access
+  └─ CKV_AWS_42: EFS is not encrypted at rest
+```
+
+### Checkov in CI/CD
+
+```yaml
+# GitHub Actions — Checkov IaC Scan
+name: IaC Security Scan
+on: [push, pull_request]
+jobs:
+  checkov:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Checkov
+        id: checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: terraform/
+          framework: terraform
+          output_format: cli
+          soft_fail: false  # Fail on any finding
+```
+
+## AWS Config — Native AWS Compliance
+
+AWS Config continuously monitors and records AWS resource configurations:
+
+```bash
+# Enable AWS Config (CLI)
+aws configservice put-configuration-recorder \
+  --configuration-recorder name=default,roleARN=arn:aws:iam::123456789012:role/AWS_ConfigRole
+
+# Enable recording
+aws configservice start-configuration-recorder \
+  --configuration-recorder-name default
+
+# Query resource compliance
+aws configservice get-compliance-details-by-config-rule \
+  --config-rule-name s3-bucket-public-read-prohibited
+
+# List non-compliant resources
+aws configservice describe-compliance-by-config-rule \
+  --compliance-types NON_COMPLIANT
+
+# Custom rule (Lambda-backed)
+# Example: Check if EC2 instances have specific tags
+aws configservice put-config-rule \
+  --config-rule '{
+    "ConfigRuleName": "required-tags",
+    "Source": {
+      "Owner": "CUSTOM_LAMBDA",
+      "SourceIdentifier": "arn:aws:lambda:us-east-1:123456789012:function:config-rule-tags"
+    }
+  }'
+```
+
+### AWS Config Managed Rules
+
+```yaml
+Common AWS Config Managed Rules:
+  └─ s3-bucket-public-read-prohibited: S3 buckets with public read access
+  └─ s3-bucket-ssl-requests-only: S3 buckets with HTTP access
+  └─ ec2-volume-inuse-check: Unused EBS volumes
+  └─ ec2-instance-managed-by-systems-manager: EC2 not managed by SSM
+  └─ rds-storage-encrypted: Unencrypted RDS instances
+  └─ cloud-trail-enabled: CloudTrail not enabled
+  └─ iam-password-policy: IAM password policy check
+  └─ restricted-ssh: Security groups with unrestricted SSH
+  └─ vpc-flow-logs-enabled: VPCs without flow logs
+  └─ root-account-mfa-enabled: Root account MFA
+```
+
+## Azure Policy
+
+Azure Policy enforces organisational standards across Azure subscriptions:
+
+```bash
+# Assign a built-in policy
+az policy assignment create \
+  --name "audit-sql-encryption" \
+  --policy "SQL Managed Instance encryption at rest using your own key" \
+  --assign-identity \
+  --location eastus
+
+# Assign a custom policy (from JSON file)
+az policy definition create \
+  --name "require-resource-group-tags" \
+  --rules policy-definition.json \
+  --display-name "Require specific tags on resource groups"
+
+az policy assignment create \
+  --name "require-tags" \
+  --policy "require-resource-group-tags" \
+  --params '{"tagName": {"value": "Environment"}}'
+```
+
+### Azure Policy Effects
+
+| Effect | Description | Use Case |
+|--------|-------------|----------|
+| **Audit** | Logs non-compliant resources | Evaluation mode (no enforcement) |
+| **Deny** | Blocks creation of non-compliant resources | Preventive control |
+| **Modify** | Auto-fixes non-compliant resources | Remediation (e.g., add tag) |
+| **AuditIfNotExists** | Checks if related resource exists | Dependencies (e.g., missing diagnostic logs) |
+| **DeployIfNotExists** | Deploys missing resources | Auto-remediation |
+
+### Azure Policy Initiative Examples
+
+```yaml
+Azure Policy Initiatives:
+  └─ CIS Microsoft Azure Foundations Benchmark: 90+ policies mapped to CIS
+  └─ NIST SP 800-53 Rev. 5: Compliance assessment for US federal workloads
+  └─ PCI DSS v4.0: Payment card industry compliance
+  └─ SOC 2 Type II: Service organisation controls
+  └─ ISO 27001:2013: International security standard
+```
+
+## Cloud Security Tool Integration
+
+### SIEM Integration
+
+```yaml
+Cloud Tool → SIEM Integration:
+  └─ AWS Config → AWS Security Hub → Amazon EventBridge → Splunk/ELK
+  └─ Azure Policy → Azure Defender → Azure Sentinel
+  └─ GCP Asset Inventory → Security Command Center → Chronicle/Splunk
+  └─ ScoutSuite → CSV/JSON export → custom SIEM ingestion
+  └─ Prowler → JSON output → automated import to SIEM
+```
+
+### Automated Remediation Playbook
+
+```bash
+# AWS: Auto-remediate public S3 buckets with AWS Config + SSM
+# 1. Config detects public S3 bucket
+# 2. Config rule triggers Lambda function
+# 3. Lambda applies block public access setting
+
+# Lambda (Python) for auto-remediation: S3 Block Public Access
+import boto3
+
+def lambda_handler(event, context):
+    s3 = boto3.client('s3')
+    bucket_name = event['detail']['resourceId']
+    
+    # Apply block public access
+    s3.put_public_access_block(
+        Bucket=bucket_name,
+        PublicAccessBlockConfiguration={
+            'BlockPublicAcls': True,
+            'IgnorePublicAcls': True,
+            'BlockPublicPolicy': True,
+            'RestrictPublicBuckets': True
+        }
+    )
+    
+    # Log the remediation
+    print(f"Applied Block Public Access to {bucket_name}")
+    return {"status": "remediated", "bucket": bucket_name}
+```
+
+<Aside variant="tip">
+CSPM tools are essential for multi-cloud environments but they are not a replacement for understanding your cloud provider's native security tools. For any organisation using a single cloud provider, start with the native tools (AWS Config, Azure Policy, GCP Asset Inventory) — they are free or low-cost and deeply integrated. Add ScoutSuite or Prowler for compliance audits and cross-cloud visibility.
+</Aside>
+
+## Key Takeaways
+
+- CSPM tools continuously assess cloud environments against security benchmarks and compliance frameworks — they detect misconfigurations before attackers can exploit them
+- ScoutSuite is the leading open-source multi-cloud auditor (AWS, Azure, GCP) — generates HTML reports with findings mapped to security controls
+- Prowler is the gold standard for AWS security assessment with 400+ checks covering CIS, PCI DSS, SOC 2, and NIST frameworks
+- Checkov scans Infrastructure-as-Code (Terraform, CloudFormation, Kubernetes) for misconfigurations before deployment — shift-left for cloud security
+- AWS Config provides native AWS compliance monitoring with managed rules for common security controls (S3 public access, RDS encryption, CloudTrail logging)
+- Azure Policy enforces organisational standards across Azure subscriptions with effects ranging from audit (logging only) to deny (blocking creation) to modify (auto-remediation)
+- Native cloud tools (AWS Config, Azure Policy, GCP Asset Inventory) should be the foundation — they are free/per-resource-cost and deeply integrated
+- Open-source tools (ScoutSuite, Prowler, Checkov) fill gaps for multi-cloud visibility, compliance auditing, and IaC scanning
+- Cloud security tool outputs should feed into SIEM (Splunk, ELK, Sentinel) for centralised alerting and automated remediation playbooks
+- Automated remediation (Lambda functions triggered by AWS Config rules) reduces mean time to remediate from days to minutes for common misconfigurations like public S3 buckets
+- The cloud security tool chain: IaC scanning (Checkov) → configuration monitoring (AWS Config) → posture assessment (Prowler/ScoutSuite) → compliance reporting (SIEM) → automated remediation (Lambda/SSM)
+- Cloud security is not "set and forget" — new services and configurations are added continuously; CSPM tools must run on a schedule (daily at minimum) to maintain visibility
+description: "ScoutSuite, Prowler, CloudSploit, AWS Config, Azure Policy, and CSPM tools for multi-cloud security auditing."
+sidebar:
+  order: 4
+  label: "Cloud Security Tools"
+tab: "cybersecurity"
+---
+
+Cloud security tools audit cloud infrastructure configurations against security best practices. Cloud misconfigurations are the #1 cause of cloud data breaches — the Capital One 2019 breach (100M records) was caused by a single misconfigured WAF.
+
+## CSPM (Cloud Security Posture Management)
+
+CSPM tools continuously monitor cloud configurations against benchmarks (CIS, NIST, SOC 2):
+
+| Tool | Type | Clouds | Key Feature |
+|------|------|--------|-------------|
+| **ScoutSuite** | Open-source | AWS, Azure, GCP, OCI | Multi-cloud, no agent, comprehensive rules |
+| **Prowler** | Open-source | AWS only | Deepest AWS coverage, 240+ checks |
+| **CloudSploit** | Open-source | AWS, Azure, GCP | CI/CD integration, GitHub Actions |
+| **AWS Config** | AWS-native | AWS only | Managed service, auto-remediation |
+| **Azure Policy** | Azure-native | Azure only | Managed service, policy-as-code |
+| **Wiz** | Commercial | Multi-cloud | Agentless, graph-based analysis |
+| **Prisma Cloud** | Commercial | Multi-cloud | CSPM + CWPP + CIEM |
+
+## ScoutSuite
+
+ScoutSuite is the leading open-source multi-cloud auditing tool:
+
+```bash
+# Install ScoutSuite
+pip install scoutsuite
+
+# Run against AWS
+scout aws --access-keys --access-key-id AKIA... --secret-access-key ...
+
+# Run against Azure
+scout azure --cli
+
+# Run against GCP
+scout gcp --service-account /path/to/service-account.json
+
+# Generate HTML report (automatically created after scan)
+# Open: scoutsuite-report/scoutsuite-report.html
+```
+
+### What ScoutSuite Checks
+
+| Category | Example Checks | Risk |
+|----------|---------------|------|
+| **IAM** | Root account has access keys, MFA not enabled on users, overly permissive policies | Privilege escalation, account takeover |
+| **S3** | Buckets publicly accessible, no encryption, no logging enabled | Data breach |
+| **EC2** | Security groups too permissive (0.0.0.0/0), unencrypted EBS volumes | Unauthorised access |
+| **RDS** | Publicly accessible databases, no encryption at rest, no backup | Data breach |
+| **CloudTrail** | Not enabled in all regions, no log file validation | No audit trail |
+| **KMS** | Key rotation disabled, cross-account access | Cryptographic weaknesses |
+
+## Prowler
+
+Prowler is the most comprehensive AWS auditing tool (240+ checks):
+
+```bash
+# Install Prowler
+pip install prowler
+
+# Run all checks
+prowler aws
+
+# Run specific categories
+prowler aws --group iam
+prowler aws --group s3
+prowler aws --group ec2
+
+# Output formats
+prowler aws -o json  # Machine-readable for SIEM ingestion
+prowler aws -o html  # Human-readable report
+prowler aws -o csv   # Spreadsheet for compliance tracking
+
+# Run against a specific profile
+prowler aws -p production --region us-east-1
+
+# Check specific CIS benchmark controls
+prowler aws --checks "cis_1.1,cise_1.2,cise_1.3,cise_1.4,cise_1.5"
+```
+
+## Cloud Security Automation
+
+### AWS Config Auto-Remediation
+
+```bash
+# Create an AWS Config rule that auto-remediates public S3 buckets
+aws configservice put-config-rule \
+  --config-rule '{
+    "ConfigRuleName": "s3-bucket-public-read-prohibited",
+    "Source": {
+      "Owner": "AWS",
+      "SourceIdentifier": "S3_BUCKET_PUBLIC_READ_PROHIBITED"
+    }
+  }'
+
+# Create auto-remediation action
+aws configservice put-remediation-configuration \
+  --config-rule-name "s3-bucket-public-read-prohibited" \
+  --remediation-configuration '{
+    "TargetType": "SSM_DOCUMENT",
+    "TargetId": "AWS-EnableS3BucketEncryption",
+    "Parameters": {
+      "AutomationAssumeRole": {"StaticValue": {"Values": ["arn:aws:iam::123456789:role/config-remediation"]}}
+    },
+    "Automatic": true,
+    "MaximumAutomaticAttempts": 3,
+    "RetryAttemptSeconds": 60
+  }'
+```
+
+### Azure Policy-as-Code
+
+```bash
+# Create an Azure Policy that blocks public network access on storage accounts
+az policy definition create \
+  --name "deny-storage-public-access" \
+  --rules '{
+    "if": {
+      "allOf": [
+        {"field": "type", "equals": "Microsoft.Storage/storageAccounts"},
+        {"field": "Microsoft.Storage/storageAccounts/allowBlobPublicAccess", "equals": true}
+      ]
+    },
+    "then": {"effect": "deny"}
+  }'
+
+# Assign policy at subscription scope
+az policy assignment create \
+  --name "deny-storage-public-access" \
+  --policy "deny-storage-public-access" \
+  --scope "/subscriptions/{subscription-id}"
+```
+
+<Aside variant="tip">
+The most common cloud security finding across all tools is "S3 bucket publicly accessible" or equivalent (Azure blob public access, GCP bucket allUsers). This is also the easiest to fix: block public access by DEFAULT at the organisational level, require exceptions through a formal approval process.
+</Aside>
+
+## Key Takeaways
+
+- CSPM tools (ScoutSuite, Prowler, CloudSploit) automate cloud configuration auditing against benchmarks like CIS and NIST — they are the "vulnerability scanners" for cloud infrastructure
+- ScoutSuite covers AWS, Azure, and GCP in a single tool — best for multi-cloud organisations that want an open-source option
+- Prowler provides the deepest AWS coverage with 240+ checks spanning IAM, S3, EC2, RDS, CloudTrail, and KMS
+- Cloud-native tools (AWS Config, Azure Policy) enable auto-remediation — not just detection but automatic correction of misconfigurations
+- Cloud misconfigurations are the #1 cause of cloud data breaches — CSPM scanning should be continuous (not point-in-time) with auto-remediation for critical findings
+- The most impactful cloud security improvement: block public access by default and require exceptions through a formal approval process

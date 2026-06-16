@@ -1,0 +1,351 @@
+---
+title: "IDS/IPS — Intrusion Detection & Prevention"
+description: "Signature vs anomaly detection, Snort/Suricata rule writing, placement strategies, evasion techniques, and real-world detection case studies."
+sidebar:
+  order: 4
+  label: "IDS / IPS"
+tab: "cybersecurity"
+---
+
+Intrusion Detection Systems (IDS) and Intrusion Prevention Systems (IPS) monitor network traffic for malicious activity. An IDS alerts — an IPS blocks.
+
+## IDS vs IPS
+
+| Aspect | IDS | IPS |
+|--------|-----|-----|
+| **Mode** | Passive (monitor only) | Inline (traffic passes through) |
+| **Action** | Alert, log | Block, drop, reject, quarantine |
+| **Network impact** | None (no latency) | Minimal latency added |
+| **Failure mode** | Failure = no alerts | Failure = no traffic (brick) |
+| **False positive impact** | Noise (analyst reviews) | Blocked legitimate traffic |
+| **Deployment** | SPAN port, TAP | Inline between networks |
+| **Detection** | After-the-fact | Real-time prevention |
+
+### When to Use Each
+
+```
+Use IDS when:
+  └─ You cannot risk blocking legitimate traffic (e.g., healthcare, critical infrastructure)
+  └─ You have a strong SOC team to review alerts
+  └─ Monitoring historical traffic forensics
+  └─ Deploying a new signature set (tune before enabling prevention)
+
+Use IPS when:
+  └─ You have a mature detection engineering process
+  └─ False positives are well-understood and minimised
+  └─ You need to block known threats automatically
+  └─ Regulatory compliance requires active blocking
+
+Best practice: Start with IDS, tune for 30-90 days, then switch to IPS.
+```
+
+## Detection Methods
+
+### 1. Signature-Based Detection
+
+Matches traffic against known attack patterns (signatures). Effective for known threats, ineffective for zero-days.
+
+```yaml
+Pros:
+  └─ Very low false positive rate when well-tuned
+  └─ Fast — can inspect traffic at line rate
+  └─ Easy to understand and maintain
+  └─ Effective against known malware and exploits
+
+Cons:
+  └─ Cannot detect unknown attacks (zero-days)
+  └─ Signature updates required constantly
+  └─ Small variations in attack bypass signatures
+  └─ High maintenance overhead (tuning)
+```
+
+### 2. Anomaly-Based Detection
+
+Establishes a baseline of normal traffic and alerts on deviations.
+
+```yaml
+Pros:
+  └─ Can detect novel attacks (zero-days)
+  └─ Detects insider threats (unusual behaviour)
+  └─ Adapts to network changes
+
+Cons:
+  └─ High false positive rate
+  └─ Difficult to tune
+  └─ Resource-intensive (requires ML/statistical analysis)
+  └─ Attacker can slowly train the baseline (blind spot)
+```
+
+### 3. Behavioral Detection
+
+Analyses patterns of behaviour rather than individual packets. Often combines signature and anomaly approaches.
+
+```
+Example: A user logs in at 3 AM from a foreign country
+  → Signature: Valid credentials (passes auth)
+  → Anomaly: 3 AM login from unusual location
+  → Behavioral: User has never accessed this server before
+  → Combined: Score = HIGH → alert
+```
+
+## Snort / Suricata Rule Writing
+
+Snort and Suricata are the dominant open-source IDS/IPS engines. Suricata is multi-threaded and generally faster, supporting both Snort-compatible rules and its own rule format.
+
+### Rule Structure
+
+```
+[action] [protocol] [source_ip] [source_port] -> [dest_ip] [dest_port] ([options])
+```
+
+**Rule components**:
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| **Action** | What to do on match | `alert`, `drop`, `reject`, `pass` |
+| **Protocol** | Layer 4 protocol | `tcp`, `udp`, `icmp`, `ip` |
+| **Source IP/Port** | Origin of traffic | `$HOME_NET any` |
+| **Direction** | Traffic flow | `->` (one-way), `<>` (bidirectional) |
+| **Dest IP/Port** | Destination | `$EXTERNAL_NET $HTTP_PORTS` |
+| **Options** | Match criteria and metadata | `content:"malware"; msg:"Malware detected";` |
+
+### Example Rules
+
+```bash
+# 1. Simple — detect SQL injection attempt
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (
+  msg:"SQL Injection — 'OR' pattern detected";
+  content:"' OR '1'='1";
+  classtype:web-application-attack;
+  sid:1000001;
+  rev:1;
+)
+
+# 2. Detect SMB EternalBlue exploit (WannaCry)
+alert tcp any any -> any 445 (
+  msg:"ET EXPLOIT EternalBlue SMB Remote Code Execution";
+  content:"|50 00 43 00 4E 00 50 00|";
+  byte_test:6,>,0x1000000,0,relative;
+  classtype:attempted-admin;
+  sid:1000002;
+  rev:1;
+  reference:cve,2017-0144;
+)
+
+# 3. Detect DNS query to known malware domain
+alert udp $HOME_NET any -> any 53 (
+  msg:"MALWARE DNS query to known C2 domain";
+  content:"|0a|malware-c2|03|com|00|";
+  classtype:trojan-activity;
+  sid:1000003;
+  rev:1;
+)
+
+# 4. Detect XSS in HTTP response
+alert tcp $EXTERNAL_NET $HTTP_PORTS -> $HOME_NET any (
+  msg:"XSS — script tag in HTTP response";
+  content:"<script>";
+  nocase;
+  classtype:web-application-attack;
+  sid:1000004;
+  rev:1;
+)
+
+# 5. SSH brute force detection
+alert tcp $EXTERNAL_NET any -> $HOME_NET 22 (
+  msg:"SSH Brute Force — multiple connections";
+  flow:to_server;
+  threshold:type both, track by_dst, count 10, seconds 60;
+  classtype:attempted-recon;
+  sid:1000005;
+  rev:1;
+)
+
+# 6. Detect exfiltration via DNS tunnelling
+alert udp $HOME_NET any -> any 53 (
+  msg:"Potential DNS tunnelling — long TXT query";
+  dsize:>128;
+  content:"|01|" offset 2;
+  content:"|00 00|" within 20;
+  classtype:policy-violation;
+  sid:1000006;
+  rev:1;
+)
+```
+
+### Rule Tuning
+
+```yaml
+False Positive Reduction:
+  └─ Target with src_ip/dst_ip — narrow scope
+  └─ Add content matching — more specific is better
+  └─ Use `threshold` to limit alert volume
+  └─ Set `priority` to filter noise
+  └─ Whitelist known-good through `pass` rules
+
+Example Tuning:
+  # Original — too broad, high false positives
+  alert tcp any any -> any 80 (msg:"Possible attack"; content:"GET"; sid:999999;)
+
+  # Tuned — specific to known vulnerable endpoint
+  alert tcp $EXTERNAL_NET any -> $DMZ_NET 80 (
+    msg:"SQLi attempt on login.php";
+    flow:to_server,established;
+    content:"POST"; http_method;
+    content:"/login.php"; http_uri;
+    content:"' OR "; http_client_body;
+    classtype:web-application-attack;
+    sid:1000007;
+    rev:1;
+  )
+```
+
+## IDS/IPS Placement
+
+```
+Internet
+   │
+   ▼
+┌──────────────┐
+│   Firewall    │
+└──────┬───────┘
+       │
+       ▼
+┌──────────────┐     ┌──────────────────┐
+│  IPS (Inline) │────▶│  DMZ Web Servers  │
+└──────┬───────┘     └──────────────────┘
+       │
+       ▼
+┌──────────────┐     ┌──────────────────┐
+│  IDS (SPAN)   │────▶│ Internal Network  │
+└──────────────┘     └──────────────────┘
+       │
+       ▼
+┌──────────────┐
+│    SIEM       │
+│ (Logs, Alerts)│
+└──────────────┘
+```
+
+| Placement | Purpose | Considerations |
+|-----------|---------|----------------|
+| **Internet edge** (after firewall) | Block known attacks at perimeter | High throughput, must be inline |
+| **DMZ** | Protect public-facing servers | Often HTTP/HTTPS traffic |
+| **Internal network** | Detect lateral movement | High volume, lots of legitimate traffic |
+| **Data center** | Protect critical databases | Sensitive data in transit |
+| **Cloud VPCs** | Monitor virtual networks | API-driven deployment |
+| **Each subnet** | Micro-segmentation monitoring | Expensive, management overhead |
+
+## Evasion Techniques
+
+Attackers actively evade IDS/IPS. Understanding evasion is critical for writing effective rules.
+
+| Technique | Description | Countermeasure |
+|-----------|-------------|---------------|
+| **Fragmentation** | Split payload across multiple packets | IP defragmentation before inspection |
+| **Encoding** | URL-encode, Base64-encode payload | Decode before inspection (normalisation) |
+| **Encryption (TLS)** | Hide payload in encrypted tunnel | SSL decryption at the IPS |
+| **Polymorphism** | Mutating malware signature each time | Behavioural detection |
+| **Slow scans** | Spread attack over hours/days | Anomaly-based detection (baseline) |
+| **Obfuscation** | Use `SEL`ECT instead of `SELECT` | SQL normalisation in WAF |
+| **Session splicing** | Split attack across multiple small packets | Stream reassembly |
+| **Insertion attacks** | Send packets that IDS accepts but target ignores | Target-based IDS (frag3, stream5) |
+
+## Real Case: Detection Failure at SolarWinds (2020)
+
+The SolarWinds supply chain attack (affecting 18,000 customers including US government agencies) evaded both signature-based and anomaly-based detection for 9+ months.
+
+```
+Why IDS/IPS Failed:
+  └─ Attacker signed malicious code with trusted certificates
+     → No signature existed for known-malware
+  └─ Communication with C2 via HTTP to AWS IPs
+     → Looked like normal API traffic
+  └─ Beacon intervals mimicked legitimate SolarWinds updates
+     → Anomaly detection saw no deviation from baseline
+  └─ Code was injected into legitimate SolarWinds DLL
+     → File hash and signature were valid
+
+Detection Challenge:
+  Traditional IDS/IPS could not detect because:
+    - No known malware signature
+    - Traffic blended with legitimate SolarWinds traffic
+    - Certificate pinning would not help (attacker had valid cert)
+  
+What Eventually Detected It:
+  └─ FireEye (who was also compromised) noticed attacker tools on their own systems
+  └─ Manual forensic analysis of SolarWinds build pipeline
+  └─ No automated detection — required human investigation
+
+Lesson:
+  IDS/IPS is essential but not sufficient for sophisticated supply chain attacks.
+  Defence-in-depth with behavioral analytics, integrity monitoring, and threat hunting is required.
+```
+
+## Performance Tuning
+
+| Tuning Parameter | Effect | Recommendation |
+|-----------------|--------|---------------|
+| **Rule count** | More rules → slower | Disable unused rules, customise to your environment |
+| **Packet reassembly** | Required for detection but expensive | Use default defrag settings |
+| **Protocol detection** | Deep inspection per protocol | Disable protocols not in use |
+| **Alert thresholding** | Reduces duplicate alerts | Essential for high-volume rules |
+| **Stream depth** | How many bytes to inspect per flow | 1MB default for most deployments |
+| **Preprocessor rules** | Base detection rules | Keep enabled for HTTP, TLS, DNS |
+
+```bash
+# Suricata performance tuning examples
+# /etc/suricata/suricata.yaml
+
+# Reduce memory usage
+defrag:
+  memcap: 32mb
+
+# Limit stream inspection depth
+stream:
+  memcap: 64mb
+  depth: 1mb
+
+# Disable unused protocol parsers
+app-layer:
+  protocols:
+    http:
+      enabled: yes
+    smb:
+      enabled: no   # Disable if no Windows file sharing
+    dns:
+      enabled: yes
+    tls:
+      enabled: yes
+    smtp:
+      enabled: no   # Disable if using cloud email
+    dcerpc:
+      enabled: no
+```
+
+## IDS/IPS Deployment Checklist
+
+| Task | Details | Status |
+|------|---------|--------|
+| Define monitoring scope | What traffic (all, specific segments, cloud) | |
+| Select hardware/VM | CPU cores, RAM, NIC throughput | |
+| Deploy in IDS mode first | Monitor-only for 30-90 days | |
+| Baseline normal traffic | Establish expected traffic patterns | |
+| Enable and tune rules | Start with Emerging Threats, customise | |
+| Reduce false positives | Whitelist known-good, narrow signatures | |
+| Switch to IPS mode | Enable blocking for tuned rule sets | |
+| Integrate with SIEM | Send alerts for correlation | |
+| Define response playbooks | What happens when IPS blocks? | |
+| Quarterly review | Rule performance, coverage gaps | |
+
+## Key Takeaways
+
+- IDS monitors and alerts; IPS monitors and blocks — always start with IDS mode, tune, then enable prevention
+- Signature detection is fast and accurate for known threats but blind to zero-days; anomaly detection catches novel attacks but generates noise — use both in combination
+- Suricata is the modern standard (multi-threaded, Snort-compatible rules, protocol parsers, file extraction)
+- Evasion techniques (encryption, fragmentation, polymorphism, obfuscation) can bypass IDS/IPS — SSL decryption and behavioural detection are essential countermeasures
+- The SolarWinds attack evaded all automated detection for 9 months — IDS/IPS is not a silver bullet; pair with threat hunting and supply chain integrity monitoring
+- Placement matters: internet edge (IPS inline) + internal network (IDS) + cloud VPCs (IDS) provides defence-in-depth coverage
+- Rule tuning is an ongoing process — the default rule set will generate thousands of false positives in a new deployment
+- Performance planning is critical — deep inspection is expensive; allocate 2-4 CPU cores per Gbps of traffic for Suricata
+- Thresholding and alert deduplication prevent alert fatigue — a single SSH brute force rule can generate millions of alerts without thresholding

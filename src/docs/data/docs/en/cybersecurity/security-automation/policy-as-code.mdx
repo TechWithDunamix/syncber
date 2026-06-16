@@ -1,0 +1,60 @@
+---
+title: "Policy as Code"
+description: "OPA/Rego, Checkov, tfsec, Terraform scanning, and infrastructure policy enforcement."
+sidebar:
+  order: 5
+  label: "Policy as Code"
+tab: "cybersecurity"
+---
+
+## What Is Policy as Code?
+
+Policy as Code (PaC) encodes security and compliance policies in machine-readable formats that can be automatically enforced in CI/CD pipelines.
+
+## OPA (Open Policy Agent) + Rego
+
+```rego
+# Rego policy: Require encryption on all S3 buckets
+package terraform.aws
+
+deny[msg] {
+  resource := input.resources[_]
+  resource.type == "aws_s3_bucket"
+  not resource.config.server_side_encryption_configuration
+  msg = sprintf("S3 bucket %v must have encryption enabled", [resource.config.bucket])
+}
+```
+
+```bash
+# Evaluate policy against Terraform plan
+opa eval --data policy/ --input tfplan.json "data.terraform.aws.deny"
+```
+
+## Checkov — Terraform Scanning
+
+```bash
+# Scan Terraform for security misconfigurations
+checkov -d terraform/
+
+# Example findings:
+# CKV_AWS_18: S3 bucket has public ACL
+# CKV_AWS_21: S3 bucket does not have versioning enabled
+# CKV_AWS_23: Security group allows 0.0.0.0/0 to SSH
+```
+
+## CI/CD Integration
+
+```yaml
+# GitLab CI — Terraform scanning
+terraform-security:
+  stage: security
+  script:
+    - cd terraform/
+    - terraform init
+    - terraform plan -out=tfplan.binary
+    - terraform show -json tfplan.binary > tfplan.json
+    - checkov -f tfplan.json --framework terraform
+    - opa eval --data ../policy/ --input tfplan.json "data.terraform.aws.deny"
+  only:
+    - merge_requests
+```

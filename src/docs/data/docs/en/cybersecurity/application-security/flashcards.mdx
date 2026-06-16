@@ -1,0 +1,81 @@
+---
+title: "Module 3: Application Security — Flashcards"
+description: "Review cards for OWASP Top 10, SQL injection, XSS, CSRF, authentication, API security, and Secure SDLC concepts."
+sidebar:
+  order: 9
+  label: "Flashcards"
+tab: "cybersecurity"
+---
+
+## OWASP Top 10 2021
+
+**Q: What is the #1 risk in OWASP Top 10 2021?**
+A: Broken Access Control (A01) — moved from #5 to #1. 94% of applications tested had some form of broken access control. Includes IDOR, privilege escalation, and missing API access controls.
+
+**Q: What is A04 — Insecure Design?**
+A: New category focusing on architecture-level flaws that can't be fixed with code changes alone. Example: missing rate limiting, trusting client-side access control. Most expensive category to remediate because it requires redesign.
+
+**Q: What is A08 — Software & Data Integrity Failures?**
+A: New category covering supply chain attacks, CI/CD pipeline compromise, and unsigned code. The SolarWinds attack (18,000 customers affected) is the key case study.
+
+**Q: What is A10 — SSRF?**
+A: Server-Side Request Forgery. Attacker makes the server send requests to internal resources. The Capital One 2019 breach ($190M in fines) used SSRF to access AWS metadata service and steal S3 data.
+
+## SQL Injection
+
+**Q: What is SQL injection?**
+A: When untrusted data is sent to a SQL interpreter without proper parameterisation. The attacker can manipulate the query to execute arbitrary database commands.
+
+**Q: What are the three types of SQLi?**
+A: 1) In-band (classic — results in HTTP response), 2) Blind (boolean/time-based — no visible result), 3) Out-of-band (DNS/exfiltration to external server).
+
+**Q: What is the only complete defence against SQLi?**
+A: Parameterised queries (prepared statements). User input is treated as data, not executable SQL. Input validation and WAFs are defence-in-depth only.
+
+**Q: How do you prevent mass assignment in APIs?**
+A: Whitelist allowed fields explicitly. Never pass request body directly to database update. Example: `ALLOWED_FIELDS = {'name', 'email'}` — reject all other fields.
+
+## XSS & CSRF
+
+**Q: What is the difference between reflected, stored, and DOM-based XSS?**
+A: Reflected — payload in URL/request, needs social engineering. Stored — payload saved on server (most dangerous). DOM-based — payload executes client-side without server interaction.
+
+**Q: What is the strongest defence against XSS?**
+A: Content Security Policy (CSP). Blocks inline scripts, eval(), and connections to unknown origins. Combined with output encoding (never innerHTML with user data).
+
+**Q: How did the Samy XSS worm work?**
+A: Stored XSS on MySpace (2005). Payload auto-copied itself to every profile viewer. 1M+ infected profiles in 20 hours. MySpace had to shut down to clean it.
+
+**Q: What is the difference between XSS and CSRF?**
+A: XSS executes JavaScript in victim's browser to steal data. CSRF tricks authenticated user into performing unintended actions. XSS requires script execution; CSRF requires authenticated session.
+
+**Q: How does SameSite cookie prevent CSRF?**
+A: SameSite=Lax sends cookie only for top-level navigations (GET), not POST from other sites. SameSite=Strict blocks all cross-site cookie sending.
+
+## Authentication
+
+**Q: Why should passwords be stored with bcrypt/Argon2, not MD5/SHA-1?**
+A: MD5 and SHA-1 are fast hashes (100B+/sec on GPU) — passwords cracked instantly. bcrypt/Argon2 are adaptive hashes (K/sec on GPU) — computationally expensive to crack.
+
+**Q: What happened with Yahoo's password storage?**
+A: 2014 breach of 3B accounts. Passwords stored with MD5 (unsalted). MD5 cracks at 100B+ hashes/second. Cost: $350M reduction in Verizon acquisition price.
+
+**Q: What is session fixation?**
+A: Attacker gives victim a session ID → victim logs in → session ID not regenerated → attacker uses same ID to access authenticated session. Fix: regenerate session ID on login.
+
+**Q: What are the 4 critical JWT validation checks?**
+A: 1) Verify signature with trusted public key, 2) Check exp (expiration), 3) Validate iss (issuer), 4) Check alg (never accept 'none' algorithm).
+
+## API Security
+
+**Q: What is BOLA (Broken Object Level Authorization)?**
+A: The #1 API security risk. Attacker changes an object ID in the request to access another user's data. Example: changing `/api/orders/1` to `/api/orders/2`. Fix: verify object ownership on every request.
+
+**Q: What is the difference between SAST and DAST?**
+A: SAST scans source code (white-box, finds issues early in SDLC). DAST scans running application (black-box, finds runtime/config issues). Both should be used in CI/CD pipeline.
+
+**Q: What is the cost ratio of fixing a vulnerability in requirements vs production?**
+A: 1x in requirements, 6x in design, 15x in implementation, 40x in testing, 100x in production. Early detection is dramatically cheaper.
+
+**Q: What is STRIDE threat modeling?**
+A: Microsoft methodology: Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege. Applied to each element in a data flow diagram.

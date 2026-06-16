@@ -1,0 +1,395 @@
+---
+title: "DevSecOps Tools"
+description: "SAST (SonarQube, Semgrep), DAST (OWASP ZAP), SCA (Snyk, Dependabot), SBOM, supply chain security, CI/CD security integration, and secret scanning."
+sidebar:
+  order: 5
+  label: "DevSecOps Tools"
+tab: "cybersecurity"
+---
+
+DevSecOps integrates security into the software development lifecycle. The goal: find and fix vulnerabilities as early as possible — ideally before code is ever deployed to production. Tools are categorised by where they operate in the pipeline.
+
+## Security Testing Categories
+
+| Category | Abbrev | What It Does | When in Pipeline | False Positives | Cost to Fix |
+|----------|--------|-------------|-----------------|-----------------|-------------|
+| Static Application Security Testing | SAST | Scans source code for vulnerabilities | Pre-commit / CI | Moderate | $100 |
+| Dynamic Application Security Testing | DAST | Scans running applications | Post-deploy / staging | Low | $1,000 |
+| Software Composition Analysis | SCA | Scans open-source dependencies | Pre-commit / CI | Low | $100 |
+| Interactive Application Security Testing | IAST | Combines SAST + DAST with runtime instrumentation | QA/testing environment | Low | $500 |
+| Runtime Application Self-Protection | RASP | Protects running applications from attacks | Production | N/A (blocks attacks) | $10,000 |
+
+### Why Shift-Left Matters
+
+```
+Cost to Fix a Vulnerability:
+  Development:     $100    ← SAST catches it here (CHEAPEST)
+  QA/Testing:      $500    ← IAST catches it here
+  Staging:         $1,000  ← DAST catches it here
+  Production:      $10,000 ← RASP or incident response
+  Post-Breach:     $100K+  ← Breach notification + remediation
+
+The earlier in the pipeline a vulnerability is found, the cheaper it is to fix.
+Shift-left is not just a security principle — it is an economic imperative.
+```
+
+## SAST — Static Application Security Testing
+
+SAST analyses source code for security vulnerabilities without executing the application:
+
+```bash
+# Semgrep — fast, open-source SAST with custom rules
+semgrep scan --config=auto src/
+# Output: Found 3 findings:
+#   src/auth.py:42 — hardcoded secret detected (CWE-798)
+#   src/api.py:87 — SQL injection (CWE-89)
+#   src/templates/index.html:15 — XSS (CWE-79)
+
+# Semgrep with custom rule
+semgrep scan --config=custom-rules/ --severity ERROR src/
+
+# SonarQube — comprehensive SAST platform with quality gates
+sonar-scanner \
+  -Dsonar.projectKey=my-app \
+  -Dsonar.sources=. \
+  -Dsonar.host.url=http://sonarqube:9000 \
+  -Dsonar.login=sq_auth_token
+
+# SonarQube quality gate check
+sonar-scanner -Dsonar.qualitygate.wait=true
+```
+
+### SAST Custom Rules
+
+```yaml
+# Semgrep custom rule: Detect hardcoded AWS keys
+rules:
+  - id: aws-access-key-detected
+    patterns:
+      - pattern-regex: AKIA[0-9A-Z]{16}
+    message: "AWS Access Key ID detected — hardcoded secrets are a breach risk"
+    severity: ERROR
+    languages: [python, javascript, go, java, ruby]
+
+# Semgrep custom rule: Detect raw SQL queries
+rules:
+  - id: sql-injection-raw-query
+    patterns:
+      - pattern: |
+          cursor.execute("SELECT * FROM $TABLE WHERE $COL = " + $VAR)
+    message: "SQL injection risk — use parameterised queries instead"
+    severity: ERROR
+    languages: [python]
+```
+
+### CI/CD Integration (GitHub Actions)
+
+```yaml
+name: SAST Scan
+on: [push, pull_request]
+jobs:
+  semgrep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: semgrep/semgrep-action@v1
+        with:
+          config: p/default  # Semgrep registry rules
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+```
+
+## DAST — Dynamic Application Security Testing
+
+DAST tests running applications for runtime vulnerabilities:
+
+```bash
+# OWASP ZAP — free, open-source DAST
+# Active scan against a running application
+zap-cli quick-scan --spider -l https://staging.example.com
+
+# Full scan with context
+zap-cli open-url https://staging.example.com
+zap-cli spider https://staging.example.com
+zap-cli active-scan https://staging.example.com
+zap-cli alerts  # Show all findings
+
+# Generate report
+zap-cli report -o zap_report.html -f html
+
+# API-based scan configuration
+docker run -v $(pwd):/zap/wrk:rw -t ghcr.io/zaproxy/zaproxy \
+  zap-api-scan.py -t https://api.example.com/openapi.json \
+  -f openapi \
+  -r zap_api_report.html
+
+# ZAP with authentication (form-based auth)
+docker run -v $(pwd):/zap/wrk:rw -t ghcr.io/zaproxy/zaproxy \
+  zap-full-scan.py -t https://app.example.com \
+    -r full_scan.html \
+    --hook=/zap/wrk/auth_hook.py
+```
+
+### DAST Findings Categories
+
+```yaml
+DAST Finding Categories (OWASP ZAP):
+  └─ High Risk:
+    └─ SQL Injection: DB error in response, time-based blind confirmed
+    └─ XSS (Reflected/Stored): Script execution in browser
+    └─ Remote Code Injection: System command execution
+    └─ Path Traversal: File read outside web root
+  └─ Medium Risk:
+    └─ CSRF: No anti-CSRF token on state-changing requests
+    └─ Missing security headers: CSP, HSTS, X-Frame-Options
+    └─ Information disclosure: Stack traces, directory listing
+    └─ Weak authentication: No account lockout, weak password policy
+  └─ Low Risk:
+    └─ Server header disclosure: Apache/2.4.49 (Ubuntu)
+    └─ Cookie without Secure/HttpOnly flags
+    └─ Auto-complete enabled on password fields
+```
+
+## SCA — Software Composition Analysis
+
+SCA tracks open-source dependencies for known vulnerabilities:
+
+```bash
+# Snyk — SCA for open-source dependencies
+snyk test --all-projects  # Scan all projects in directory
+snyk monitor  # Monitor for new vulnerabilities continuously
+
+# Snyk with JSON output
+snyk test --all-projects --json > snyk-report.json
+
+# Dependabot (GitHub) — automated dependency updates
+# Configuration: .github/dependabot.yml
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "security"
+
+# Trivy — container + dependency scanning
+trivy fs --severity CRITICAL,HIGH .
+trivy image --severity CRITICAL node:18-alpine
+
+# Grype — vulnerability scanner for container images and filesystems
+grype alpine:latest
+grype dir:.
+```
+
+### SCA Vulnerability Example
+
+```yaml
+SCA Finding (Snyk):
+  Package: lodash@4.17.20
+  Vulnerability: Prototype Pollution (CVE-2020-8203)
+  Severity: HIGH (CVSS 7.4)
+  Fixed in: lodash@4.17.21
+  Path: my-app > express > body-parser > lodash (transitive dependency)
+  Remediation: Update lodash to 4.17.21 or upgrade body-parser
+
+SCA Finding (Trivy):
+  Package: node:18-alpine
+  Vulnerability: CVE-2023-31484 (HTTP Request Smuggling)
+  Severity: CRITICAL
+  Fixed in: node:18.16.1-alpine
+  Remediation: Rebuild container with updated base image
+```
+
+## Secret Scanning
+
+Secret scanning prevents credentials from being committed to source control:
+
+```bash
+# TruffleHog — deep secret scanning
+trufflehog filesystem --directory=. --json > secrets.json
+
+# Gitleaks — fast git history scanning
+gitleaks detect --source=. --verbose
+gitleaks detect --source=. --report-format json --report-path gitleaks-report.json
+
+# Pre-commit hook (prevent secrets from being committed)
+# .pre-commit-config.yaml
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.16.0
+    hooks:
+      - id: gitleaks
+
+# Git hooks: detect secrets pre-commit
+cat .git/hooks/pre-commit
+#!/bin/bash
+gitleaks protect --staged
+```
+
+### What Secret Scanning Detects
+
+```yaml
+Secret Types Detected:
+  └─ AWS Access Key IDs (AKIA*)
+  └─ AWS Secret Access Keys
+  └─ GitHub Personal Access Tokens (ghp_*)
+  └─ GitHub OAuth Access Tokens (gho_*)
+  └─ GitLab Personal Access Tokens (glpat-*)
+  └─ Slack API Tokens (xoxb-*, xoxp-*)
+  └─ Google API Keys
+  └─ Azure Storage Account Keys
+  └─ SSH Private Keys
+  └─ JWT Tokens (if high-entropy)
+  └─ Generic High-Entropy Strings (base64, hex)
+```
+
+## SBOM — Software Bill of Materials
+
+An SBOM is a formal, machine-readable inventory of all software components — essential for supply chain security:
+
+```bash
+# Generate SBOM with Syft
+syft packages alpine:latest -o cyclonedx > sbom.cdx.json
+
+# Generate SBOM for a directory
+syft dir:src/ -o spdx-json > src-sbom.spdx.json
+
+# Scan SBOM for vulnerabilities (Grype)
+grype sbom:sbom.cdx.json
+
+# Verify SBOM attestation (in-toto)
+cosign verify-attestation --type cyclonedx example.com/image:tag
+
+# Generate SBOM in CI/CD
+# GitHub Actions
+- name: Generate SBOM
+  uses: anchore/sbom-action@v0
+  with:
+    path: .
+    format: spdx-json
+```
+
+### SBOM Format (CycloneDX Example)
+
+```json
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "metadata": {
+    "component": {
+      "name": "my-app",
+      "version": "2.3.1",
+      "type": "application"
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "name": "lodash",
+      "version": "4.17.21",
+      "purl": "pkg:npm/lodash@4.17.21",
+      "licenses": [{"license": {"id": "MIT"}}]
+    }
+  ]
+}
+```
+
+### SBOM Use Cases
+
+```yaml
+SBOM Applications:
+  └─ Vulnerability management: Scan SBOM against CVE database (Grype, Trivy)
+  └─ License compliance: Verify all components use approved licenses
+  └─ Supply chain attestation: Prove what software is in your product
+  └─ Incident response: When Log4Shell was announced, did you have log4j?
+  └─ Regulatory compliance: US Executive Order 14028, EU Cyber Resilience Act
+```
+
+## Pipeline Security Integration
+
+```yaml
+# Complete DevSecOps pipeline (GitHub Actions)
+name: DevSecOps Pipeline
+on: [push]
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      # SAST — source code analysis
+      - name: SAST Scan
+        run: semgrep scan --config=auto --json -o semgrep-report.json .
+      
+      # SCA — dependency analysis
+      - name: SCA Scan
+        run: snyk test --all-projects --json > snyk-report.json
+      
+      # Secret scanning
+      - name: Secret Scan
+        run: |
+          pip install truffleHog
+          trufflehog --json . > secrets-report.json
+      
+      # Container scanning (if building image)
+      - name: Container Scan
+        run: trivy image --severity CRITICAL,HIGH --exit-code 1 my-app:latest
+      
+      # Generate SBOM
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: spdx-json
+      
+      # Block PRs with critical findings
+      - name: Block Critical Findings
+        run: |
+          if jq -e '.results[] | select(.severity == "CRITICAL")' semgrep-report.json > /dev/null; then
+            echo "❌ CRITICAL SAST findings detected — blocking PR"
+            exit 1
+          fi
+```
+
+### Pipeline Gate Strategy
+
+```yaml
+Gate Decisions by Severity:
+  └─ CRITICAL: Block the pipeline (must fix)
+  └─ HIGH: Block the pipeline (require fix or documented exception)
+  └─ MEDIUM: Warn in PR, allow merge with approval
+  └─ LOW: Log for tracking, do not block
+
+Gate Timing:
+  └─ Commit stage: SAST + SCA + Secret scan (fast, < 5 minutes)
+  └─ Build stage: Container scan + SBOM generation
+  └─ Test stage: DAST (slower, runs on deployable artifact)
+  └─ Deploy stage: RASP activated in production
+
+Exceptions:
+  └─ False positives: Document and suppress with justification
+  └─ Accepted risk: Formal waiver with expiry date
+  └─ Time-boxed fix: Jira ticket created, auto-recheck in 30 days
+```
+
+<Aside variant="tip">
+Shift-left is the mantra of DevSecOps: find vulnerabilities as early as possible. A vulnerability found in development costs $100 to fix. The same vulnerability found in production costs $10,000+. SAST should run on every commit, DAST on every deployment.
+</Aside>
+
+## Key Takeaways
+
+- SAST (Semgrep, SonarQube) scans source code for vulnerabilities before it runs — catch issues at commit time, not after deployment; Semgrep supports custom rules for organisation-specific patterns
+- DAST (OWASP ZAP) tests running applications for runtime vulnerabilities — complements SAST by finding issues that only appear during execution (authentication, session management, business logic)
+- SCA (Snyk, Dependabot, Trivy) tracks open-source dependencies for known CVEs — critical for supply chain security and the most actionable category (fix = update version)
+- Secret scanning (TruffleHog, Gitleaks) prevents credentials from being committed to source control — integrate as a pre-commit hook and CI gate to prevent secrets from reaching the repository
+- SBOM (Syft, CycloneDX, SPDX) provides a standardised inventory of all software components — essential for supply chain risk management and regulatory compliance (US Executive Order 14028, EU Cyber Resilience Act)
+- DevSecOps is about integrating security into the CI/CD pipeline with automated gates that block vulnerable code from reaching production — each gate evaluates findings by severity and decides: block, warn, or allow
+- The cost of fixing vulnerabilities increases 10x at each pipeline stage (development $100 → production $10,000) — shift-left is the economic argument for DevSecOps
+- Pipeline gates should be severity-based: CRITICAL/HIGH blocks, MEDIUM warns, LOW logs — with documented exception processes for false positives and accepted risks
+- A complete DevSecOps pipeline runs: SAST + SCA + Secret scan (per commit) → Container scan + SBOM (per build) → DAST (per deployment) → RASP (production)
+- Supply chain security is the emerging priority — SBOM generation and vulnerability scanning for every component in your software supply chain is becoming a regulatory requirement

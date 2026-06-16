@@ -1,0 +1,375 @@
+---
+title: "Privileged Access Management"
+description: "PAM fundamentals, credential vaulting, session management, password rotation, tiered admin model, and the Uber 2016 breach case study."
+sidebar:
+  order: 4
+  label: "Privileged Access Management"
+tab: "cybersecurity"
+---
+
+Privileged Access Management (PAM) is the set of tools and processes for securing, managing, and monitoring accounts with elevated permissions. Privileged accounts (admins, root, service accounts) represent the highest-risk identities in any organisation — a compromised admin account can bypass every other security control.
+
+## Why PAM Matters
+
+| Statistic | Source |
+|-----------|--------|
+| 80% of breaches involve privileged credentials | Forrester |
+| Average enterprise has 3x more service accounts than human users | IDC |
+| 60% of organisations do not rotate privileged passwords after incidents | Ponemon |
+| Mean time to detect a compromised privileged account: 56 days | CrowdStrike |
+
+## PAM Core Capabilities
+
+| Capability | Description | Why Important |
+|------------|-------------|---------------|
+| **Credential Vaulting** | Securely store passwords, SSH keys, API tokens in an encrypted vault | Eliminates hardcoded credentials in scripts/config files |
+| **Session Management** | Record, monitor, and control privileged sessions in real-time | Provides audit trail for all admin actions |
+| **Password Rotation** | Automatically change passwords after each use or on a schedule | Limits window of credential exposure |
+| **JIT Privilege Elevation** | Grant privileged access only when needed, for a limited time | Reduces attack surface of always-on admin access |
+| **Privileged Account Discovery** | Automatically discover all privileged accounts across the environment | You can't protect what you don't know exists |
+| **Application Credential Management** | Manage service accounts and application secrets | Prevents credential exposure in CI/CD, config files |
+
+## PAM Architecture
+
+```
+Privileged Users
+    ↓
+PAM Portal (check-in/check-out, approval, MFA)
+    ↓
+PAM Vault (encrypted credential storage)
+    ↓
+Credential Checkout → Session Launched → Session Recorded → Credential Rotated
+    ↓
+Target System (SSH, RDP, Web Console, Database)
+```
+
+## Credential Vaulting
+
+### What to Vault
+
+| Credential Type | Risk If Exposed | Vault Required? |
+|-----------------|-----------------|-----------------|
+| Domain Admin password | Full AD compromise | Yes — immediate |
+| Local admin password | Host compromise | Yes |
+| Service account password | Application compromise | Yes |
+| SSH private key | Server compromise | Yes |
+| API key / access token | Cloud resource compromise | Yes |
+| Database connection string | Data breach | Yes |
+| Certificate private key | TLS compromise, impersonation | Yes |
+| Application config secret | Application compromise | Yes |
+
+### Vault Check-in/Check-out Process
+
+```
+Administrator needs to access server FIN-SRV-03
+
+1. Admin → PAM Portal
+2. Authenticate (password + phishing-resistant MFA)
+3. Select target system: FIN-SRV-03
+4. Enter justification: "Patching CVE-2026-1234, ticket SEC-45678"
+5. Request approved by: Senior Admin (automatic for standard access, manual for critical)
+6. Credential checked out: password revealed for 2-hour window
+7. Session launched via PAM proxy (recorded)
+8. Admin completes patching
+9. Credential checked in (or auto-expired)
+10. Password automatically rotated → old password is invalid
+```
+
+## Session Management
+
+All privileged sessions should be:
+- **Proxied through PAM** — users never connect directly to targets
+- **Recorded** — video capture of entire session
+- **Monitored** — suspicious commands trigger alerts
+- **Auditable** — full session playback for investigations
+
+```bash
+# Example: PAM session recording with CyberArk or BeyondTrust
+# Session recording captures:
+# - Keystrokes and command output
+# - Screen video (RDP, VNC)
+# - File transfers
+# - Database queries
+
+# Command monitoring (example alerts):
+# CREATE USER, GRANT, DROP — database admin commands
+# whoami, net group "Domain Admins" — AD reconnaissance  
+# vssadmin delete shadows — ransomware prep
+# iptables -F — firewall flush (defense evasion)
+```
+
+## Password Rotation
+
+### Rotation Strategies
+
+| Strategy | Use Case | Example |
+|----------|----------|---------|
+| **After every use** | Shared admin accounts | Check out → use → auto-rotate on check-in |
+| **Scheduled (e.g., every 30 days)** | Service accounts | Monthly rotation during maintenance window |
+| **On-demand** | Emergency break-glass accounts | Rotate immediately after emergency use |
+| **Event-triggered** | Compromised credentials | Forced rotation on incident detection |
+
+```bash
+# Automatic password rotation via Ansible (for local admin accounts)
+- name: Rotate local admin password
+  hosts: all
+  tasks:
+    - name: Generate new password
+      set_fact:
+        new_password: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+    
+    - name: Update local admin password (Linux)
+      user:
+        name: root
+        password: "{{ new_password | password_hash('sha512') }}"
+      when: ansible_os_family == "Debian"
+    
+    - name: Update local admin password (Windows)
+      win_user:
+        name: Administrator
+        password: "{{ new_password }}"
+      when: ansible_os_family == "Windows"
+    
+    - name: Store new password in vault
+      hashivault_write:
+        path: "secret/ansible/local-admin/{{ inventory_hostname }}"
+        data:
+          password: "{{ new_password }}"
+```
+
+## Tiered Admin Model (Microsoft ESAE / "Red Forest")
+
+The Microsoft Enhanced Security Admin Environment (ESAE) model separates administrative accounts into tiers:
+
+| Tier | Description | Accounts | What Can Be Managed |
+|------|-------------|----------|-------------------|
+| **Tier 0** | Identity and security control | Domain Admin, Enterprise Admin, DC Admin | Domain Controllers, Azure AD, PAM, PKI |
+| **Tier 1** | Server and application administration | Server Admin, Exchange Admin, SQL Admin | Servers, applications, databases |
+| **Tier 2** | User workstation and device administration | Helpdesk Admin, Desktop Admin | User workstations, printers, user accounts |
+
+### Tier 0 Security Requirements
+
+```
+Tier 0 Accounts (Domain Admins, etc.):
+- Account is SEPARATE from user email account
+- Password is 25+ characters, randomly generated
+- Requires phishing-resistant MFA (YubiKey or smart card)
+- Admin workstations are dedicated (PAW — Privileged Access Workstation):
+  → Clean OS, no email/web browsing, no USB except smart card reader
+  → Only admin tools installed
+  → Connected to isolated management network
+  → No internet access
+- Session is proxied through PAM with recording
+- Password is rotated after every use
+```
+
+### Privileged Access Workstation (PAW)
+
+```powershell
+# PAW Configuration PowerShell script (partial)
+# Configure Windows Defender Credential Guard (prevent LSASS dumping)
+reg add HKLM\System\CurrentControlSet\Control\Lsa /v LsaCfgFlags /t REG_DWORD /d 1 /f
+
+# Disable Windows Defender Remote Credential Guard (no delegated tickets)
+reg add HKLM\SOFTWARE\Policies\Microsoft\Windows\CredentialsDelegation /v AllowProtectedCreds /t REG_DWORD /d 0 /f
+
+# Enable Windows Defender Application Control (WDAC) — only allowed apps run
+# Disable SMBv1
+# Disable PowerShell v2
+# Remove all unnecessary applications
+```
+
+## Case Study: Uber 2016 — PAM Failure
+
+The Uber 2016 data breach (57 million records) was caused by a PAM failure:
+
+**Attack chain:**
+1. Attacker obtained credentials from a private GitHub repository
+2. Credentials were for an AWS account with overprivileged IAM permissions
+3. Attacker accessed an S3 bucket containing 57 million user records
+4. Uber paid the attacker $100,000 as a "bug bounty" to delete the data and remain silent
+
+**IAM/PAM failures:**
+- AWS credentials committed to GitHub (no credential scanning, no vault integration)
+- IAM key with excessive permissions (no least privilege for CI/CD)
+- No PAM for service account credentials (GitHub secrets should feed PAM, not be hardcoded)
+- S3 bucket publicly accessible (no access control on the data storage itself)
+- Delayed notification (breach was hidden for 1 year)
+
+**Lessons:**
+- Never hardcode credentials in source code — use PAM vault + secret management (HashiCorp Vault, AWS Secrets Manager)
+- Service account credentials must be rotated regularly and included in PAM scope
+- All cloud credentials should have least-privilege policies enforced through IAM
+
+<Aside variant="danger">
+The Uber breach demonstrates a common PAM blind spot: service accounts and CI/CD credentials. Organisations focus PAM on human privileged users but ignore application credentials and API keys. Every credential — human or machine — must be vaulted, rotated, and audited.
+</Aside>
+
+## Key Takeaways
+
+- PAM is the most important IAM control for reducing breach impact — a compromised admin account gives attackers the keys to the kingdom
+- Core PAM capabilities: credential vaulting, session recording, password rotation, JIT elevation, privileged account discovery, and application credential management
+- The tiered admin model (Tier 0/1/2) ensures that compromising a workstation admin account does not lead to domain controller compromise
+- Privileged Access Workstations (PAWs) provide a clean, hardened environment for admin tasks — no email, no web browsing, no unnecessary applications
+- Password rotation after every use limits the exposure window for shared privileged accounts
+- The Uber 2016 breach demonstrates that PAM must cover machine identities (service accounts, API keys, CI/CD credentials), not just human admins
+
+## PAM Implementation Roadmap
+
+### Phase 1: Discover and Assess
+
+```yaml
+Activities:
+  └─ Discover all privileged accounts:
+    └─ Domain admins, enterprise admins, schema admins
+    └─ Local admin accounts on servers and workstations
+    └─ Service accounts with admin rights
+    └─ Cloud admin roles (AWS IAM, Azure Global Admin, GCP Org Admin)
+    └─ Application admin accounts (SaaS, databases, network devices)
+    └─ SSH keys with root access
+  └─ Classify by privilege level:
+    └─ Tier 0: Domain/cloud admin (highest privilege)
+    └─ Tier 1: Server admin (medium privilege)
+    └─ Tier 2: Workstation admin (lowest privilege)
+  └─ Identify shared/emergency accounts:
+    └─ root, Administrator, localadmin
+    └─ Break-glass accounts (emergency access)
+```
+
+### Phase 2: Vault and Rotate
+
+```yaml
+Activities:
+  └─ Onboard privileged accounts into PAM vault (CyberArk, beyondtrust, Delinea)
+  └─ Enable automatic password rotation:
+    └─ Tier 0: Rotate after every use (check-out/check-in)
+    └─ Tier 1: Rotate weekly or after each use
+    └─ Tier 2: Rotate monthly
+    └─ Service accounts: Rotate quarterly (coordinate with application owners)
+  └─ Configure session recording for all interactive privileged sessions
+  └─ Set up access workflows:
+    └─ Request → Approval (manager/security) → Time-bound access → Auto-revoke
+```
+
+### Phase 3: Monitor and Audit
+
+```yaml
+Activities:
+  └─ Session recording review:
+    └─ Flag commands: whoami, net use, reg save, ntdsutil, mimikatz
+    └─ Flag unusual hours: admin activity outside business hours
+  └─ Alerts on:
+    └─ Failed login attempts to vault (possible compromise)
+    └─ Password check-out outside approved schedule
+    └─ Session recording stopped or tampered with
+  └─ Monthly reports:
+    └─ Privileged access usage by user
+    └─ Password rotation compliance
+    └─ Session recording audit trail
+    └─ Emergency (break-glass) account usage
+```
+
+### Phase 4: Continuous Improvement
+
+```yaml
+Activities:
+  └─ Quarterly access certification for all privileged accounts
+  └─ Annual architecture review:
+    └─ Are admin tier boundaries still intact?
+    └─ Are there new privileged attack paths (cloud, SaaS, APIs)?
+    └─ Is JIT coverage expanding to more use cases?
+  └─ Post-incident review:
+    └─ Did PAM controls work as expected?
+    └─ Were there PAM bypasses?
+    └─ What PAM improvements would reduce future risk?
+```
+
+## PAM Tool Comparison
+
+| Feature | CyberArk | BeyondTrust | Delinea (Centrify) | HashiCorp Vault |
+|---------|----------|-------------|-------------------|-----------------|
+| **Credential vaulting** | ✓ | ✓ | ✓ | ✓ |
+| **Session recording** | ✓ | ✓ | ✓ | Limited |
+| **Password rotation** | ✓ | ✓ | ✓ | ✓ |
+| **JIT elevation** | ✓ | ✓ | ✓ | ✓ |
+| **Service account mgmt** | ✓ | ✓ | ✓ | ✓ |
+| **SSH key management** | ✓ | ✓ | ✓ | ✓ |
+| **Cloud secret mgmt** | Limited | Limited | Limited | **Best** |
+| **On-prem deployment** | ✓ | ✓ | ✓ | ✓ |
+| **Cloud/SaaS** | ✓ (CyberArk Cloud) | ✓ (BeyondTrust Cloud) | ✓ (Delinea Cloud) | ✓ (HCP Vault) |
+| **Pricing** | $$$$ | $$$ | $$ | Free (OSS) / $$ (Enterprise) |
+
+## PAM Automation Example
+
+```python
+#!/usr/bin/env python3
+"""
+Automated privileged account check-out workflow
+CyberArk REST API example
+"""
+import requests
+import json
+from datetime import datetime, timedelta
+
+CYBERARK_URL = "https://cyberark.example.com"
+API_TOKEN = "your-api-token"
+
+def check_out_account(safe, account_name, reason, duration_hours=2):
+    """Check out a privileged account from CyberArk vault"""
+    
+    headers = {
+        "Authorization": f"Bearer {API_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    
+    # Request account access
+    response = requests.post(
+        f"{CYBERARK_URL}/API/Accounts/{account_name}/CheckOut",
+        headers=headers,
+        json={
+            "Reason": reason,
+            "DurationHours": duration_hours,
+            "Safe": safe
+        }
+    )
+    
+    if response.status_code == 200:
+        account_data = response.json()
+        return {
+            "username": account_data["UserName"],
+            "password": account_data["Content"],
+            "expires_at": datetime.now() + timedelta(hours=duration_hours),
+            "checkout_id": account_data["CheckOutID"]
+        }
+    else:
+        raise Exception(f"Checkout failed: {response.text}")
+
+def check_in_account(checkout_id):
+    """Check in the account (auto-rotate password)"""
+    
+    headers = {"Authorization": f"Bearer {API_TOKEN}"}
+    
+    response = requests.post(
+        f"{CYBERARK_URL}/API/Accounts/{checkout_id}/CheckIn",
+        headers=headers
+    )
+    
+    if response.status_code == 200:
+        print(f"Account {checkout_id} checked in — password rotated")
+    else:
+        print(f"Check-in failed: {response.text}")
+
+# Usage
+account = check_out_account(
+    safe="Linux-Admins",
+    account_name="root@web-prod-01",
+    reason="Emergency patch deployment",
+    duration_hours=1
+)
+
+print(f"Logged in as {account['username']}")
+print(f"Password expires at {account['expires_at']}")
+
+# After work is done:
+check_in_account(account['checkout_id'])
+```

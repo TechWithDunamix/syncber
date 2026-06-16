@@ -1,0 +1,202 @@
+---
+title: "Shared Responsibility Model"
+description: "Cloud shared responsibility model for AWS, Azure, and GCP, how responsibility shifts by service type (IaaS/PaaS/SaaS), the Capital One 2019 SSRF breach case study, and common misconfiguration patterns."
+sidebar:
+  order: 2
+  label: "Shared Responsibility"
+tab: "cybersecurity"
+---
+
+The shared responsibility model divides security obligations between the cloud provider and the customer. Understanding this division is the most fundamental concept in cloud security.
+
+## What Is Shared Responsibility?
+
+The cloud provider is responsible for **security OF the cloud**. The customer is responsible for **security IN the cloud**.
+
+```yaml
+Provider Responsibility (Security OF the Cloud):
+  └─ Physical security of data centres
+  └─ Hardware (servers, storage, networking)
+  └─ Hypervisor isolation
+  └─ Network infrastructure (underlay)
+  └─ Managed service security (SaaS, PaaS)
+
+Customer Responsibility (Security IN the Cloud):
+  └─ Data classification and encryption
+  └─ Identity and access management (IAM)
+  └─ Operating system patching (IaaS)
+  └─ Network configuration (firewall rules, security groups)
+  └─ Application security
+  └─ Compliance with regulations
+```
+
+## Responsibility by Service Model
+
+```
+On-Premises ────────── IaaS ────────── PaaS ────────── SaaS
+┌─────────────────┐  ┌─────────────┐  ┌──────────┐  ┌───────────┐
+│ Data             │  │ Data        │  │ Data     │  │ Data      │
+│ Applications     │  │ Applications│  │ Apps     │  │           │
+│ Runtime          │  │ Runtime     │  │          │  │           │
+│ OS               │  │ OS          │  │          │  │           │
+│ Hypervisor       │  │             │  │          │  │           │
+│ Physical Network │  │             │  │          │  │           │
+│ Physical Storage │  │             │  │          │  │           │
+│ Physical Servers │  │             │  │          │  │           │
+│ Data Center      │  │             │  │          │  │           │
+└─────────────────┘  └─────────────┘  └──────────┘  └───────────┘
+
+  ─── Customer manages     Provider manages ───
+```
+
+## AWS Shared Responsibility
+
+```yaml
+AWS Manages:
+  └─ Global infrastructure (regions, AZs, edge locations)
+  └─ Physical security (24/7 guards, biometric access, CCTV)
+  └─ Hardware lifecycle (servers, storage, network devices)
+  └─ Hypervisor (Nitro, Xen)
+  └─ Managed services (RDS, S3, Lambda, DynamoDB)
+
+Customer Manages ALWAYS:
+  └─ Customer data (encryption, access control, classification)
+  └─ IAM (users, groups, roles, policies)
+  └─ AWS account root key security (MFA!)
+  └─ Compliance with regulations
+
+Customer Manages — Varies by Service:
+
+  EC2 (IaaS):
+    └─ Guest OS (patching, hardening)
+    └─ Application stack
+    └─ Security group rules
+    └─ OS-level firewall
+    └─ Data encryption on volume
+
+  RDS (PaaS):
+    └─ Database settings (not OS — managed by AWS)
+    └─ Data encryption at rest/enabled
+    └─ Network access (security groups)
+    └─ Backup retention configuration
+
+  S3 (PaaS):
+    └─ Bucket policies and ACLs
+    └─ Encryption settings
+    └─ Public access settings
+    └─ Versioning and replication
+```
+
+## The Capital One Breach (2019) — SSRF Case Study
+
+The Capital One breach is the most instructive cloud security failure in history.
+
+### Timeline
+
+```
+March 2019:
+  └─ Capital One hosts a web application on AWS EC2 with a WAF (WAF)
+  └─ A misconfiguration in the WAF allows SSRF (Server-Side Request Forgery)
+  └─ Attacker (Paige Thompson, former AWS employee) discovers the SSRF
+
+March 22, 2019:
+  └─ Attacker sends a crafted request to the WAF
+  └─ The WAF forwards the request to the EC2 metadata endpoint
+  └─ Metadata endpoint returns: IAM role credentials for the EC2 instance
+  └─  http://169.254.169.254/latest/meta-data/iam/security-credentials/
+
+March 22 — July 17, 2019:
+  └─ Attacker uses stolen IAM credentials to list S3 buckets
+  └─ Attacker exfiltrates data from 30+ S3 buckets
+  └─ 106 million credit card applications stolen (SSN, DOB, income data)
+  └─ 80,000 linked bank account numbers
+  └─ Data exfiltration via an encrypted tunnel over 4 months
+
+July 17, 2019:
+  └─ Security researcher finds the exposed S3 data on GitHub
+  └─ Notifies Capital One
+  └─ Capital One confirms the breach
+
+July 29, 2019:
+  └─ Breach publicly disclosed
+  └─ CEO: "I'm deeply sorry"
+  └─ Stock drops 5.9% ($2B market cap loss)
+```
+
+### Root Causes
+
+```yaml
+Technical Failures:
+  └─ WAF misconfiguration allowed SSRF to metadata endpoint
+  └─ EC2 IAM role had overly permissive S3 access (could read all buckets)
+  └─ No S3 bucket policy restricting access to specific VPC endpoints
+  └─ No IMDSv2 (Instance Metadata Service v2) — which prevents SSRF-based access
+  └─ No S3 server access logging enabled on sensitive buckets
+  └─ No GuardDuty anomaly detection for unusual data access patterns
+
+Process Failures:
+  └─ Cloud configuration review did not catch WAF misconfiguration
+  └─ No network segmentation between WAF and internal services
+  └─ Least privilege principle violated (EC2 role could read more than needed)
+  └─ No automated scanning for SSRF vulnerabilities
+
+Governance Failures:
+  └─ No mandatory cloud security training for developers
+  └─ No cloud security architect on the application team
+  └─ Cloud security reviews were manual, not automated
+```
+
+### What Should Have Been Done
+
+```yaml
+Prevention (any single control would have stopped the breach):
+
+1. IMDSv2 (Instance Metadata Service v2):
+   └─ Requires session token to access metadata
+   └─ SSRF attacks cannot obtain the token (it's put-responding)
+   └─ AWS introduced IMDSv2 in 2019 — EC2 can enforce its use
+
+2. Least Privilege IAM:
+   └─ EC2 role should only access specific S3 buckets, not all
+   └─ S3 bucket policies should restrict access to known VPC endpoints
+   └─ `s3:ListAllMyBuckets` should never be granted to application servers
+
+3. S3 Protection:
+   └─ Block public access at account level
+   └─ S3 bucket policies with VPC endpoint restrictions
+   └─ Enable S3 server access logging
+   └─ Enable S3 Object Lock (immutable storage)
+
+4. Network Segmentation:
+   └─ WAF should not reach internal metadata services
+   └─ EC2 instances in private subnets only
+   └─ VPC endpoints for S3 instead of internet gateway
+
+5. Detection:
+   └─ GuardDuty anomaly detection (unusual data access patterns)
+   └─ CloudTrail monitoring for suspicious IAM activity
+   └─ Macie for sensitive data discovery in S3
+```
+
+### Aftermath
+
+```yaml
+  └─ Fine: $190M (largest ever for a data breach at the time)
+  └─ Legal: Class-action lawsuit settled for $190M
+  └─ Regulatory: OCC (Office of Comptroller of Currency) consent order
+  └─ Technical: Full cloud security overhaul, IMDSv2 enforced, least privilege IAM
+  └─ Personnel: Attacker sentenced to time served (already in custody)
+  └─ Industry impact: Cloud SSRF became a top priority for every organisation
+```
+
+## Key Takeaways
+
+- The shared responsibility model means the provider handles physical/hardware security — the customer handles data, IAM, network configuration, and application security
+- Responsibility shifts by service model: IaaS (customer manages everything above hypervisor), PaaS (customer manages data and access only), SaaS (customer manages data only)
+- The Capital One 2019 breach (106M records, $190M fine) was caused by a WAF SSRF vulnerability that allowed access to the EC2 metadata service — demonstrating cloud-specific attack vectors
+- IMDSv2 prevents SSRF-based metadata theft — enforce it on all EC2 instances (it is a simple toggle)
+- Least privilege IAM is the single most impactful cloud security control — the Capital One EC2 role had access to all S3 buckets when it only needed one
+- S3 buckets are the most common cloud misconfiguration — enable Block Public Access at account level, enable logging, and encrypt everything
+- Cloud security requires different tools and processes than on-premises — cloud configuration review, automated scanning (CloudSploit, ScoutSuite), and cloud-specific training
+- The shared responsibility model is not a checkbox — it is a design principle that must be understood by every engineer deploying to the cloud
+- Cloud breaches are almost always configuration errors, not provider vulnerabilities — 99% of cloud security failures are the customer's responsibility

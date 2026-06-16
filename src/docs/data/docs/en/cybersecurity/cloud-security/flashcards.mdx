@@ -1,0 +1,75 @@
+---
+title: "Module 9: Cloud Security — Flashcards"
+description: "Review cards for shared responsibility model, AWS, Azure, GCP security services, cloud compliance, and cloud breaches."
+sidebar:
+  order: 8
+  label: "Flashcards"
+tab: "cybersecurity"
+---
+
+## Shared Responsibility Model
+
+**Q: What is the shared responsibility model?**
+A: Provider manages "security OF the cloud" (hardware, physical security, hypervisor). Customer manages "security IN the cloud" (data, IAM, network config, application security). Division shifts by service model (IaaS vs PaaS vs SaaS).
+
+**Q: What was the root cause of the Capital One 2019 breach?**
+A: WAF misconfiguration allowed SSRF to EC2 metadata endpoint. Attacker stole IAM role credentials, accessed 30+ S3 buckets, exfiltrated 106M records. Cost: $190M fine. Prevention: IMDSv2, least privilege IAM, VPC endpoints.
+
+**Q: What is IMDSv2 and why does it matter?**
+A: AWS Instance Metadata Service v2 requires a session token (PUT response) to access metadata. SSRF attacks cannot obtain this token — prevents the metadata theft that enabled the Capital One breach.
+
+**Q: Who is responsible for encryption in the cloud?**
+A: The customer. The provider offers encryption services (KMS, Key Vault, Cloud KMS) but the customer must enable them. Data is NOT encrypted by default — the customer must configure encryption.
+
+**Q: What changes in responsibility between IaaS, PaaS, and SaaS?**
+A: IaaS — customer manages OS, app, data. PaaS — customer manages data and access only. SaaS — customer manages data only. Provider responsibility increases as you move up the stack.
+
+## AWS Security
+
+**Q: What are the most important AWS security services?**
+A: IAM (identity), CloudTrail (audit), GuardDuty (detection), Security Hub (posture), KMS (encryption), Config (compliance), WAF (application security).
+
+**Q: What is the single most important AWS security best practice?**
+A: Enable MFA on the root account IMMEDIATELY. Root user has full access to all resources and cannot be restricted by IAM policies.
+
+**Q: What are the S3 security best practices?**
+A: Block Public Access at account level, enable encryption (SSE-S3/KMS), enable versioning, enable server access logging, use bucket policies with conditions, enable MFA Delete.
+
+**Q: What does AWS GuardDuty detect?**
+A: Recon (port scanning), compromise (crypto mining, unusual traffic), persistence (IAM key creation), privilege escalation (AssumeRole from unusual entity), exfiltration (unusual S3 access).
+
+## Azure Security
+
+**Q: What is Azure Conditional Access?**
+A: Identity-driven policy engine that enforces controls based on user, device, location, and risk. Can require MFA, block sign-ins from untrusted locations, require compliant devices.
+
+**Q: What is Azure PIM (Privileged Identity Management)?**
+A: Just-in-time (JIT) privileged access. Users request admin access for a limited time, must justify, and access is approved. Eliminates standing admin privileges.
+
+**Q: What is Azure Policy?**
+A: Governance tool that enforces compliance rules across subscriptions. Can block non-compliant resources, audit configurations, and auto-remediate. Examples: require encryption, enforce tagging, restrict regions.
+
+## GCP Security
+
+**Q: What is GCP VPC Service Controls?**
+A: Creates a security perimeter around GCP services to prevent data exfiltration. Data cannot be copied outside the perimeter even with valid IAM credentials.
+
+**Q: What is Google's BeyondCorp?**
+A: Zero Trust architecture that removes the concept of a trusted internal network. Access decisions based on user identity, device, and context — not network location.
+
+**Q: What is GCP Security Command Center?**
+A: Unified CSPM + vulnerability scanning + threat detection. Provides compliance dashboard, asset inventory, and finding aggregation.
+
+## Cloud Compliance
+
+**Q: What compliance certifications do major cloud providers hold?**
+A: SOC 1/2/3, PCI DSS Level 1, ISO 27001/27017/27018, HIPAA (with BAA), FedRAMP, GDPR (with DPA). Providers certify their infrastructure; customers must configure their workloads to be compliant.
+
+**Q: What is the most common cloud compliance gap?**
+A: Data residency — cloud services can replicate data across regions automatically. GDPR requires EU data stay in EU. Must use provider data residency controls to prevent cross-region replication.
+
+**Q: What tools automate cloud compliance monitoring?**
+A: AWS Config + Audit Manager, Azure Policy + Compliance Manager, GCP Assured Workloads + Security Command Center. Continuously monitor compliance posture and auto-remediate.
+
+**Q: What is the shared compliance responsibility?**
+A: Cloud provider certifies the platform (e.g., "AWS is PCI DSS compliant"). Customer must configure their workloads to comply (e.g., "our S3 configuration meets PCI DSS requirements"). Both must be compliant for the customer to be compliant.

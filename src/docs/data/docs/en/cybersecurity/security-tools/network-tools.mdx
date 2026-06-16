@@ -1,0 +1,323 @@
+---
+title: "Network Security Tools"
+description: "Wireshark, nmap, tcpdump, Zeek, Suricata, Brim — network monitoring, packet analysis, intrusion detection, network scanning, and threat hunting."
+sidebar:
+  order: 2
+  label: "Network Tools"
+tab: "cybersecurity"
+---
+
+Network security tools monitor, analyse, and protect network traffic. They provide visibility into what is crossing your network — the connections, protocols, and data that attackers use for command-and-control, lateral movement, and exfiltration.
+
+## Nmap — Network Discovery and Scanning
+
+Nmap is the de facto standard for network discovery and security scanning:
+
+```bash
+# Basic port scan
+nmap -sV -sC 192.168.1.0/24
+
+# Full port scan with service detection
+nmap -sV -sC -p- 203.0.113.50
+
+# Stealth SYN scan (half-open scan, faster)
+nmap -sS -T4 -Pn 203.0.113.0/24
+
+# OS detection
+nmap -O 203.0.113.50
+
+# Script scanning (vulnerability, exploit, enumeration)
+nmap --script vuln 203.0.113.50
+nmap --script smb-enum-shares 203.0.113.50
+nmap --script http-headers,http-methods,http-title example.com
+
+# Output formats
+nmap -oA scan_output 192.168.1.0/24
+# Creates: scan_output.nmap, scan_output.gnmap, scan_output.xml
+```
+
+### Nmap Output Analysis
+
+```
+PORT     STATE SERVICE    VERSION
+22/tcp   open  ssh        OpenSSH 7.4 (protocol 2.0)
+80/tcp   open  http       Apache httpd 2.4.49
+443/tcp  open  ssl/http   Apache httpd 2.4.49
+3306/tcp open  mysql      MySQL 5.7.33
+8080/tcp open  http       Apache Tomcat 9.0.50
+
+Host script results:
+| smb-vuln-ms17-010:
+|   VULNERABLE: Remote Code Execution vulnerability in SMBv1
+|   CVE-2017-0143
+|   Risk: CRITICAL — EternalBlue exploit
+```
+
+### Nmap Scripting Engine (NSE) Categories
+
+```yaml
+NSE Script Categories:
+  └─ auth: Authentication-related scripts (brute force, credential validation)
+  └─ broadcast: Broadcast listeners to discover hosts
+  └─ brute: Password brute-forcing (HTTP, FTP, SSH, MySQL, etc.)
+  └─ default: Basic security checks (-sC runs default scripts)
+  └─ discovery: Service and host discovery
+  └─ dos: Denial of service tests (use with caution)
+  └─ exploit: Exploit known vulnerabilities
+  └─ external: Scripts that query external services (DNS, whois)
+  └─ fuzzer: Fuzzing scripts for protocol vulnerabilities
+  └─ intrusive: Potentially disruptive scripts
+  └─ malware: Malware detection and analysis
+  └─ safe: Non-disruptive scripts
+  └─ version: Version detection
+  └─ vuln: Vulnerability detection
+```
+
+## Tcpdump — Packet Capture
+
+```bash
+# Capture all traffic on interface
+tcpdump -i eth0 -w capture.pcap
+
+# Capture specific port
+tcpdump -i eth0 port 443 -w https_traffic.pcap
+
+# Capture traffic from a specific host
+tcpdump -i eth0 host 192.168.1.100 -w host_traffic.pcap
+
+# Capture with protocol filter
+tcpdump -i eth0 tcp port 80 -w http_traffic.pcap
+
+# Read and analyse a capture
+tcpdump -r capture.pcap
+tcpdump -r capture.pcap -X  # Show hex and ASCII
+tcpdump -r capture.pcap port 53  # Filter DNS queries only
+tcpdump -r capture.pcap -c 100  # Show first 100 packets
+
+# Advanced filtering
+tcpdump -i eth0 "tcp[tcpflags] & tcp-syn != 0 and tcp[tcpflags] & tcp-ack == 0"
+  # ^ Shows only SYN packets (half-open connections)
+
+tcpdump -i eth0 "icmp and src host 10.0.0.5"
+  # ^ Shows ICMP from specific source
+
+# Count packets per IP
+tcpdump -r capture.pcap | awk '{print $3}' | cut -d. -f1-4 | sort | uniq -c | sort -nr
+```
+
+## Wireshark — GUI Packet Analysis
+
+Wireshark is the industry-standard protocol analyser with deep inspection capabilities:
+
+### Common Display Filters
+
+| Filter | What It Shows |
+|--------|---------------|
+| `http.request` | All HTTP request packets |
+| `dns.qry.name contains "example"` | DNS queries containing "example" |
+| `tcp.port == 443` | All HTTPS traffic |
+| `ip.addr == 192.168.1.100` | All traffic to/from a specific IP |
+| `tls.handshake.type == 1` | TLS Client Hello messages (SSL/TLS handshake initiations) |
+| `icmp` | All ICMP (ping) traffic |
+| `http.response.code >= 400` | HTTP error responses |
+| `tcp.analysis.flags` | TCP anomalies (retransmissions, dup ACKs, zero window) |
+| `data.len > 1000` | Packets with large data payloads (possible exfiltration) |
+| `!(arp or dns or dhcp)` | Hide background noise |
+
+### Suspicious Traffic Patterns to Hunt
+
+| Pattern | Wireshark Filter | Possible Indication |
+|---------|------------------|-------------------|
+| **Periodic beaconing** | Follow TCP stream, check timing | C2 beacon (same interval + payload size) |
+| **DNS TXT queries with random subdomains** | `dns.txt` | DNS tunnelling |
+| **HTTP POST to rare endpoint** | `http.request.method == "POST"` | C2 callback, data exfiltration |
+| **Large outbound data transfer at 3 AM** | `tcp.len > 5000 && ip.dst != 192.168.0.0/16` | Data exfiltration |
+| **TLS to unusual ports** | `tls.handshake.type == 1 && tcp.dstport != 443` | Hidden C2 channel |
+| **SMB connections to external IPs** | `smb && ip.dst != 192.168.0.0/16` | Data exfiltration via SMB |
+| **ARP scanning** | `arp.opcode == 1 && arp.dst.proto_ipv4` (many unique targets) | Network reconnaissance |
+
+## Zeek — Network Monitoring Framework
+
+Zeek (formerly Bro) passively monitors network traffic and produces structured logs:
+
+```bash
+# Install Zeek
+sudo apt-get install zeek
+
+# Monitor an interface
+zeek -i eth0 local
+
+# Zeek log types (automatically generated)
+# conn.log — all network connections (source, dest, protocol, duration, bytes)
+# http.log — all HTTP requests (method, URI, user-agent, response code, mime type)
+# dns.log — all DNS queries (query, answer, query type, response code)
+# ssl.log — all TLS handshakes (version, cipher, certificate, SNI)
+# files.log — all file transfers (filename, mime type, MD5/SHA1)
+# dhcp.log — DHCP assignments (IP to MAC mapping)
+# smtp.log — Email traffic metadata
+# ftp.log — FTP session details
+```
+
+### Zeek Hunting Queries
+
+```bash
+# Find hosts making DNS queries to newly registered domains
+cat dns.log | zeek-cut query answers | sort | uniq -c | sort -nr | head -20
+
+# Find hosts with TLS connections to unusual ports
+cat ssl.log | zeek-cut server_name orig_h resp_p | grep -v "443$"
+
+# Find long-duration connections (possible data exfiltration or C2)
+cat conn.log | awk '$NF > 3600' | zeek-cut ts id.orig_h id.resp_h proto service duration
+
+# Detect beaconing (periodic C2 communication) using conn.log
+cat conn.log | zeek-cut ts id.orig_h id.resp_h | sort | uniq -c | sort -nr
+
+# Find HTTP requests with unusual user agents
+cat http.log | zeek-cut ts host uri user_agent | sort -k4 | uniq -c | sort -nr
+
+# Detect DNS queries for algorithmically generated domains (DGA)
+cat dns.log | zeek-cut query | grep -E '^[a-z]{10,}\.' | sort -u
+
+# Find SSL certificates from untrusted issuers
+cat ssl.log | zeek-cut subject issuer | grep -v "Let's Encrypt" | grep -v "DigiCert"
+```
+
+### Zeek Event-Driven Detection
+
+```zeek
+# Custom Zeek script to detect SMB connections to external IPs
+event smb2_connection_configured(c: connection) {
+    if (192.168.0.0/16 !in c$id$resp_h) {
+        NOTICE([$note=External_SMB_Connection,
+                $msg=fmt("SMB connection to external host %s", c$id$resp_h),
+                $conn=c]);
+    }
+}
+
+# Custom Zeek script to detect HTTP requests with no User-Agent
+event http_request(c: connection, method: string, original_URI: string,
+                   unescaped_URI: string, version: string) {
+    if (! c$http?$user_agent) {
+        NOTICE([$note=HTTP_No_UserAgent,
+                $msg="HTTP request with no User-Agent header",
+                $conn=c]);
+    }
+}
+```
+
+## Suricata — IDS/IPS
+
+Suricata performs deep packet inspection against rules for threat detection:
+
+```yaml
+# Suricata rule example (alert on Cobalt Strike beacon)
+alert tcp $HOME_NET any -> $EXTERNAL_NET $HTTP_PORTS (
+  msg:"Cobalt Strike HTTPS Beacon Detected";
+  content:"POST"; http_method;
+  content:"Mozilla/4.0"; http_user_agent;
+  content:"|0d 0a|Cookie: " http_cookie;
+  pcre:"/^(?:[A-Za-z0-9+\/]{4})*(?:[A-Za-z0-9+\/]{2}==|[A-Za-z0-9+\/]{3}=)?$/";
+  sid:1000001;
+  rev:1;
+)
+
+# Suricata rule for Log4Shell exploitation attempt
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (
+  msg:"Log4Shell JNDI Injection Attempt";
+  content:"${jndi:";
+  flow:to_server,established;
+  sid:1000002;
+  rev:1;
+)
+```
+
+```bash
+# Run Suricata in IDS mode
+suricata -c /etc/suricata/suricata.yaml -i eth0
+
+# Run Suricata against a pcap file
+suricata -c /etc/suricata/suricata.yaml -r capture.pcap
+
+# Check alerts in real-time
+tail -f /var/log/suricata/eve.json | jq 'select(.alert != null) | {timestamp, alert}'
+
+# Alert summary
+cat /var/log/suricata/eve.json | jq -r 'select(.alert != null) | [.timestamp, .alert.signature, .alert.severity] | @tsv'
+
+# Statistics
+cat /var/log/suricata/stats.log | grep -E "decoder|detect"
+```
+
+### Suricata vs Zeek
+
+| Feature | Zeek | Suricata |
+|---------|------|----------|
+| **Primary function** | Network monitoring & logging | Intrusion detection & prevention |
+| **Detection method** | Event-driven analysis | Signature-based (rules) |
+| **Output** | Structured logs (conn, http, dns, ssl, files) | Alerts + packet capture |
+| **Performance** | Better on high-speed links | Resource-intensive with many rules |
+| **Can block traffic?** | No (monitoring only) | Yes (IPS mode — inline blocking) |
+| **Protocol coverage** | Extensive (100+ protocols) | Good (major protocols) |
+| **File extraction** | Yes (built-in) | Yes (through rules) |
+| **TLS inspection** | Certificate metadata only | Full TLS inspection (with key) |
+| **Use together?** | YES — Zeek for visibility, Suricata for detection | |
+
+## Brim / Zed — Modern Network Analysis
+
+Brim (now Zed) combines Zeek logs with packet capture for modern network analysis:
+
+```bash
+# Import pcap into Zed
+zed ingest capture.pcap
+
+# Query all HTTP POST requests
+zed query 'from capture | where http.method == "POST"'
+
+# Find connections to suspicious ports
+zed query 'from capture | where id.resp_p == 4444 or id.resp_p == 8443'
+
+# Analyse DNS queries for DGA
+zed query 'from capture | dns | count() by query | sort count desc | head 20'
+```
+
+## Network Tool Selection Guide
+
+```yaml
+For Network Discovery:
+  └─ Nmap: Port scanning, service detection, OS fingerprinting
+  └─ Masscan: Faster mass scanning (entire internet in minutes)
+  └─ Zmap: Stateless scanning for large address spaces
+
+For Packet Capture & Analysis:
+  └─ Tcpdump: Command-line capture (lightweight, remote servers)
+  └─ Wireshark: Deep GUI inspection (forensics, protocol analysis)
+  └─ tshark: Command-line Wireshark (scriptable analysis)
+
+For Continuous Monitoring:
+  └─ Zeek: Event-driven logging (conn, http, dns, ssl logs)
+  └─ Suricata: Signature-based IDS/IPS (alerting, blocking)
+  └─ Snort: Classic IDS/IPS (predecessor to Suricata)
+
+For Threat Hunting:
+  └─ Zeek logs + ELK/Splunk: Historical analysis of conn, dns, http logs
+  └─ Brim/Zed: Interactive pcap analysis with Zeek enrichment
+  └─ RITA (Real Intelligence Threat Analytics): Beacon detection from Zeek logs
+```
+
+<Aside variant="tip">
+Zeek and Suricata complement each other. Run both: Zeek produces the detailed logs you use for hunting and investigation; Suricata generates the alerts that trigger your incident response. Most mature SOCs run both alongside an EDR.
+</Aside>
+
+## Key Takeaways
+
+- Nmap is the foundational network discovery tool — its NSE scripting engine provides vulnerability scanning, enumeration, and exploitation checks in addition to basic port scanning
+- Tcpdump is essential for lightweight packet capture on servers and remote systems — filters can isolate specific hosts, ports, and protocols for targeted analysis
+- Wireshark is the industry-standard protocol analyser — display filters enable deep forensic analysis of individual packets and sessions
+- Zeek produces structured, event-driven logs (conn, http, dns, ssl, files) that are the raw material for network threat hunting — unlike full packet capture, Zeek logs are compact and queryable
+- Suricata provides signature-based intrusion detection with real-time alerting — rules detect known attack patterns including C2 beacons, exploit attempts, and malware traffic
+- Suspicious network patterns to hunt: periodic beaconing (C2), unusual DNS queries (tunnelling), TLS on non-standard ports (hidden channels), large outbound transfers (exfiltration), SMB to external IPs (data theft)
+- Zeek and Suricata are complementary, not competing — run both for full visibility (Zeek for logging/hunting + Suricata for detection/alerting)
+- Modern tools like Brim/Zed combine packet capture with Zeek log enrichment for interactive threat hunting workflows
+- Network security tools form a stack: discovery (Nmap) → capture (tcpdump/Wireshark) → monitoring (Zeek) → detection (Suricata) → hunting (Zeek + SIEM)
+- Effective network security depends on having the right tool for each phase of the incident response lifecycle: prepare (discover) → detect (monitor) → analyse (capture) → respond (hunt)
