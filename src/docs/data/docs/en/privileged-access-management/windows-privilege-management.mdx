@@ -1,0 +1,430 @@
+---
+title: "Windows Privilege Management"
+description: "Managing privileged access on Windows systems — local admin passwords (LAPS), UAC, built-in groups, service accounts (gMSA), JEA, Credential Guard, PAW, event logging, and integration with enterprise PAM platforms."
+sidebar:
+  order: 13
+  label: "Windows Privilege Management"
+tab: "iam-pam-professional"
+---
+
+Windows remains the dominant desktop and server operating system in most enterprises. Managing privileged access on Windows requires understanding its unique security architecture — from the Local Security Authority (LSA) and security tokens to Group Policy and the wide variety of privileged built-in groups.
+
+This page covers the Windows privilege management landscape from a PAM practitioner's perspective.
+
+## Windows Security Architecture
+
+### Security Tokens
+
+Every process on Windows runs with a security token that contains:
+- **User SID** — The account's unique identifier
+- **Group SIDs** — All groups the user is a member of (including nested groups)
+- **Privileges** — System-wide rights (e.g., `SeTakeOwnershipPrivilege`, `SeBackupPrivilege`)
+- **Integrity Level** — Mandatory label (System > High > Medium > Low > Untrusted)
+
+```
+Token for user DOMAIN\jadmin
+├── User: DOMAIN\jadmin (S-1-5-21-...-1105)
+├── Groups:
+│   ├── Everyone (S-1-1-0)
+│   ├── BUILTIN\Administrators (S-1-5-32-544)
+│   ├── DOMAIN\Domain Admins (S-1-5-21-...-512)
+│   └── DOMAIN\Enterprise Admins (S-1-5-21-...-519)
+├── Privileges:
+│   ├── SeBackupPrivilege
+│   ├── SeDebugPrivilege
+│   ├── SeTakeOwnershipPrivilege
+│   └── SeSecurityPrivilege
+└── Integrity Level: High
+```
+
+### Integrity Levels
+
+Windows uses mandatory integrity control to restrict what processes can access:
+
+| Level | Typical User/Process | Scope |
+|-------|---------------------|-------|
+| **System** | `SYSTEM`, kernel | Operating system kernel |
+| **High** | Administrator | Admin applications |
+| **Medium** | Standard user | User applications |
+| **Low** | Sandboxed processes | Browser, isolated apps |
+| **Untrusted** | Anonymous | Anonymous access |
+
+A process cannot write to an object with a higher integrity level without explicit permission. This is the foundation of UAC (User Account Control).
+
+## Local Administrator Password Solution (LAPS)
+
+LAPS solves a classic Windows security problem: organisations needed local admin passwords for support and recovery, but manually managing thousands of unique passwords was impractical. LAPS automates this.
+
+### How LAPS Works
+
+```
+┌─────────────┐     LDAP write      ┌──────────────┐
+│ Workstation ├────────────────────►│ Domain        │
+│ LAPS Client │                    │ Controller    │
+│             │◄──── LDAP read ────│ (ms-Mcs-AdmPwd)│
+└─────────────┘     (password)     └──────────────┘
+```
+
+1. **AD Schema Extension**: Adds `ms-Mcs-AdmPwd` (password) and `ms-Mcs-AdmPwdExpirationTime` attributes to computer objects
+2. **Client Agent**: Installed on managed systems, rotates the local admin password on a schedule
+3. **Group Policy**: Configures rotation interval, password complexity, and length
+4. **Permission Delegation**: Granular AD permissions control who can read the password attribute
+
+### LAPS Configuration
+
+```powershell
+# Step 1: Extend AD schema (run once)
+Update-AdmPwdADSchema
+
+# Step 2: Delegate read permission to helpdesk group
+Set-AdmPwdComputerSelfPermission -OrgUnit "OU=Workstations,DC=corp,DC=com"
+Grant-AdmPwdReadAccess -Identity "HELPDESK" -OrgUnit "OU=Workstations,DC=corp,DC=com"
+
+# Step 3: Configure via Group Policy
+# Computer Config > Admin Templates > LAPS
+# └─ Enable local admin password management: Enabled
+# └─ Password complexity: Large letters + Small letters + Numbers + Specials
+# └─ Password length: 24 characters
+# └─ Password age (days): 30
+
+# Step 4: Retrieve password (helpdesk workflow)
+Get-AdmPwdPassword -ComputerName WORKSTATION-001
+# ComputerName     Password                 ExpirationTimestamp
+# ────────────     ────────                 ───────────────────
+# WORKSTATION-001  qF7#mK2$pL9@nR4$xW8*cJ 03/15/2026 14:30:00
+```
+
+### LAPS Alternatives
+
+| Solution | Deployment | Key Feature |
+|----------|-----------|-------------|
+| **Microsoft LAPS** | Built-in (free) | AD-based, schema extension required |
+| **Windows LAPS** | Windows 10 20H2+ | Cloud or on-prem, no schema extension |
+| **Third-party PIM tools** | CyberArk, BeyondTrust | Centralised, vaulted, with rotation policies |
+
+## User Account Control (UAC)
+
+UAC is Microsoft's consent-based privilege elevation mechanism for Windows.
+
+### UAC Elevation Flow
+
+```
+Standard User                 Administrator
+    │                              │
+    │  Double-click app            │  Double-click app
+    │                              │
+    ▼                              ▼
+App launches with                 App launches with
+Medium Integrity                  Medium Integrity
+    │                              │
+    │  App requires admin          │  App requires admin
+    │                              │
+    ▼                              ▼
+Prompt for admin                  Consent prompt
+credentials (creds)               (Admin Consent)
+    │                              │
+    ▼                              ▼
+Process elevated to               Process elevated to
+High Integrity                    High Integrity
+```
+
+### UAC Configuration Levels
+
+| Setting | Behavior | Use Case |
+|---------|----------|----------|
+| **Always notify** | Prompt on any elevation, dim desktop | Highest security, most disruptive |
+| **Notify only when apps make changes (default)** | Silent elevation for Windows components, prompt for third-party | Good balance for standard users |
+| **Notify only when apps make changes (no dim)** | Same as default but desktop not dimmed | Convenience over security |
+| **Never notify** | No prompts. Full admin for admin accounts. | **Not recommended** — defeats UAC purpose |
+
+### UAC Bypass Techniques
+
+Attackers frequently bypass UAC using:
+
+| Technique | Mechanism | Detection |
+|-----------|-----------|-----------|
+| **CMSTP** | Microsoft Connection Manager Profile Installer auto-elevates | Monitor `cmstp.exe` execution |
+| **FODHelper** | Features on Demand helper auto-elevates | Monitor `fodhelper.exe` |
+| **Event Viewer** | Help link opens arbitrary URL with elevated privileges | Monitor registry modifications to help URIs |
+| **MSBuild** | Build tasks can execute arbitrary code in elevated context | Monitor `MSBuild.exe` invocation |
+
+## Windows Privileged Groups
+
+### Built-in Local Groups
+
+| Group | RID | Default Members | Privilege |
+|-------|-----|----------------|-----------|
+| **Administrators** | S-1-5-32-544 | Local Administrator, Domain Admins | Full system access |
+| **Backup Operators** | S-1-5-32-551 | None | Can read all files, including those denied by ACL |
+| **Event Log Readers** | S-1-5-32-573 | None | Read event logs remotely |
+| **Hyper-V Administrators** | S-1-5-32-578 | None | Full access to Hyper-V (potential escape) |
+| **Print Operators** | S-1-5-32-550 | None (DC only) | Can load printer drivers (DLL injection vector) |
+
+### Domain Built-in Groups
+
+| Group | RID | Scope | Attack Value |
+|-------|-----|-------|-------------|
+| **Domain Admins** | S-1-5-21-...-512 | Domain-wide | Tier 0 — compromise = domain compromise |
+| **Enterprise Admins** | S-1-5-21-...-519 | Forest-wide | Tier 0 — compromise = full forest compromise |
+| **Schema Admins** | S-1-5-21-...-518 | Forest-wide | Can modify AD schema |
+| **Group Policy Creator Owners** | S-1-5-21-...-520 | Forest-wide | Can create GPOs (potential infection vector) |
+| **Protected Users** | S-1-5-21-...-521 | Domain-wide | Special group that enforces strong auth protocols |
+
+### Protected Users Group
+
+The **Protected Users** group (introduced in Windows 8.1/2012 R2) significantly reduces credential exposure by enforcing:
+- No NTLM authentication
+- No Kerberos DES/RC4 encryption types
+- No Kerberos delegation (unconstrained or constrained)
+- No Kerberos TGT renewal beyond 4 hours
+- No cached credentials (ticket expires after 4 hours)
+
+**Best Practice**: Add all privileged accounts (Domain Admins, Enterprise Admins) to the Protected Users group.
+
+## Service Accounts
+
+### Traditional Service Accounts
+Run with domain user accounts that never expire — but often have overly broad permissions and passwords that never rotate.
+
+### Managed Service Accounts (MSA)
+
+| Feature | sMSA (Standalone) | gMSA (Group) |
+|---------|------------------|--------------|
+| Introduced | Windows 2008 R2 | Windows 2012 |
+| Domain join required | Yes | Yes |
+| Use on multiple servers | No (single server only) | Yes (managed via AD) |
+| Password management | Automatic (ADS-managed) | Automatic (ADS-managed) |
+| SPN management | Automatic | Automatic |
+
+```powershell
+# Create gMSA for SQL Server cluster
+New-ADServiceAccount -Name "gMSA-SQL-Prod" `
+    -DNSHostName "sql-prod.corp.com" `
+    -PrincipalsAllowedToRetrieveManagedPassword "SQL-Servers" `
+    -KerberosEncryptionType AES256
+
+# Install gMSA on member server
+Install-ADServiceAccount -Identity "gMSA-SQL-Prod"
+
+# Configure service to run as gMSA
+Set-ADServiceAccount -Identity "gMSA-SQL-Prod" -PrincipalsAllowedToRetrieveManagedPassword @("Add-Server01", "Add-Server02")
+
+# Verify gMSA
+Test-ADServiceAccount -Identity "gMSA-SQL-Prod"
+```
+
+### Group Managed Service Account Benefits
+- **120-character random password** rotated automatically by the Domain Controller
+- **No human interaction needed** for password changes
+- **AES256 Kerberos** by default
+- **SUPPORTED by gMSA**: IIS app pools, Windows services, SQL Server, scheduled tasks
+- **NOT supported**: Interactive logon, third-party services without gMSA awareness
+
+## Just Enough Administration (JEA)
+
+JEA is a PowerShell-based solution for role-based privileged access management on Windows. It allows non-administrators to run specific commands with elevated privileges — without giving them administrative rights.
+
+### JEA Architecture
+
+```
+User ──→ PowerShell Remoting ──→ JEA Session Configuration
+              │                           │
+              │                     └── Restricted function set
+              │                         └── Specific parameters
+              │                         └── Approved values
+              │
+         No admin                                        
+         rights                                      
+```
+
+### JEA Configuration
+
+```powershell
+# Step 1: Create a role capabilities file
+New-PSRoleCapabilityFile -Path ".\ADRole.psrc"
+
+# ADRole.psrc content:
+@{
+    ModulesToImport = @(
+        @{ ModuleName = 'ActiveDirectory'; ModuleVersion = '1.0.0.0' }
+    )
+    VisibleCmdlets = @(
+        'Get-ADUser',
+        'Unlock-ADAccount',
+        @{
+            Name = 'Reset-ADAccountPassword'
+            Parameters = @{ 
+                Identity = '*'
+                # Only allow reset, not set
+            }
+        }
+    )
+    VisibleFunctions = @(
+        'Get-ADUserDetails'  # Custom function
+    )
+}
+
+# Step 2: Create session configuration
+Register-PSSessionConfiguration -Name "ADSupport" `
+    -SessionType RestrictedRemoteServer `
+    -TranscriptDirectory "\\audit\jea-transcripts" `
+    -RunAsCredential "CORP\JEAServiceAccount" `
+    -RoleDefinitions @{
+        "CORP\HelpDesk" = @{ RoleCapabilities = "ADRole" }
+    }
+
+# Step 3: Connect as helpdesk user
+Enter-PSSession -ComputerName DC01 -ConfigurationName ADSupport
+```
+
+## Windows Defender Credential Guard
+
+Credential Guard uses virtualisation-based security (VBS) to protect privileged credentials from theft attacks (Pass-the-Hash, Pass-the-Ticket).
+
+### What It Protects
+
+| Protected | Not Protected |
+|-----------|--------------|
+| NTLM password hashes | Interactive logon sessions (first auth) |
+| Kerberos TGT and service tickets | Credentials for 3rd-party providers |
+| Domain credentials stored in LSASS | Software-based TPM (requires discrete TPM) |
+| DPAPI domain keys | |
+
+### Enabling Credential Guard
+
+```powershell
+# Via Group Policy:
+# Computer Config > Admin Templates > System > Device Guard
+# └─ Turn on Virtualization Based Security: Enabled
+#    └─ Platform Security Level: Secure Boot + DMA Protection
+#    └─ Credential Guard Configuration: Enabled with UEFI lock
+
+# Via registry:
+reg add "HKLM\System\CurrentControlSet\Control\DeviceGuard" /v "EnableVirtualizationBasedSecurity" /t REG_DWORD /d 1 /f
+reg add "HKLM\System\CurrentControlSet\Control\DeviceGuard" /v "RequirePlatformSecurityFeatures" /t REG_DWORD /d 1 /f
+reg add "HKLM\System\CurrentControlSet\Control\Lsa" /v "LsaCfgFlags" /t REG_DWORD /d 1 /f
+```
+
+### Verification
+
+```powershell
+# Check if Credential Guard is running
+Get-CimInstance -ClassName Win32_DeviceGuard -Namespace root\Microsoft\Windows\DeviceGuard
+
+# Check via msinfo32
+msinfo32.exe
+# System Summary > Device Guard > Credential Guard: Running
+```
+
+## Privileged Access Workstations (PAW)
+
+A PAW (formerly known as "jump box" or "admin workstation") provides a dedicated, hardened workstation for performing administrative tasks.
+
+### PAW Design Principles
+
+| Principle | Implementation |
+|-----------|---------------|
+| **Dedicated purpose** | PAW is used ONLY for administration |
+| **No internet browsing** | No email, no web browsing on PAW |
+| **Separate accounts** | Admin uses privileged account ONLY on PAW |
+| **Hardened configuration** | AppLocker, Credential Guard, WDAC |
+| **PAM integreted** | Session proxied through PAM platform |
+
+### PAW Tiers
+
+```
+Tier 2                      Tier 1                  Tier 0
+(Workstation Admin)         (Server Admin)          (Identity Admin)
+    │                           │                       │
+    ▼                           ▼                       ▼
+Standard PAW                Server PAW              DC Admin PAW
+(No internet)               (No internet)           (No internet)
+(Credential Guard)          (Credential Guard)      (Credential Guard)
+(AppLocker)                 (AppLocker)             (AppLocker)
+                            (MFA required)          (MFA required)
+                                                    (Smart card only)
+```
+
+### PAW Hardening Checklist
+
+- [ ] Windows Defender Application Control (WDAC) enabled with allow-list policy
+- [ ] Credential Guard enabled
+- [ ] Remote Credential Guard enabled for RDP sessions
+- [ ] Local admin password managed by LAPS
+- [ ] BitLocker enabled on system drive
+- [ ] No local admin group membership for standard user
+- [ ] USB device restriction via Group Policy
+- [ ] Windows Firewall with default deny inbound
+- [ ] MFA enforced for all admin logons
+- [ ] Device compliance enforcement via Intune/GPO
+
+## Event Logging for Privilege Use
+
+### Critical Event IDs
+
+| Event ID | Source | Description |
+|----------|--------|-------------|
+| **4624** | Security | Account logon (success) |
+| **4625** | Security | Account logon (failure) |
+| **4634** | Security | Account logoff |
+| **4648** | Security | Explicit credential usage (RunAs) |
+| **4672** | Security | Special privileges assigned to new logon (admin) |
+| **4688** | Security | Process creation (command-line audit) |
+| **4698** | Task Scheduler | Scheduled task created |
+| **4702** | Task Scheduler | Scheduled task updated |
+| **4720** | Security | User account created |
+| **4728** | Security | Member added to security-enabled global group |
+| **4732** | Security | Member added to security-enabled local group |
+| **4756** | Security | Member added to security-enabled universal group |
+| **4768** | Security | Kerberos TGT requested |
+| **4769** | Security | Kerberos service ticket requested |
+| **4776** | Security | NTLM authentication |
+| **5136** | DS Access | Directory service object modified |
+| **5140** | Security | Network share accessed |
+
+### PowerShell Logging
+
+```powershell
+# Enable PowerShell script block logging
+# Group Policy: Computer Config > Admin Templates > Windows Components > Windows PowerShell
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging" `
+    -Name "EnableScriptBlockLogging" -Value 1
+
+# Enable PowerShell transcription
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\PowerShell\Transcription" `
+    -Name "EnableTranscripting" -Value 1 `
+    -Name "OutputDirectory" -Value "\\audit\psscripts"
+
+# Enable module logging
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\PowerShell\ModuleLogging" `
+    -Name "EnableModuleLogging" -Value 1
+```
+
+## Integration with Enterprise PAM
+
+Windows privilege management typically integrates with PAM platforms through:
+
+### 1. LAPS Integration
+PAM vault can read LAPS passwords via AD and provide granular access workflows for local admin password retrieval.
+
+### 2. JEA Integration
+PAM platforms can proxy administrative requests through JEA endpoints, providing vaulted, recorded access to Windows servers.
+
+### 3. Session Recording
+PAM session proxies (e.g., CyberArk PSM, BeyondTrust) can connect to Windows endpoints via RDP with full keystroke and screen recording.
+
+### 4. Privilege Elevation
+PAM solutions can deliver just-in-time elevation by:
+- Adding users to security groups temporarily (JIT group membership)
+- Elevating processes via agent-based elevation rules
+- Brokering RDP sessions with temporary admin rights
+
+## Key Takeaways
+
+- **LAPS** eliminates the shared local admin password problem — deploy it on every workstation and server
+- **gMSAs** solve service account password management — use them instead of traditional domain service accounts
+- **JEA** enables least-privilege administration for PowerShell — non-admins get specific cmdlets, not full admin
+- **Credential Guard** stops Pass-the-Hash and Pass-the-Ticket — enable it on all privileged workstations
+- **PAWs** create a trusted administrative path — separate admin workstations prevent credential spillage
+- **Event logging** is your forensic foundation — log everything, centralise it, monitor it
+- **Windows privileged groups** define the attack surface — audit membership continuously

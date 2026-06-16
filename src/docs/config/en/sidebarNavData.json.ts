@@ -75,14 +75,10 @@ const sidebarNavData: DocsSidebarNavData = {
       description: "Master Python from fundamentals to advanced",
       icon: "tabler/brand-python",
       sections: [
-        {
-          id: "pam-program-maturity",
-          title: "PAM Program Maturity",
-        },
-        {
-          id: "platform-guide",
-          title: "Platform Tools Guide",
-        },
+    {
+      id: "pam-program-maturity",
+      title: "PAM Program Maturity",
+    },
       ],
     },
     {

@@ -1,0 +1,384 @@
+---
+title: "Linux Privilege Management"
+description: "Managing privileged access on Linux systems — sudo configuration, root account security, SSH key management, PAM integration, Linux capabilities, auditing, and defending against privilege escalation."
+sidebar:
+  order: 12
+  label: "Linux Privilege Management"
+tab: "iam-pam-professional"
+---
+
+Linux systems form the backbone of enterprise infrastructure — from web servers and databases to container hosts and cloud workloads. Managing privileged access on Linux requires understanding the unique security model of Unix-like systems: discretionary access control (DAC), the root account paradigm, and the role of `sudo` as the primary privilege elevation mechanism.
+
+This page covers everything a PAM professional needs to know about Linux privilege management.
+
+## The Linux Security Model
+
+### Users and Groups
+
+Every process and file in Linux belongs to a user and group:
+
+- **UID 0 (root)** — The superuser with unrestricted system access
+- **System accounts (UID 1-999)** — Service accounts for daemons (e.g., www-data, sshd, mysql)
+- **Regular users (UID 1000+)** — Human users with limited privileges
+
+Groups function similarly — every user has a primary group and can belong to secondary groups.
+
+```
+User: john  (UID 1001)
+├── Primary Group: john (GID 1001)
+└── Supplementary Groups: sudo, docker, developers
+```
+
+### File Permissions
+
+Linux uses a triple-based permission model:
+
+```
+-rwxr-xr--  1 root  admin  1024  Jan 1 12:00  script.sh
+^ ^^^ ^^^ ^^^
+| │   │   └── Other permissions (read)
+| │   └────── Group permissions (read + execute)
+| └────────── Owner permissions (read + write + execute)
+└── File type (- = file, d = directory, l = symlink)
+```
+
+### Special Permission Bits
+
+| Bit | Symbolic | Effect on Files | Effect on Directories |
+|-----|----------|----------------|----------------------|
+| **SUID** | `s` in owner (e.g., `rwsr-xr-x`) | Runs with file owner's privileges | (ignored) |
+| **SGID** | `s` in group (e.g., `rwxr-sr-x`) | Runs with file group's privileges | New files inherit group |
+| **Sticky Bit** | `t` on other (e.g., `rwxrwxrwt`) | (ignored) | Only owner can delete files |
+
+SUID binaries are a **common privilege escalation vector** — an attacker who exploits a vulnerable SUID binary gains the privileges of its owner (often root).
+
+## The Root Account
+
+### Root Access Methods
+
+| Method | Description | Typical Use |
+|--------|-------------|-------------|
+| `su -` | Switch user to root (requires root password) | Direct console access |
+| `sudo -i` | Interactive root shell (requires user's password) | Authorised admin sessions |
+| `sudo <command>` | Run single command as root | Audit-friendly elevation |
+| SSH as root | Direct SSH login to root account (usually disabled) | Emergency access only |
+
+### Root Account Hardening
+
+```bash
+# Disable direct root SSH login
+echo "PermitRootLogin no" >> /etc/ssh/sshd_config
+systemctl restart sshd
+
+# Enforce sudo for privilege elevation
+# /etc/sudoers configuration:
+# Defaults        !rootpw          # Use user's password, not root's
+# Defaults        log_input,log_output  # Log all sudo sessions
+
+# Set strong root password (if used)
+# Use a 25+ character random password stored in a vault
+openssl rand -base64 32
+```
+
+**Best Practice**: Disable direct root login entirely. All admin access should go through `sudo` with full session logging. The root password should be long, random, stored in an enterprise vault, and used only for emergency break-glass scenarios.
+
+## sudo Deep Dive
+
+### sudoers Configuration
+
+The `/etc/sudoers` file (and files in `/etc/sudoers.d/`) control who can run what commands as which users.
+
+```bash
+# Syntax: WHO HOST = (RUNAS) TAG: COMMAND
+# ─────  ─── ────  ─────  ───  ───────
+
+# User aliases
+User_Alias  ADMINS = alice, bob, charles
+User_Alias  DBAS = david, eve
+
+# Runas aliases
+Runas_Alias DB = oracle, postgres
+
+# Command aliases  
+Cmnd_Alias  SERVICES = /usr/bin/systemctl, /usr/sbin/service
+Cmnd_Alias  NETWORKING = /sbin/ifconfig, /sbin/ip
+
+# Rules
+ADMINS      ALL = (ALL) ALL                        # Full sudo access for admins
+DBAS        ALL = (DB) SERVICES                    # DBAs can manage DB services
+alice       SERVER01 = (root) NOPASSWD: /sbin/reboot  # Passwordless reboot on one host
+
+# Defaults
+Defaults    log_input, log_output                  # Log all commands
+Defaults    mail_always                            # Email root on sudo events
+Defaults    timestamp_timeout=0                    # Always prompt for password
+```
+
+### Dangerous sudo Entries
+
+These sudo permissions are frequently abused for privilege escalation:
+
+| Sudo Entry | Risk | How Attackers Abuse It |
+|------------|------|----------------------|
+| `user ALL=(ALL) ALL` | Full root | Complete system compromise |
+| `user ALL=(root) NOPASSWD: ALL` | Full root without password | Trivial escalation |
+| `user ALL=(ALL) /bin/vim` | Command escape | `:!bash` from vim |
+| `user ALL=(ALL) /bin/less` | Command escape | `!bash` from less |
+| `user ALL=(ALL) /usr/bin/python` | Full root | `os.system('/bin/bash')` |
+| `user ALL=(ALL) /usr/bin/apt` | Package manipulation | Post-install hooks |
+| `user ALL=(ALL) /usr/sbin/tcpdump` | Credential theft | Capture network traffic |
+| `user ALL=(ALL) /bin/kill` | Process manipulation | Kill security agents |
+
+### sudo Logging
+
+```bash
+# Sudo logs are stored in:
+/var/log/auth.log        # Debian/Ubuntu — "sudo:  session opened for user root"
+/var/log/secure          # RHEL/CentOS — "sudo:  session opened for user root"
+
+# For detailed command logging (input/output):
+/var/log/sudo-io/        # Directory with session recordings
+# Play back a session:
+sudoreplay -l            # List recorded sessions
+sudoreplay <ID>          # Replay session
+```
+
+## SSH Key Management
+
+### Key Types and Security
+
+| Key Type | Bit Length | Security Level | Status |
+|----------|-----------|----------------|--------|
+| **Ed25519** | 256 | High (Post-quantum safe curve) | **Recommended** |
+| **ECDSA** | 256/384/521 | High (NIST curves) | Good |
+| **RSA** | 2048+ | Adequate | Acceptable (deprecating) |
+| **RSA** | 4096+ | Strong | Verbose but secure |
+| **DSA** | 1024 | Weak | **Deprecated** — disabled in OpenSSH 7.0+ |
+
+```bash
+# Generate Ed25519 key (recommended)
+ssh-keygen -t ed25519 -a 100 -f ~/.ssh/id_ed25519
+
+# Generate RSA 4096-bit key (fallback)
+ssh-keygen -t rsa -b 4096 -a 100 -f ~/.ssh/id_rsa
+
+# View key fingerprint
+ssh-keygen -lf ~/.ssh/id_ed25519.pub
+```
+
+### Authorized Keys Hardening
+
+```bash
+# /etc/ssh/sshd_config — Hardened SSH settings
+PubkeyAuthentication yes
+AuthorizedKeysFile      .ssh/authorized_keys
+PasswordAuthentication no                    # Disable password auth
+ChallengeResponseAuthentication no           # Disable challenge-response
+UsePAM yes
+MaxAuthTries 3                               # Limit auth attempts
+MaxSessions 2                                # Limit concurrent sessions
+PermitEmptyPasswords no                      # Never allow empty passwords
+ClientAliveInterval 300                      # Check client alive every 5 min
+ClientAliveCountMax 0                        # Disconnect on inactivity
+
+# Authorized keys file (.ssh/authorized_keys) — Use options:
+# Restrict commands, source IP, and forwarding
+command="/usr/local/bin/backup.sh",from="10.0.1.0/24",no-agent-forwarding,no-port-forwarding,no-pty ssh-ed25519 AAAAC3... user@backup-agent
+```
+
+### SSH Key Rotation Strategy
+
+| Action | Frequency | Automation |
+|--------|-----------|------------|
+| Rotate user SSH keys | Every 90-180 days | Scripted with Ansible |
+| Rotate service account keys | Every 30-90 days | PAM credential vault |
+| Revoke compromised keys | Immediately | CRL or `ssh-keygen -k` |
+| Audit authorized_keys | Monthly | grep all `~/.ssh/authorized_keys` |
+
+## Linux PAM (Pluggable Authentication Modules)
+
+PAM provides a modular authentication framework used by SSH, sudo, login, and other services.
+
+### PAM Configuration Structure
+
+```
+/etc/pam.d/
+├── common-auth        # Authentication rules
+├── common-account     # Account management (expiry, etc.)
+├── common-password    # Password strength and rotation
+├── common-session     # Session setup (limits, audit)
+└── sshd              # SSH-specific rules (can reference common-*)
+```
+
+### PAM Module Stack
+
+Each PAM rule has four fields: `type`, `control`, `module`, `arguments`
+
+```
+auth      required      pam_unix.so          try_first_pass
+───      ────────      ──────────            ─────────────
+type     control       module                arguments
+```
+
+| Type | Purpose |
+|------|---------|
+| `auth` | Verify user identity (password, biometric, token) |
+| `account` | Check account validity (expiry, time restrictions) |
+| `password` | Manage password changes and strength |
+| `session` | Setup/teardown session (logging, limits) |
+
+| Control Flag | Behavior |
+|-------------|----------|
+| `required` | Must pass. Other modules in stack still run even if this fails. |
+| `requisite` | Must pass. If this fails, stop immediately. |
+| `sufficient` | If this passes and no prior `required` failures, skip remaining. |
+| `optional` | Not critical — used for logging or non-essential checks. |
+
+### Practical PAM Security Examples
+
+```bash
+# /etc/pam.d/common-auth — Enforce MFA for SSH
+auth    [success=1 default=ignore]  pam_unix.so nullok_secure
+auth    requisite                   pam_deny.so
+auth    required                    pam_google_authenticator.so
+
+# /etc/pam.d/common-password — Password strength
+password  requisite   pam_pwquality.so retry=3 minlen=14 difok=3
+password  [success=1 default=ignore] pam_unix.so obscure use_authtok try_first_pass sha512
+
+# /etc/pam.d/common-account — Lock inactive accounts
+account   required    pam_unix.so
+account   required    pam_lastlog.so inactive=90
+
+# /etc/security/limits.conf — Resource limits via pam_limits.so
+@admins          hard    maxlogins     3
+@developers      soft    nproc         1000
+```
+
+## Linux Capabilities
+
+Modern Linux replaces the binary root/non-root model with fine-grained capabilities:
+
+| Capability | Permission Granted |
+|------------|-------------------|
+| `CAP_NET_BIND_SERVICE` | Bind to privileged ports (< 1024) |
+| `CAP_DAC_OVERRIDE` | Bypass file permission checks |
+| `CAP_SYS_ADMIN` | Many administrative operations (very powerful) |
+| `CAP_SETUID` | Change UID arbitrarily |
+| `CAP_NET_RAW` | Raw sockets (packet sniffing) |
+| `CAP_AUDIT_WRITE` | Write audit log entries |
+
+```bash
+# View capabilities on a binary
+getcap /usr/bin/ping
+# /usr/bin/ping cap_net_raw=ep
+
+# Set capabilities on a binary
+setcap cap_net_bind_service=+ep /usr/local/bin/myapp
+
+# Remove capabilities
+setcap -r /usr/local/bin/myapp
+
+# Run command with specific capabilities
+capsh --caps="cap_net_bind_service=+ep" -- -c /usr/local/bin/myapp
+```
+
+**Best Practice**: Replace SUID binaries with capability-based equivalents wherever possible. This dramatically reduces the attack surface for privilege escalation.
+
+## Auditing Linux Privileged Access
+
+### auditd
+
+```bash
+# Install and configure
+apt install auditd          # Debian/Ubuntu
+yum install audit           # RHEL/CentOS
+
+# Audit rules — /etc/audit/rules.d/audit.rules
+-w /etc/sudoers -p wa -k sudoers_changes      # Watch sudoers changes
+-w /etc/passwd -p wa -k user_db_changes       # Watch user database
+-w /etc/shadow -p wa -k shadow_changes        # Watch password file
+-a exit,always -S execve -k shell_execution    # Log all commands
+-w /root/.ssh -p wa -k ssh_key_changes         # Watch SSH keys
+-w /etc/sshd_config -p wa -k sshd_config       # Watch SSH config
+
+# View audit logs
+ausearch -k sudoers_changes                    # Search by key
+ausearch -k shell_execution --start today      # Today's commands
+aureport -au                                   # Authentication report
+```
+
+### Log Monitoring
+
+```bash
+# Monitor auth logs in real-time
+tail -f /var/log/auth.log | grep "sudo\|sshd\|su"
+
+# Key events to monitor
+# Successful sudo: sudo: pam_unix(sudo:session): session opened for user root
+# Failed auth: Failed password for root from 10.0.0.5 port 22 ssh2
+# SSH key auth: Accepted publickey for admin from 10.0.0.5 port 22
+# User creation: useradd[1234]: new user: name=backdoor, UID=0
+```
+
+## Privilege Escalation Prevention
+
+### Common Escalation Techniques and Defenses
+
+| Technique | Description | Defense |
+|-----------|-------------|---------|
+| **SUID binary abuse** | Exploit misconfigured SUID binaries | Audit all SUID files; use capabilities instead |
+| **sudo escape** | Break out of restricted sudo commands | Use `Cmnd_Alias` carefully; test with `sudo -l` |
+| **Kernel exploit** | Unpatched kernel vulnerability | Keep kernels updated; enable live patching |
+| **Path hijacking** | Modify PATH to run malicious binary | Use absolute paths in scripts; secure PATH in sudoers |
+| **LD_PRELOAD** | Inject malicious shared library | Set `Defaults noexec` in sudoers; restrict env_reset |
+| **Docker escape** | Break out of container | Don't run containers as root; use seccomp profiles |
+| **Cron job abuse** | Modify writable cron scripts | Restrict cron script permissions; audit cron changes |
+
+### Defensive Configuration
+
+```bash
+# /etc/sudoers — Security defaults
+Defaults        env_reset                          # Reset environment
+Defaults        env_keep -= "LD_PRELOAD"           # Remove dangerous env vars
+Defaults        secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Defaults        mail_badpass                       # Email on bad password attempts
+Defaults        passwd_timeout=0                   # No timeout for password entry
+Defaults        timestamp_timeout=0                # Always require password
+
+# Audit all SUID binaries weekly
+find / -perm -4000 -type f 2>/dev/null > /var/log/suid-binaries-$(date +%Y%m%d).log
+
+# Restrict cron to root only
+echo "root" > /etc/cron.allow
+chmod 600 /etc/cron.allow
+
+# Disable core dumps for setuid programs
+echo "hard core 0" >> /etc/security/limits.conf
+```
+
+## Integration with PAM Platforms
+
+Linux privilege management typically integrates with enterprise PAM solutions in three ways:
+
+### 1. Credential Vaulting
+The PAM vault stores Linux root passwords and service account credentials, with automated checkout/check-in and rotation.
+
+### 2. Session Management
+Privileged sessions to Linux servers are proxied through the PAM platform, which records all keystrokes and output (typically via SSH proxy or `pam_exec` hooks).
+
+### 3. Just-in-Time Access
+Instead of permanent sudo rights, users request time-bound elevation:
+
+- **SSH Key Broker**: Temporary SSH keys issued on demand, revoked after session
+- **sudo Integration**: PAM module calls vault API to verify entitlement before granting elevation
+- **Certificate-Based**: Short-lived SSH certificates via an internal CA
+
+## Key Takeaways
+
+- **Root should never be a shared credential** — every admin needs their own identity with sudo
+- **sudo logging is your audit trail** — configure `log_input, log_output` on all sudo-capable users
+- **SSH keys are privileged credentials** — manage them with the same rigour as passwords
+- **PAM is your integration point** — most enterprise PAM tools integrate via PAM modules
+- **Capabilities are better than SUID** — retire SUID binaries in favour of granular capabilities
+- **Audit everything** — `auditd`, `sudo` logs, and SSH logs provide the evidence chain for compliance

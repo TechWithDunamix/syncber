@@ -1,0 +1,768 @@
+---
+title: "CyberArk Lab Deployment — Step-by-Step Guide"
+description: "Complete hands-on guide to deploying a CyberArk lab environment. Covers VM setup, Domain Controller configuration, Vault installation, PVWA deployment, CPM setup, and end-to-end verification."
+sidebar:
+  order: 15
+  label: "CyberArk Lab Deployment"
+tab: "iam-pam-professional"
+---
+
+The best way to learn CyberArk is to **deploy it yourself**. This guide walks you through setting up a complete CyberArk lab environment — from bare virtual machines to a working PAM platform with Vault, PVWA, CPM, and PSM components.
+
+This is not a theory overview. You will follow actual deployment steps, execute real commands, and end with a functioning CyberArk environment where you can practice every concept from the course.
+
+<Aside variant="info" title="Before You Begin">
+Complete the CyberArk Architecture page first if you haven't already. This guide assumes you understand the component roles (Vault, PVWA, CPM, PSM, AIM) and their relationships.
+</Aside>
+
+## Lab Architecture Overview
+
+The CyberArk lab consists of four virtual machines on an isolated network:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    LAB NETWORK (192.168.100.0/24)                 │
+│                                                                   │
+│  ┌──────────────────┐    ┌──────────────────┐                    │
+│  │  DC01             │    │  VAULT01          │                    │
+│  │  Domain Controller│    │  CyberArk Vault   │                    │
+│  │  Windows Server   │    │  Hardened Linux    │                    │
+│  │  192.168.100.10   │    │  192.168.100.20    │                    │
+│  └────────┬─────────┘    └────────┬─────────┘                    │
+│           │                       │                               │
+│  ┌────────┴─────────┐    ┌────────┴─────────┐                    │
+│  │  PVWA01           │    │  TARGET01         │                    │
+│  │  PVWA + CPM + PSM │    │  Target Windows   │                    │
+│  │  Windows Server   │    │  Server for        │                    │
+│  │  192.168.100.30   │    │  Account Onboarding │                   │
+│  │                   │    │  192.168.100.40    │                    │
+│  └──────────────────┘    └──────────────────┘                    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+| VM | Role | OS | Specs | IP |
+|----|------|-----|-------|-----|
+| **DC01** | Domain Controller | Windows Server 2022 | 4 vCPU, 8 GB RAM, 80 GB disk | 192.168.100.10 |
+| **VAULT01** | CyberArk Vault | Red Hat Enterprise Linux 9.x | 4 vCPU, 16 GB RAM, 200 GB disk | 192.168.100.20 |
+| **PVWA01** | PVWA + CPM + PSM | Windows Server 2022 | 8 vCPU, 16 GB RAM, 150 GB disk | 192.168.100.30 |
+| **TARGET01** | Target system for onboarding | Windows Server 2019/2022 | 4 vCPU, 8 GB RAM, 80 GB disk | 192.168.100.40 |
+
+<Aside variant="tip" title="Hardware Requirements">
+Your host machine needs at least 32 GB RAM and 200 GB free disk space to run all four VMs. If resources are tight, start with DC01 + VAULT01 + PVWA01 (three VMs) and add TARGET01 later. You can also use nested virtualisation on a cloud VM (Azure, AWS) with at least 64 GB RAM.
+</Aside>
+
+## Prerequisites
+
+### Software Required
+
+| Software | Purpose | Download |
+|----------|---------|----------|
+| **Hypervisor** (choose one) | Run virtual machines | VMware Workstation Pro (trial), VirtualBox (free), or Hyper-V (Windows built-in) |
+| **Windows Server 2022 ISO** | Domain Controller, PVWA, Target | Microsoft Evaluation Centre (free 180-day trial) |
+| **Red Hat Enterprise Linux 9.x ISO** | Vault OS | Red Hat Developer Subscription (free) or Rocky Linux 9 (free, compatible) |
+| **CyberArk Installation Packages** | Vault, PVWA, CPM, PSM | CyberArk Marketplace (trial license) or CyberArk Training Portal |
+| **CyberArk License File** | Component activation | Request from CyberArk sales or use training license |
+| **SQL Server Express** | PVWA database | Microsoft (free, included with PVWA installer) |
+| **Web Server Role (IIS)** | PVWA web host | Windows Server feature |
+
+### Obtaining CyberArk Software
+
+CyberArk does not offer a free "Community Edition" of the full PAM suite. However, beginners have several options:
+
+<Aside variant="info" title="Getting Access to CyberArk Software">
+**Option 1 — CyberArk Training Portal (Recommended for Students)**
+If you are enrolled in a CyberArk training program (including partner or academic programs), you get access to the CyberArk Training Portal which provides pre-configured lab VMs and installation media.
+
+**Option 2 — Trial License**
+Request a 30-day trial from the [CyberArk Marketplace](https://cyberark.com/trial) or through a CyberArk sales representative. Trials include full installation packages.
+
+**Option 3 — CyberArk Partner Program**
+If you work for a CyberArk partner or system integrator, you can access the CyberArk Partner Portal for evaluation licenses.
+
+**Option 4 — CyberArk Community Edition (Conjur)**
+For secrets management specifically, CyberArk offers [Conjur Open Source](https://github.com/cyberark/conjur) for free. This is limited to secrets management functionality but is a useful starting point.
+
+**Option 5 — Pre-Built Lab Images**
+Some training providers and cloud marketplaces offer pre-built CyberArk lab environments. These are typically paid but save significant setup time.
+</Aside>
+
+### Network Configuration
+
+Before deploying any VMs, plan your lab network:
+
+| Setting | Value |
+|---------|-------|
+| **Subnet** | 192.168.100.0/24 |
+| **Gateway** | 192.168.100.1 |
+| **DNS** | 192.168.100.10 (DC01 — will be configured later) |
+| **Hypervisor Network** | Host-only or internal (no internet required after downloads) |
+
+Create a **host-only** or **internal** virtual network in your hypervisor. Do not use NAT or Bridged — the lab should be isolated from your production network.
+
+<Steps>
+
+### Step 1: Deploy the Domain Controller (DC01)
+
+The Domain Controller provides authentication for the CyberArk environment. CyberArk components require Active Directory for user and service account management.
+
+#### 1.1 Create the VM
+
+```
+Virtual Machine Settings (VMware/Hyper-V/VirtualBox):
+  Name: DC01
+  OS: Windows Server 2022 (Desktop Experience)
+  vCPU: 4
+  RAM: 8192 MB (8 GB)
+  Disk: 80 GB (thin provisioned)
+  Network: Host-only / Internal (192.168.100.0/24)
+  ISO: Windows Server 2022 ISO
+```
+
+#### 1.2 Install Windows Server
+
+1. Boot from the Windows Server 2022 ISO
+2. Select **Windows Server 2022 Standard (Desktop Experience)**
+3. Accept the license terms
+4. Choose **Custom: Install Windows only (advanced)**
+5. Select the unallocated disk and click **Next**
+6. Wait for installation to complete (10-15 minutes)
+7. Set the administrator password when prompted (e.g., `L@bAdmin!2026`)
+8. Log in as Administrator
+
+#### 1.3 Configure IP and Hostname
+
+```powershell
+# Run PowerShell as Administrator
+
+# Set static IP
+New-NetIPAddress -InterfaceAlias "Ethernet0" `
+  -IPAddress 192.168.100.10 `
+  -PrefixLength 24 `
+  -DefaultGateway 192.168.100.1
+
+# Set DNS to self (will be the DC)
+Set-DnsClientServerAddress -InterfaceAlias "Ethernet0" -ServerAddresses 127.0.0.1
+
+# Rename computer
+Rename-Computer -NewName "DC01" -Restart
+```
+
+The server will restart. Log back in as Administrator.
+
+#### 1.4 Install Active Directory Domain Services
+
+```powershell
+# Install AD DS role
+Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools
+
+# Promote to Domain Controller (create new forest)
+# Use a .local or .lab domain — do NOT use a public domain name
+Install-ADDSForest `
+  -DomainName "cyberark.lab" `
+  -DomainNetbiosName "CYBERARK" `
+  -ForestMode "WinThreshold" `
+  -DomainMode "WinThreshold" `
+  -InstallDns:$true `
+  -SafeModeAdministratorPassword (ConvertTo-SecureString "L@bAdmin!2026" -AsPlainText -Force) `
+  -Force:$true
+```
+
+This will restart the server again. After reboot, log in as `CYBERARK\Administrator`.
+
+#### 1.5 Verify AD Installation
+
+```powershell
+# Check domain and forest info
+Get-ADDomain | Format-List Name, DNSRoot, DomainMode
+Get-ADForest | Format-List Name, ForestMode, RootDomain
+
+# Create organizational units for CyberArk
+New-ADOrganizationalUnit -Name "CyberArk" -Path "DC=cyberark,DC=lab"
+New-ADOrganizationalUnit -Name "ServiceAccounts" -Path "OU=CyberArk,DC=cyberark,DC=lab"
+New-ADOrganizationalUnit -Name "CyberArkAdmins" -Path "OU=CyberArk,DC=cyberark,DC=lab"
+New-ADOrganizationalUnit -Name "TargetServers" -Path "DC=cyberark,DC=lab"
+
+# Create service accounts for CyberArk components
+New-ADUser -Name "svc-vault" -SamAccountName "svc-vault" `
+  -UserPrincipalName "svc-vault@cyberark.lab" `
+  -Path "OU=ServiceAccounts,OU=CyberArk,DC=cyberark,DC=lab" `
+  -AccountPassword (ConvertTo-SecureString "Svc@ccount!2026" -AsPlainText -Force) `
+  -Enabled:$true -PasswordNeverExpires:$true
+
+New-ADUser -Name "svc-pvwa" -SamAccountName "svc-pvwa" `
+  -UserPrincipalName "svc-pvwa@cyberark.lab" `
+  -Path "OU=ServiceAccounts,OU=CyberArk,DC=cyberark,DC=lab" `
+  -AccountPassword (ConvertTo-SecureString "Svc@ccount!2026" -AsPlainText -Force) `
+  -Enabled:$true -PasswordNeverExpires:$true
+
+New-ADUser -Name "svc-cpm" -SamAccountName "svc-cpm" `
+  -UserPrincipalName "svc-cpm@cyberark.lab" `
+  -Path "OU=ServiceAccounts,OU=CyberArk,DC=cyberark,DC=lab" `
+  -AccountPassword (ConvertTo-SecureString "Svc@ccount!2026" -AsPlainText -Force) `
+  -Enabled:$true -PasswordNeverExpires:$true
+
+# Create administrative users
+New-ADUser -Name "PAM Admin" -SamAccountName "pamadmin" `
+  -UserPrincipalName "pamadmin@cyberark.lab" `
+  -Path "OU=CyberArkAdmins,OU=CyberArk,DC=cyberark,DC=lab" `
+  -AccountPassword (ConvertTo-SecureString "P@mAdmin!2026" -AsPlainText -Force) `
+  -Enabled:$true -PasswordNeverExpires:$true
+
+New-ADUser -Name "PAM Auditor" -SamAccountName "pamauditor" `
+  -UserPrincipalName "pamauditor@cyberark.lab" `
+  -Path "OU=CyberArkAdmins,OU=CyberArk,DC=cyberark,DC=lab" `
+  -AccountPassword (ConvertTo-SecureString "P@mAudit!2026" -AsPlainText -Force) `
+  -Enabled:$true -PasswordNeverExpires:$true
+
+# Add pamadmin to Domain Admins (required for initial setup)
+Add-ADGroupMember -Identity "Domain Admins" -Members "pamadmin"
+
+# Verify
+Get-ADUser -Filter * -SearchBase "OU=CyberArk,DC=cyberark,DC=lab" | Format-Table Name, SamAccountName
+```
+
+<Aside variant="tip" title="DNS Verification">
+Ensure DC01's DNS is working correctly. Run `Resolve-DnsName cyberark.lab` and `Resolve-DnsName dc01.cyberark.lab` to confirm. If DNS fails, check that the AD installation completed without errors and that the network adapter points to 127.0.0.1 for DNS.
+</Aside>
+
+### Step 2: Deploy the CyberArk Vault (VAULT01)
+
+The Vault is the heart of CyberArk — a hardened Linux server running the CyberArk Vault service. This is the most critical and sensitive component.
+
+#### 2.1 Create the VM
+
+| Setting | Value |
+|---------|-------|
+| **Name** | VAULT01 |
+| **OS** | RHEL 9.x or Rocky Linux 9.x (minimal install, no GUI) |
+| **vCPU** | 4 |
+| **RAM** | 16384 MB (16 GB) |
+| **Disk** | 200 GB (thin provisioned) |
+| **Network** | Same host-only/internal network as DC01 |
+
+<Aside variant="caution" title="Vault OS Requirements">
+CyberArk Vault requires a **Red Hat Enterprise Linux** derivative. The officially supported versions are RHEL 8.6+ and RHEL 9.0+. Rocky Linux and AlmaLinux are community-supported alternatives that work identically. Do NOT use Ubuntu or Debian — the Vault installer specifically targets RHEL-based distributions.
+</Aside>
+
+#### 2.2 Install the Operating System
+
+1. Boot from the RHEL/Rocky Linux ISO
+2. Select **Install Rocky Linux 9.x**
+3. Choose language and keyboard layout
+4. **Installation Destination**: Select the disk, keep automatic partitioning (or use LVM with separate `/` and `/var` volumes)
+5. **Software Selection**: Choose **Minimal Install** (no GUI needed)
+6. **Network & Hostname**:
+   - Set hostname: `vault01.cyberark.lab`
+   - Configure IPv4: **Manual**
+   - Address: `192.168.100.20`
+   - Netmask: `255.255.255.0`
+   - Gateway: `192.168.100.1`
+   - DNS: `192.168.100.10`
+7. **Root Password**: Set a strong password (e.g., `V@ultR00t!2026`)
+8. Begin installation
+9. After reboot, log in as `root`
+
+#### 2.3 Configure the Vault OS
+
+```bash
+# Update the system
+dnf update -y
+
+# Install required packages
+dnf install -y net-tools bind-utils vim wget curl tar gzip unzip \
+  lvm2 device-mapper-persistent-data nfs-utils
+
+# Disable unnecessary services
+systemctl stop firewalld
+systemctl disable firewalld
+systemctl stop postfix
+systemctl disable postfix
+
+# Disable SELinux (required by CyberArk Vault)
+# Edit /etc/selinux/config
+sed -i 's/^SELINUX=.*/SELINUX=disabled/' /etc/selinux/config
+
+# Set kernel parameters for CyberArk Vault
+cat >> /etc/sysctl.d/99-cyberark.conf << 'EOF'
+kernel.shmmax = 4294967295
+kernel.shmall = 1073741823
+kernel.sem = 1000 1024000 500 1024
+fs.file-max = 6553600
+net.core.somaxconn = 4096
+net.ipv4.ip_local_port_range = 11000 65535
+vm.max_map_count = 262144
+EOF
+
+# Apply kernel parameters
+sysctl -p /etc/sysctl.d/99-cyberark.conf
+
+# Increase file descriptor limits
+cat >> /etc/security/limits.d/99-cyberark.conf << 'EOF'
+* soft nofile 6553600
+* hard nofile 6553600
+* soft nproc 6553600
+* hard nproc 6553600
+EOF
+
+# Set system-wide ulimit
+echo "ulimit -n 6553600" >> /etc/profile
+
+# Reboot to apply SELinux change
+reboot
+```
+
+#### 2.4 Verify Network Connectivity
+
+```bash
+# After reboot, verify connectivity to DC01
+ping 192.168.100.10
+
+# Verify DNS resolution
+nslookup dc01.cyberark.lab 192.168.100.10
+
+# If DNS does not resolve, check /etc/resolv.conf
+cat /etc/resolv.conf
+# Should contain: nameserver 192.168.100.10
+```
+
+#### 2.5 Join VAULT01 to the Domain
+
+```bash
+# Install SSSD for domain integration
+dnf install -y sssd realmd oddjob oddjob-mkhomedir adcli samba-common
+
+# Discover the domain
+realm discover cyberark.lab
+
+# Join the domain
+echo "Svc@ccount!2026" | realm join --user=svc-vault cyberark.lab
+
+# Verify domain join
+realm list
+# Should show: domain-name: cyberark.lab
+#              configured: kerberos-member
+
+# Configure SSH to allow domain users
+echo "AllowUsers root pamadmin@cyberark.lab" >> /etc/ssh/sshd_config
+systemctl restart sshd
+```
+
+#### 2.6 Create Vault File System Structure
+
+```bash
+# Create the vault installation directory structure
+mkdir -p /opt/CyberArk/Vault
+mkdir -p /opt/CyberArk/Vault/Backup
+mkdir -p /var/log/cyberark/vault
+mkdir -p /var/cyberark/vault/db
+mkdir -p /var/cyberark/vault/conf
+
+# Create the vault user
+useradd -m -s /bin/bash -d /home/vault vault
+echo "V@ultUser!2026" | passwd --stdin vault
+
+# Set ownership
+chown -R vault:vault /opt/CyberArk
+chown -R vault:vault /var/log/cyberark
+chown -R vault:vault /var/cyberark
+```
+
+#### 2.7 Install CyberArk Vault
+
+<Aside variant="caution" title="Installation Media Required">
+The following steps assume you have obtained the CyberArk Vault installation package (`CyberArk_PAS_<version>_Vault.zip` or similar) from the CyberArk Marketplace or training portal. Transfer this file to VAULT01 using SCP or a shared folder.
+</Aside>
+
+```bash
+# Transfer the Vault installation package
+# From your local machine:
+# scp CyberArk_PAS_14.2_Vault.zip root@192.168.100.20:/tmp/
+
+# Or if using a shared folder in your hypervisor:
+cp /mnt/hgfs/software/CyberArk_PAS_14.2_Vault.zip /tmp/
+
+# Extract the installation package
+cd /tmp
+unzip CyberArk_PAS_14.2_Vault.zip -d vault-install
+cd vault-install
+
+# Make the installer executable
+chmod +x CyberArk_Vault_Install.sh
+
+# Run the Vault installer
+# The installer will prompt for:
+#   - Installation directory (default: /opt/CyberArk/Vault)
+#   - Vault database directory (default: /var/cyberark/vault/db)
+#   - Vault admin password (the initial Administrator password for the vault)
+#   - License file path
+
+./CyberArk_Vault_Install.sh
+
+# Follow the interactive prompts:
+# 1. Accept license agreement
+# 2. Installation path: /opt/CyberArk/Vault [Enter]
+# 3. Database path: /var/cyberark/vault/db [Enter]
+# 4. Vault Administrator password: V@ultAdmin!2026
+# 5. Confirm password: V@ultAdmin!2026
+# 6. License file: /tmp/vault-license.xml (provide the license file from CyberArk)
+# 7. Confirm installation [Y]
+
+# The installation takes 10-15 minutes. The vault service will start automatically.
+```
+
+#### 2.8 Verify Vault Installation
+
+```bash
+# Check vault service status
+systemctl status vaultd
+
+# Should show: Active: active (running)
+
+# Check vault process
+ps aux | grep vault
+# Should show the Vault server process running
+
+# Check vault log for any errors
+tail -50 /var/log/cyberark/vault/vault.log
+
+# Check vault port listening
+netstat -tlnp | grep 1858
+# Should show: LISTEN on port 1858 (CyberArk Vault default port)
+```
+
+<Aside variant="danger" title="Vault Security — Initial Actions">
+As soon as the vault is installed and running, secure it immediately:
+1. The vault is now listening on port 1858 — ensure ONLY PVWA01 (192.168.100.30) can reach it
+2. Record the Vault Administrator password in a secure location — if lost, you cannot recover the vault
+3. Do not make the vault accessible from the internet under any circumstances
+</Aside>
+
+### Step 3: Deploy PVWA + CPM + PSM (PVWA01)
+
+The PVWA server hosts the web interface, the CPM manages password policies, and the PSM proxies privileged sessions. In a lab environment, these can coexist on a single Windows Server, though production environments separate them.
+
+#### 3.1 Create the VM
+
+| Setting | Value |
+|---------|-------|
+| **Name** | PVWA01 |
+| **OS** | Windows Server 2022 (Desktop Experience) |
+| **vCPU** | 8 |
+| **RAM** | 16384 MB (16 GB) |
+| **Disk** | 150 GB (thin provisioned) |
+| **Network** | Same host-only/internal network |
+| **IP** | 192.168.100.30 |
+| **DNS** | 192.168.100.10 |
+| **Join Domain** | Yes — cyberark.lab |
+
+#### 3.2 Install and Configure Windows Server
+
+1. Install Windows Server 2022 (Desktop Experience)
+2. Set static IP:
+```powershell
+New-NetIPAddress -InterfaceAlias "Ethernet0" `
+  -IPAddress 192.168.100.30 `
+  -PrefixLength 24 `
+  -DefaultGateway 192.168.100.1
+Set-DnsClientServerAddress -InterfaceAlias "Ethernet0" -ServerAddresses 192.168.100.10
+```
+
+3. Rename and join domain:
+```powershell
+Rename-Computer -NewName "PVWA01"
+# After reboot, join domain
+Add-Computer -DomainName "cyberark.lab" -Credential CYBERARK\Administrator -Restart
+```
+
+4. After reboot, log in as `CYBERARK\pamadmin`
+
+#### 3.3 Install IIS and Prerequisites
+
+```powershell
+# Install IIS with required features
+Install-WindowsFeature -Name Web-Server, Web-WebServer, `
+  Web-Common-Http, Web-Default-Doc, Web-Dir-Browsing, `
+  Web-Http-Errors, Web-Static-Content, Web-Http-Redirect, `
+  Web-Health, Web-Http-Logging, Web-Custom-Logging, `
+  Web-Log-Libraries, Web-Request-Monitor, Web-Http-Tracing, `
+  Web-Performance, Web-Stat-Compression, Web-Dyn-Compression, `
+  Web-Security, Web-Filtering, Web-Basic-Auth, `
+  Web-Windows-Auth, Web-Digest-Auth, Web-Client-Auth, `
+  Web-Cert-Auth, Web-IP-Security, Web-URL-Auth, `
+  Web-App-Dev, Web-Net-Ext45, Web-Asp-Net45, `
+  Web-ISAPI-Ext, Web-ISAPI-Filter, `
+  Web-Mgmt-Tools, Web-Mgmt-Console, Web-Mgmt-Compat, `
+  Web-Metabase, Web-WMI, Web-Scripting-Tools, `
+  Web-Lgcy-Scripting -IncludeAllSubFeature -IncludeManagementTools
+
+# Install .NET Framework 4.8+ features
+Install-WindowsFeature -Name NET-Framework-45-Core, NET-Framework-45-Features, `
+  NET-WCF-HTTP-Activation45 -IncludeAllSubFeature
+
+# Install WebDAV and other IIS extras
+Install-WindowsFeature -Name Web-DAV-Publishing, Web-DAV-Redirector
+
+# Restart
+Restart-Computer
+```
+
+#### 3.4 Install SQL Server Express (for PVWA)
+
+```powershell
+# Download SQL Server Express (or use the one bundled with CyberArk installer)
+# The CyberArk PVWA installer includes SQL Server Express, or you can pre-install it
+
+# If installing separately:
+# 1. Download SQL2022-SSEI-Expr.exe from Microsoft
+# 2. Run: SQL2022-SSEI-Expr.exe /MediaType=Local /Action=Download
+# 3. Execute: SETUP.exe
+
+# For automated install from the CyberArk bundle:
+# Locate SQLServerExpressInstaller.exe in the CyberArk installation media
+# Run with default settings - the PVWA installer will configure it
+```
+
+#### 3.5 Install PVWA Component
+
+<Aside variant="caution" title="PVWA Installation Media">
+You need the CyberArk PVWA installation package (`CyberArk_PAS_<version>_PVWA.zip` or similar). Transfer it to PVWA01 via SCP from your host or shared folder.
+</Aside>
+
+```powershell
+# Extract the PVWA installation package
+# Assume the zip is at C:\Install\CyberArk_PAS_14.2_PVWA.zip
+
+Expand-Archive -Path "C:\Install\CyberArk_PAS_14.2_PVWA.zip" `
+  -DestinationPath "C:\Install\PVWA"
+
+# Run the PVWA installer
+cd "C:\Install\PVWA"
+.\CyberArk_PVWA_Install.exe
+
+# The installer wizard will guide you through:
+# 1. Welcome — Next
+# 2. License Agreement — Accept
+# 3. Installation Type — Select "PVWA Only"
+# 4. Vault Connection:
+#    - Vault IP: 192.168.100.20
+#    - Vault Port: 1858
+# 5. PVWA Configuration:
+#    - Website name: CyberArk
+#    - Port: 443 (HTTPS)
+# 6. Certificate — Select "Create self-signed certificate" (for lab only)
+# 7. Authentication — Select "CyberArk + LDAP"
+# 8. LDAP Configuration:
+#    - LDAP Server: dc01.cyberark.lab
+#    - Domain: cyberark.lab
+#    - Base DN: DC=cyberark,DC=lab
+#    - Bind DN: CN=svc-pvwa,OU=ServiceAccounts,OU=CyberArk,DC=cyberark,DC=lab
+#    - Bind Password: Svc@ccount!2026
+# 9. Database — Select SQL Server Express (local)
+# 10. Installation — Begin
+```
+
+#### 3.6 Verify PVWA Installation
+
+```powershell
+# Check IIS site
+Get-Website | Where-Object { $_.Name -eq "CyberArk" } | Format-List
+
+# Test HTTPS connectivity
+Invoke-WebRequest -Uri "https://localhost" -UseBasicParsing
+
+# Check PVWA logs
+Get-ChildItem "C:\CyberArk\PVWA\Logs\" | Sort-Object LastWriteTime -Descending | Select-Object -First 5
+```
+
+#### 3.7 Install CPM Component
+
+```powershell
+# Extract CPM installation package
+Expand-Archive -Path "C:\Install\CyberArk_PAS_14.2_CPM.zip" `
+  -DestinationPath "C:\Install\CPM"
+
+# Verify prerequisites
+# CPM requires:
+# - .NET Framework 4.8+
+# - The target application servers must be reachable (we will configure later)
+# - CPM service account must have local admin on target systems
+
+# Run the CPM installer
+cd "C:\Install\CPM"
+.\CyberArk_CPM_Install.exe
+
+# Installer wizard steps:
+# 1. Welcome — Next
+# 2. License — Accept
+# 3. Vault Connection:
+#    - Vault IP: 192.168.100.20
+#    - Vault Port: 1858
+# 4. CPM Service Account:
+#    - User: CYBERARK\svc-cpm
+#    - Password: Svc@ccount!2026
+# 5. Installation Path — Default (C:\CyberArk\CPM)
+# 6. Begin Installation
+
+# After installation, verify CPM service
+Get-Service -Name "CyberArk CPM" | Format-List Status, Name, DisplayName
+```
+
+#### 3.8 Install PSM Component
+
+```powershell
+# Extract PSM installation package
+Expand-Archive -Path "C:\Install\CyberArk_PAS_14.2_PSM.zip" `
+  -DestinationPath "C:\Install\PSM"
+
+# Run the PSM installer
+cd "C:\Install\PSM"
+.\CyberArk_PSM_Install.exe
+
+# Installer wizard steps:
+# 1. Welcome — Next
+# 2. License — Accept
+# 3. Vault Connection:
+#    - Vault IP: 192.168.100.20
+#    - Vault Port: 1858
+# 4. PSM Service Account:
+#    - User: CYBERARK\svc-pvwa (reuse the PVWA service account)
+#    - Password: Svc@ccount!2026
+# 5. Installation Path — Default (C:\CyberArk\PSM)
+# 6. PSM Shadow Users — Create local shadow users (accept defaults)
+# 7. Begin Installation
+
+# After installation, verify PSM service
+Get-Service -Name "CyberArk PSM" | Format-List Status, Name, DisplayName
+```
+
+### Step 4: Deploy Target Server (TARGET01)
+
+The target server is a system you will manage through CyberArk — typically a Windows or Linux server where privileged accounts will be discovered, vaulted, and managed.
+
+#### 4.1 Create Target VM
+
+| Setting | Value |
+|---------|-------|
+| **Name** | TARGET01 |
+| **OS** | Windows Server 2019/2022 (or Linux) |
+| **vCPU** | 4 |
+| **RAM** | 8192 MB |
+| **Disk** | 80 GB |
+| **Network** | Same host-only network |
+| **IP** | 192.168.100.40 (static) |
+| **DNS** | 192.168.100.10 |
+| **Domain** | Join to cyberark.lab |
+
+```powershell
+# On TARGET01, as Administrator:
+
+# Set static IP
+New-NetIPAddress -InterfaceAlias "Ethernet0" `
+  -IPAddress 192.168.100.40 `
+  -PrefixLength 24 `
+  -DefaultGateway 192.168.100.1
+Set-DnsClientServerAddress -InterfaceAlias "Ethernet0" -ServerAddresses 192.168.100.10
+
+# Rename and join domain
+Rename-Computer -NewName "TARGET01"
+# Restart, then:
+Add-Computer -DomainName "cyberark.lab" -Credential CYBERARK\Administrator -Restart
+```
+
+#### 4.2 Create Local Admin Account for Vaulting
+
+```powershell
+# On TARGET01, create a local admin account that we will vault in CyberArk
+$localAdminPassword = ConvertTo-SecureString "T@rgetL0cal!2026" -AsPlainText -Force
+New-LocalUser -Name "targetadmin" -Password $localAdminPassword -PasswordNeverExpires
+Add-LocalGroupMember -Group "Administrators" -Member "targetadmin"
+```
+
+### Step 5: End-to-End Verification
+
+Before moving on to configuration, verify all components are communicating:
+
+#### 5.1 Verify Network Connectivity
+
+| Source | Destination | Port | Test Command | Expected Result |
+|--------|------------|------|-------------|-----------------|
+| PVWA01 | VAULT01 | 1858 (TCP) | `Test-NetConnection 192.168.100.20 -Port 1858` | TcpTestSucceeded: True |
+| PVWA01 | DC01 | 389 (LDAP) | `Test-NetConnection 192.168.100.10 -Port 389` | TcpTestSucceeded: True |
+| PVWA01 | TARGET01 | 445 (SMB) | `Test-NetConnection 192.168.100.40 -Port 445` | TcpTestSucceeded: True |
+| VAULT01 | DC01 | 389 (LDAP) | `nmap -p 389 192.168.100.10` | Port 389 open |
+
+#### 5.2 Verify Vault Access
+
+```powershell
+# From PVWA01, verify vault connectivity using CyberArk's vault utility
+# Located at: C:\CyberArk\Vault\ (installed as part of PVWA)
+
+cd "C:\CyberArk\Vault"
+.\CreateCredFile.exe AppProvider "C:\temp\vault.cred" /Password V@ultAdmin!2026 /UserName Administrator /Ent
+```
+
+#### 5.3 Verify PVWA Web Access
+
+On your hypervisor host (or a machine that can reach the lab network):
+
+1. Add a route to the lab network if needed:
+   - For host-only networking, the hypervisor typically provides a virtual NIC on the same subnet
+2. Open a browser and navigate to: `https://192.168.100.30`
+3. You should see the CyberArk PVWA login page
+4. **Do NOT log in yet** — that is covered in the First Steps guide
+
+</Steps>
+
+## Deployment Troubleshooting
+
+### Vault Installation Failures
+
+| Symptom | Likely Cause | Solution |
+|---------|-------------|----------|
+| `vaultd` service fails to start | SELinux not disabled | Run `getenforce` — must return `Disabled`. Check `/etc/selinux/config` |
+| Vault service starts but port 1858 not listening | License file invalid | Verify license file with CyberArk. Check `/opt/CyberArk/Vault/logs/vault.log` |
+| Vault installation hangs at 95% | Disk space insufficient | Ensure at least 50 GB free on vault partition |
+| Cannot connect to vault from PVWA | Firewall blocking | Check `iptables -L` or ensure firewalld is stopped |
+
+### PVWA Installation Failures
+
+| Symptom | Likely Cause | Solution |
+|---------|-------------|----------|
+| PVWA page shows 500 error | IIS configuration incomplete | Re-run PVWA installer repair option. Check `C:\CyberArk\PVWA\Logs\` |
+| PVWA cannot connect to vault | Incorrect vault IP or port | Verify vault connectivity: `telnet 192.168.100.20 1858` |
+| HTTPS certificate warning | Self-signed cert in lab | Accept the warning in browser — this is normal for lab environments |
+| LDAP authentication fails | Incorrect base DN or bind credentials | Verify `dc01.cyberark.lab` is reachable. Test LDAP with: `Get-ADUser -Filter * -Server dc01.cyberark.lab` |
+
+### CPM Installation Failures
+
+| Symptom | Likely Cause | Solution |
+|---------|-------------|----------|
+| CPM service won't start | Service account lacks permissions | Ensure `svc-cpm` has `Log on as a service` right on PVWA01 |
+| CPM cannot connect to vault | Credential file missing or expired | Re-create the credential file using `CreateCredFile.exe` |
+| Password rotation fails | CPM cannot reach target system | Verify network path: `Test-NetConnection TARGET01 -Port 445` |
+
+## Lab Network Summary
+
+After successful deployment, your lab should have:
+
+```
+Host Machine (Hypervisor)
+  └── Host-Only Network: 192.168.100.0/24
+        ├── DC01:   192.168.100.10  (Domain Controller, DNS)
+        ├── VAULT01: 192.168.100.20 (CyberArk Vault)
+        ├── PVWA01:  192.168.100.30 (PVWA + CPM + PSM)
+        └── TARGET01: 192.168.100.40 (Target managed system)
+```
+
+## Key Takeaways
+
+- A CyberArk lab requires **four VMs** — Domain Controller, Vault (Linux), PVWA/CPM/PSM (Windows), and a target system
+- **DC01** must be deployed first — all other components depend on Active Directory for authentication
+- **VAULT01** runs on RHEL/Rocky Linux — the vault OS must be hardened and isolated immediately after installation
+- **PVWA01** consolidates the web interface, password management, and session proxy — production environments separate these
+- **Port 1858** is the CyberArk Vault's default listening port — all components connect to the vault through this port
+- The lab is now ready for CyberArk **First Steps** — creating safes, onboarding accounts, configuring CPM policies, and testing PSM sessions
+
+<Aside variant="tip" title="Next Steps">
+Your CyberArk lab is deployed. Now proceed to **[CyberArk First Steps & Configuration](/learn/privileged-access-management/cyberark-first-steps/)** where you will log into PVWA for the first time, create safes, configure CPM, and onboard your first privileged account.
+</Aside>

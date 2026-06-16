@@ -1,0 +1,221 @@
+---
+title: "Active Directory Basics"
+description: "Foundational concepts of Active Directory — domain structure, objects, Group Policy, authentication protocols, privileged groups, security hardening, and common attack vectors every PAM professional must understand."
+sidebar:
+  order: 11
+  label: "Active Directory Basics"
+tab: "iam-pam-professional"
+---
+
+Active Directory (AD) is the backbone of identity management in most enterprise environments. As a PAM professional, you will spend a significant portion of your time working with AD — auditing privileged groups, hardening domain controllers, detecting attacks, and integrating PAM tools with directory services.
+
+This page covers the AD fundamentals that every PAM practitioner needs to know.
+
+## AD Logical Structure
+
+Active Directory organises resources in a hierarchical structure:
+
+### Domain
+The core administrative unit in AD. A domain is a security boundary — policies and permissions within one domain do not extend to another by default. Each domain has its own database of objects (users, groups, computers) and is identified by a DNS name (e.g., `corp.example.com`).
+
+### Tree
+A collection of domains that share a contiguous DNS namespace. For example:
+```
+corp.example.com
+├── na.corp.example.com
+└── eu.corp.example.com
+```
+
+### Forest
+The outermost security boundary. A forest contains one or more domain trees that share:
+- A common schema (object definitions)
+- Global Catalog (searchable object index)
+- Enterprise-wide trust relationships
+- Forest-root domain (the first domain created)
+
+```
+Forest: example.com
+├── Domain: corp.example.com
+│   ├── Domain: na.corp.example.com
+│   └── Domain: eu.corp.example.com
+└── Domain: dev.example.com
+```
+
+### Organizational Units (OUs)
+Containers within a domain used to organise objects and delegate administrative authority. OUs are the finest granularity at which Group Policy can be applied.
+
+```
+OU: HQ
+├── OU: Users
+│   ├── User: John Smith
+│   └── User: Jane Doe
+├── OU: Computers
+│   ├── Computer: LAPTOP-001
+│   └── Computer: SERVER-001
+└── OU: Groups
+    ├── Group: Domain Admins
+    └── Group: SQL Admins
+```
+
+## AD Objects
+
+### User Objects
+Represent human users or service accounts. Each user object stores:
+- `sAMAccountName` — Legacy logon name (pre-Windows 2000)
+- `userPrincipalName` — Modern logon name (`user@domain.com`)
+- `objectSid` — Immutable security identifier
+- `tokenGroups` — Computed group membership at logon
+
+### Group Objects
+AD supports two group types:
+- **Security groups** — Used for access control (can be assigned permissions)
+- **Distribution groups** — Used for email distribution (cannot be assigned permissions)
+
+Three group scopes:
+
+| Scope | Members Can Include | Scope of Group |
+|-------|-------------------|----------------|
+| **Domain Local** | Users, groups from any domain | Local domain only |
+| **Global** | Users, groups from same domain | Any domain in forest |
+| **Universal** | Users, groups from any domain | Any domain in forest |
+
+### Computer Objects
+Machine accounts for workstations and servers joined to the domain. Each computer object has:
+- A machine account password (automatically rotated every 30 days by default)
+- A `userAccountControl` attribute indicating OS type, trust status, etc.
+
+## Group Policy
+
+Group Policy is AD's configuration management engine. Policies are defined in Group Policy Objects (GPOs) and linked to sites, domains, or OUs.
+
+### GPO Processing Order
+1. **Local** policy (local machine)
+2. **Site**-linked GPOs
+3. **Domain**-linked GPOs
+4. **OU**-linked GPOs (applied in order from parent OU to child OU)
+
+Later policies override earlier ones by default — a setting at the OU level can override a Domain-level setting.
+
+### Security-Relevant GPO Settings
+
+| Policy Path | Setting | Impact |
+|-------------|---------|--------|
+| `Computer Config > Windows Settings > Security Settings > Account Policies > Password Policy` | Minimum password length, complexity, age | Enforces credential hygiene |
+| `Computer Config > Windows Settings > Security Settings > Local Policies > User Rights Assignment` | Deny logon locally, Access this computer from network | Controls who can authenticate |
+| `Computer Config > Administrative Templates > System > Credentials Delegation` | Restrict delegation of credentials | Mitigates Pass-the-Hash |
+| `Computer Config > Administrative Templates > Windows Components > Windows Remote Management` | WinRM service settings | Controls remote management attack surface |
+
+## Authentication Protocols
+
+### Kerberos (Default)
+The primary authentication protocol in modern AD environments.
+
+```
+1. User → KDC (AS-REQ):           "I want to authenticate"
+2. KDC → User (AS-REP):           TGT (Ticket-Granting Ticket)
+3. User → KDC (TGS-REQ):          "I want access to FileServer"
+4. KDC → User (TGS-REP):          Service Ticket for FileServer
+5. User → FileServer:             Present Service Ticket
+```
+
+**Key components:**
+- **KDC** (Key Distribution Center) — Domain Controller running Kerberos service
+- **TGT** (Ticket-Granting Ticket) — Proof of authentication, encrypted with krbtgt hash
+- **Service Ticket** — Proof of authorisation for a specific service
+- **PAC** (Privilege Attribute Certificate) — Embedded group membership data
+
+### NTLM (Legacy — Fallback)
+Used when Kerberos is unavailable (e.g., older systems, workgroup scenarios, IP-based connections). NTLM is significantly weaker:
+
+- **NTLMv1** — 56-bit DES key, trivially brute-forced
+- **NTLMv2** — Stronger but still vulnerable to relay attacks
+
+As a PAM professional, you should **disable NTLM** wherever possible and monitor for NTLM usage as an indicator of legacy authentication that bypasses modern controls.
+
+## Critical Privileged Groups
+
+These groups grant varying levels of administrative privilege across an AD environment:
+
+| Group | Scope | Privilege | Attack Value |
+|-------|-------|-----------|-------------|
+| **Enterprise Admins** | Forest | Full admin on all domains | **Critical** — compromise = full forest takeover |
+| **Domain Admins** | Domain | Full admin on single domain | **Critical** — compromise = domain compromise |
+| **Administrators** | Domain | Local admin on domain controllers | **Critical** |
+| **Schema Admins** | Forest | Can modify AD schema | **High** — can backdoor authentication |
+| **Backup Operators** | Domain | Can read all files on DCs | **High** — can extract NTDS.dit |
+| **Server Operators** | Domain | Can logon to DCs interactively | **High** |
+| **Account Operators** | Domain | Can modify most accounts | **Medium** — can weaken other accounts |
+| **Print Operators** | Domain | Can logon to DCs | **Medium** — often leveraged in attacks |
+| **DNSAdmins** | Domain | Can manage DNS | **Medium** — can load arbitrary DLLs on DCs |
+
+## Common AD Attack Vectors
+
+PAM professionals must understand how attackers compromise AD to design effective controls.
+
+### Kerberoasting
+Attackers request service tickets for any user account with a `ServicePrincipalName` (SPN), then crack the service account password offline.
+
+**Detection**: Look for unusual volumes of TGS-REQ requests from a single source (Event ID 4769 with service name mismatch).
+
+**Mitigation**: Use long, complex passwords for service accounts; implement Managed Service Accounts (gMSA); monitor SPN-to-TGS activity.
+
+### DCSync Attack
+An attacker with Replicating Directory Changes permission can simulate a Domain Controller and request password hashes for any user.
+
+**Detection**: Event ID 4662 (Directory Service Access) with Access Mask 0x100 (Replication).
+
+**Mitigation**: Audit membership of groups with replication rights; implement tiering to keep DC administration separate.
+
+### Golden Ticket Attack
+An attacker with the KRBTGT hash can forge TGTs granting access to any resource as any user.
+
+**Detection**: Look for TGTs with unusually long lifetimes, anomalous user SIDs, or Kerberos PAC validation failures (Event ID 4768, 4771).
+
+**Mitigation**: Rotate the KRBTGT password twice after a compromise; implement Kerberos Armoring (FAST); monitor for forged PACs.
+
+### Pass-the-Hash (PtH)
+An attacker uses captured NTLM hashes instead of plaintext passwords to authenticate.
+
+**Detection**: Same source authenticating to multiple systems with different accounts; unusual NTLM authentication patterns.
+
+**Mitigation**: Enable Credential Guard; use LAPS for local admin passwords; implement network segmentation; restrict NTLM.
+
+### ACL Abuse
+Attackers modify AD objects' security descriptors to grant themselves privileges (e.g., adding `GenericAll` or `WriteOwner` to a privileged user).
+
+**Detection**: Event ID 5136 (Directory Service Change) on unusual attribute modifications.
+
+**Mitigation**: Configure AD ACL audit; implement tiered administration; use tools like PingCastle or BloodHound for continuous assessment.
+
+## AD Hardening for PAM
+
+### Tiering Model (ESAE / Red Forest)
+Microsoft recommends a tiered administration model:
+
+- **Tier 0**: Identity services (Domain Controllers, AD, ADFS, CA). Highest sensitivity.
+- **Tier 1**: Server infrastructure (member servers, server apps). Medium sensitivity.
+- **Tier 2**: User workstations and devices. Low sensitivity.
+
+Administrators from Tier 2 should **never** authenticate to Tier 0 devices.
+
+### Recommended Hardening Actions
+
+| Action | Priority | Impact |
+|--------|----------|--------|
+| Disable NTLMv1 | Critical | Eliminates relay and brute-force vectors |
+| Enable Credential Guard | Critical | Protects hashes in memory |
+| Deploy LAPS | Critical | Rotates local admin passwords automatically |
+| Implement PAWs | High | Dedicated admin workstations |
+| Restrict Replication Rights | Critical | Prevents DCSync |
+| Enable Advanced Audit Policy | High | Detects privilege abuse |
+| Rotate KRBTGT password | Event-driven | Post-compromise recovery |
+| Implement JIT for Tier 0 | High | Reduces standing privilege |
+
+## Key Takeaways
+
+- AD is a **security boundary**, not just an identity store — forest-wide trust means forest-wide risk
+- **Privileged groups** are the most targeted objects in any environment — audit them continuously
+- **Kerberos is fundamentally secure** but can be subverted if the KRBTGT or service account hashes are compromised
+- **ACL attacks** are sophisticated and hard to detect — use BloodHound and PingCastle to map attack paths
+- **Tiering** is the single most effective AD hardening strategy for PAM
+- **LAPS** and **Credential Guard** solve the two biggest local credential problems

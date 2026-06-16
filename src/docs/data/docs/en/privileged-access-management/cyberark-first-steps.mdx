@@ -1,0 +1,549 @@
+---
+title: "CyberArk First Steps & Configuration"
+description: "Your first CyberArk configuration session — PVWA login, safe creation, user management, CPM policy configuration, LDAP integration setup, and platform configuration for account onboarding."
+sidebar:
+  order: 16
+  label: "CyberArk First Steps"
+tab: "iam-pam-professional"
+---
+
+Your CyberArk lab is deployed. Now it is time to bring it to life. This guide walks through your **first configuration session** — from the initial PVWA login to a fully configured PAM platform ready to manage privileged accounts.
+
+<Aside variant="info" title="Prerequisites">
+You must have completed the **[CyberArk Lab Deployment](/learn/privileged-access-management/cyberark-lab-deployment/)** guide and have all four VMs running. If you are using an existing CyberArk environment, the concepts still apply but some steps may differ.
+</Aside>
+
+## What You Will Accomplish
+
+By the end of this guide, you will have:
+
+1. Logged into PVWA as the Vault Administrator
+2. Created your first Safe for credential storage
+3. Created administrative users with appropriate roles
+4. Created a CPM policy for automated password management
+5. Configured LDAP directory integration
+6. Verified CPM is operational and communicating with the vault
+7. Verified PSM is operational
+
+## First PVWA Login
+
+### Accessing PVWA
+
+1. From your host machine (or any machine that can reach `192.168.100.30`), open a browser
+2. Navigate to: `https://192.168.100.30`
+
+<Aside variant="caution" title="HTTPS Certificate Warning">
+You will see a certificate warning because the lab uses a self-signed certificate. This is **normal and safe** in a lab environment. Click **Advanced** → **Proceed to 192.168.100.30 (unsafe)** to continue.
+</Aside>
+
+3. You should see the CyberArk PVWA login page:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                                                              │
+│                    CyberArk                                │
+│              Password Vault Web Access                       │
+│                                                              │
+│                                                              │
+│    ┌─────────────────────────────────────────────────┐      │
+│    │  Username:  ____________________                │      │
+│    │                                                 │      │
+│    │  Password:  ____________________                │      │
+│    │                                                 │      │
+│    │  ┌─────────────────────────────────────────┐   │      │
+│    │  │              SIGN IN                    │   │      │
+│    │  └─────────────────────────────────────────┘   │      │
+│    │                                                 │      │
+│    │  [x] Authentication: CyberArk                   │      │
+│    └─────────────────────────────────────────────────┘      │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+4. Log in with the **Vault Administrator** credentials created during Vault installation:
+   - **Username**: `Administrator`
+   - **Password**: `V@ultAdmin!2026` (or whatever you set during vault installation)
+   - **Authentication**: `CyberArk`
+
+### PVWA Interface Overview
+
+After successful login, you will see the PVWA main dashboard:
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│ CyberArk PVWA  │  ☰ Menu  │  Administrator  │  ⚙ Settings  │  👤 Logout │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                           │
+│  ┌─── SIDEBAR ────────────────────────────────────────────────────────┐  │
+│  │                                                                     │  │
+│  │  ◆ Dashboard                                                        │  │
+│  │  ◆ Accounts                                                         │  │
+│  │  ◆ Safes                                                            │  │
+│  │  ◆ Policies                                                         │  │
+│  │  ◆ Users                                                            │  │
+│  │  ◆ Platforms                                                        │  │
+│  │  ◆ Audit                                                            │  │
+│  │  ◆ Applications                                                     │  │
+│  │  ◆ Reports                                                          │  │
+│  │                                                                     │  │
+│  └─────────────────────────────────────────────────────────────────────┘  │
+│                                                                           │
+│  Main Content Area: Welcome Dashboard                                     │
+│  ┌─────────────────────────────────────────────────────────────────────┐  │
+│  │  Welcome to CyberArk Privileged Access Security                     │  │
+│  │                                                                     │  │
+│  │  [Quick Start] [Documentation] [Support]                            │  │
+│  │                                                                     │  │
+│  │  Summary:                                                           │  │
+│  │  ┌──────────────┬──────────────┬──────────────┬──────────────┐     │  │
+│  │  │   0 Safes    │   0 Accounts │  0 CPM Users │  0 Platforms │     │  │
+│  │  └──────────────┴──────────────┴──────────────┴──────────────┘     │  │
+│  └─────────────────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+**Key navigation areas:**
+
+| Menu Item | Purpose | First Use |
+|-----------|---------|-----------|
+| **Dashboard** | Overview of vault health, recent activity, alerts | Check after each configuration change |
+| **Accounts** | Search, view, and manage privileged accounts | After onboarding accounts |
+| **Safes** | Create and manage safes (logical credential containers) | **Immediately — first task** |
+| **Policies** | Define CPM password management policies | After safe creation |
+| **Users** | Create and manage vault users and groups | After safe creation |
+| **Platforms** | Define target system connection profiles | Default platforms are pre-installed |
+| **Audit** | View all vault activity logs | Continuous — check periodically |
+| **Reports** | Generate compliance and operational reports | After accounts are onboarded |
+
+## Creating Your First Safe
+
+A **Safe** is a logical container within the CyberArk Vault that stores and manages privileged credentials. Every credential in CyberArk belongs to exactly one safe. Safes are the primary mechanism for organising access control — users and groups are granted permissions at the safe level.
+
+### Safe Naming Convention
+
+In production, you must establish a consistent safe naming convention before creating safes. Common conventions include:
+
+```
+Pattern: [Environment]-[SystemType]-[AccessLevel]
+
+Examples:
+  PROD-Win-LocalAdmins        # Production Windows local admin accounts
+  PROD-Linux-Root             # Production Linux root accounts
+  DEV-SQL-ServiceAccounts     # Development SQL service accounts
+  CORP-Domain-Admins          # Corporate domain admin accounts
+  SHARED-BreakGlass           # Emergency break-glass accounts
+  INFRA-Network-Devices       # Network device credentials
+```
+
+For your lab, you will create four safes covering typical use cases:
+
+| Safe Name | Purpose | CPM Policy | Access Level |
+|-----------|---------|------------|-------------|
+| `LAB-Win-LocalAdmins` | Windows local admin passwords | Rotate every 30 days | PAM Admins only |
+| `LAB-Linux-Root` | Linux root passwords | Rotate every 30 days | PAM Admins only |
+| `LAB-Service-Accounts` | Domain service accounts | Rotate every 90 days | PAM Admins + Operators |
+| `LAB-BreakGlass` | Emergency access accounts | Manual rotation, no auto-expire | Vault Admin only |
+
+### Create a Safe — Step by Step
+
+<Steps>
+
+#### Navigate to Safe Management
+
+In PVWA, click the **☰ Menu** → **Safes** → **Add Safe**.
+
+#### Configure Safe Properties
+
+Fill in the safe creation form:
+
+| Field | Value | Explanation |
+|-------|-------|-------------|
+| **Safe Name** | `LAB-Win-LocalAdmins` | Follow the naming convention |
+| **Description** | `Lab Windows local administrator accounts` | Clear documentation of purpose |
+| **Location** | `\` (Root) | Keep all lab safes at root level |
+| **Safe Type** | `General` | Default safe type for credential storage |
+
+#### Configure Safe Settings
+
+| Setting | Value | Reason |
+|---------|-------|--------|
+| **Allow retrieval of passwords** | ✅ Enabled | Users must be able to check out passwords |
+| **Allow listing of content** | ✅ Enabled | Users must be able to see accounts in the safe |
+| **Allow administrative access** | ❌ Disabled | Restrict to Vault Admin only |
+| **Allow automatic password management** | ✅ Enabled | CPM must manage passwords in this safe |
+| **Require dual approval for password retrieval** | ❌ Disabled (lab) | Enable in production for high-risk safes |
+| **Require reason for access** | ✅ Enabled | Every access must be justified |
+| **Enable session isolation** | ❌ Disabled (lab) | Enable in production for sensitive systems |
+| **Password complexity** | `Default` | Will use CPM policy settings |
+| **Lock after days of inactivity** | `0` (no lock) | Lab setting only |
+
+#### Add Members (Safe Permissions)
+
+CyberArk permissions are granular — you grant specific capabilities to users or groups on each safe. For this lab safe, grant yourself full access:
+
+Click **Add Member** → Select `Administrator` → Assign these permissions:
+
+| Permission Category | Permission | Description |
+|--------------------|------------|-------------|
+| **Access** | List accounts | View accounts in the safe |
+| **Access** | Retrieve accounts | Check out passwords |
+| **Access** | Add accounts | Onboard new accounts |
+| **Access** | Update account properties | Modify account settings |
+| **Access** | Delete accounts | Remove accounts from safe |
+| **Management** | Initiate CPM password management | Trigger manual password rotation |
+| **Management** | Specify next password | Manually set the next password value |
+| **Management** | Access without confirmation | Bypass dual control (if enabled) |
+| **Audit** | View audit log | See all actions on this safe |
+
+Click **OK** to create the safe.
+
+<Aside variant="tip" title="Safe Permissions Best Practice">
+In production, follow the principle of **least privilege** — grant only the permissions each role needs:
+- **Vault Admins**: Full access to all safes (limited number of people)
+- **PAM Operators**: Retrieve and list accounts in assigned safes
+- **Application Identities**: Add/update accounts via API only (no retrieve)
+- **Auditors**: View audit log only
+
+For your lab, granting yourself everything is fine — you are learning.
+</Aside>
+
+#### Create Remaining Safes
+
+Repeat the process for the remaining three safes:
+
+| Safe Name | Distinct Settings |
+|-----------|-------------------|
+| `LAB-Linux-Root` | Same as above, add note in description |
+| `LAB-Service-Accounts` | Enable "Allow automatic password management" |
+| `LAB-BreakGlass` | Disable "Allow automatic password management" (manual rotation only) |
+
+**Verify safes are created:**
+
+Go to **☰ Menu** → **Safes**. You should see all four safes listed:
+
+```
+Name                     │ Type    │ Accounts │ CPM Policy
+─────────────────────────┼─────────┼──────────┼─────────────
+LAB-Win-LocalAdmins      │ General │ 0        │ None
+LAB-Linux-Root           │ General │ 0        │ None
+LAB-Service-Accounts     │ General │ 0        │ None
+LAB-BreakGlass           │ General │ 0        │ None
+```
+
+</Steps>
+
+## Creating Vault Users and Groups
+
+Now you need to create vault users so that different personas can interact with CyberArk. You will create three user categories:
+
+| User | Role | Purpose |
+|------|------|---------|
+| `pamadmin` | Safe Admin | Day-to-day PAM administration |
+| `pamauditor` | Auditor | Review access logs and generate reports |
+| `helpdesk_user` | Operator | Check out passwords for support tasks |
+
+### Create a Vault User
+
+<Steps>
+
+#### Navigate to User Management
+
+In PVWA, go to **☰ Menu** → **Users** → **Add User**.
+
+#### Configure User Properties
+
+For the **pamadmin** user:
+
+| Field | Value | Explanation |
+|-------|-------|-------------|
+| **Username** | `pamadmin` | Matches the AD user created earlier |
+| **Full Name** | `PAM Administrator` | Display name |
+| **Email** | `pamadmin@cyberark.lab` | For notifications |
+| **Authentication Method** | `CyberArk` | Vault-native authentication (we will add LDAP later) |
+| **Password** | `P@mAdmin!2026` | Set a strong password |
+| **User Type** | `Safe Admin` | Can manage safes and permissions (but not vault configuration) |
+| **Disabled** | `No` | Account is active |
+
+<Aside variant="tip" title="User Types Explained">
+- **Vault Admin**: Full system configuration — user management, policy creation, system settings. Only 2-3 people should have this role.
+- **Safe Admin**: Manage safes, onboard accounts, define access permissions. Most PAM team members get this role.
+- **Auditor**: Read-only access to audit logs and reports. Cannot view passwords.
+- **Operator**: Retrieve passwords, request access, connect via PSM. No configuration access.
+- **User**: Request access to specific accounts, no administration.
+- **Application Identity**: API-based credential retrieval via AIM. No interactive login.
+</Aside>
+
+#### Configure Safe Permissions for pamadmin
+
+Now grant `pamadmin` appropriate access to the safes:
+
+1. Go to **☰ Menu** → **Safes** → Select `LAB-Win-LocalAdmins`
+2. Click **Members** → **Add Member**
+3. Select `pamadmin`
+4. Grant permissions:
+   - **Access**: List accounts, Retrieve accounts, Add accounts, Update account properties, Delete accounts
+   - **Management**: Initiate CPM password management
+   - **Audit**: View audit log
+5. Click **OK**
+6. Repeat for `LAB-Linux-Root` and `LAB-Service-Accounts`
+7. For `LAB-BreakGlass`, grant `pamadmin` only **List accounts** and **Retrieve accounts** (restrictive access)
+
+#### Create Auditor User
+
+Create `pamauditor` with **Auditor** user type. Grant **View audit log** only on all safes.
+
+#### Create Operator User
+
+Create `helpdesk_user` with **Operator** user type. Grant **List accounts** and **Retrieve accounts** on `LAB-Service-Accounts` only.
+
+</Steps>
+
+### Verify Users and Permissions
+
+```powershell
+# From PVWA01, you can use the CyberArk CLI utilities to verify
+cd "C:\CyberArk\Vault"
+
+# List vault users (requires Vault Admin)
+.\PACLI.exe VAULTADMIN Listusers
+
+# Check specific user permissions
+.\PACLI.exe VAULTADMIN GetUser -user pamadmin
+```
+
+Alternatively, log out of PVWA as `Administrator` and log back in as `pamadmin` to verify permissions are working.
+
+## Configuring CPM (Password Policy)
+
+The Central Policy Manager automates password management — verification, rotation, and reconciliation. Before CPM can manage any accounts, you must define a **CPM Policy**.
+
+### What is a CPM Policy?
+
+A CPM Policy defines **how** passwords are managed for accounts assigned to that policy:
+
+| Policy Element | What It Controls |
+|----------------|-----------------|
+| **Rotation Frequency** | How often the password is changed (1-365 days) |
+| **Password Complexity** | Character types, length, rules for generated passwords |
+| **Verification Frequency** | How often CPM checks that the password in the vault matches the target system |
+| **Reconciliation** | What CPM does if the vault password does not match the target (auto-fix) |
+| **Post-Rotation Actions** | What happens after rotation (verify only, full verification, notify) |
+
+### Create a CPM Policy
+
+<Steps>
+
+#### Navigate to Policy Management
+
+In PVWA, go to **☰ Menu** → **Policies** → **Add Policy**.
+
+#### Configure Policy — General Settings
+
+| Field | Value | Explanation |
+|-------|-------|-------------|
+| **Policy Name** | `LAB-Standard-Rotation-30` | Descriptive name reflecting purpose |
+| **Description** | `Standard 30-day rotation for lab Windows/Linux accounts` | |
+| **Policy Type** | `CPM Password Management` | |
+| **Enabled** | ✅ | Policy is active |
+
+#### Configure Password Complexity
+
+| Setting | Value | Rationale |
+|---------|-------|-----------|
+| **Minimum Password Length** | `25` | 25+ characters for privileged accounts |
+| **Maximum Password Length** | `30` | Keep within manageable range |
+| **Uppercase (A-Z)** | ✅ Enabled | Mandatory character type |
+| **Lowercase (a-z)** | ✅ Enabled | Mandatory character type |
+| **Digits (0-9)** | ✅ Enabled | Mandatory character type |
+| **Special Characters (!@#$%...)** | ✅ Enabled | Mandatory character type — essential for complexity |
+| **Restrict Consecutive Characters** | `3` | No more than 3 identical consecutive characters |
+| **Exclude Characters** | (leave empty) | Optionally exclude ambiguous characters like `l`, `1`, `O`, `0` |
+
+#### Configure Rotation Settings
+
+| Setting | Value | Rationale |
+|---------|-------|-----------|
+| **Rotation Frequency** | `30` days | Standard for interactive privileged accounts |
+| **Rotation Method** | `Automatic` | CPM rotates without manual intervention |
+| **Change Password After** | `Check-in` | Rotate immediately after each checkout (zero-standing) |
+| **Post-Rotation Action** | `Verify Password Change` | CPM confirms the new password works on the target |
+| **Verify Password Frequency** | `1` day | Daily verification — detect drift within 24 hours |
+
+<Aside variant="caution" title="Rotation Method: Automatic vs. Manual">
+- **Automatic**: CPM rotates the password on the defined schedule without human intervention. Use for most accounts.
+- **Manual**: CPM generates a new password but does NOT apply it — an administrator must manually apply the change. Use for accounts where automatic rotation would break critical processes (e.g., application service accounts that cannot tolerate password changes during business hours).
+</Aside>
+
+#### Configure Reconcile Settings
+
+| Setting | Value | Rationale |
+|---------|-------|-----------|
+| **Reconcile on Verification Failure** | ✅ Enabled | If password mismatch detected, CPM auto-fixes |
+| **Reconcile Method** | `Set Password` | CPM sets the vault password on the target (requires sufficient privileges) |
+| **Reconcile Frequency** | `1` day | Check for drift daily |
+
+#### Assign Policy to Safes
+
+Click **Assign Safes** → Select `LAB-Win-LocalAdmins`, `LAB-Linux-Root`, and `LAB-Service-Accounts`.
+
+Click **Create** to save the policy.
+
+#### Create Additional Policies
+
+| Policy Name | Rotation | Password Length | Target Safes | Use Case |
+|-------------|----------|----------------|-------------|----------|
+| `LAB-Service-90day` | 90 days | 50 chars | LAB-Service-Accounts | Service accounts (longer intervals reduce disruption risk) |
+| `LAB-HighSecurity-7day` | 7 days | 30 chars | LAB-BreakGlass (if added) | High-security accounts rotated frequently |
+| `LAB-Domain-Admin-30day` | 30 days | 30 chars | LAB-Win-LocalAdmins | Domain admin accounts |
+
+</Steps>
+
+### Verify CPM is Operational
+
+```powershell
+# On PVWA01, check CPM service status
+Get-Service "CyberArk CPM"
+
+# If Status is not "Running":
+Start-Service "CyberArk CPM"
+
+# Check CPM logs for errors
+Get-Content "C:\CyberArk\CPM\Logs\CPM.log" -Tail 50
+```
+
+In PVWA, go to **☰ Menu** → **Dashboard**. The CPM status should show as **Connected** or **Operational**.
+
+## Configuring LDAP Directory Integration
+
+LDAP integration allows users to authenticate to PVWA using their Active Directory credentials instead of separate vault credentials. This is essential for production deployments.
+
+<Steps>
+
+### Navigate to LDAP Configuration
+
+In PVWA, go to **☰ Menu** → **Administration** → **Options** → **Authentications** → **LDAP**.
+
+### Add LDAP Directory
+
+Click **Add Directory** and configure:
+
+| Field | Value | Explanation |
+|-------|-------|-------------|
+| **Directory Name** | `CyberArk Lab AD` | Display name for this directory |
+| **Domain** | `cyberark.lab` | Your AD domain |
+| **LDAP Server Address** | `dc01.cyberark.lab` | Domain Controller hostname |
+| **LDAP Port** | `389` | Standard LDAP (non-SSL for lab) |
+| **Use SSL** | ❌ Disabled | Enable in production with LDAPS (port 636) |
+| **Base DN** | `DC=cyberark,DC=lab` | Root of the AD tree |
+| **Bind User DN** | `CN=svc-pvwa,OU=ServiceAccounts,OU=CyberArk,DC=cyberark,DC=lab` | Service account for LDAP queries |
+| **Bind User Password** | `Svc@ccount!2026` | Password for the bind account |
+| **Group Base DN** | `OU=CyberArk,DC=cyberark,DC=lab` | Where to search for groups |
+
+### Test LDAP Connection
+
+Click **Test Connection**. You should see a success message.
+
+If the test fails, check:
+
+```powershell
+# From PVWA01, test LDAP connectivity
+Test-NetConnection dc01.cyberark.lab -Port 389
+
+# Test LDAP query using PowerShell
+Get-ADUser -Filter * -Server dc01.cyberark.lab -SearchBase "DC=cyberark,DC=lab"
+```
+
+### Map LDAP Groups to Vault Roles
+
+| LDAP Group | Vault Role | Purpose |
+|------------|-----------|---------|
+| `CYBERARK\Domain Admins` | Vault Admin | Full vault access |
+| `CYBERARK\CyberArkAdmins` | Safe Admin | PAM administration |
+| `CYBERARK\Domain Users` | User | Basic access |
+
+To configure:
+1. Click **Group Mapping**
+2. Add each group and assign the corresponding vault role
+3. Click **Save**
+
+### Enable LDAP Authentication
+
+1. Go to **Authentication Methods**
+2. Enable **LDAP** as an authentication source
+3. Set the authentication order (e.g., CyberArk first, then LDAP)
+4. Click **Apply**
+
+</Steps>
+
+### Test LDAP Authentication
+
+1. Log out of PVWA
+2. On the login page, change the authentication method to **LDAP**
+3. Log in as `CYBERARK\pamadmin` with password `P@mAdmin!2026`
+4. You should successfully authenticate via LDAP
+
+## Verifying PSM Installation
+
+PSM (Privileged Session Manager) provides session proxying and recording. Verify it is installed correctly.
+
+```powershell
+# On PVWA01, check PSM service
+Get-Service "CyberArk PSM"
+
+# Check PSM registration in vault
+# In PVWA, go to ☰ Menu → Administration → PSM Management
+# You should see PVWA01 listed as a PSM server
+
+# Check PSM log
+Get-Content "C:\CyberArk\PSM\Logs\PSM.log" -Tail 30
+```
+
+If PSM is not listed in the vault, register it:
+
+```powershell
+# From the PSM installation directory
+cd "C:\CyberArk\PSM"
+.\PSMRegistrationTool.exe -Register -VaultIP 192.168.100.20 -VaultPort 1858
+```
+
+## Initial Configuration Checklist
+
+Use this checklist to confirm your CyberArk environment is ready:
+
+| # | Task | Status | Verification Method |
+|---|------|--------|-------------------|
+| 1 | PVWA accessible via HTTPS | ☐ | Browse to `https://192.168.100.30` |
+| 2 | Vault Administrator can log in | ☐ | Login with Administrator / V@ultAdmin!2026 |
+| 3 | Safes created (4 minimum) | ☐ | Safes page shows LAB-* safes |
+| 4 | Users created (pamadmin, pamauditor, helpdesk_user) | ☐ | Users page lists all three |
+| 5 | Safe permissions granted | ☐ | Each user sees correct safes |
+| 6 | CPM policy created and assigned | ☐ | Policies page shows LAB-Standard-Rotation-30 |
+| 7 | CPM service running | ☐ | Dashboard shows CPM connected |
+| 8 | LDAP directory configured | ☐ | LDAP test connection succeeds |
+| 9 | LDAP authentication works | ☐ | Login as CYBERARK\pamadmin via LDAP |
+| 10 | PSM registered and running | ☐ | PSM Management shows PVWA01 |
+
+## Common First-Configuration Issues
+
+| Problem | Symptom | Solution |
+|---------|---------|----------|
+| Cannot log in as Administrator | "Invalid credentials" | Use the vault Administrator password set during vault installation, NOT the AD Administrator password |
+| LDAP test fails | "Cannot connect to LDAP server" | Verify DC01 is running. Check `Test-NetConnection dc01.cyberark.lab -Port 389` |
+| CPM shows "Disconnected" in dashboard | CPM service not running | `Start-Service "CyberArk CPM"`. Check CPM logs at `C:\CyberArk\CPM\Logs\` |
+| Cannot create safe | "Insufficient permissions" | Only Vault Admin and Safe Admin user types can create safes. Verify your user type |
+| Safe shows "No CPM Policy" | Policy not assigned | Go to Policies → Edit Policy → Assign Safes |
+| PSM not listed in vault | PSM not registered | Run `PSMRegistrationTool.exe -Register` on PVWA01 |
+| Browser shows "This site is not secure" | Self-signed certificate | This is expected in lab. Proceed past the warning |
+
+## Key Takeaways
+
+- **Safe creation is the first administrative task** — safes are the fundamental organisational unit for credentials and permissions in CyberArk
+- **User types determine capability scope** — Vault Admin (full system), Safe Admin (credential management), Auditor (read-only), Operator (credential retrieval), and User (request-based)
+- **CPM policies automate password hygiene** — define rotation frequency, complexity, verification, and reconciliation settings per safe or account type
+- **LDAP integration enables single sign-on** — users authenticate with their existing AD credentials instead of managing separate vault passwords
+- **Permission assignment is granular** — each safe can have unique permissions for each user, enabling precise access control following least privilege
+- **Verification is continuous** — CPM verifies passwords daily and reconciles mismatches automatically, ensuring vault accuracy
+
+<Aside variant="info" title="Next Steps">
+Your CyberArk environment is now configured and ready for action. Proceed to **[CyberArk Operations & Account Onboarding](/learn/privileged-access-management/cyberark-operations/)** to onboard your first privileged account, test password rotation, configure PSM for session management, and learn day-to-day operational tasks.
+</Aside>
