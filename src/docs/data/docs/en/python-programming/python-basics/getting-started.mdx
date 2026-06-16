@@ -1,0 +1,106 @@
+---
+title: "Getting Started with Python"
+description: "Install Python, set up your environment, and write your first program"
+sidebar:
+  order: 1
+  label: "Getting Started"
+tab: "python-programming"
+---
+
+Python is a high-level, interpreted programming language known for its readability and versatility. Let's get you set up and writing code.
+
+## Installing Python
+
+Download Python from [python.org](https://python.org) (version 3.11+ recommended). During installation on Windows, check **"Add Python to PATH"**.
+
+Verify the installation:
+
+```python
+python --version
+# Python 3.12.0
+```
+
+## The Python REPL
+
+Python includes an interactive shell called the **REPL** (Read-Eval-Print Loop). Type `python` in your terminal to start it:
+
+```python
+>>> print("Hello, Python!")
+Hello, Python!
+>>> 2 + 3
+5
+>>> exit()
+```
+
+## Your First Python Script
+
+Create a file called `hello.py`:
+
+```python
+# hello.py
+print("Hello, Python!")
+```
+
+Run it:
+
+```bash
+python hello.py
+# Hello, Python!
+```
+
+## Python Syntax at a Glance
+
+Python uses **indentation** instead of braces to define code blocks:
+
+```python
+# No semicolons needed
+name = "Alice"
+
+# Indentation matters — 4 spaces is standard
+if name == "Alice":
+    print("Hello, Alice!")
+else:
+    print("Hello, stranger!")
+
+# Comments use #
+```
+
+<Aside variant="tip">
+  Python's `print()` function is your best debugging friend. Use it freely as you learn.
+</Aside>
+
+## Using the Help System
+
+Python's built-in `help()` function is invaluable:
+
+```python
+>>> help(print)
+# Shows documentation for the print function
+
+>>> help(str)
+# Shows all methods available on strings
+```
+
+## Writing Clean Python
+
+Python enforces clean code through its syntax:
+
+```python
+# ✅ Pythonic — clear and readable
+numbers = [1, 2, 3, 4, 5]
+squares = [n ** 2 for n in numbers]
+
+# ❌ Not Pythonic (but works)
+squares = []
+for n in [1, 2, 3, 4, 5]:
+    squares.append(n ** 2)
+```
+
+## Key Takeaways
+
+- Python uses indentation for code blocks — be consistent with 4 spaces
+- The REPL is great for experimenting
+- `print()` and `help()` are your primary tools
+- Python values readability and simplicity
+
+Up next: variables, data types, and the core building blocks of Python.

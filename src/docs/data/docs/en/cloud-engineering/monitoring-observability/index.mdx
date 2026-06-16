@@ -1,0 +1,23 @@
+---
+title: "Module 10: Monitoring & Observability"
+description: "Learn to implement observability across cloud environments using metrics, logs, traces, and alerting to maintain reliable systems at scale."
+sidebar:
+  order: 0
+  label: "Module Overview"
+tab: "cloud-engineering"
+---
+
+
+Monitoring and observability are what separate reactive firefighting from proactive operations. This module teaches you to instrument cloud workloads so you can answer three questions at any moment: *What is happening?*, *Why is it happening?*, and *What do we need to fix?*
+
+Observability rests on three pillars: **metrics** (numeric measurements over time), **logs** (discrete event records with timestamps), and **traces** (end-to-end request paths across distributed services). Each pillar provides a different lens into system behavior. Metrics tell you *when* something went wrong, logs tell you *what* happened at that moment, and traces tell you *where* in the service graph the failure occurred.
+
+We begin with metrics and logging on each major provider — CloudWatch on AWS, Azure Monitor, and GCP Cloud Monitoring — including agent-based log collection and structured logging best practices. Next we cover distributed tracing and APM with AWS X-Ray and the vendor-neutral OpenTelemetry standard. You will learn how OpenTelemetry's collector architecture lets you export telemetry to any backend, avoiding lock-in.
+
+The third section focuses on dashboards and alerting using Grafana — connecting it to cloud data sources, building actionable dashboards, defining SLOs and SLIs, and preventing alert fatigue through careful threshold design.
+
+<Aside variant="info">
+The module project walks you through deploying a full monitoring stack: CloudWatch custom metrics and logs, X-Ray distributed tracing, and Grafana dashboards wired to both AWS and Prometheus data sources.
+</Aside>
+
+By the end of Module 10 you will be able to instrument any cloud application, build dashboards that surface real signals, and configure alerting that notifies the right person at the right time.

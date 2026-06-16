@@ -1,0 +1,270 @@
+---
+title: "Decorators & Context Managers in Depth"
+description: "Advanced patterns for decorators and context managers"
+sidebar:
+  order: 2
+  label: "Decorators & Context Managers"
+tab: "python-programming"
+---
+
+## Decorators with Arguments
+
+```python
+from functools import wraps
+
+def retry(max_attempts=3, delay=1):
+    """Decorator that retries a function on failure."""
+
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            import time
+
+            last_exception = None
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    last_exception = e
+                    print(f"Attempt {attempt} failed: {e}")
+                    if attempt < max_attempts:
+                        time.sleep(delay)
+
+            raise last_exception
+        return wrapper
+    return decorator
+
+@retry(max_attempts=3, delay=0.5)
+def fetch_data():
+    import random
+    if random.random() < 0.7:
+        raise ConnectionError("Network error")
+    return "Data loaded"
+
+print(fetch_data())
+```
+
+## Class-Based Decorators
+
+```python
+from functools import wraps
+
+class CountCalls:
+    """Decorator class that counts function calls."""
+
+    def __init__(self, func):
+        wraps(func)(self)
+        self.func = func
+        self.count = 0
+
+    def __call__(self, *args, **kwargs):
+        self.count += 1
+        print(f"Call {self.count} of {self.func.__name__}")
+        return self.func(*args, **kwargs)
+
+@CountCalls
+def say_hello():
+    print("Hello!")
+
+say_hello()  # Call 1 of say_hello
+say_hello()  # Call 2 of say_hello
+print(say_hello.count)  # 2
+```
+
+## Decorating Classes
+
+```python
+def add_repr(cls):
+    """Class decorator that adds __repr__."""
+    def __repr__(self):
+        attrs = ", ".join(f"{k}={v!r}" for k, v in self.__dict__.items())
+        return f"{cls.__name__}({attrs})"
+    cls.__repr__ = __repr__
+    return cls
+
+@add_repr
+class Person:
+    def __init__(self, name, age):
+        self.name = name
+        self.age = age
+
+p = Person("Alice", 30)
+print(p)  # Person(name='Alice', age=30)
+```
+
+## Singleton Decorator
+
+```python
+from functools import wraps
+
+def singleton(cls):
+    """Decorator that ensures only one instance of a class."""
+    instances = {}
+
+    @wraps(cls)
+    def get_instance(*args, **kwargs):
+        if cls not in instances:
+            instances[cls] = cls(*args, **kwargs)
+        return instances[cls]
+
+    return get_instance
+
+@singleton
+class Database:
+    def __init__(self):
+        print("Creating database connection")
+
+db1 = Database()  # Prints: Creating database connection
+db2 = Database()  # No print — returns existing instance
+print(db1 is db2)  # True
+```
+
+## Advanced Context Managers
+
+### Context Manager with Exception Handling
+
+```python
+from contextlib import contextmanager
+
+@contextmanager
+def transaction(db_name="default"):
+    """Context manager for database transactions."""
+    print(f"  Opening transaction on {db_name}")
+    try:
+        yield {"name": db_name}
+        print(f"  Committing transaction on {db_name}")
+    except Exception as e:
+        print(f"  Rolling back transaction on {db_name}: {e}")
+        raise  # Re-raise exception
+
+with transaction("users") as db:
+    print(f"  Working with {db['name']}")
+    # If an exception occurs here, rollback happens
+```
+
+### Nested Context Managers
+
+```python
+from contextlib import contextmanager
+
+@contextmanager
+def open_file(filename, mode="r"):
+    print(f"Opening {filename}")
+    f = open(filename, mode)
+    try:
+        yield f
+    finally:
+        print(f"Closing {filename}")
+        f.close()
+
+@contextmanager
+def lock_resource(name):
+    print(f"Locking {name}")
+    try:
+        yield
+    finally:
+        print(f"Unlocking {name}")
+
+# Nested context managers
+with open_file("data.txt") as f, lock_resource("file_lock"):
+    content = f.read()
+
+# Equivalent to:
+with open_file("data.txt") as f:
+    with lock_resource("file_lock"):
+        content = f.read()
+```
+
+### Async Context Manager
+
+```python
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def async_connection(url):
+    """Async context manager for database connections."""
+    print(f"Connecting to {url}")
+    try:
+        yield {"url": url, "connected": True}
+    finally:
+        print(f"Disconnecting from {url}")
+
+async def main():
+    async with async_connection("postgres://localhost/db") as conn:
+        print(f"Working with: {conn}")
+```
+
+### Context Manager as Decorator
+
+```python
+from contextlib import ContextDecorator
+
+class timed(ContextDecorator):
+    """Can be used as both context manager and decorator."""
+
+    def __init__(self, name=None):
+        self.name = name
+
+    def __enter__(self):
+        import time
+        self.start = time.perf_counter()
+        return self
+
+    def __exit__(self, *args):
+        import time
+        elapsed = time.perf_counter() - self.start
+        name = self.name or "Block"
+        print(f"{name} took {elapsed:.4f}s")
+
+# As decorator
+@timed(name="sleep")
+def do_work():
+    import time
+    time.sleep(0.5)
+
+do_work()  # sleep took 0.5001s
+
+# As context manager
+with timed("calculation"):
+    sum(x ** 2 for x in range(1000000))
+```
+
+## Decorator Stacking Order
+
+```python
+from functools import wraps
+
+def bold(func):
+    @wraps(func)
+    def wrapper():
+        return f"<b>{func()}</b>"
+    return wrapper
+
+def italic(func):
+    @wraps(func)
+    def wrapper():
+        return f"<i>{func()}</i>"
+    return wrapper
+
+@bold
+@italic
+def greet():
+    return "Hello"
+
+print(greet())  # <b><i>Hello</i></b>
+
+# The order matters:
+# greet = bold(italic(greet))
+# First italic wraps, then bold wraps the result
+```
+
+## Key Takeaways
+
+- Decorators with arguments need triple nesting: `def decorator(args): return wrapper`
+- Class-based decorators use `__call__`; `@wraps` preserves metadata
+- Class decorators add/modify class behavior without inheritance
+- Context managers can handle exceptions, rollback, and cleanup
+- `ContextDecorator` works as both decorator and context manager
+- `@asynccontextmanager` for async context managers
+- Decorator stacking: bottom decorator wraps first, top wraps last
+- Singleton pattern via decorator is simple but use `__init__` with care

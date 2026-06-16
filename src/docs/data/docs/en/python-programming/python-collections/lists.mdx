@@ -1,0 +1,157 @@
+---
+title: "Lists"
+description: "Python lists — creation, indexing, methods, slicing, and list comprehensions"
+sidebar:
+  order: 1
+  label: "Lists"
+tab: "python-programming"
+---
+
+Lists are ordered, mutable sequences — Python's workhorse collection type.
+
+## Creating Lists
+
+```python
+# Empty list
+empty = []
+empty = list()
+
+# With initial values
+numbers = [1, 2, 3, 4, 5]
+mixed = [1, "hello", 3.14, True]
+nested = [[1, 2], [3, 4]]
+
+# From other sequences
+list("hello")       # ['h', 'e', 'l', 'l', 'o']
+list(range(5))      # [0, 1, 2, 3, 4]
+```
+
+## Indexing and Slicing
+
+```python
+fruits = ["apple", "banana", "cherry", "date", "elderberry"]
+
+# Indexing
+fruits[0]    # 'apple'
+fruits[-1]   # 'elderberry'
+fruits[-2]   # 'date'
+
+# Slicing
+fruits[1:3]      # ['banana', 'cherry']
+fruits[:3]       # ['apple', 'banana', 'cherry']
+fruits[::2]      # ['apple', 'cherry', 'elderberry']
+fruits[::-1]     # ['elderberry', 'date', 'cherry', 'banana', 'apple']
+```
+
+## List Methods
+
+```python
+items = [1, 2, 3]
+
+# Adding
+items.append(4)          # [1, 2, 3, 4]
+items.insert(0, 0)       # [0, 1, 2, 3, 4]
+items.extend([5, 6])     # [0, 1, 2, 3, 4, 5, 6]
+
+# Removing
+items.remove(3)          # removes first 3 — ValueError if not found
+popped = items.pop()     # removes and returns last item (6)
+first = items.pop(0)     # removes and returns item at index 0
+
+# Finding
+items = [10, 20, 30, 20, 40]
+items.index(20)          # 1 — first occurrence
+items.index(20, 2)       # 3 — starting from index 2
+items.count(20)          # 2
+
+# Reordering
+items.sort()             # sorts in place — [10, 20, 20, 30, 40]
+items.sort(reverse=True) # [40, 30, 20, 20, 10]
+items.reverse()          # reverses in place
+
+# Copying
+copy = items.copy()      # shallow copy
+deep = items[:]          # slice copy — also shallow
+```
+
+<Aside variant="caution">
+  Methods like `.sort()`, `.reverse()`, and `.append()` modify the list **in place** and return `None`. Methods like `.copy()` return a new list.
+</Aside>
+
+## List Comprehensions
+
+```python
+# Basic
+squares = [x ** 2 for x in range(10)]
+# [0, 1, 4, 9, 16, 25, 36, 49, 64, 81]
+
+# With condition
+evens = [x for x in range(20) if x % 2 == 0]
+
+# With if-else
+labels = ["even" if x % 2 == 0 else "odd" for x in range(5)]
+# ['even', 'odd', 'even', 'odd', 'even']
+
+# Nested
+matrix = [[i + j for j in range(3)] for i in range(3)]
+# [[0, 1, 2], [1, 2, 3], [2, 3, 4]]
+
+# Flatten a nested list
+nested = [[1, 2], [3, 4], [5, 6]]
+flat = [item for sublist in nested for item in sublist]
+# [1, 2, 3, 4, 5, 6]
+```
+
+## List Operations
+
+```python
+# Concatenation and repetition
+[1, 2] + [3, 4]       # [1, 2, 3, 4]
+[1] * 4               # [1, 1, 1, 1]
+
+# Membership
+3 in [1, 2, 3]        # True
+5 not in [1, 2, 3]    # True
+
+# Length, min, max, sum
+len([1, 2, 3])        # 3
+min([3, 1, 2])        # 1
+max([3, 1, 2])        # 3
+sum([1, 2, 3])        # 6
+```
+
+## Sorting with `sorted()`
+
+The `sorted()` function returns a new sorted list:
+
+```python
+nums = [3, 1, 4, 1, 5]
+sorted(nums)              # [1, 1, 3, 4, 5]
+sorted(nums, reverse=True) # [5, 4, 3, 1, 1]
+
+# Sort by key function
+words = ["apple", "kiwi", "banana", "pear"]
+sorted(words, key=len)     # ['pear', 'kiwi', 'apple', 'banana']
+
+# Sort by last character
+sorted(words, key=lambda w: w[-1])
+```
+
+## Lists vs. Arrays
+
+Native Python lists are flexible but can be memory-heavy for numeric data. For numerical work, use `array` from the standard library or `numpy`:
+
+```python
+from array import array
+nums = array("i", [1, 2, 3])  # type 'i' = signed int
+```
+
+## Key Takeaways
+
+- Lists are ordered, mutable, and can hold mixed types
+- Indexing starts at 0; negative indexes count from the end
+- Slice: `list[start:stop:step]`
+- List comprehensions: `[expr for item in iterable if condition]`
+- `.sort()` sorts in place; `sorted()` returns a new list
+- `.append()`, `.extend()`, `.pop()`, `.remove()` modify in place
+- Use `.copy()` or `[:]` for shallow copies

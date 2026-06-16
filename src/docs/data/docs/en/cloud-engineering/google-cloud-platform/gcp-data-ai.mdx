@@ -1,0 +1,133 @@
+---
+title: "GCP Data & AI"
+description: "Explore GCP's data and AI services — BigQuery, Dataflow, Pub/Sub, and Vertex AI — with practical examples and comparisons to AWS data analytics services."
+sidebar:
+  order: 2
+  label: "GCP Data & AI"
+tab: "cloud-engineering"
+---
+
+
+GCP was built on the same infrastructure that powers Google Search, YouTube, and Gemini. Its data and AI services are the strongest differentiator against AWS and Azure.
+
+## BigQuery
+
+BigQuery is a serverless, highly scalable data warehouse with built-in machine learning and BI capabilities. It separates storage and compute, allowing you to query petabytes of data without managing infrastructure.
+
+```sql
+-- Query a public dataset
+SELECT
+  state,
+  COUNT(*) as num_cities,
+  ROUND(AVG(population), 0) as avg_population
+FROM `bigquery-public-data.usa_names.usa_1910_current`
+GROUP BY state
+ORDER BY avg_population DESC
+LIMIT 10;
+```
+
+BigQuery supports standard SQL, handles semi-structured data (JSON, Avro, Parquet), and offers BI Engine for sub-second query response on dashboards.
+
+```bash
+# Load CSV data from Cloud Storage into BigQuery
+bq load \
+  --source_format=CSV \
+  --autodetect \
+  my_dataset.sales_data \
+  gs://my-bucket/sales-*.csv
+```
+
+<Aside variant="info" title="AWS Comparison">
+  BigQuery → Redshift (serverless), Athena (ad-hoc queries), Glue (ETL). BigQuery's key advantage is automatic scaling — you never provision clusters or manage partitions.
+</Aside>
+
+## Dataflow
+
+Dataflow is a managed stream and batch processing service based on Apache Beam. It provides auto-scaling, exactly-once processing, and integrated monitoring.
+
+```python
+# Apache Beam pipeline (Python)
+import apache_beam as beam
+
+with beam.Pipeline() as pipeline:
+    (
+        pipeline
+        | "ReadFromPubSub" >> beam.io.ReadFromPubSub(topic="projects/my-project/topics/events")
+        | "ParseJSON" >> beam.Map(lambda x: json.loads(x.decode("utf-8")))
+        | "FilterValid" >> beam.Filter(lambda x: x.get("event_type") == "purchase")
+        | "WriteToBigQuery" >> beam.io.WriteToBigQuery(
+            table="my-project:my_dataset.purchases",
+            schema="event_id:STRING, user_id:STRING, amount:FLOAT, timestamp:TIMESTAMP",
+            write_disposition=beam.io.BigQueryDisposition.WRITE_APPEND
+        )
+    )
+```
+
+```bash
+# Run a Dataflow job
+python pipeline.py \
+  --runner DataflowRunner \
+  --project my-project \
+  --region us-central1 \
+  --temp_location gs://my-bucket/temp
+```
+
+Dataflow automatically scales workers and reshards data to handle spikes in throughput.
+
+## Pub/Sub
+
+Pub/Sub is a managed message queue service for event ingestion and delivery — equivalent to AWS SQS + SNS + EventBridge.
+
+```bash
+# Create a topic and subscription
+gcloud pubsub topics create order-events
+gcloud pubsub subscriptions create order-sub \
+  --topic order-events \
+  --ack-deadline 60
+```
+
+```python
+# Publish a message
+from google.cloud import pubsub_v1
+
+publisher = pubsub_v1.PublisherClient()
+topic_path = publisher.topic_path("my-project", "order-events")
+data = b"User 12345 placed order ABC"
+future = publisher.publish(topic_path, data)
+```
+
+Pub/Sub offers at-least-once delivery, global availability, and supports push (HTTP webhook) or pull subscribers.
+
+## Vertex AI
+
+Vertex AI is GCP's unified platform for machine learning: AutoML, custom training, model deployment, and feature store — comparable to AWS SageMaker.
+
+```bash
+# Deploy a model to an endpoint
+gcloud ai endpoints create --region us-central1 --display-name "classifier"
+gcloud ai models upload \
+  --region us-central1 \
+  --display-name "fraud-detector" \
+  --container-image-uri us-docker.pkg.dev/vertex-ai/prediction/tf2-cpu.2-12:latest \
+  --artifact-uri gs://my-bucket/models/fraud/v1
+
+gcloud ai endpoints deploy-model \
+  --region us-central1 \
+  --endpoint classifier \
+  --model fraud-detector \
+  --traffic-split 0=100
+```
+
+Vertex AI also includes:
+- **Vertex AI Workbench** — Managed Jupyter notebooks
+- **Vertex AI Pipelines** — ML pipeline orchestration (Kubeflow-based)
+- **Generative AI Studio** — Prompt design and model tuning for Gemini models
+- **Model Garden** — Foundation models including Gemini, Claude, and Llama
+
+<Aside variant="tip">
+  For serverless ML inference, use Vertex AI endpoints with autoscaling. For batch predictions on large datasets, use Vertex AI Batch Prediction which processes data through Dataflow under the hood.
+</Aside>
+
+## Summary
+
+GCP's data and AI services — BigQuery (serverless warehouse), Dataflow (stream/batch processing), Pub/Sub (messaging), and Vertex AI (ML platform) — form an integrated stack for building data-intensive applications. These services are GCP's strongest differentiator and a compelling reason to choose GCP for analytics and AI workloads.

@@ -1,0 +1,227 @@
+---
+title: "File I/O"
+description: "Read and write files in Python — text, binary, and structured data"
+sidebar:
+  order: 2
+  label: "File I/O"
+tab: "python-programming"
+---
+
+## Opening and Closing Files
+
+```python
+# Basic open/close
+file = open("data.txt", "r")
+content = file.read()
+file.close()
+
+# Context manager — auto-closes even on errors
+with open("data.txt", "r") as file:
+    content = file.read()
+```
+
+## File Modes
+
+```python
+# Modes:
+# "r"  — read (default)
+# "w"  — write (overwrites existing)
+# "a"  — append
+# "x"  — exclusive creation (fails if exists)
+# "b"  — binary mode
+# "t"  — text mode (default)
+# "+"  — read and write
+
+with open("notes.txt", "w") as f:
+    f.write("New content")       # Overwrites
+
+with open("notes.txt", "a") as f:
+    f.write("\nMore content")    # Appends
+
+with open("new_file.txt", "x") as f:
+    f.write("Created")           # Fails if exists
+```
+
+## Reading Files
+
+```python
+with open("data.txt", "r") as f:
+    # All at once
+    content = f.read()           # Entire file as string
+
+    # Line by line
+    for line in f:               # Memory efficient for large files
+        print(line.strip())
+
+    # All lines
+    lines = f.readlines()        # List of strings
+    lines = f.read().splitlines()  # Without trailing newlines
+
+    # Read specific amount
+    chunk = f.read(1024)         # First 1024 bytes
+```
+
+## Writing Files
+
+```python
+# Text files
+with open("output.txt", "w", encoding="utf-8") as f:
+    f.write("Line 1\n")
+    f.write("Line 2\n")
+    f.writelines(["Line 3\n", "Line 4\n"])
+
+# Appending
+with open("log.txt", "a") as f:
+    print("Error occurred", file=f)  # print() can write to files
+```
+
+## Working with File Paths
+
+```python
+# Old way — string concatenation (brittle)
+path = "/home/user/data/" + filename
+
+# Better — pathlib (Python 3.4+)
+from pathlib import Path
+
+data_dir = Path("/home/user/data")
+file_path = data_dir / "results.csv"  # Uses / operator
+
+# Common operations
+p = Path("data/config.json")
+
+p.exists()          # True/False
+p.is_file()         # True/False
+p.is_dir()          # True/False
+p.name              # 'config.json'
+p.stem              # 'config'
+p.suffix            # '.json'
+p.parent            # Path('data')
+p.absolute()        # Full path
+
+# Reading/writing with pathlib
+p.write_text('{"key": "value"}')
+content = p.read_text()
+
+# Directory operations
+for item in Path(".").iterdir():
+    print(item.name)
+
+for py_file in Path("src").glob("**/*.py"):
+    print(py_file)
+
+# Create directories
+Path("output/data").mkdir(parents=True, exist_ok=True)
+```
+
+## Binary Files
+
+```python
+# Reading binary
+with open("image.jpg", "rb") as f:
+    data = f.read()
+    print(f"Read {len(data)} bytes")
+
+# Writing binary
+with open("output.bin", "wb") as f:
+    f.write(b"\x00\x01\x02\x03")
+
+# Copying binary
+with open("source.jpg", "rb") as src, open("copy.jpg", "wb") as dst:
+    dst.write(src.read())
+```
+
+## Temporary Files
+
+```python
+from tempfile import TemporaryFile, NamedTemporaryFile, TemporaryDirectory
+
+# Temporary file (no name, auto-deleted)
+with TemporaryFile("w+") as f:
+    f.write("Temporary data")
+    f.seek(0)
+    print(f.read())
+
+# Named temporary file
+with NamedTemporaryFile(delete=True) as f:
+    print(f"Temp file: {f.name}")
+    f.write(b"data")
+
+# Temporary directory
+with TemporaryDirectory() as tmpdir:
+    path = Path(tmpdir) / "work.txt"
+    path.write_text("Working here")
+```
+
+## Structured Data Files
+
+### CSV
+
+```python
+import csv
+
+# Reading
+with open("data.csv", "r") as f:
+    reader = csv.DictReader(f)
+    for row in reader:
+        print(row["name"], row["age"])
+
+# Writing
+with open("output.csv", "w", newline="") as f:
+    writer = csv.DictWriter(f, fieldnames=["name", "age"])
+    writer.writeheader()
+    writer.writerow({"name": "Alice", "age": 30})
+```
+
+### JSON
+
+```python
+import json
+
+data = {"users": [{"name": "Alice", "age": 30}]}
+
+# Writing
+with open("data.json", "w") as f:
+    json.dump(data, f, indent=2)
+
+# Reading
+with open("data.json", "r") as f:
+    loaded = json.load(f)
+
+# String conversions
+json_str = json.dumps(data)
+parsed = json.loads(json_str)
+```
+
+## File and Directory Operations
+
+```python
+import shutil
+import os
+
+# Copy
+shutil.copy("source.txt", "dest.txt")           # File
+shutil.copytree("src_dir", "dest_dir")           # Directory
+
+# Move/Rename
+shutil.move("old.txt", "new.txt")
+
+# Delete
+os.remove("file.txt")                            # File
+os.rmdir("empty_dir")                            # Empty directory
+shutil.rmtree("dir_to_delete")                   # Directory + contents
+
+# File info
+os.path.getsize("data.txt")                      # Size in bytes
+os.path.getmtime("data.txt")                     # Last modified timestamp
+```
+
+## Key Takeaways
+
+- Always use `with` for file operations — auto-closes on errors
+- Modes: `r` read, `w` write (overwrite), `a` append, `b` binary, `+` read+write
+- Use `pathlib.Path` for path manipulation over string concatenation
+- CSV and JSON have dedicated modules in the standard library
+- `shutil` handles file/directory copy, move, delete
+- `tempfile` creates temporary files and directories
+- Specify `encoding="utf-8"` for text files to avoid platform issues

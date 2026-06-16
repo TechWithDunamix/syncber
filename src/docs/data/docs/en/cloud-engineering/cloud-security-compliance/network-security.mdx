@@ -1,0 +1,221 @@
+---
+title: "Network Security"
+description: "Implement network security using WAF, Shield, security groups, NACLs, Azure Firewall, and Cloud Armor — including DDoS protection strategies."
+sidebar:
+  order: 2
+  label: "Network Security"
+tab: "cloud-engineering"
+---
+
+
+Network security controls are your first line of defense in the cloud. This page covers web application firewalls, DDoS protection, the critical distinction between security groups and network ACLs, and equivalent services across Azure and GCP.
+
+## Security Groups vs. Network ACLs (NACLs)
+
+Security groups and NACLs both filter traffic, but they operate at different layers and have fundamentally different behaviors.
+
+### Security Groups
+
+- **Stateful** — If you allow inbound traffic on port 443, the return traffic is automatically allowed regardless of outbound rules
+- **Instance-level** — Applied to ENIs (Elastic Network Interfaces), which are attached to EC2 instances, ECS tasks, or Lambda (via VPC)
+- **Default-deny** — No inbound rules by default; all outbound traffic allowed by default
+- **Evaluation** — All rules are evaluated together (rules are not ordered)
+
+```hcl
+resource "aws_security_group" "web_sg" {
+  name        = "web-tier"
+  description = "Allow HTTP/HTTPS inbound"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+```
+
+### Network ACLs (NACLs)
+
+- **Stateless** — You must explicitly define both inbound and outbound rules for return traffic
+- **Subnet-level** — Applied to an entire subnet, affecting every instance in that subnet
+- **Ordered** — Rules are evaluated in ascending order by rule number; the first match applies
+- **Allow/Deny** — NACLs can explicitly *deny* traffic; security groups can only *allow*
+
+```hcl
+resource "aws_network_acl" "public_subnet_acl" {
+  vpc_id     = aws_vpc.main.id
+  subnet_ids = [aws_subnet.public.id]
+
+  ingress {
+    rule_no    = 100
+    from_port  = 443
+    to_port    = 443
+    protocol   = "tcp"
+    cidr_block = "0.0.0.0/0"
+    action     = "allow"
+  }
+
+  # Ephemeral ports for return traffic (stateless!)
+  ingress {
+    rule_no    = 200
+    from_port  = 1024
+    to_port    = 65535
+    protocol   = "tcp"
+    cidr_block = "0.0.0.0/0"
+    action     = "allow"
+  }
+
+  egress {
+    rule_no    = 100
+    from_port  = 0
+    to_port    = 0
+    protocol   = "-1"
+    cidr_block = "0.0.0.0/0"
+    action     = "allow"
+  }
+}
+```
+
+<Aside variant="tip">
+Use security groups for instance-level allowlists. Use NACLs as a subnet-level safety net — for example, explicitly deny traffic from known bad IP ranges before traffic reaches the security group layer.
+</Aside>
+
+## AWS WAF
+
+AWS WAF is a web application firewall that protects against common web exploits. Deploy it in front of CloudFront, ALB, or API Gateway.
+
+### Core Rule Sets
+
+AWS provides managed rule groups for common threats:
+
+```hcl
+resource "aws_wafv2_web_acl" "main" {
+  name        = "main-waf-acl"
+  scope       = "CLOUDFRONT"
+
+  default_action { allow {} }
+
+  # AWS managed rules
+  rule {
+    name     = "AWSManagedRulesCommonRuleSet"
+    priority = 0
+
+    override_action { none {} }
+
+    statement {
+      managed_rule_group_statement {
+        vendor_name = "AWS"
+        name        = "AWSManagedRulesCommonRuleSet"
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "AWSManagedRulesCommonRuleSet"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  # Rate-based rule
+  rule {
+    name     = "rate-limit"
+    priority = 1
+
+    action { block {} }
+
+    statement {
+      rate_based_statement {
+        limit              = 2000
+        aggregate_key_type = "IP"
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "RateLimit"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  visibility_config {
+    cloudwatch_metrics_enabled = true
+    metric_name                = "MainWAF"
+    sampled_requests_enabled   = true
+  }
+}
+```
+
+## AWS Shield
+
+Shield provides DDoS protection. **Shield Standard** is free and protects against common DDoS attacks (SYN floods, UDP reflection). **Shield Advanced** ($3,000/month) adds:
+
+- Enhanced detection and mitigation for larger, more sophisticated attacks
+- DDoS cost protection — get credits for scale-related cost spikes during an attack
+- Real-time visibility via CloudWatch metrics
+- 24/7 access to the AWS DDoS Response Team (DRT)
+
+## Azure Firewall and Cloud Armor
+
+| Service | Provider | Purpose |
+|---------|----------|---------|
+| **Azure Firewall** | Azure | Managed, stateful firewall with built-in threat intelligence. Supports application rules (FQDN) and network rules. |
+| **Azure WAF** | Azure | Integrated with Application Gateway and Front Door. Pre-configured OWASP rule sets. |
+| **Cloud Armor** | GCP | WAF and DDoS protection for Cloud Load Balancing. Supports OWASP rules, rate limiting, and geo-based access control. |
+| **Google Cloud Firewall** | GCP | Distributed firewall rules applied to VMs via tags and service accounts. Stateful, similar to AWS security groups. |
+
+### Azure Firewall Example
+
+```bash
+az network firewall create \
+  --name prod-firewall \
+  --resource-group prod-rg \
+  --sku Premium
+
+az network firewall policy rule-collection-group create \
+  --name NetworkRules \
+  --policy-name prod-fw-policy \
+  --priority 100
+
+az network firewall policy rule-collection-group collection add \
+  --name "block-known-bad" \
+  --policy-name prod-fw-policy \
+  --rcg-name NetworkRules \
+  --collection-priority 200 \
+  --action Deny \
+  --type NetworkRule \
+  --rules '[{"name":"block-malicious-ip","protocols":["Any"],"source-addresses":["198.51.100.0/24"],"destination-addresses":["*"],"destination-ports":["*"]}]'
+```
+
+## DDoS Protection Strategy
+
+A defense-in-depth DDoS strategy uses multiple layers:
+
+1. **Edge** — CloudFront or Global Accelerator absorbs volumetric attacks at the edge
+2. **WAF** — Rate-based rules block application-layer attacks
+3. **Shield** — AWS Shield Advanced detects and mitigates infrastructure-layer attacks
+4. **Auto Scaling** — Scales out during legitimate traffic spikes; use with care during attack scenarios
+5. **SNS Alerts** — Notify the operations team when Shield detects an attack
+
+<Aside variant="danger">
+Do not rely on auto scaling alone to handle DDoS attacks. Attack traffic is often expensive to scale for and may not trigger scale events correctly. Always combine with WAF rate limiting and Shield.
+</Aside>
+
+## Summary
+
+Understanding the difference between security groups (stateful, instance-level) and NACLs (stateless, subnet-level) is fundamental to AWS network security. WAF and Shield add application-layer protection and DDoS mitigation. Azure Firewall and Cloud Armor provide equivalent capabilities on their respective platforms.

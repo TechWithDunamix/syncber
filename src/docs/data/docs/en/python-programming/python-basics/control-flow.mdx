@@ -1,0 +1,171 @@
+---
+title: "Control Flow"
+description: "Master Python's conditional statements and loops"
+sidebar:
+  order: 4
+  label: "Control Flow"
+tab: "python-programming"
+---
+
+Control flow determines the order in which your code executes.
+
+## Conditionals: `if`, `elif`, `else`
+
+```python
+score = 85
+
+if score >= 90:
+    grade = "A"
+elif score >= 80:
+    grade = "B"       # This runs (85 >= 80)
+elif score >= 70:
+    grade = "C"
+else:
+    grade = "F"
+
+print(f"Grade: {grade}")  # Grade: B
+```
+
+### Truthiness in Conditions
+
+```python
+# Values that evaluate to False:
+# 0, 0.0, "", None, [], {}, (), set(), False
+
+name = ""
+if not name:
+    print("Name is empty")  # This runs
+
+items = []
+if items:       # False for empty collections
+    print("Has items")
+else:
+    print("No items")
+```
+
+### Ternary Expression
+
+```python
+age = 20
+status = "adult" if age >= 18 else "minor"
+# status = "adult"
+```
+
+## The `match` Statement (Python 3.10+)
+
+Structural pattern matching — like switch on steroids:
+
+```python
+def describe(value):
+    match value:
+        case 0:
+            return "Zero"
+        case 1 | 2 | 3:
+            return "Small number"
+        case int(n) if n > 100:
+            return "Large number"
+        case str(s):
+            return f"String: {s}"
+        case _:
+            return "Something else"
+```
+
+## `for` Loops
+
+```python
+# Iterating over a sequence
+fruits = ["apple", "banana", "cherry"]
+for fruit in fruits:
+    print(fruit)
+
+# Using range()
+for i in range(5):       # 0, 1, 2, 3, 4
+    print(i)
+
+for i in range(2, 10, 3):  # 2, 5, 8
+    print(i)
+
+# Enumerate — get index and value
+for index, fruit in enumerate(fruits):
+    print(f"{index}: {fruit}")
+
+# Zip — iterate multiple sequences in parallel
+names = ["Alice", "Bob", "Charlie"]
+scores = [85, 92, 78]
+for name, score in zip(names, scores):
+    print(f"{name}: {score}")
+```
+
+## `while` Loops
+
+```python
+count = 0
+while count < 5:
+    print(count)
+    count += 1
+
+# Be careful with infinite loops!
+while True:
+    response = input("Type 'quit' to exit: ")
+    if response == "quit":
+        break
+```
+
+## Loop Control: `break`, `continue`, `else`
+
+```python
+# break — exit the loop immediately
+for n in range(10):
+    if n == 5:
+        break
+    print(n)            # 0, 1, 2, 3, 4
+
+# continue — skip to next iteration
+for n in range(5):
+    if n == 2:
+        continue
+    print(n)            # 0, 1, 3, 4
+
+# for/else — else runs if loop completed normally (no break)
+for n in range(5):
+    if n == 10:
+        break
+else:
+    print("Loop completed without break")  # This runs
+
+for n in range(5):
+    if n == 3:
+        break
+else:
+    print("Not reached")  # Doesn't run — loop was broken
+```
+
+## List Comprehensions
+
+A Pythonic way to create lists:
+
+```python
+# Traditional
+squares = []
+for n in range(10):
+    squares.append(n ** 2)
+
+# Comprehension — cleaner and faster
+squares = [n ** 2 for n in range(10)]
+
+# With condition
+evens = [n for n in range(20) if n % 2 == 0]
+
+# Nested loops
+pairs = [(x, y) for x in [1, 2] for y in ["a", "b"]]
+# [(1, 'a'), (1, 'b'), (2, 'a'), (2, 'b')]
+```
+
+## Key Takeaways
+
+- `if`/`elif`/`else` for conditionals — empty collections and `None` are falsy
+- `for` loops iterate over sequences — use `enumerate()` for indexes, `zip()` for parallel iteration
+- `break` exits a loop, `continue` skips to the next iteration
+- `else` on loops runs only if no `break` occurred
+- List comprehensions `[expr for item in iterable if cond]` are Pythonic and fast
+- `match`/`case` (3.10+) provides powerful pattern matching

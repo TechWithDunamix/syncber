@@ -1,0 +1,126 @@
+---
+title: "GCP Core Services"
+description: "Explore Google Cloud's core compute, storage, and networking — Compute Engine, GKE, Cloud Run, Cloud Storage, VPC, and Cloud Load Balancing — with gcloud examples and AWS comparisons."
+sidebar:
+  order: 1
+  label: "GCP Core Services"
+tab: "cloud-engineering"
+---
+
+
+## Compute Services
+
+### Compute Engine
+
+Compute Engine provides IaaS virtual machines — equivalent to AWS EC2. You select a machine family (general-purpose, compute-optimized, memory-optimized), an image (Ubuntu, Debian, CentOS, Windows Server), and a zone.
+
+```bash
+gcloud compute instances create web-server \
+  --zone us-central1-a \
+  --machine-type e2-micro \
+  --image-family ubuntu-2204-lts \
+  --image-project ubuntu-os-cloud \
+  --tags http-server
+```
+
+Key differentiators:
+- **Sole-tenant nodes** — Dedicated physical servers for licensing or compliance
+- **Preemptible / Spot VMs** — Up to 91% discount for interruptible workloads
+- **Live migration** — GCP migrates VMs between hosts during maintenance without reboot (most machine types)
+
+### Google Kubernetes Engine (GKE)
+
+GKE is the managed Kubernetes service that originated from Google's internal Borg system — the same technology that spawned Kubernetes itself. GKE is widely considered the most mature managed Kubernetes offering.
+
+```bash
+gcloud container clusters create my-cluster \
+  --zone us-central1-a \
+  --num-nodes 3 \
+  --enable-autopilot
+```
+
+**Autopilot** mode offloads node management entirely — GKE manages the underlying compute, scaling, and security. Standard mode gives you control over node pools and configuration.
+
+### Cloud Run
+
+Cloud Run is a serverless container platform that executes stateless HTTP containers on a fully managed infrastructure. You package your app as a container image, push it to Artifact Registry, and Cloud Run scales from zero to thousands of requests.
+
+```bash
+gcloud run deploy my-service \
+  --image gcr.io/my-project/my-app:latest \
+  --region us-central1 \
+  --allow-unauthenticated
+```
+
+Cloud Run charges only for the time your container handles requests (down to 100ms increments) and scales to zero when idle — the most cost-effective option for intermittent workloads.
+
+<Aside variant="info" title="AWS Mapping">
+  Compute Engine → EC2, GKE → EKS, Cloud Run → App Runner (closest) / Fargate, App Engine → Elastic Beanstalk.
+</Aside>
+
+## Storage Services
+
+### Cloud Storage
+
+Cloud Storage is GCP's object storage service, equivalent to AWS S3. It offers four storage classes:
+
+| Class | Availability | Min Duration | Typical Use |
+|-------|-------------|-------------|-------------|
+| Standard | Regional/multi-region | None | Active data |
+| Nearline | Regional | 30 days | Data accessed < once/month |
+| Coldline | Regional | 90 days | Data accessed < once/quarter |
+| Archive | Regional | 365 days | Long-term backup |
+
+```bash
+# Create a bucket and upload a file
+gcloud storage buckets create gs://my-demo-bucket --location us-central1
+gcloud storage cp index.html gs://my-demo-bucket
+```
+
+Cloud Storage supports object versioning, lifecycle policies, and uniform bucket-level access control (IAM) or fine-grained ACLs.
+
+## Networking Services
+
+### VPC
+
+GCP's VPC is a global networking resource — unlike AWS VPCs which are regional. A single VPC can span multiple continents without peering. Subnets are regional, and resources in any zone within that region can use them.
+
+```bash
+gcloud compute networks create my-vpc --subnet-mode custom
+gcloud compute networks subnets create web-subnet \
+  --network my-vpc \
+  --region us-central1 \
+  --range 10.0.1.0/24
+```
+
+GCP also supports **Shared VPC** (manage networking from a central project while allowing other projects to use the subnets) and **VPC Network Peering** for connecting across projects or organizations.
+
+### Cloud Load Balancing
+
+Cloud Load Balancing is a single, global, anycast-based load balancing service. Unlike AWS (which requires separate ALB/NLB per region), a single Cloud Load Balancer can route traffic globally to backends in multiple regions.
+
+```bash
+gcloud compute forwarding-rules create http-rule \
+  --region us-central1 \
+  --ports 80 \
+  --target-http-proxy my-proxy
+```
+
+It supports HTTP(S), TCP/SSL, and UDP protocols, with built-in CDN integration (Cloud CDN) and DDoS protection (Cloud Armor).
+
+## Management Tools
+
+```bash
+# List all compute instances across projects
+gcloud compute instances list
+
+# View resource hierarchy
+gcloud resource-manager folders list
+gcloud projects list
+```
+
+<Aside variant="tip">
+  Use `gcloud config set project <project-id>` to set your default project and avoid passing `--project` on every command.
+</Aside>
+
+GCP's core services follow a philosophy of global resources, managed services, and API-first design. This foundation enables the data and AI capabilities covered in the next section.

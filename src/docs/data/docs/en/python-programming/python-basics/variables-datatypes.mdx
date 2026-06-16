@@ -1,0 +1,126 @@
+---
+title: "Variables & Data Types"
+description: "Learn about Python variables, fundamental data types, and dynamic typing"
+sidebar:
+  order: 2
+  label: "Variables & Data Types"
+tab: "python-programming"
+---
+
+Python is **dynamically typed** — variables can hold any type of value, and their type can change.
+
+## Variables and Assignment
+
+```python
+# No type declarations needed
+name = "Alice"       # str
+age = 25             # int
+height = 1.68        # float
+is_student = True    # bool
+
+# Dynamic typing — variables can change type
+value = 42           # int
+value = "now text"   # str — perfectly valid
+```
+
+## Fundamental Data Types
+
+### Numbers
+
+```python
+# Integer
+count = 100
+binary = 0b1010      # 10 in decimal
+hex_val = 0xFF       # 255 in decimal
+
+# Float
+pi = 3.14159
+scientific = 1.5e-4  # 0.00015
+
+# Complex numbers
+z = 3 + 4j
+print(z.real, z.imag)  # 3.0 4.0
+
+# Type conversion
+int("42")           # 42
+float("3.14")       # 3.14
+round(3.14159, 2)   # 3.14
+```
+
+### Booleans
+
+```python
+is_ready = True
+is_done = False
+
+# Boolean from comparisons
+print(5 > 3)    # True
+print(10 == 9)  # False
+
+# Truthy/falsy values
+bool(0)          # False
+bool("")         # False
+bool([])         # False
+bool(42)         # True
+bool("hello")    # True
+```
+
+### The `None` Type
+
+```python
+result = None  # Represents absence of a value
+
+# Common pattern: initialize then assign
+user = None
+# ... later ...
+user = get_user()  # might return None
+if user is None:
+    print("User not found")
+```
+
+## Type Checking
+
+```python
+type(42)           # <class 'int'>
+type("hello")      # <class 'str'>
+type(True)         # <class 'bool'>
+
+# Check with isinstance() — preferred
+isinstance(42, int)          # True
+isinstance("hi", (str, int)) # True — checks against tuple of types
+```
+
+## Type Hints (Python 3.6+)
+
+Type hints document expected types (not enforced at runtime):
+
+```python
+def greet(name: str) -> str:
+    return f"Hello, {name}"
+
+age: int = 25
+# Type hint is ignored at runtime:
+age = "twenty-five"  # No error!
+```
+
+## Variables Are References
+
+```python
+a = [1, 2, 3]
+b = a          # b references the SAME list
+b.append(4)
+print(a)       # [1, 2, 3, 4] — a changed too!
+
+# Create a copy instead
+c = a.copy()
+c.append(5)
+print(a)       # [1, 2, 3, 4] — unchanged
+```
+
+## Key Takeaways
+
+- Python uses dynamic typing — no type declarations needed
+- Core types: `int`, `float`, `str`, `bool`, `NoneType`
+- Use `isinstance()` over `type()` for type checking
+- `None` represents "no value" — compare with `is None`
+- Variables are references to objects, not containers

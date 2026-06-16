@@ -1,0 +1,240 @@
+---
+title: "Functions & Modules Project"
+description: "Build a modular data analysis toolkit using functions and modules"
+sidebar:
+  order: 4
+  label: "Analysis Toolkit Project"
+tab: "python-programming"
+---
+
+Apply functions, closures, decorators, and modular design to build a data analysis toolkit.
+
+## Project Structure
+
+```
+analysis_toolkit/
+├── __init__.py
+├── stats.py        # Statistical functions
+├── transforms.py   # Data transformation functions
+├── io_utils.py     # Input/output helpers
+└── main.py         # CLI entry point
+```
+
+### `analysis_toolkit/stats.py`
+
+```python
+"""Statistical analysis functions."""
+
+from functools import wraps
+
+
+def validate_numeric(func):
+    """Decorator: ensure all inputs are numeric."""
+
+    @wraps(func)
+    def wrapper(data, *args, **kwargs):
+        numeric = [x for x in data if isinstance(x, (int, float))]
+        if not numeric:
+            raise ValueError("No numeric data found")
+        return func(numeric, *args, **kwargs)
+    return wrapper
+
+
+@validate_numeric
+def mean(data):
+    """Calculate arithmetic mean."""
+    return sum(data) / len(data)
+
+
+@validate_numeric
+def median(data):
+    """Calculate median value."""
+    sorted_data = sorted(data)
+    n = len(sorted_data)
+    mid = n // 2
+
+    if n % 2 == 0:
+        return (sorted_data[mid - 1] + sorted_data[mid]) / 2
+    return sorted_data[mid]
+
+
+@validate_numeric
+def mode(data):
+    """Find most common value(s)."""
+    from collections import Counter
+    counts = Counter(data)
+    max_count = max(counts.values())
+    return [k for k, v in counts.items() if v == max_count]
+
+
+@validate_numeric
+def std_dev(data):
+    """Calculate population standard deviation."""
+    avg = mean(data)
+    variance = sum((x - avg) ** 2 for x in data) / len(data)
+    return variance ** 0.5
+
+
+def summary(data):
+    """Return a complete statistical summary."""
+    if not data:
+        return {"error": "No data provided"}
+
+    return {
+        "count": len(data),
+        "mean": mean(data),
+        "median": median(data),
+        "mode": mode(data),
+        "std_dev": std_dev(data),
+        "min": min(data),
+        "max": max(data),
+        "range": max(data) - min(data),
+    }
+```
+
+### `analysis_toolkit/transforms.py`
+
+```python
+"""Data transformation functions."""
+
+from functools import wraps
+
+
+def chain(*funcs):
+    """Create a pipeline of transformations.
+
+    Returns a closure that applies each function in sequence.
+    """
+    def pipeline(data):
+        result = data
+        for func in funcs:
+            result = func(result)
+        return result
+    return pipeline
+
+
+def scale(factor):
+    """Return a function that scales data by factor."""
+    return lambda data: [x * factor for x in data]
+
+
+def normalize(data):
+    """Min-max normalize data to 0-1 range."""
+    if not data:
+        return []
+    mn, mx = min(data), max(data)
+    if mn == mx:
+        return [0.0] * len(data)
+    return [(x - mn) / (mx - mn) for x in data]
+
+
+def standardize(data):
+    """Z-score standardize data."""
+    from .stats import mean, std_dev
+    if len(data) < 2:
+        return data
+    avg = mean(data)
+    sd = std_dev(data)
+    if sd == 0:
+        return [0.0] * len(data)
+    return [(x - avg) / sd for x in data]
+
+
+def rolling_mean(data, window=3):
+    """Calculate rolling/moving average."""
+    if len(data) < window:
+        return []
+    result = []
+    for i in range(len(data) - window + 1):
+        result.append(sum(data[i:i + window]) / window)
+    return result
+
+
+def clamp(data, low=None, high=None):
+    """Clamp values to a range."""
+    result = data[:]
+    if low is not None:
+        result = [max(x, low) for x in result]
+    if high is not None:
+        result = [min(x, high) for x in result]
+    return result
+```
+
+### `analysis_toolkit/__init__.py`
+
+```python
+"""Analysis Toolkit — a modular data analysis package."""
+
+from .stats import mean, median, mode, std_dev, summary
+from .transforms import scale, normalize, standardize, rolling_mean, clamp, chain
+
+__all__ = [
+    "mean", "median", "mode", "std_dev", "summary",
+    "scale", "normalize", "standardize", "rolling_mean", "clamp", "chain",
+]
+```
+
+### `analysis_toolkit/main.py`
+
+```python
+"""CLI entry point for the analysis toolkit."""
+
+from . import stats, transforms
+
+
+def run_demo():
+    """Demonstrate the toolkit with sample data."""
+
+    data = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
+
+    print("=== Analysis Toolkit Demo ===")
+    print(f"Data: {data}")
+
+    print("\n--- Statistics ---")
+    s = stats.summary(data)
+    for key, value in s.items():
+        print(f"  {key}: {value}")
+
+    print("\n--- Transformations ---")
+    print(f"Normalized: {[round(x, 3) for x in transforms.normalize(data)]}")
+    print(f"Standardized: {[round(x, 3) for x in transforms.standardize(data)]}")
+    print(f"Rolling mean (window=3): {[round(x, 2) for x in transforms.rolling_mean(data, 3)]}")
+
+    print("\n--- Pipeline ---")
+    pipeline = transforms.chain(
+        transforms.clamp(low=5, high=15),
+        transforms.scale(2),
+    )
+    print(f"Clamped(5-15) then scaled(x2): {pipeline(data)}")
+
+    print("\n--- Decorators in Action ---")
+    print(f"Mean: {stats.mean(data)}")
+    try:
+        stats.mean(["a", "b", "c"])
+    except ValueError as e:
+        print(f"Validation caught: {e}")
+
+
+if __name__ == "__main__":
+    run_demo()
+```
+
+## What You Practiced
+
+| Concept | Usage |
+|---------|-------|
+| Modules | Split code across `stats.py`, `transforms.py`, `main.py` |
+| Packages | `__init__.py` with `__all__` for clean exports |
+| Functions | Pure functions with type hints, parameters, returns |
+| Closures | `chain()` returns a `pipeline()` closure |
+| Decorators | `@validate_numeric` validates inputs before function runs |
+| `*args`/`**kwargs` | Decorator wraps arbitrary function signatures |
+| Variable scope | `from .stats import mean` — relative imports |
+
+## Extensions
+
+1. **Plotting** — Add a `visualize.py` module with basic ASCII/terminal plotting
+2. **Outlier detection** — Add IQR-based outlier detection to `stats.py`
+3. **Correlation** — Add correlation coefficient calculation
+4. **File input** — Add CSV reading to `io_utils.py`
+5. **Command-line arguments** — Use `argparse` to specify which analysis to run

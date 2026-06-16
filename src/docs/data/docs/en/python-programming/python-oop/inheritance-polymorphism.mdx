@@ -1,0 +1,235 @@
+---
+title: "Inheritance & Polymorphism"
+description: "Deep dive into inheritance, polymorphism, abstract classes, and composition"
+sidebar:
+  order: 2
+  label: "Inheritance & Polymorphism"
+tab: "python-programming"
+---
+
+## Method Resolution Order (MRO)
+
+Python determines which method to call using MRO — a well-defined lookup order:
+
+```python
+class A:
+    def method(self):
+        return "A"
+
+class B(A):
+    def method(self):
+        return "B"
+
+class C(A):
+    def method(self):
+        return "C"
+
+class D(B, C):
+    pass
+
+d = D()
+print(d.method())   # B — follows MRO: D → B → C → A
+print(D.__mro__)    # (D, B, C, A, object)
+```
+
+## Using `super()`
+
+Call parent class methods:
+
+```python
+class Person:
+    def __init__(self, name, age):
+        self.name = name
+        self.age = age
+
+class Employee(Person):
+    def __init__(self, name, age, employee_id):
+        super().__init__(name, age)  # Call parent constructor
+        self.employee_id = employee_id
+
+    def __str__(self):
+        return f"{self.name} (ID: {self.employee_id})"
+
+emp = Employee("Alice", 30, "E001")
+print(emp.name)      # Alice — set by Person.__init__
+print(emp.employee_id)  # E001 — set by Employee.__init__
+```
+
+### `super()` in Multiple Inheritance
+
+```python
+class Base:
+    def __init__(self):
+        print("Base.__init__")
+        super().__init__()  # Calls next in MRO
+
+class MixinA(Base):
+    def __init__(self):
+        print("MixinA.__init__")
+        super().__init__()
+
+class MixinB(Base):
+    def __init__(self):
+        print("MixinB.__init__")
+        super().__init__()
+
+class Concrete(MixinA, MixinB):
+    def __init__(self):
+        print("Concrete.__init__")
+        super().__init__()
+
+obj = Concrete()
+# Concrete.__init__
+# MixinA.__init__
+# MixinB.__init__
+# Base.__init__
+```
+
+## Polymorphism
+
+Different classes providing the same interface:
+
+```python
+from abc import ABC, abstractmethod
+
+class PaymentProcessor(ABC):
+    @abstractmethod
+    def process_payment(self, amount):
+        pass
+
+    @abstractmethod
+    def refund(self, transaction_id):
+        pass
+
+class CreditCardProcessor(PaymentProcessor):
+    def process_payment(self, amount):
+        return f"Charged ${amount} to credit card"
+
+    def refund(self, transaction_id):
+        return f"Refunded transaction {transaction_id}"
+
+class PayPalProcessor(PaymentProcessor):
+    def process_payment(self, amount):
+        return f"Processed ${amount} via PayPal"
+
+    def refund(self, transaction_id):
+        return f"PayPal refund {transaction_id} initiated"
+
+# Polymorphic usage
+def checkout(processor, amount):
+    print(processor.process_payment(amount))
+
+checkout(CreditCardProcessor(), 100)
+checkout(PayPalProcessor(), 50)
+```
+
+## Duck Typing
+
+"If it walks like a duck and quacks like a duck, it's a duck":
+
+```python
+class Duck:
+    def quack(self): return "Quack!"
+    def walk(self): return "Waddle"
+
+class RobotDuck:
+    def quack(self): return "Beep quack!"
+    def walk(self): return "Mechanical waddle"
+
+def make_it_quack(thing):
+    # Doesn't care about type — just calls .quack()
+    print(thing.quack())
+
+make_it_quack(Duck())       # Quack!
+make_it_quack(RobotDuck())  # Beep quack!
+```
+
+## Abstract Base Classes
+
+```python
+from abc import ABC, abstractmethod
+
+class Shape(ABC):
+    @abstractmethod
+    def area(self):
+        pass
+
+    @abstractmethod
+    def perimeter(self):
+        pass
+
+    # Concrete method — shared by all subclasses
+    def describe(self):
+        return f"Area: {self.area():.2f}, Perimeter: {self.perimeter():.2f}"
+
+class Rectangle(Shape):
+    def __init__(self, width, height):
+        self.width = width
+        self.height = height
+
+    def area(self):
+        return self.width * self.height
+
+    def perimeter(self):
+        return 2 * (self.width + self.height)
+
+# shape = Shape()  # TypeError! Can't instantiate abstract class
+rect = Rectangle(5, 3)
+print(rect.describe())  # Area: 15.00, Perimeter: 16.00
+```
+
+## Composition Over Inheritance
+
+```python
+class Engine:
+    def start(self): return "Engine started"
+    def stop(self): return "Engine stopped"
+
+class Wheels:
+    def rotate(self): return "Wheels rotating"
+
+class Car:
+    """Uses composition — has-a relationship."""
+    def __init__(self):
+        self.engine = Engine()   # Composition
+        self.wheels = [Wheels() for _ in range(4)]
+
+    def drive(self):
+        return f"{self.engine.start()} — {self.wheels[0].rotate()}"
+
+car = Car()
+print(car.drive())  # Engine started — Wheels rotating
+```
+
+## Mixins
+
+Reusable pieces of functionality via multiple inheritance:
+
+```python
+class JSONMixin:
+    def to_json(self):
+        import json
+        return json.dumps(self.__dict__)
+
+class LoggableMixin:
+    def log(self, message):
+        print(f"[{self.__class__.__name__}] {message}")
+
+class User(JSONMixin, LoggableMixin):
+    def __init__(self, name, email):
+        self.name = name
+        self.email = email
+
+user = User("Alice", "alice@example.com")
+print(user.to_json())  # {"name": "Alice", "email": "alice@example.com"}
+user.log("User created")
+```
+
+## Key Takeaways
+
+- MRO (Method Resolution Order) determines method lookup — `Class.__mro__` shows it
+- `super()` delegates to the next class in MRO — works correctly with multiple inheritance
+- Abstract Base Classes define interfaces that subclasses must implement
+- Duck typing: if an object has the right methods, it works — no explicit interface needed
+- Prefer composition (`has-a`) over inheritance (`is-a`) for flexible design
+- Mixins provide reusable behavior via multiple inheritance

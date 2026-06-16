@@ -1,0 +1,307 @@
+---
+title: "Error Handling Project"
+description: "Build a robust file processor with error handling and logging"
+sidebar:
+  order: 3
+  label: "File Processor Project"
+tab: "python-programming"
+---
+
+Apply exception handling, file I/O, and logging to build a robust file processing tool.
+
+## Project: Robust File Processor
+
+Create `file_processor.py`:
+
+```python
+"""A robust file processing tool with comprehensive error handling."""
+
+import csv
+import json
+import logging
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+from dataclasses import dataclass, field
+from datetime import datetime
+
+
+# --- Logging Setup ---
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler("processor.log"),
+        logging.StreamHandler(),
+    ],
+)
+logger = logging.getLogger(__name__)
+
+
+# --- Custom Exceptions ---
+class FileProcessorError(Exception):
+    """Base exception for file processor."""
+    pass
+
+class UnsupportedFormatError(FileProcessorError):
+    def __init__(self, format):
+        super().__init__(f"Unsupported file format: {format}")
+
+class ValidationError(FileProcessorError):
+    def __init__(self, message, row=None):
+        self.row = row
+        super().__init__(f"Validation error: {message}" + (f" (row {row})" if row else ""))
+
+
+# --- Data Models ---
+@dataclass
+class ProcessedFile:
+    """Result of processing a file."""
+    filename: str
+    format: str
+    row_count: int
+    columns: List[str]
+    preview: List[Dict[str, Any]] = field(default_factory=list)
+    processing_time: float = 0.0
+    errors: List[str] = field(default_factory=list)
+
+
+# --- File Processing ---
+class FileProcessor:
+    """Process various file formats with error handling."""
+
+    SUPPORTED_FORMATS = {".csv", ".json", ".txt"}
+
+    def __init__(self, input_dir: str = ".", output_dir: str = "output"):
+        self.input_dir = Path(input_dir)
+        self.output_dir = Path(output_dir)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+
+    def process_file(self, filename: str) -> Optional[ProcessedFile]:
+        """Process a single file with comprehensive error handling."""
+        filepath = self.input_dir / filename
+
+        if not filepath.exists():
+            logger.error(f"File not found: {filepath}")
+            return None
+
+        suffix = filepath.suffix.lower()
+        if suffix not in self.SUPPORTED_FORMATS:
+            logger.error(f"Unsupported format: {suffix}")
+            raise UnsupportedFormatError(suffix)
+
+        logger.info(f"Processing: {filename}")
+
+        try:
+            import time
+            start = time.time()
+
+            if suffix == ".csv":
+                result = self._process_csv(filepath)
+            elif suffix == ".json":
+                result = self._process_json(filepath)
+            elif suffix == ".txt":
+                result = self._process_txt(filepath)
+
+            result.processing_time = time.time() - start
+            logger.info(f"Processed {filename} in {result.processing_time:.2f}s")
+            return result
+
+        except PermissionError:
+            logger.error(f"Permission denied: {filepath}")
+            return None
+        except UnicodeDecodeError:
+            logger.error(f"Encoding error: {filepath}")
+            return None
+        except Exception as e:
+            logger.exception(f"Unexpected error processing {filename}: {e}")
+            return None
+
+    def _process_csv(self, filepath: Path) -> ProcessedFile:
+        """Process a CSV file."""
+        result = ProcessedFile(
+            filename=filepath.name,
+            format="csv",
+            row_count=0,
+            columns=[],
+        )
+
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                result.columns = reader.fieldnames or []
+
+                for i, row in enumerate(reader, 1):
+                    try:
+                        self._validate_row(row, result.columns)
+                        result.row_count += 1
+                        if len(result.preview) < 5:
+                            result.preview.append(row)
+                    except ValidationError as e:
+                        result.errors.append(str(e))
+                        logger.warning(str(e))
+
+        except csv.Error as e:
+            raise FileProcessorError(f"CSV parse error: {e}")
+
+        return result
+
+    def _process_json(self, filepath: Path) -> ProcessedFile:
+        """Process a JSON file."""
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            if isinstance(data, list):
+                records = data
+            elif isinstance(data, dict):
+                records = [data]
+            else:
+                raise FileProcessorError("JSON must be object or array")
+
+            result = ProcessedFile(
+                filename=filepath.name,
+                format="json",
+                row_count=len(records),
+                columns=list(records[0].keys()) if records else [],
+            )
+
+            for i, record in enumerate(records, 1):
+                if len(result.preview) < 5:
+                    result.preview.append(record)
+
+            return result
+
+        except json.JSONDecodeError as e:
+            raise FileProcessorError(f"JSON parse error: {e}")
+
+    def _process_txt(self, filepath: Path) -> ProcessedFile:
+        """Process a text file."""
+        with open(filepath, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+
+        result = ProcessedFile(
+            filename=filepath.name,
+            format="txt",
+            row_count=len(lines),
+            columns=["line"],
+        )
+
+        for i, line in enumerate(lines[:5], 1):
+            result.preview.append({"line": i, "content": line.rstrip("\n")})
+
+        return result
+
+    def _validate_row(self, row: Dict, columns: List[str], row_num: int = None):
+        """Validate a data row."""
+        for col in columns:
+            if col not in row:
+                raise ValidationError(f"Missing column: {col}", row_num)
+
+    def process_directory(self) -> List[ProcessedFile]:
+        """Process all supported files in the input directory."""
+        results = []
+        for filepath in sorted(self.input_dir.iterdir()):
+            if filepath.suffix.lower() in self.SUPPORTED_FORMATS:
+                try:
+                    result = self.process_file(filepath.name)
+                    if result:
+                        results.append(result)
+                except UnsupportedFormatError:
+                    continue
+        return results
+
+    def generate_report(self, results: List[ProcessedFile], output_file: str = "report.json"):
+        """Generate a processing report."""
+        report = {
+            "generated_at": datetime.now().isoformat(),
+            "total_files": len(results),
+            "total_rows": sum(r.row_count for r in results),
+            "total_errors": sum(len(r.errors) for r in results),
+            "files": [
+                {
+                    "filename": r.filename,
+                    "format": r.format,
+                    "rows": r.row_count,
+                    "errors": len(r.errors),
+                    "time": round(r.processing_time, 3),
+                }
+                for r in results
+            ],
+        }
+
+        report_path = self.output_dir / output_file
+        with open(report_path, "w") as f:
+            json.dump(report, f, indent=2)
+
+        logger.info(f"Report saved: {report_path}")
+        return report
+
+
+def main():
+    """Run the file processor demo."""
+
+    import tempfile
+    import os
+
+    # Create sample files
+    with tempfile.TemporaryDirectory() as tmpdir:
+        input_dir = Path(tmpdir) / "input"
+        input_dir.mkdir()
+
+        # Sample CSV
+        csv_path = input_dir / "users.csv"
+        csv_path.write_text("""name,email,age
+Alice,alice@example.com,30
+Bob,bob@example.com,25
+Charlie,charlie@example.com,invalid_age
+Diana,diana@example.com,28
+""")
+
+        # Sample JSON
+        json_path = input_dir / "products.json"
+        json_path.write_text(json.dumps([
+            {"id": 1, "name": "Widget", "price": 9.99},
+            {"id": 2, "name": "Gadget", "price": 24.99},
+        ]))
+
+        # Sample TXT
+        txt_path = input_dir / "notes.txt"
+        txt_path.write_text("Line one\nLine two\nLine three\n")
+
+        # Process files
+        processor = FileProcessor(input_dir=input_dir)
+        results = processor.process_directory()
+
+        print("\n=== Processing Results ===")
+        for r in results:
+            status = "✓" if not r.errors else "⚠"
+            print(f"{status} {r.filename} ({r.format}): {r.row_count} rows, {len(r.errors)} errors")
+
+        report = processor.generate_report(results)
+        print(f"\nTotal: {report['total_files']} files, {report['total_rows']} rows, {report['total_errors']} errors")
+
+
+if __name__ == "__main__":
+    main()
+```
+
+## What You Practiced
+
+| Concept | Usage |
+|---------|-------|
+| Custom exceptions | `FileProcessorError`, `UnsupportedFormatError`, `ValidationError` |
+| try/except/else/finally | Per-format processing with error containment |
+| File I/O | Read CSV, JSON, TXT; write JSON reports |
+| Logging | `logging` module with file + console handlers |
+| Context managers | `with open()` for all file operations |
+| pathlib | `Path` for directory traversal, file inspection |
+| Error recovery | Per-row error handling in CSV processing |
+| Exception chaining | Wrapping low-level errors in domain exceptions |
+
+## Extensions
+
+1. **YAML support** — Add YAML file processing with `pyyaml`
+2. **Schema validation** — Define expected columns/types and validate against schema
+3. **Encoding detection** — Use `chardet` to auto-detect file encoding
+4. **Progress bar** — Add `tqdm` progress bar for batch processing
+5. **Parallel processing** — Use `concurrent.futures` to process files in parallel

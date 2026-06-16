@@ -1,0 +1,174 @@
+---
+title: "Tuples & Sets"
+description: "Immutable sequences with tuples, unique elements with sets"
+sidebar:
+  order: 2
+  label: "Tuples & Sets"
+tab: "python-programming"
+---
+
+## Tuples
+
+Tuples are **immutable** sequences — once created, they cannot be changed.
+
+```python
+# Creating tuples
+empty = ()
+single = (42,)          # Note the trailing comma!
+coordinates = (10, 20)
+mixed = (1, "hello", 3.14)
+
+# Parentheses are optional in many contexts
+point = 10, 20
+print(type(point))      # <class 'tuple'>
+
+# From other iterables
+tuple([1, 2, 3])       # (1, 2, 3)
+tuple("abc")            # ('a', 'b', 'c')
+```
+
+### Tuple Operations
+
+```python
+point = (3, 4)
+
+# Indexing and slicing — same as lists
+point[0]     # 3
+point[-1]    # 4
+
+# point[0] = 5  # TypeError! Tuples are immutable
+
+# Concatenation and repetition
+(1, 2) + (3, 4)     # (1, 2, 3, 4)
+(1,) * 3            # (1, 1, 1)
+
+# Membership
+3 in (1, 2, 3)      # True
+
+# Unpacking
+x, y = (10, 20)     # x=10, y=20
+x, y = y, x         # Swap — works because tuple on RHS
+```
+
+### When to Use Tuples
+
+```python
+# Fixed data that shouldn't change
+DAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+
+# Function returning multiple values
+def min_max(items):
+    return min(items), max(items)
+
+low, high = min_max([3, 1, 4, 1, 5])
+print(low, high)  # 1 5
+
+# Dictionary keys (lists can't be keys)
+locations = {
+    (40.7128, -74.0060): "New York",
+    (51.5074, -0.1278): "London",
+}
+
+# Named tuples for lightweight objects
+from collections import namedtuple
+Point = namedtuple("Point", ["x", "y"])
+p = Point(3, 4)
+print(p.x, p.y)     # 3 4
+print(p[0], p[1])   # 3 4 — also supports indexing
+```
+
+## Sets
+
+Sets are **unordered collections of unique elements**.
+
+```python
+# Creating sets
+empty = set()            # {} creates an empty dict, not set!
+numbers = {1, 2, 3, 4, 5}
+mixed = {1, "hello", 3.14}
+
+# From other iterables — duplicates are removed
+set([1, 2, 2, 3, 3, 3])  # {1, 2, 3}
+set("mississippi")        # {'m', 'i', 's', 'p'}
+```
+
+### Set Operations
+
+```python
+a = {1, 2, 3, 4}
+b = {3, 4, 5, 6}
+
+# Union
+a | b              # {1, 2, 3, 4, 5, 6}
+a.union(b)
+
+# Intersection
+a & b              # {3, 4}
+a.intersection(b)
+
+# Difference
+a - b              # {1, 2} — in a but not b
+b - a              # {5, 6} — in b but not a
+
+# Symmetric difference
+a ^ b              # {1, 2, 5, 6} — in either but not both
+
+# Subset/superset
+{1, 2}.issubset(a)      # True
+a.issuperset({1, 2})    # True
+```
+
+### Set Methods
+
+```python
+items = {1, 2, 3}
+
+# Adding and removing
+items.add(4)             # {1, 2, 3, 4}
+items.add(2)             # No effect — 2 already exists
+items.remove(3)          # Removes 3 — KeyError if not found
+items.discard(10)        # Removes if exists, no error if not
+popped = items.pop()     # Removes and returns arbitrary element
+items.clear()            # Empty the set
+
+# Set comprehensions
+squares = {x ** 2 for x in range(10)}
+# {0, 1, 4, 9, 16, 25, 36, 49, 64, 81}
+```
+
+### Frozenset
+
+An immutable version of set:
+
+```python
+fs = frozenset([1, 2, 3])
+# fs.add(4)  # AttributeError!
+# Can be used as dictionary key
+data = {frozenset({1, 2}): "pair"}
+```
+
+## Performance Comparison
+
+| Operation | List | Tuple | Set |
+|-----------|------|-------|-----|
+| Lookup by index | O(1) | O(1) | N/A |
+| Membership check | O(n) | O(n) | **O(1)** |
+| Add element | O(1) | N/A | O(1) |
+| Delete element | O(n) | N/A | O(1) |
+
+Sets excel at membership testing and deduplication:
+
+```python
+# Remove duplicates from a list
+items = [1, 2, 2, 3, 3, 3]
+unique = list(set(items))  # [1, 2, 3] — order may vary
+```
+
+## Key Takeaways
+
+- Tuples are immutable — use for fixed data, return values, dict keys
+- Tuples with one element need a trailing comma: `(42,)`
+- Sets store unique elements — great for deduplication and membership tests
+- Set operations: `|` union, `&` intersection, `-` difference, `^` symmetric difference
+- Membership checks are O(1) for sets vs O(n) for lists
+- Use `frozenset` for immutable, hashable sets

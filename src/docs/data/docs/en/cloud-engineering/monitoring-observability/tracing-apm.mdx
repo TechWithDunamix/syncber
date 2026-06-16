@@ -1,0 +1,152 @@
+---
+title: "Tracing & APM"
+description: "Implement distributed tracing and application performance monitoring using AWS X-Ray, OpenTelemetry, and vendor-agnostic observability patterns."
+sidebar:
+  order: 2
+  label: "Tracing & APM"
+tab: "cloud-engineering"
+---
+
+
+Distributed tracing solves a problem that metrics and logs cannot: tracing a single request across service boundaries. When a user clicks "Place Order" and the request travels through a load balancer, authentication service, product catalog, order service, payment gateway, and notification service — and one of them is slow — tracing reveals exactly where the latency lives.
+
+## Core Tracing Concepts
+
+A **trace** represents the end-to-end journey of a single request. It is composed of **spans**, each representing a unit of work (an HTTP request, a database query, a queue publish). Spans contain:
+
+- **Span ID** — unique identifier for this unit of work
+- **Trace ID** — shared across all spans in the request
+- **Parent Span ID** — links this span to its caller
+- **Timing** — start time and duration
+- **Attributes** — HTTP method, URL, status code, error details
+- **Events** — application-level annotations (e.g., "cache miss", "retry attempt")
+
+## AWS X-Ray
+
+X-Ray is AWS's managed tracing service. It receives trace data from instrumented applications and the X-Ray daemon, then provides a service map showing connections and latency between components.
+
+### Instrumenting with the X-Ray SDK
+
+**Python (Flask) example:**
+
+```python
+from aws_xray_sdk.core import xray_recorder
+from aws_xray_sdk.ext.flask.middleware import XRayMiddleware
+
+app = Flask(__name__)
+xray_recorder.configure(service='order-service')
+XRayMiddleware(app, xray_recorder)
+
+@app.route('/api/orders')
+def list_orders():
+    with xray_recorder.in_subsegment('query_database'):
+        orders = db.query('SELECT * FROM orders')
+    return jsonify(orders)
+```
+
+### X-Ray Daemon
+
+The daemon runs as a sidecar or host-level service, buffering and batching trace data before sending it to the X-Ray API:
+
+```bash
+# Run X-Ray daemon in a Docker container
+docker run --network host \
+  -e AWS_REGION=us-east-1 \
+  -v /home/ec2-user/.aws/:/root/.aws/ \
+  amazon/aws-xray-daemon
+```
+
+For ECS Fargate tasks, deploy the daemon as a sidecar container in the same task definition.
+
+## OpenTelemetry
+
+OpenTelemetry (OTel) is the industry-standard, vendor-neutral framework for generating telemetry. It consists of **SDKs** for instrumenting applications and the **OpenTelemetry Collector** for receiving, processing, and exporting telemetry to any backend.
+
+### OpenTelemetry Collector
+
+The Collector is a vendor-agnostic proxy that sits between your instrumented applications and your observability backends:
+
+```yaml
+# otel-collector-config.yaml
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+
+exporters:
+  awsxray:
+    region: us-east-1
+  prometheus:
+    endpoint: 0.0.0.0:8889
+  logging:
+    loglevel: debug
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [awsxray, logging]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [prometheus, logging]
+```
+
+### Instrumenting with OpenTelemetry SDKs
+
+**Node.js example using the OpenTelemetry JS SDK:**
+
+```javascript
+const { NodeSDK } = require('@opentelemetry/sdk-node');
+const { getNodeAutoInstrumentations } = require('@opentelemetry/auto-instrumentations-node');
+const { OTLPTraceExporter } = require('@opentelemetry/exporter-trace-otlp-grpc');
+
+const sdk = new NodeSDK({
+  traceExporter: new OTLPTraceExporter({
+    url: 'http://otel-collector:4317',
+  }),
+  instrumentations: [getNodeAutoInstrumentations()],
+});
+
+sdk.start();
+```
+
+The auto-instrumentation packages capture HTTP requests, database calls, and gRPC calls without any manual span creation.
+
+<Aside variant="tip">
+OpenTelemetry's big advantage is portability. Instrument once with the OTel SDK, point the Collector at any backend (X-Ray, Datadog, Jaeger, Zipkin, Grafana Tempo), and switch providers by changing exporter config — no code changes.
+</Aside>
+
+## APM Tools Comparison
+
+| Tool | Strengths | Weaknesses | Typical Cost |
+|------|-----------|------------|--------------|
+| **AWS X-Ray** | Deep AWS integration, pay-per-traces, no infrastructure to manage | AWS-only, limited query capabilities | ~$5/month per million traces |
+| **Datadog APM** | Rich UI, custom dashboards, integrated logs/traces/metrics | Expensive at scale, vendor lock-in | ~$31/host/month |
+| **New Relic** | Full-stack observability, AI-driven insights, broad language support | Pricing complexity, data retention limits | ~$0.25/GB ingested |
+| **Grafana Tempo** | Open source, works with Grafana+Loki+Prometheus, cost-effective | Requires self-managed infrastructure, steeper learning curve | Free (self-hosted) or ~$8/host (Grafana Cloud) |
+
+## Sampling Strategies
+
+Tracing every request at scale is expensive. Use sampling to keep costs predictable:
+
+- **Head-based sampling** — Decide at the request start whether to trace (e.g., 5% of all requests). Simple but may miss rare errors.
+- **Tail-based sampling** — Record all spans but decide which traces to retain *after* seeing the full trace. Keeps all errors and slow traces.
+- **Rate-based sampling** — Trace up to N requests per second.
+
+<Aside variant="info">
+A common pattern is head-based sampling at 5% for normal traffic plus recording 100% of traces that contain errors — the X-Ray SDK supports this via the `sampling-rules` configuration.
+</Aside>
+
+## Summary
+
+Distributed tracing is essential for understanding request paths in microservice architectures. AWS X-Ray provides a managed, AWS-native solution while OpenTelemetry gives you vendor independence. The Collector pattern — applications send OTLP to a collector, which exports to one or more backends — has become the industry standard and is the approach the module project uses.

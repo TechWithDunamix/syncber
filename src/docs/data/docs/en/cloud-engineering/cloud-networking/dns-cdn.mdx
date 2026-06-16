@@ -1,0 +1,92 @@
+---
+title: "DNS & CDN"
+description: "Master cloud DNS services (Route 53, Azure DNS, Cloud DNS) and CDN services (CloudFront, Azure CDN, Cloud CDN). Learn routing policies, caching strategies, and how to accelerate content delivery globally."
+sidebar:
+  order: 2
+  label: "DNS & CDN"
+tab: "cloud-engineering"
+---
+
+
+DNS and CDNs serve complementary roles: DNS directs users to the right server, and CDNs make that server's content arrive faster. Together they form the front door of any internet-facing application.
+
+## Cloud DNS Services
+
+Every major cloud provider offers a managed DNS service:
+
+- **Route 53** (AWS) — Domain registration, public and private hosted zones, health checks, routing policies
+- **Azure DNS** — Domain registration, private zones, alias records, integration with Traffic Manager
+- **Cloud DNS** (GCP) — Global anycast DNS, managed zones, DNSSEC, routing policies
+
+### DNS Record Types
+
+| Type | Purpose | Example |
+|------|---------|---------|
+| A | Maps a domain to an IPv4 address | `example.com → 192.0.2.1` |
+| AAAA | Maps a domain to an IPv6 address | `example.com → 2001:db8::1` |
+| CNAME | Maps a domain to another domain (alias) | `www.example.com → example.com` |
+| MX | Routes email | Mail exchanger for the domain |
+| TXT | Stores arbitrary text (SPF, DKIM, verification) | `"v=spf1 include:_spf.google.com ~all"` |
+| ALIAS | Like CNAME but works at the zone apex | `example.com → cloudfront.net` |
+
+<Aside variant="tip">
+A CNAME record cannot exist at the zone apex (bare domain like `example.com`). Use an ALIAS or A record alias (Route 53) to point the apex to an AWS resource like CloudFront or an ELB.
+</Aside>
+
+### Routing Policies
+
+Cloud DNS services support multiple routing policies beyond simple resolution:
+
+- **Simple** — Standard DNS resolution. One record, one response.
+- **Weighted** — Distribute traffic across multiple endpoints by percentage. Useful for canary deployments.
+- **Latency-based** — Route users to the region with the lowest latency for them.
+- **Geolocation** — Route users based on their geographic location (e.g., EU users to `eu-west-1`).
+- **Failover** — Route traffic to a primary endpoint; if health checks fail, redirect to a secondary.
+
+## Content Delivery Networks
+
+A CDN caches content at edge locations close to end users, reducing latency and offloading the origin server.
+
+### CloudFront (AWS)
+
+CloudFront is a CDN that works with any origin — S3, EC2, ALB, or an external HTTP server. Key features:
+
+- **Distributions** — A named configuration of origins, behaviors, and cache settings.
+- **Origin groups** — Primary and fallback origins for failover.
+- **Behaviors** — Route requests based on path patterns (`/images/*`, `/api/*`) to different origins.
+- **Lambda@Edge / CloudFront Functions** — Run lightweight code at edge locations for URL rewrites, authentication, or A/B testing.
+
+### Cache Behavior
+
+Cache behavior is controlled by TTL (Time to Live) and headers:
+
+```
+Cache-Control: max-age=31536000  (cache for 1 year)
+Cache-Control: no-cache          (revalidate with origin on every request)
+```
+
+<Aside variant="caution">
+Be careful with cache invalidation. Invalidating files on CloudFront costs money and takes several minutes to propagate. Prefer versioned filenames — `app.a1b2c3.js` instead of `app.js` — so you can use long TTLs without needing invalidations.
+</Aside>
+
+### Comparison
+
+| Provider | CDN Service | Edge Locations | Edge Compute |
+|----------|-------------|----------------|--------------|
+| AWS | CloudFront | 600+ PoPs | Lambda@Edge, CloudFront Functions |
+| Azure | Azure CDN / Front Door | 130+ PoPs | Azure Functions at edge |
+| GCP | Cloud CDN | 200+ PoPs | Cloud Functions, but limited edge compute |
+
+## Putting It Together
+
+A typical global architecture:
+
+1. User types `www.example.com` in their browser.
+2. DNS resolves to the CloudFront distribution's IP address (via Route 53 alias).
+3. CloudFront checks its edge cache. If the object is cached and fresh, it returns it immediately.
+4. If the object is not cached, CloudFront fetches it from the origin (e.g., S3 or an ALB).
+5. The response is cached at the edge for subsequent requests.
+
+<Aside variant="info">
+This architecture reduces latency from hundreds of milliseconds (a round trip to a distant region) to tens of milliseconds (served from the local edge location). It also reduces origin load by 80-95% for cacheable content.
+</Aside>

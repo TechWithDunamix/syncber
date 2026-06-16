@@ -1,0 +1,155 @@
+---
+title: "Well-Architected Framework"
+description: "The AWS Well-Architected Framework provides best practices for designing reliable, secure, and cost-optimized cloud architectures across six pillars."
+sidebar:
+  order: 1
+  label: "Well-Architected Framework"
+tab: "cloud-engineering"
+---
+
+The AWS Well-Architected Framework helps cloud architects build secure, high-performing, resilient, and efficient infrastructure. It is organized into six pillars with design principles and review questions for each.
+
+## The Six Pillars
+
+| Pillar | Focus | Key Question |
+|--------|-------|-------------|
+| **Operational Excellence** | Run and monitor systems, continuously improve processes | How do you support your workloads? |
+| **Security** | Protect data, systems, and assets | How do you protect your systems? |
+| **Reliability** | Recover from failures, scale dynamically | How do you prevent and recover from failures? |
+| **Performance Efficiency** | Use computing resources efficiently | How do you optimize your architecture? |
+| **Cost Optimization** | Avoid unnecessary costs, deliver business value | How do you minimize costs while delivering value? |
+| **Sustainability** | Minimize environmental impact | How do you reduce your workload's energy consumption? |
+
+## Operational Excellence
+
+Design principles:
+- **Perform operations as code** — use CloudFormation, Terraform, or CDK to automate infrastructure changes
+- **Make frequent, small, reversible changes** — deploy incrementally, roll back easily
+- **Refine operations procedures frequently** — run game days and incident response drills
+- **Anticipate failure** — test failure scenarios with Chaos Engineering tools (AWS Fault Injection Simulator)
+
+```bash
+# AWS Fault Injection Simulator — test EC2 instance termination
+aws fis create-experiment-template \
+  --cli-input-json file://fis-terminate-instance.json
+```
+
+## Security
+
+Design principles:
+- **Implement a strong identity foundation** — IAM with least privilege, centralize with AWS Organizations
+- **Enable traceability** — CloudTrail, CloudWatch, GuardDuty, Security Hub
+- **Apply security at all layers** — VPC, subnets, security groups, WAF, network ACLs
+- **Automate security best practices** — use AWS Config rules for compliance checking
+
+```hcl
+# AWS Config managed rule — require MFA for console access
+resource "aws_config_config_rule" "mfa_enabled" {
+  name = "iam-mfa-enabled"
+
+  source {
+    owner             = "AWS"
+    source_identifier = "IAM_USER_MFA_ENABLED"
+  }
+
+  scope {
+    compliance_resource_types = ["AWS::IAM::User"]
+  }
+}
+```
+
+## Reliability
+
+Design principles:
+- **Test recovery procedures** — use Chaos Engineering to validate failover
+- **Automatically recover from failure** — use Auto Scaling, health checks, Route53
+- **Scale horizontally** — add more instances rather than larger ones
+- **Stop guessing capacity** — use Auto Scaling, DynamoDB on-demand, Aurora Serverless
+
+```hcl
+# Auto Scaling group with health checks
+resource "aws_autoscaling_group" "web_asg" {
+  name               = "web-asg"
+  min_size           = 2
+  max_size           = 10
+  desired_capacity   = 2
+  vpc_zone_identifier = var.public_subnet_ids
+
+  launch_template {
+    id      = aws_launch_template.web.id
+    version = "$Latest"
+  }
+
+  health_check_type         = "ELB"
+  health_check_grace_period = 300
+}
+```
+
+## Performance Efficiency
+
+Design principles:
+- **Democratize advanced technologies** — use managed services (DynamoDB, S3, RDS) instead of self-managed
+- **Go global in minutes** — Route53 latency routing, CloudFront CDN, Global Accelerator
+- **Use serverless architectures** — Lambda, Fargate, S3, API Gateway to eliminate server management
+- **Experiment more often** — use instance families that match workload (compute, memory, storage optimized)
+
+## Cost Optimization
+
+Design principles:
+- **Implement Cloud Financial Management** — use AWS Budgets, Cost Explorer, anomaly detection
+- **Adopt a consumption model** — pay only for what you use, not provisioned capacity
+- **Measure overall efficiency** — track Cost per Transaction or Cost per User
+- **Stop spending money on undifferentiated heavy lifting** — use managed services over DIY
+
+```bash
+# Set a budget alert
+aws budgets create-budget \
+  --account-id 123456789012 \
+  --budget file://budget.json \
+  --notifications-with-subscribers file://notifications.json
+```
+
+## Sustainability (6th Pillar)
+
+Added in 2021, this pillar focuses on minimizing environmental impact:
+- **Choose efficient hardware** — Graviton (ARM) instances use less energy per compute unit
+- **Optimize workload placement** — deploy in regions with lower carbon intensity
+- **Minimize data movement** — process data close to where it is generated
+- **Right-size and decommission** — delete unused resources, right-size over-provisioned instances
+
+<Aside variant="tip">
+  The AWS Customer Carbon Footprint Tool tracks your historical and estimated future emissions. Use it alongside the Well-Architected sustainability pillar to report on ESG goals.
+</Aside>
+
+## Well-Architected Tool
+
+The AWS WA Tool automatically reviews your workloads against the framework:
+
+```bash
+# Create a workload review
+aws wellarchitected create-workload \
+  --workload-name "Production-WebApp" \
+  --description "Production e-commerce platform" \
+  --environment "PRODUCTION" \
+  --lenses "arn:aws:wellarchitected::aws:lens/wellarchitected" \
+  --aws-regions "us-east-1" "eu-west-1"
+
+# List workload reviews
+aws wellarchitected list-workloads
+
+# Get lens review results
+aws wellarchitected get-lens-review \
+  --workload-id <workload-id> \
+  --lens-alias "wellarchitected"
+```
+
+## Key Takeaways
+
+- Six pillars: Operational Excellence (automate operations), Security (protect with least privilege), Reliability (recover from failure, scale horizontally), Performance Efficiency (use managed services), Cost Optimization (pay for what you use), Sustainability (minimize environmental impact)
+- Design principles emphasize automation, reversibility, failure testing, horizontal scaling, consumption-based pricing, and efficient hardware (Graviton)
+- Operational Excellence: operations as code (IaC), small reversible changes, game days
+- Security: strong identity (IAM, Organizations), traceability (CloudTrail, GuardDuty), defense in depth, automated compliance (Config)
+- Reliability: test recovery procedures, auto recover (Auto Scaling, health checks), horizontal scaling, right-size capacity
+- Performance Efficiency: managed services over DIY, global distribution (CloudFront, Global Accelerator), serverless-first, right instance families
+- Cost Optimization: budgets and cost monitoring (Cost Explorer, Budgets), consumption model, measure efficiency per transaction
+- The Well-Architected Tool automates reviews — use it to identify high-risk items and track remediation progress

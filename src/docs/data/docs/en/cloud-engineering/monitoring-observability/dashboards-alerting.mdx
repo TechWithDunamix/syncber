@@ -1,0 +1,140 @@
+---
+title: "Dashboards & Alerting"
+description: "Build actionable dashboards with Grafana, define SLOs and SLIs, and configure alerting that minimizes noise while catching real incidents."
+sidebar:
+  order: 3
+  label: "Dashboards & Alerting"
+tab: "cloud-engineering"
+---
+
+
+Dashboards make metrics visible; alerting makes them actionable. This page covers Grafana — the leading open-source visualization platform — and the discipline of defining service-level objectives and alerting rules that balance sensitivity with specificity.
+
+## Grafana
+
+Grafana connects to dozens of data sources (CloudWatch, Prometheus, Azure Monitor, GCP Monitoring, Loki, Elasticsearch) and renders them into customizable dashboards.
+
+### Adding a Data Source
+
+```bash
+# Provision a CloudWatch data source via YAML
+cat <<EOF > datasources.yaml
+apiVersion: 1
+
+datasources:
+  - name: CloudWatch
+    type: cloudwatch
+    access: proxy
+    jsonData:
+      authType: default
+      defaultRegion: us-east-1
+    editable: false
+EOF
+```
+
+For Prometheus data from the OpenTelemetry Collector:
+
+```yaml
+  - name: OTEL Prometheus
+    type: prometheus
+    access: proxy
+    url: http://otel-collector:8889
+    isDefault: true
+```
+
+### Building a Dashboard
+
+A well-designed dashboard answers a specific question. Common panel types:
+
+- **Time series** — CPU, memory, request rate, latency over time
+- **Stat** — Single current value (e.g., "5xx errors in last 5 minutes")
+- **Table** — Top-N lists (e.g., slowest endpoints)
+- **Heatmap** — Latency distribution over time
+
+Use **template variables** to make dashboards reusable across environments:
+
+```
+# Query variable for service selection
+label_values(aws_ec2_cpuutilization_average, {dimensions.InstanceId})
+```
+
+<Aside variant="tip">
+Follow the "single-purpose dashboard" principle: each dashboard should answer one question. A "latency" dashboard, an "errors" dashboard, and a "capacity" dashboard are more useful than a single 40-panel monster.
+</Aside>
+
+### Integrating Loki for Logs
+
+Loki is Grafana's log aggregation system designed for cost-efficient log storage. It indexes labels (not full text) and works directly with Prometheus-style selectors:
+
+```
+{app="order-service"} |= "ERROR" |= "database_timeout"
+```
+
+Add Loki as a data source and use the **Explore** view to correlate logs with metrics panels.
+
+## SLOs and SLIs
+
+Service Level Indicators (SLIs) are the metrics you measure — request latency, error rate, uptime. Service Level Objectives (SLOs) are the targets you set — "99.9% of requests complete in under 500ms over a 30-day rolling window."
+
+### Defining an SLO
+
+```
+SLI:   Proportion of GET /api/products requests with status < 500
+Goal:  99.9%
+Window: 30 days rolling
+Measurement: (successful requests / total requests) * 100
+```
+
+### Burn Rate Alerting
+
+Burn rate measures how fast you are consuming your error budget. A 1% error rate against a 99.9% SLO (0.1% budget) means you burn through your budget 10x faster than expected.
+
+```yaml
+# Prometheus-style burn rate alert
+groups:
+  - name: slo-alerts
+    rules:
+      - alert: HighErrorBudgetBurnRate
+        expr: |
+          (
+            1 - (sum(rate(http_requests_total{status=~"5.."}[1h]))
+                 / sum(rate(http_requests_total[1h])))
+          ) < 0.999
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Error budget burn rate is critically high"
+```
+
+## Alert Fatigue Prevention
+
+Alert fatigue occurs when too many alerts desensitize operators. Prevention strategies:
+
+- **Use multi-condition rules** — Alert only when a high-severity condition persists (e.g., error rate > 5% for 5 minutes)
+- **Group related alerts** — A single "Region us-east-1 is degraded" avoids 50 per-service alerts
+- **Define runbook links** — Every alert should link to a playbook
+- **Review alert noise quarterly** — Tune thresholds or remove stale rules
+
+<Aside variant="caution">
+Never use email for production alerts. Use PagerDuty, OpsGenie, or a dedicated Slack channel with on-call rotation. Email is too easy to ignore.
+</Aside>
+
+### CloudWatch Alarm Example
+
+```bash
+aws cloudwatch put-metric-alarm \
+  --alarm-name "order-service-5xx-high" \
+  --metric-name 5xxCount \
+  --namespace MyApp \
+  --statistic Sum \
+  --period 300 \
+  --evaluation-periods 2 \
+  --threshold 50 \
+  --comparison-operator GreaterThanThreshold \
+  --alarm-actions arn:aws:sns:us-east-1:123456789012:ops-team
+```
+
+## Summary
+
+Grafana provides a unified view across clouds and on-premise infrastructure. SLOs and burn-rate alerting give you a data-driven approach to reliability. Invest time in dashboard design and alert tuning — they are force multipliers for any operations team.

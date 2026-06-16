@@ -1,0 +1,249 @@
+---
+title: "Exception Handling"
+description: "Handle errors gracefully with try/except, finally, and custom exceptions"
+sidebar:
+  order: 1
+  label: "Exception Handling"
+tab: "python-programming"
+---
+
+Exceptions are Python's mechanism for handling errors at runtime.
+
+## Basic Exception Handling
+
+```python
+try:
+    result = 10 / 0
+except ZeroDivisionError:
+    print("Cannot divide by zero!")
+
+# Multiple except blocks
+try:
+    num = int(input("Enter a number: "))
+    result = 100 / num
+except ValueError:
+    print("That's not a valid number!")
+except ZeroDivisionError:
+    print("Number cannot be zero!")
+```
+
+## Catching Exception Details
+
+```python
+try:
+    file = open("missing.txt")
+except FileNotFoundError as e:
+    print(f"Error: {e}")          # Error: [Errno 2] No such file or directory: 'missing.txt'
+    print(f"Errno: {e.errno}")     # Errno: 2
+```
+
+## The `else` and `finally` Clauses
+
+```python
+# else — runs if no exception occurred
+# finally — ALWAYS runs
+
+def divide_safe(a, b):
+    try:
+        result = a / b
+    except ZeroDivisionError:
+        print("Cannot divide by zero")
+        return None
+    else:
+        print(f"Result: {result}")
+        return result
+    finally:
+        print("Cleanup complete")  # Always runs
+
+divide_safe(10, 2)
+# Result: 5.0
+# Cleanup complete
+
+divide_safe(10, 0)
+# Cannot divide by zero
+# Cleanup complete
+```
+
+## Raising Exceptions
+
+```python
+def withdraw(balance, amount):
+    if amount <= 0:
+        raise ValueError("Amount must be positive")
+    if amount > balance:
+        raise ValueError("Insufficient funds")
+    return balance - amount
+
+try:
+    withdraw(100, 200)
+except ValueError as e:
+    print(f"Withdrawal failed: {e}")
+
+# Re-raising
+try:
+    withdraw(100, -5)
+except ValueError:
+    print("Logging error...")
+    raise  # Re-raises the same exception
+```
+
+## Custom Exceptions
+
+```python
+class BankError(Exception):
+    """Base exception for bank operations."""
+    pass
+
+class InsufficientFundsError(BankError):
+    def __init__(self, balance, amount):
+        self.balance = balance
+        self.amount = amount
+        super().__init__(f"Insufficient funds: ${balance} < ${amount}")
+
+class AccountFrozenError(BankError):
+    pass
+
+class InvalidTransactionError(BankError):
+    pass
+
+
+def transfer(sender_balance, amount, account_frozen=False):
+    if account_frozen:
+        raise AccountFrozenError("Account is frozen")
+    if amount <= 0:
+        raise InvalidTransactionError("Amount must be positive")
+    if amount > sender_balance:
+        raise InsufficientFundsError(sender_balance, amount)
+    return sender_balance - amount
+
+try:
+    transfer(100, 200)
+except InsufficientFundsError as e:
+    print(f"Failed: {e}")
+    print(f"Balance: ${e.balance}, Needed: ${e.amount}")
+except BankError as e:
+    print(f"Bank error: {e}")
+```
+
+## Exception Hierarchy
+
+```
+BaseException
+├── SystemExit
+├── KeyboardInterrupt
+└── Exception
+    ├── ArithmeticError
+    │   ├── ZeroDivisionError
+    │   └── FloatingPointError
+    ├── LookupError
+    │   ├── IndexError
+    │   └── KeyError
+    ├── ValueError
+    ├── TypeError
+    ├── OSError
+    │   └── FileNotFoundError
+    └── RuntimeError
+```
+
+<Aside variant="tip">
+  Catch `Exception`, not `BaseException`, to avoid catching `SystemExit` and `KeyboardInterrupt`.
+</Aside>
+
+## Exception Chaining
+
+```python
+# Implicit chain
+try:
+    int("not a number")
+except ValueError as e:
+    raise RuntimeError("Conversion failed") from e
+
+# Suppress chain
+try:
+    int("not a number")
+except ValueError:
+    raise RuntimeError("Conversion failed") from None
+```
+
+## Context Managers with `with`
+
+```python
+# File automatically closes after the block
+with open("data.txt", "r") as file:
+    content = file.read()
+# File is closed here, even if an exception occurred
+```
+
+### Creating Context Managers
+
+```python
+class ManagedFile:
+    def __init__(self, filename, mode="r"):
+        self.filename = filename
+        self.mode = mode
+
+    def __enter__(self):
+        self.file = open(self.filename, self.mode)
+        return self.file
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.file.close()
+        # Return False to propagate exceptions, True to suppress
+        return False
+
+with ManagedFile("test.txt", "w") as f:
+    f.write("Hello!")
+
+# Using contextlib
+from contextlib import contextmanager
+
+@contextmanager
+def managed_file(filename, mode="r"):
+    f = open(filename, mode)
+    try:
+        yield f
+    finally:
+        f.close()
+
+with managed_file("test.txt") as f:
+    print(f.read())
+```
+
+## Best Practices
+
+```python
+# ✅ Good: catch specific exceptions
+try:
+    data = json.loads(text)
+except json.JSONDecodeError as e:
+    print(f"Invalid JSON: {e}")
+
+# ❌ Bad: bare except catches everything
+try:
+    risky_operation()
+except:
+    pass
+
+# ✅ Good: minimal try blocks
+try:
+    config = load_config()
+except FileNotFoundError:
+    config = DEFAULT_CONFIG
+
+# ✅ Good: use finally for cleanup
+conn = database.connect()
+try:
+    conn.execute(query)
+finally:
+    conn.close()
+```
+
+## Key Takeaways
+
+- Use `try`/`except` to handle expected errors, not for control flow
+- Catch specific exception types, not bare `except:`
+- `else` runs on success; `finally` always runs (cleanup)
+- Create custom exceptions by inheriting from `Exception`
+- Use `raise ... from e` for exception chaining
+- Context managers (`with` statement) handle setup/cleanup automatically
+- Minimal `try` blocks — only wrap the code that might fail

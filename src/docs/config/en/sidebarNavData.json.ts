@@ -123,10 +123,82 @@ const sidebarNavData: DocsSidebarNavData = {
       description: "Master Python from fundamentals to advanced",
       icon: "tabler/brand-python",
       sections: [
-    {
-      id: "pam-program-maturity",
-      title: "PAM Program Maturity",
-    },
+        {
+          id: "python-programming",
+          title: "Course Overview",
+        },
+        {
+          id: "phase-1-python-foundations",
+          title: "Phase 1: Python Foundations",
+          children: [
+            {
+              id: "python-basics",
+              title: "Python Basics",
+            },
+            {
+              id: "python-collections",
+              title: "Data Structures & Collections",
+            },
+            {
+              id: "python-functions",
+              title: "Functions & Modules",
+            },
+          ],
+        },
+        {
+          id: "phase-2-python-oop",
+          title: "Phase 2: Object-Oriented Python",
+          children: [
+            {
+              id: "python-oop",
+              title: "Object-Oriented Programming",
+            },
+            {
+              id: "python-advanced-oop",
+              title: "Advanced OOP Techniques",
+            },
+            {
+              id: "python-error-handling",
+              title: "Error Handling & File I/O",
+            },
+          ],
+        },
+        {
+          id: "phase-3-python-proficiency",
+          title: "Phase 3: Python Proficiency",
+          children: [
+            {
+              id: "python-standard-library",
+              title: "Standard Library Deep Dive",
+            },
+            {
+              id: "python-advanced-topics",
+              title: "Advanced Python Topics",
+            },
+            {
+              id: "python-testing",
+              title: "Testing & Debugging",
+            },
+          ],
+        },
+        {
+          id: "phase-4-python-in-practice",
+          title: "Phase 4: Python in Practice",
+          children: [
+            {
+              id: "python-data-tools",
+              title: "Working with Data",
+            },
+            {
+              id: "python-building-tools",
+              title: "Building Python Tools",
+            },
+            {
+              id: "python-project",
+              title: "Capstone Project",
+            },
+          ],
+        },
       ],
     },
     {
@@ -140,16 +212,76 @@ const sidebarNavData: DocsSidebarNavData = {
           title: "Course Overview",
         },
         {
-          id: "cloud-fundamentals",
-          title: "Cloud Fundamentals",
+          id: "phase-1-cloud-foundations",
+          title: "Phase 1: Cloud Foundations",
+          children: [
+            {
+              id: "cloud-fundamentals",
+              title: "Cloud Fundamentals",
+            },
+            {
+              id: "cloud-networking",
+              title: "Cloud Networking",
+            },
+            {
+              id: "cloud-storage-databases",
+              title: "Storage & Databases",
+            },
+          ],
         },
         {
-          id: "aws-services",
-          title: "AWS Services",
+          id: "phase-2-aws-deep-dive",
+          title: "Phase 2: AWS Deep Dive",
+          children: [
+            {
+              id: "aws-core-services",
+              title: "AWS Core Services",
+            },
+            {
+              id: "aws-compute-serverless",
+              title: "Compute & Serverless",
+            },
+            {
+              id: "aws-architecture",
+              title: "Architecture & Best Practices",
+            },
+          ],
         },
         {
-          id: "azure-gcp",
-          title: "Azure & GCP",
+          id: "phase-3-multi-cloud-iac",
+          title: "Phase 3: Multi-Cloud & IaC",
+          children: [
+            {
+              id: "microsoft-azure",
+              title: "Microsoft Azure",
+            },
+            {
+              id: "google-cloud-platform",
+              title: "Google Cloud Platform",
+            },
+            {
+              id: "infrastructure-as-code",
+              title: "Infrastructure as Code",
+            },
+          ],
+        },
+        {
+          id: "phase-4-cloud-operations",
+          title: "Phase 4: Cloud Operations",
+          children: [
+            {
+              id: "monitoring-observability",
+              title: "Monitoring & Observability",
+            },
+            {
+              id: "cloud-security-compliance",
+              title: "Security & Compliance",
+            },
+            {
+              id: "cloud-capstone",
+              title: "Capstone Project",
+            },
+          ],
         },
       ],
     },

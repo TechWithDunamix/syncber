@@ -1,0 +1,25 @@
+---
+title: "Module 3: Cloud Storage & Databases"
+description: "Master cloud storage — object storage, block storage, and managed databases. Compare S3, EBS, RDS, DynamoDB, and their Azure and GCP equivalents."
+sidebar:
+  order: 0
+  label: "Module Overview"
+tab: "cloud-engineering"
+---
+
+
+Data is the core of every application. How you store, retrieve, and protect that data determines your application's performance, durability, and cost. This module covers the three major storage paradigms in the cloud.
+
+**Object storage** — Services like Amazon S3, Azure Blob Storage, and Google Cloud Storage store data as objects (files + metadata) in a flat namespace. They offer 99.999999999% durability (11 nines), unlimited capacity, and a rich ecosystem of lifecycle policies, versioning, and access controls. You will learn about storage classes — from frequently accessed to archive — and when to use each.
+
+**Block storage** — Services like Amazon EBS, Azure Managed Disks, and Google Persistent Disks provide raw block devices that attach to virtual machines. They behave like physical hard drives: you format them with a filesystem and mount them. You will examine performance tiers (SSD vs. HDD), encryption, snapshots, and the ephemeral vs. persistent distinction.
+
+**Managed databases** — Cloud providers offer fully managed relational databases (RDS, Cloud SQL, Azure SQL), NoSQL databases (DynamoDB, Cosmos DB, Firestore), and caching layers (ElastiCache, Cloud Memorystore). You will learn when to choose a relational database over a NoSQL database, how read replicas improve performance, and how Multi-AZ deployments provide high availability.
+
+<Aside variant="info">
+The "lift and shift" approach — moving an on-premises database to a VM in the cloud — is rarely optimal. Managed databases eliminate patching, backup, and replication overhead. Always evaluate a managed service before reaching for a self-hosted solution.
+</Aside>
+
+The module project asks you to design a multi-tier storage architecture for an e-commerce platform, combining object storage (product images), block storage (application server data), and managed databases (relational for orders, NoSQL for the product catalog, caching for session data).
+
+By the end of this module you will be able to evaluate storage options against application requirements, design data lifecycle policies, and architect durable, performant data layers.

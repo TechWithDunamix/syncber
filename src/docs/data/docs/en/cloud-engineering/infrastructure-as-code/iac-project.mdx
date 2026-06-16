@@ -1,0 +1,476 @@
+---
+title: "Deploy VPC + EC2 + RDS with Terraform"
+description: "Provision a complete multi-tier architecture on AWS using Terraform — VPC with public/private subnets, EC2 instances behind an ALB, and an RDS MySQL database — with reusable modules and remote state."
+sidebar:
+  order: 99
+  label: "Module Project"
+tab: "cloud-engineering"
+---
+
+
+## Project Overview
+
+In this capstone project you will deploy a complete three-tier architecture on AWS entirely through Terraform:
+
+- **Networking** — VPC with public and private subnets across two AZs
+- **Compute** — EC2 instances in an Auto Scaling Group behind an Application Load Balancer
+- **Database** — RDS MySQL in private subnets
+- **State** — Remote S3 backend with DynamoDB locking
+
+## Architecture
+
+```
+Internet
+    │
+    ▼
+ALB (public subnets)
+    │
+    ├──► EC2 (private subnet, AZ-a)
+    ├──► EC2 (private subnet, AZ-b)
+    │
+    ▼
+RDS MySQL (private subnet, Multi-AZ)
+```
+
+## File Structure
+
+```
+terraform-project/
+├── main.tf
+├── variables.tf
+├── outputs.tf
+├── terraform.tfvars
+├── modules/
+│   ├── networking/
+│   │   ├── main.tf
+│   │   ├── variables.tf
+│   │   └── outputs.tf
+│   ├── compute/
+│   │   ├── main.tf
+│   │   ├── variables.tf
+│   │   └── outputs.tf
+│   └── database/
+│       ├── main.tf
+│       ├── variables.tf
+│       └── outputs.tf
+└── user_data.sh
+```
+
+## Step 1: Provider and Backend Configuration
+
+```hcl
+# main.tf
+terraform {
+  required_version = ">= 1.6"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+  backend "s3" {
+    bucket         = "my-terraform-state-bucket"
+    key            = "production/terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "terraform-locks"
+    encrypt        = true
+  }
+}
+
+provider "aws" {
+  region = var.aws_region
+}
+```
+
+## Step 2: Networking Module
+
+```hcl
+# modules/networking/main.tf
+resource "aws_vpc" "main" {
+  cidr_block           = var.vpc_cidr
+  enable_dns_support   = true
+  enable_dns_hostnames = true
+  tags = { Name = "${var.environment}-vpc" }
+}
+
+resource "aws_internet_gateway" "igw" {
+  vpc_id = aws_vpc.main.id
+  tags   = { Name = "${var.environment}-igw" }
+}
+
+resource "aws_subnet" "public" {
+  count                   = 2
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = var.public_subnet_cidrs[count.index]
+  availability_zone       = var.azs[count.index]
+  map_public_ip_on_launch = true
+  tags = { Name = "${var.environment}-public-${count.index}" }
+}
+
+resource "aws_subnet" "private" {
+  count             = 2
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = var.private_subnet_cidrs[count.index]
+  availability_zone = var.azs[count.index]
+  tags = { Name = "${var.environment}-private-${count.index}" }
+}
+
+resource "aws_eip" "nat" {
+  domain = "vpc"
+}
+
+resource "aws_nat_gateway" "nat" {
+  allocation_id = aws_eip.nat.id
+  subnet_id     = aws_subnet.public[0].id
+  tags = { Name = "${var.environment}-nat" }
+}
+
+resource "aws_route_table" "public" {
+  vpc_id = aws_vpc.main.id
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.igw.id
+  }
+  tags = { Name = "${var.environment}-public-rt" }
+}
+
+resource "aws_route_table_association" "public" {
+  count          = 2
+  subnet_id      = aws_subnet.public[count.index].id
+  route_table_id = aws_route_table.public.id
+}
+
+resource "aws_route_table" "private" {
+  vpc_id = aws_vpc.main.id
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.nat.id
+  }
+  tags = { Name = "${var.environment}-private-rt" }
+}
+
+resource "aws_route_table_association" "private" {
+  count          = 2
+  subnet_id      = aws_subnet.private[count.index].id
+  route_table_id = aws_route_table.private.id
+}
+```
+
+## Step 3: Compute Module
+
+```hcl
+# modules/compute/main.tf
+resource "aws_security_group" "alb" {
+  name_prefix = "${var.environment}-alb-"
+  vpc_id      = var.vpc_id
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_lb" "web" {
+  name               = "${var.environment}-alb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.alb.id]
+  subnets            = var.public_subnet_ids
+}
+
+resource "aws_lb_target_group" "web" {
+  name     = "${var.environment}-tg"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = var.vpc_id
+  health_check {
+    path                = "/health"
+    healthy_threshold   = 2
+    unhealthy_threshold = 3
+    timeout             = 5
+    interval            = 30
+  }
+}
+
+resource "aws_lb_listener" "web" {
+  load_balancer_arn = aws_lb.web.arn
+  port              = 80
+  protocol          = "HTTP"
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.web.arn
+  }
+}
+
+resource "aws_security_group" "ec2" {
+  name_prefix = "${var.environment}-ec2-"
+  vpc_id      = var.vpc_id
+  ingress {
+    from_port       = 80
+    to_port         = 80
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb.id]
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_launch_template" "web" {
+  name_prefix   = "${var.environment}-web-"
+  image_id      = data.aws_ami.amazon_linux_2.id
+  instance_type = var.instance_type
+  user_data     = base64encode(var.user_data)
+  vpc_security_group_ids = [aws_security_group.ec2.id]
+}
+
+resource "aws_autoscaling_group" "web" {
+  name                = "${var.environment}-asg"
+  vpc_zone_identifier = var.private_subnet_ids
+  min_size            = 2
+  max_size            = 6
+  desired_capacity    = 2
+  target_group_arns   = [aws_lb_target_group.web.arn]
+  launch_template {
+    id      = aws_launch_template.web.id
+    version = "$Latest"
+  }
+  tag {
+    key                 = "Name"
+    value              = "${var.environment}-web"
+    propagate_at_launch = true
+  }
+}
+
+data "aws_ami" "amazon_linux_2" {
+  most_recent = true
+  owners      = ["amazon"]
+  filter {
+    name   = "name"
+    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+  }
+}
+```
+
+## Step 4: Database Module
+
+```hcl
+# modules/database/main.tf
+resource "aws_security_group" "rds" {
+  name_prefix = "${var.environment}-rds-"
+  vpc_id      = var.vpc_id
+  ingress {
+    from_port       = 3306
+    to_port         = 3306
+    protocol        = "tcp"
+    security_groups = [var.app_security_group_id]
+  }
+}
+
+resource "aws_db_subnet_group" "rds" {
+  name       = "${var.environment}-rds-subnets"
+  subnet_ids = var.private_subnet_ids
+}
+
+resource "aws_db_instance" "main" {
+  identifier             = "${var.environment}-mysql"
+  engine                 = "mysql"
+  engine_version         = "8.0"
+  instance_class         = var.instance_class
+  allocated_storage      = 20
+  storage_type           = "gp3"
+  db_name                = var.db_name
+  username               = var.db_username
+  password               = var.db_password
+  db_subnet_group_name   = aws_db_subnet_group.rds.name
+  vpc_security_group_ids = [aws_security_group.rds.id]
+  multi_az               = var.multi_az
+  skip_final_snapshot    = var.skip_final_snapshot
+  backup_retention_period = 7
+  backup_window          = "03:00-04:00"
+  maintenance_window     = "sun:04:00-sun:05:00"
+  tags = { Name = "${var.environment}-mysql" }
+}
+```
+
+## Step 5: Variables and Root Module
+
+```hcl
+# variables.tf
+variable "aws_region" {
+  description = "AWS region"
+  type        = string
+  default     = "us-east-1"
+}
+
+variable "environment" {
+  description = "Environment name"
+  type        = string
+}
+
+variable "vpc_cidr" {
+  description = "VPC CIDR block"
+  type        = string
+  default     = "10.0.0.0/16"
+}
+
+variable "private_subnet_cidrs" {
+  description = "Private subnet CIDRs"
+  type        = list(string)
+  default     = ["10.0.1.0/24", "10.0.2.0/24"]
+}
+
+variable "public_subnet_cidrs" {
+  description = "Public subnet CIDRs"
+  type        = list(string)
+  default     = ["10.0.101.0/24", "10.0.102.0/24"]
+}
+
+variable "azs" {
+  description = "Availability zones"
+  type        = list(string)
+  default     = ["us-east-1a", "us-east-1b"]
+}
+
+variable "instance_type" {
+  description = "EC2 instance type"
+  type        = string
+  default     = "t3.micro"
+}
+
+variable "db_instance_class" {
+  description = "RDS instance class"
+  type        = string
+  default     = "db.t3.micro"
+}
+
+variable "db_username" {
+  description = "Database username"
+  type        = string
+  sensitive   = true
+}
+
+variable "db_password" {
+  description = "Database password"
+  type        = string
+  sensitive   = true
+}
+
+variable "multi_az" {
+  description = "Enable Multi-AZ for RDS"
+  type        = bool
+  default     = true
+}
+
+variable "skip_final_snapshot" {
+  description = "Skip final snapshot (dev only)"
+  type        = bool
+  default     = false
+}
+
+variable "db_name" {
+  description = "Database name"
+  type        = string
+  default     = "appdb"
+}
+```
+
+```hcl
+# terraform.tfvars
+environment        = "production"
+aws_region         = "us-east-1"
+instance_type      = "t3.small"
+db_instance_class  = "db.t3.small"
+db_username        = "admin"
+db_password        = "ChangeMe123!"
+multi_az           = true
+```
+
+```hcl
+# outputs.tf
+output "alb_dns_name" {
+  description = "ALB DNS name"
+  value       = module.compute.alb_dns_name
+}
+
+output "rds_endpoint" {
+  description = "RDS endpoint"
+  value       = module.database.rds_endpoint
+  sensitive   = true
+}
+
+output "vpc_id" {
+  description = "VPC ID"
+  value       = module.networking.vpc_id
+}
+```
+
+## Step 6: User Data Script
+
+```bash
+#!/bin/bash
+# user_data.sh
+yum update -y
+yum install -y httpd
+systemctl enable httpd
+systemctl start httpd
+
+cat > /var/www/html/index.html << EOF
+<!DOCTYPE html>
+<html>
+<body>
+<h1>Hello from Terraform!</h1>
+<p>Instance: $(hostname -f)</p>
+<p>Region: ${aws_region}</p>
+</body>
+</html>
+EOF
+```
+
+<Aside variant="tip">
+  For production, bake the application into a golden AMI with Packer + Ansible instead of using user_data. The user_data approach is shown here for simplicity.
+</Aside>
+
+## Step 7: Deploy
+
+```bash
+# Initialize with backend
+terraform init
+
+# Preview changes
+terraform plan
+
+# Apply
+terraform apply -auto-approve
+
+# Get outputs
+terraform output
+
+# Destroy (when finished)
+terraform destroy -auto-approve
+```
+
+<Aside variant="caution">
+  Running `terraform destroy` will remove ALL resources including the database. Use `terraform plan` targeting a specific resource if you only want to modify part of the stack: `terraform plan -target=module.compute`
+</Aside>
+
+## Summary
+
+You have deployed a production-grade three-tier architecture using Terraform with:
+- **Reusable modules** for networking, compute, and database
+- **Remote S3 backend** with DynamoDB state locking
+- **Auto Scaling** with an ALB for the web tier
+- **Multi-AZ RDS** for database high availability
+- **Immutable infrastructure** — all changes flow through Terraform, no manual SSH
+
+This project demonstrates real-world IaC patterns used by organizations managing infrastructure at scale.

@@ -1,0 +1,25 @@
+---
+title: "Module 2: Cloud Networking"
+description: "Design and configure cloud networks — VPCs, subnets, DNS, CDNs, and load balancers. Understand how traffic flows through the cloud and how to secure it at every layer."
+sidebar:
+  order: 0
+  label: "Module Overview"
+tab: "cloud-engineering"
+---
+
+
+Networking is the backbone of cloud infrastructure. Every service you provision — whether a virtual machine, a database, or a serverless function — lives on a network. Understanding how that network is designed, segmented, and secured is essential for any cloud engineer.
+
+Module 2 covers three major networking domains.
+
+**VPCs and Subnets** — Virtual Private Clouds (VPCs) are your isolated network environment in the cloud. You will learn CIDR notation for IP addressing, how to divide a VPC into public and private subnets, and how route tables, internet gateways, and NAT gateways direct traffic. We compare security groups (stateful instance-level firewalls) with network ACLs (stateless subnet-level firewalls) so you know how to layer defenses.
+
+<Aside variant="info">
+A well-designed VPC is the single most impactful decision you can make for security and scalability. Misconfiguring CIDR ranges or subnet layouts early is painful to fix later.
+</Aside>
+
+**DNS and CDN** — The Domain Name System translates human-readable names to IP addresses. We cover Route 53 (AWS), Azure DNS, and Cloud DNS (GCP) for domain registration, record management, and routing policies. Content delivery networks (CDNs) like CloudFront bring content closer to users through edge caching.
+
+**Load Balancing and Auto Scaling** — Traffic must be distributed across healthy instances. We examine Application Load Balancers (layer 7), Network Load Balancers (layer 4), Azure Load Balancer, and GCP Cloud Load Balancing. Auto scaling policies ensure you run just enough capacity to handle demand.
+
+The module project challenges you to design a multi-tier VPC architecture — a private web tier, a private application tier, and a private database tier — with appropriate security and routing. This is the same pattern used by production applications across every industry.

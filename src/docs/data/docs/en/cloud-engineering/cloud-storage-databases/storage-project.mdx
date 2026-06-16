@@ -1,0 +1,149 @@
+---
+title: "Module Project: Multi-Tier Storage Architecture"
+description: "Design a complete storage and database architecture for an e-commerce platform. Combine object storage, block storage, relational databases, NoSQL, and caching to meet real-world requirements."
+sidebar:
+  order: 99
+  label: "Module Project"
+tab: "cloud-engineering"
+---
+
+
+## Project Overview
+
+Design a multi-tier storage and database architecture for an e-commerce platform called "ShopCloud." The platform sells physical and digital goods, has a global customer base, and needs to be highly available, durable, and performant.
+
+**Scenario:** ShopCloud is launching in three phases. Phase 1 targets North America and Europe. The engineering team practices Infrastructure as Code (Terraform) and wants to automate everything. You must recommend every storage and database service, justify your choices, and document the data flow.
+
+## Requirements
+
+| Requirement | Detail |
+|-------------|--------|
+| Product catalog | 1 million SKUs, growing 10% monthly. Highly read-heavy. |
+| User accounts | 500K registered users. Passwords hashed with bcrypt. |
+| Orders | 50K orders/day. Must be ACID-compliant. |
+| Session data | Ephemeral, high-throughput, low-latency. |
+| Product images | 10 TB of images, served globally. Cache-friendly. |
+| Analytics pipeline | Raw clickstream data, warehouse for reporting. |
+| Disaster recovery | RPO ≤ 5 minutes, RTO ≤ 1 hour. |
+
+## Architecture Decision Record
+
+### 1. Product Catalog → DynamoDB
+
+**Why:** The catalog is accessed by product ID. No complex joins are needed — just fast key-value lookups. DynamoDB scales automatically to handle traffic spikes during sales events.
+
+**Configuration:**
+- Table with `product_id` (partition key) and `category` (GSI for category browsing)
+- On-demand capacity (unpredictable traffic during flash sales)
+- DAX cluster for microsecond reads on frequently accessed products
+
+<Aside variant="info">
+If the product catalog required full-text search or faceted navigation (filter by price range, brand, ratings), we would add a secondary indexing layer like Amazon OpenSearch.
+</Aside>
+
+### 2. User Accounts and Orders → RDS PostgreSQL
+
+**Why:** Orders involve multiple tables (customers, orders, line items, payments) with complex transactional logic. ACID guarantees are non-negotiable for financial data.
+
+**Configuration:**
+- db.r6g.xlarge (8 vCPU, 64 GB RAM) — Multi-AZ
+- Automated backups with 35-day retention
+- Read replica in `eu-west-1` for European users
+
+### 3. Session Data → ElastiCache Redis
+
+**Why:** Sessions are ephemeral, require single-digit-millisecond latency, and benefit from Redis data structures (sorted sets for cart expiration, pub/sub for inventory notifications).
+
+**Configuration:**
+- Redis cluster mode enabled, 3 shards, 1 replica per shard
+- No persistence (sessions are disposable; RAM-only for maximum performance)
+
+### 4. Product Images → S3 + CloudFront
+
+**Why:** Images are large, immutable, and accessed globally. S3 provides 11 nines durability, lifecycle policies manage cost, and CloudFront caches at edge locations.
+
+**Configuration:**
+- S3 Standard — images uploaded in the last 30 days
+- S3 Standard-IA — images 31-90 days old
+- S3 Glacier Deep Archive — images older than 90 days (rarely accessed)
+- CloudFront distribution with origin access identity
+- Image optimization (WebP conversion via Lambda@Edge)
+
+### 5. Analytics Pipeline → S3 + Athena
+
+**Why:** Clickstream data is unstructured, high-volume, and accessed for ad-hoc analysis. S3 serves as the data lake, Athena queries it via SQL without provisioning servers.
+
+**Configuration:**
+- S3 bucket with partitioned layout: `clickstream/year=2025/month=01/day=15/`
+- Lifecycle policy: transition to S3 Glacier after 90 days, delete after 7 years
+- Glue crawler for schema discovery
+- QuickSight for dashboards
+
+## Data Flow Diagram
+
+```
+                    ┌──────────────┐
+                    │  Users       │
+                    └──────┬───────┘
+                           │
+                    ┌──────▼───────┐
+                    │  CloudFront  │
+                    │  (CDN)       │
+                    └──────┬───────┘
+                           │
+              ┌────────────┼────────────┐
+              │            │            │
+        ┌─────▼────┐ ┌────▼────┐ ┌────▼────┐
+        │ S3       │ │ ALB     │ │ Athena  │
+        │ (Images) │ │         │ │ (Analytics)
+        └──────────┘ └────┬────┘ └─────────┘
+                          │
+                 ┌────────┼────────┐
+                 │        │        │
+           ┌─────▼──┐ ┌──▼───┐ ┌──▼─────┐
+           │ EC2    │ │Redis │ │ Lambda │
+           │ (App)  │ │Sess. │ │ (Auth) │
+           └────┬───┘ └──────┘ └────────┘
+                │
+          ┌─────┼─────┐
+          │     │     │
+    ┌─────▼┐ ┌──▼──┐ ┌▼──────┐
+    │ RDS  │ │Dynamo│ │ S3    │
+    │Orders│ │Catalog│ │DataLake│
+    └──────┘ └──────┘ └───────┘
+```
+
+## Disaster Recovery
+
+| Tier | Primary | DR Strategy | RPO | RTO |
+|------|---------|-------------|-----|-----|
+| RDS (Orders) | us-east-1 | Cross-region read replica in us-west-2 | < 5 seconds | < 1 hour |
+| DynamoDB (Catalog) | us-east-1 | Global table (us-west-2) | < 1 second | < 1 minute |
+| ElastiCache (Sessions) | us-east-1 | Rebuild from app on failover | N/A | < 5 minutes |
+| S3 (Images + Lake) | us-east-1 | Cross-region replication | < 15 minutes | < 1 hour |
+
+<Aside variant="caution">
+Cross-region replication for S3 incurs transfer costs (roughly $0.02/GB for inter-region). Only replicate buckets that contain business-critical data. Recreatable data (transient logs) can be regenerated from source systems.
+</Aside>
+
+## Cost Estimate (Monthly)
+
+| Service | Configuration | Estimated Cost |
+|---------|--------------|---------------|
+| S3 (10 TB) + CloudFront (50 TB egress) | Standard + Glacier lifecycle | $1,200 |
+| DynamoDB (1M RCU/WCU on-demand) | With DAX cluster | $900 |
+| RDS PostgreSQL (Multi-AZ) | db.r6g.xlarge | $800 |
+| ElastiCache Redis (3 shards) | r6g.large | $450 |
+| S3 data lake + Athena queries | Partitioned, 10 TB scanned | $200 |
+| **Total** | | **~$3,550** |
+
+## Reflection Questions
+
+1. **Why not use RDS for the product catalog?** RDS would work, but it requires manual sharding at this scale. DynamoDB handles partitioning automatically and costs less for simple key-value access.
+2. **Should the analytics pipeline use a data warehouse (Redshift) instead of Athena?** At this data volume (~1 TB/month), Athena and S3 are more cost-effective. Redshift becomes compelling at 10+ TB with complex, repeated queries.
+3. **How would you handle digital goods delivery?** Store digital goods in S3 with pre-signed URLs (time-limited, one-time use). The order confirmation Lambda generates the URL after payment is validated.
+4. **What if read traffic doubles overnight (viral marketing campaign)?** DynamoDB on-demand and CloudFront absorb spikes automatically. RDS would need read replicas scaled up — automate this with a Lambda that monitors replica lag and adds replicas on threshold breach.
+
+## Deliverable
+
+Create an ADR covering: service selection rationale, configuration details, data flow diagram, DR strategy, and cost estimate. Be prepared to justify each choice against alternatives (e.g., why DynamoDB over MongoDB on EC2, why Aurora over standard PostgreSQL).

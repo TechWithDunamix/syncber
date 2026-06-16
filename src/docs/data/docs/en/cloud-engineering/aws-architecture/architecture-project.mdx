@@ -1,0 +1,290 @@
+---
+title: "Module Project — Design HA Multi-Region Web Application Architecture"
+description: "Design and document a highly available, multi-region web application architecture on AWS. Apply the Well-Architected Framework, define RPO/RTO, and produce an architecture diagram."
+sidebar:
+  order: 99
+  label: "Module Project"
+tab: "cloud-engineering"
+---
+
+In this project, you will design a highly available, multi-region web application architecture for a global e-commerce platform. This is an architecture design exercise — you will produce documentation and Terraform templates rather than deploying to AWS.
+
+## Business Requirements
+
+- Global user base across North America and Europe
+- 99.99% availability SLA
+- Recovery Time Objective (RTO): 5 minutes
+- Recovery Point Objective (RPO): 1 minute
+- Zero data loss in single-AZ failure
+- Must handle traffic spikes during Black Friday (10x normal load)
+
+## Architecture Design
+
+```
+                              ┌─────────────────────────────┐
+                              │         Route53             │
+                              │   Latency-based Routing     │
+                              │   Health Checks (2s)        │
+                              └──────┬──────────────┬───────┘
+                                     │              │
+                 ┌───────────────────┘              └───────────────────┐
+                 ▼                                                     ▼
+     ┌──────────────────────────┐           ┌──────────────────────────┐
+     │     Region: us-east-1     │           │     Region: eu-west-1    │
+     │                           │           │                           │
+     │  ┌─────────────────────┐  │           │  ┌─────────────────────┐  │
+     │  │  CloudFront + WAF   │  │           │  │  CloudFront + WAF   │  │
+     │  └─────────┬───────────┘  │           │  └─────────┬───────────┘  │
+     │            │              │           │            │              │
+     │  ┌─────────┴───────────┐  │           │  ┌─────────┴───────────┐  │
+     │  │   ALB (3 AZs)       │  │           │  │   ALB (3 AZs)       │  │
+     │  └─────────┬───────────┘  │           │  └─────────┬───────────┘  │
+     │            │              │           │            │              │
+     │  ┌─────────┴───────────┐  │           │  ┌─────────┴───────────┐  │
+     │  │  ECS Fargate (ASG)  │  │           │  │  ECS Fargate (ASG)  │  │
+     │  │  min:4 max:40       │  │           │  │  min:4 max:40       │  │
+     │  │  CPU-based scaling  │  │           │  │  CPU-based scaling  │  │
+     │  └─────────┬───────────┘  │           │  └─────────┬───────────┘  │
+     │            │              │           │            │              │
+     │            ├──────────┐   │           │            ├──────────┐   │
+     │  ┌─────────┴────┐ ┌──┴───────┐       │  ┌─────────┴────┐ ┌──┴───────┐
+     │  │ Aurora       │ │ Elastic  │       │  │ Aurora       │ │ Elastic  │
+     │  │ Global DB    │ │ Redis    │       │  │ Global DB    │ │ Redis    │
+     │  │ (Writer)     │ │ (Local)  │       │  │ (Reader)     │ │ (Local)  │
+     │  └──────────────┘ └──────────┘       │  └──────────────┘ └──────────┘
+     │                                      │                           │
+     │  ┌────────────────────────────┐      │  ┌──────────────────────┐ │
+     │  │  S3 (Static Assets)       │      │  │ S3 CRR Replica       │ │
+     │  │  + CloudFront OAI         │      │  │ (Cross-Region)       │ │
+     │  └────────────────────────────┘      │  └──────────────────────┘ │
+     └──────────────────────────────────┘   └──────────────────────────┘
+```
+
+## Step 1: Define the Architecture Components
+
+Complete the following table for your architecture:
+
+| Component | Service | Configuration | Justification |
+|-----------|---------|---------------|---------------|
+| **DNS** | Route53 | Latency-based routing, health checks every 2s | Routes users to nearest healthy region |
+| **CDN** | CloudFront | WAF integration, OAI for S3, custom SSL | Reduces latency, DDoS protection |
+| **Compute** | ECS Fargate | Min 4, max 40 per region, CPU scaling at 70% | Serverless containers, AZ-aware |
+| **Database** | Aurora Global DB | 1 writer (us-east-1), 1 reader (eu-west-1) | Sub-second replication, less than 1 min RPO |
+| **Cache** | ElastiCache Redis | Cluster mode, multi-AZ auto-failover | Session store, reduces DB load |
+| **Storage** | S3 + S3 CRR | CloudFront OAI, CRR to DR region | Static assets, cross-region replication |
+| **Secrets** | Secrets Manager | Auto-rotation, cross-region replica | Database credentials, API keys |
+
+## Step 2: Write Key Terraform Components
+
+Create `regions/main.tf`:
+
+```hcl
+module "app_primary" {
+  source = "../modules/web-app"
+
+  providers = {
+    aws = aws.us_east_1
+  }
+
+  region          = "us-east-1"
+  environment     = "prod"
+  vpc_cidr        = "10.0.0.0/16"
+  instance_count  = 4
+  max_instances   = 40
+  is_primary      = true
+}
+
+module "app_dr" {
+  source = "../modules/web-app"
+
+  providers = {
+    aws = aws.eu_west_1
+  }
+
+  region          = "eu-west-1"
+  environment     = "prod"
+  vpc_cidr        = "10.1.0.0/16"
+  instance_count  = 2
+  max_instances   = 40
+  is_primary      = false
+}
+```
+
+Create `modules/web-app/main.tf`:
+
+```hcl
+variable "region" { type = string }
+variable "environment" { type = string }
+variable "vpc_cidr" { type = string }
+variable "instance_count" { type = number }
+variable "max_instances" { type = number }
+variable "is_primary" { type = bool }
+
+# VPC with 3 AZs
+module "vpc" {
+  source = "terraform-aws-modules/vpc/aws"
+  name   = "${var.environment}-${var.region}"
+  cidr   = var.vpc_cidr
+
+  azs             = ["${var.region}a", "${var.region}b", "${var.region}c"]
+  private_subnets = [cidrsubnet(var.vpc_cidr, 4, 0), cidrsubnet(var.vpc_cidr, 4, 1), cidrsubnet(var.vpc_cidr, 4, 2)]
+  public_subnets  = [cidrsubnet(var.vpc_cidr, 4, 3), cidrsubnet(var.vpc_cidr, 4, 4), cidrsubnet(var.vpc_cidr, 4, 5)]
+
+  enable_nat_gateway   = true
+  single_nat_gateway   = false
+  enable_dns_hostnames = true
+}
+
+# ALB
+resource "aws_lb" "web" {
+  name               = "${var.environment}-${var.region}-alb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.alb.id]
+  subnets            = module.vpc.public_subnets
+  enable_deletion_protection = true
+}
+
+# ECS Fargate
+resource "aws_ecs_cluster" "main" {
+  name = "${var.environment}-${var.region}-ecs"
+}
+
+resource "aws_ecs_service" "app" {
+  name            = "${var.environment}-${var.region}-app"
+  cluster         = aws_ecs_cluster.main.id
+  task_definition = aws_ecs_task_definition.app.arn
+  desired_count   = var.instance_count
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    subnets         = module.vpc.private_subnets
+    security_groups = [aws_security_group.ecs.id]
+  }
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.app.arn
+    container_name   = "app"
+    container_port   = 3000
+  }
+}
+
+# Auto scaling
+resource "aws_appautoscaling_target" "app" {
+  max_capacity       = var.max_instances
+  min_capacity       = var.instance_count
+  resource_id        = "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.app.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  service_namespace  = "ecs"
+}
+
+resource "aws_appautoscaling_policy" "app_cpu" {
+  name               = "${var.environment}-${var.region}-cpu-scaling"
+  policy_type        = "TargetTrackingScaling"
+  resource_id        = aws_appautoscaling_target.app.resource_id
+  scalable_dimension = aws_appautoscaling_target.app.scalable_dimension
+  service_namespace  = aws_appautoscaling_target.app.service_namespace
+
+  target_tracking_scaling_policy_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = "ECSServiceAverageCPUUtilization"
+    }
+    target_value = 70
+  }
+}
+```
+
+Create `route53/main.tf`:
+
+```hcl
+# Primary region health check
+resource "aws_route53_health_check" "primary" {
+  fqdn              = "primary-app.example.com"
+  port              = 443
+  type              = "HTTPS"
+  resource_path     = "/health"
+  failure_threshold = 3
+  request_interval  = 10
+}
+
+# Latency-based alias records
+resource "aws_route53_record" "app" {
+  zone_id = var.hosted_zone_id
+  name    = "app.example.com"
+  type    = "A"
+
+  latency_routing_policy {
+    region = "us-east-1"
+  }
+  set_identifier = "us-east-1"
+  alias {
+    zone_id                = var.primary_alb_zone_id
+    name                   = var.primary_alb_dns
+    evaluate_target_health = true
+  }
+}
+
+resource "aws_route53_record" "app_eu" {
+  zone_id = var.hosted_zone_id
+  name    = "app.example.com"
+  type    = "A"
+
+  latency_routing_policy {
+    region = "eu-west-1"
+  }
+  set_identifier = "eu-west-1"
+  alias {
+    zone_id                = var.dr_alb_zone_id
+    name                   = var.dr_alb_dns
+    evaluate_target_health = true
+  }
+}
+```
+
+## Step 3: Document the Architecture
+
+Create `architecture-documentation.md` with these sections:
+
+1. **Overview** — Business goals, assumptions, constraints
+2. **Architecture Diagram** — ASCII or Lucidchart diagram with all components
+3. **Component Details** — Each service, configuration, and justification
+4. **Data Flow** — Request lifecycle from user to response:
+   ```
+   User → Route53 → CloudFront → WAF → ALB → ECS Fargate → Aurora/Redis → Response
+   ```
+5. **Resilience Strategy**:
+   - AZ failure: ECS spreads tasks across 3 AZs, Aurora Multi-AZ failover
+   - Region failure: Route53 routes to DR region, Aurora promotes reader
+   - Data durability: Aurora Global DB (sub-second replication), S3 CRR, daily EBS snapshots
+6. **RPO/RTO Analysis**:
+   | Scenario | RPO | RTO | Mechanism |
+   |----------|-----|-----|-----------|
+   | AZ failure | 0 | < 1 min | Multi-AZ, ALB health checks |
+   | Single instance | 0 | < 30s | ECS replaces, ALB drains |
+   | Region failure | ~1s | ~5 min | Aurora promote, Route53 failover |
+   | Data corruption | < 5 min | < 30 min | PITR (Aurora), versioning (S3) |
+7. **Cost Estimate** — Approximate monthly cost per region:
+   | Service | us-east-1 | eu-west-1 |
+   |---------|-----------|-----------|
+   | ECS Fargate (4 tasks) | ~$400 | ~$200 (min) |
+   | ALB | ~$25 | ~$25 |
+   | Aurora | ~$500 | ~$250 (reader) |
+   | ElastiCache | ~$100 | ~$100 |
+   | Data transfer | ~$200 | ~$200 |
+   | **Total** | **~$1,225** | **~$775** |
+8. **Operational Runbook** — Deployment, scaling, failover, restore procedures
+
+## Deliverables
+
+- Architecture diagram (ASCII or tool-generated) showing multi-region topology
+- Terraform modules for: VPC (3 AZs), ECS Fargate (Auto Scaling), ALB, Aurora Global DB, Route53 (latency routing)
+- Architecture documentation with data flow, resilience strategy, RPO/RTO analysis, and cost estimate
+- Operational runbook covering failover and restore procedures
+
+<Aside variant="info" title="Architecture Review Checklist">
+  - Are all single points of failure eliminated? (ALB, ECS, DB, cache)
+  - Does the design meet the 5-minute RTO and 1-minute RPO?
+  - Can it handle 10x traffic spikes (Black Friday scenario)?
+  - Are all cross-region data transfers encrypted and within compliance requirements?
+  - Do IAM policies follow least privilege across all services?
+</Aside>

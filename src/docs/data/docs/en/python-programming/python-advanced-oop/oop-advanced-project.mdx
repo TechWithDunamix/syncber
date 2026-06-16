@@ -1,0 +1,335 @@
+---
+title: "Advanced OOP Project"
+description: "Build a plugin system using metaclasses, descriptors, enums, and protocols"
+sidebar:
+  order: 3
+  label: "Plugin System Project"
+tab: "python-programming"
+---
+
+Apply advanced OOP — metaclasses, descriptors, enums, protocols — to build a plugin system.
+
+## Project: Plugin System with Advanced OOP
+
+Create `plugin_system.py`:
+
+```python
+"""A plugin system demonstrating advanced Python OOP features."""
+
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from enum import Enum, auto
+from typing import Dict, List, Optional, Protocol, Any
+import importlib
+import inspect
+import pkgutil
+
+
+class PluginPriority(IntEnum):
+    """Plugin execution priority."""
+    LOWEST = 0
+    LOW = 25
+    NORMAL = 50
+    HIGH = 75
+    HIGHEST = 100
+
+
+class PluginState(Enum):
+    """Plugin lifecycle state."""
+    REGISTERED = auto()
+    INITIALIZED = auto()
+    ACTIVE = auto()
+    ERROR = auto()
+    DISABLED = auto()
+
+
+class ValidationError(Exception):
+    """Raised when plugin validation fails."""
+    pass
+
+
+class ValidatedAttribute:
+    """Descriptor for validated plugin attributes."""
+
+    def __init__(self, validator, default=None):
+        self.validator = validator
+        self.default = default
+        self.data = {}
+
+    def __set_name__(self, owner, name):
+        self.name = name
+
+    def __get__(self, obj, objtype=None):
+        if obj is None:
+            return self
+        return self.data.get(id(obj), self.default)
+
+    def __set__(self, obj, value):
+        if not self.validator(value):
+            raise ValidationError(
+                f"Invalid value for {self.name}: {value}"
+            )
+        self.data[id(obj)] = value
+
+    def __delete__(self, obj):
+        del self.data[id(obj)]
+
+
+def non_empty_string(value):
+    return isinstance(value, str) and len(value) > 0
+
+def positive_int(value):
+    return isinstance(value, int) and value >= 0
+
+def valid_priority(value):
+    return isinstance(value, PluginPriority)
+
+
+class PluginMeta(type):
+    """Metaclass that auto-registers plugins."""
+
+    def __init__(cls, name, bases, namespace):
+        super().__init__(name, bases, namespace)
+        # Skip abstract base
+        if not getattr(cls, '_abstract', False):
+            PluginRegistry.register(cls)
+
+    def __repr__(cls):
+        return f"<Plugin: {cls.__name__}>"
+
+
+class PluginRegistry:
+    """Central registry for all plugins."""
+
+    _plugins: Dict[str, type] = {}
+    _instances: Dict[str, Any] = {}
+    _hooks: Dict[str, List[str]] = {}
+
+    @classmethod
+    def register(cls, plugin_cls):
+        """Register a plugin class."""
+        name = plugin_cls.__name__
+        cls._plugins[name] = plugin_cls
+        return plugin_cls
+
+    @classmethod
+    def get_plugin(cls, name: str):
+        """Get a plugin class by name."""
+        return cls._plugins.get(name)
+
+    @classmethod
+    def get_all(cls):
+        """Get all registered plugins."""
+        return dict(cls._plugins)
+
+    @classmethod
+    def instantiate_all(cls):
+        """Create instances of all non-abstract plugins."""
+        for name, plugin_cls in cls._plugins.items():
+            try:
+                instance = plugin_cls()
+                cls._instances[name] = instance
+                instance._state = PluginState.INITIALIZED
+            except Exception as e:
+                print(f"Failed to instantiate {name}: {e}")
+
+    @classmethod
+    def get_instances(cls):
+        return dict(cls._instances)
+
+
+class PluginInterface(Protocol):
+    """Protocol for plugin interface."""
+
+    name: str
+    version: int
+    priority: PluginPriority
+
+    def initialize(self) -> bool:
+        ...
+
+    def execute(self) -> Any:
+        ...
+
+    def shutdown(self) -> None:
+        ...
+
+
+class BasePlugin(metaclass=PluginMeta):
+    """Abstract base for all plugins."""
+
+    _abstract = True
+
+    name = ValidatedAttribute(non_empty_string, "unnamed")
+    version = ValidatedAttribute(positive_int, 1)
+    priority = ValidatedAttribute(valid_priority, PluginPriority.NORMAL)
+
+    def __init__(self):
+        self._state = PluginState.REGISTERED
+
+    def initialize(self) -> bool:
+        self._state = PluginState.ACTIVE
+        print(f"  [{self.name}] Initialized v{self.version}")
+        return True
+
+    @abstractmethod
+    def execute(self):
+        pass
+
+    def shutdown(self):
+        self._state = PluginState.DISABLED
+        print(f"  [{self.name}] Shut down")
+
+    @property
+    def state(self):
+        return self._state
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}: {self.name} v{self.version}>"
+
+
+# --- Concrete Plugins ---
+
+class LoggingPlugin(BasePlugin):
+    name = "Logger"
+    version = 1
+    priority = PluginPriority.HIGH
+
+    def execute(self):
+        print(f"  [{self.name}] Logging system active")
+        return {"logs_written": 0}
+
+
+class MetricsPlugin(BasePlugin):
+    name = "Metrics Collector"
+    version = 2
+    priority = PluginPriority.HIGHEST
+
+    def execute(self):
+        print(f"  [{self.name}] Collecting metrics...")
+        return {"metrics": {"cpu": 45, "memory": 62}}
+
+
+class CachePlugin(BasePlugin):
+    name = "Cache Manager"
+    version = 3
+    priority = PluginPriority.NORMAL
+
+    def __init__(self):
+        super().__init__()
+        self._cache = {}
+
+    def execute(self):
+        print(f"  [{self.name}] Cache ready ({len(self._cache)} entries)")
+        return {"cache_size": len(self._cache)}
+
+    def set(self, key, value):
+        self._cache[key] = value
+
+    def get(self, key):
+        return self._cache.get(key)
+
+
+class PluginManager:
+    """Manages plugin lifecycle and execution."""
+
+    def __init__(self):
+        self.plugins: Dict[str, BasePlugin] = {}
+
+    def load_all(self):
+        """Instantiate and initialize all registered plugins."""
+        PluginRegistry.instantiate_all()
+        self.plugins = PluginRegistry.get_instances()
+
+        # Initialize in priority order
+        for plugin in self._sorted_by_priority():
+            try:
+                plugin.initialize()
+            except Exception as e:
+                print(f"  Failed to initialize {plugin.name}: {e}")
+
+    def _sorted_by_priority(self):
+        return sorted(
+            self.plugins.values(),
+            key=lambda p: p.priority.value,
+            reverse=True,
+        )
+
+    def execute_all(self):
+        """Execute all active plugins."""
+        results = {}
+        for plugin in self._sorted_by_priority():
+            if plugin.state == PluginState.ACTIVE:
+                try:
+                    results[plugin.name] = plugin.execute()
+                except Exception as e:
+                    print(f"  [{plugin.name}] Error: {e}")
+        return results
+
+    def shutdown_all(self):
+        """Shutdown all plugins."""
+        for plugin in self.plugins.values():
+            plugin.shutdown()
+
+    def get_plugin(self, name):
+        return self.plugins.get(name)
+
+
+def demo():
+    print("=== Plugin System Demo ===\n")
+
+    manager = PluginManager()
+
+    print("Loading plugins:")
+    manager.load_all()
+
+    print("\nRegistered plugins:")
+    for name, plugin_cls in PluginRegistry.get_all().items():
+        print(f"  {name} ({plugin_cls.priority.name})")
+
+    print("\nExecuting plugins:")
+    results = manager.execute_all()
+
+    print("\nResults:")
+    for name, result in results.items():
+        print(f"  {name}: {result}")
+
+    print("\nShutting down:")
+    manager.shutdown_all()
+
+    # Demonstrate protocol compliance
+    print("\nProtocol check:")
+    plugin = manager.get_plugin("Logger")
+    print(f"Plugin matches PluginInterface: {isinstance(plugin, PluginInterface)}")
+
+    # Demonstrate descriptor validation
+    print("\nDescriptor validation:")
+    try:
+        CachePlugin.name = ""  # Empty name is invalid
+    except ValidationError as e:
+        print(f"  Correctly rejected: {e}")
+
+
+if __name__ == "__main__":
+    demo()
+```
+
+## What You Practiced
+
+| Concept | Usage |
+|---------|-------|
+| Metaclass | `PluginMeta` auto-registers all subclasses of `BasePlugin` |
+| Descriptor | `ValidatedAttribute` validates name, version, priority |
+| Enum | `PluginPriority` (IntEnum) for ordering, `PluginState` for lifecycle |
+| Protocol | `PluginInterface` defines expected interface |
+| ABC | `BasePlugin` with abstract `execute()` method |
+| Registry pattern | `PluginRegistry` tracks all plugins centrally |
+| Plugin lifecycle | Init → Active → Error/Disabled → Shutdown |
+
+## Extensions
+
+1. **Dependency injection** — Allow plugins to declare dependencies on other plugins
+2. **Hot-reload** — Add a reload method that re-imports the module
+3. **Configuration** — Add a config system where plugins can declare config options
+4. **Event system** — Add hook registration so plugins can respond to events
+5. **Sandboxing** — Run plugins in subprocesses for isolation

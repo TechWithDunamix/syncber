@@ -1,0 +1,137 @@
+---
+title: "EC2 Compute"
+description: "Amazon EC2 provides scalable virtual servers in the cloud. Learn instance types, AMIs, security groups, pricing models, and placement groups."
+sidebar:
+  order: 1
+  label: "EC2 Compute"
+tab: "cloud-engineering"
+---
+
+Amazon Elastic Compute Cloud (EC2) is the core compute service on AWS. It provides resizable virtual machines (instances) that you can launch within minutes.
+
+## Instance Types
+
+EC2 instances are categorized into families optimized for different workloads:
+
+| Family | Use Case | Example Types |
+|--------|----------|---------------|
+| **General purpose** | Web servers, dev environments | t3, t4g, m7i |
+| **Compute optimized** | Batch processing, HPC | c7i, c6g |
+| **Memory optimized** | Databases, in-memory caches | r7i, x2iedn |
+| **Storage optimized** | Big data, data warehousing | i4i, d3 |
+| **Accelerated computing** | ML, GPU rendering | p5, g5, trn1 |
+
+Instance types follow a naming convention: `{family}{generation}.{size}`, for example `t3.large` or `m7i.xlarge`.
+
+<Aside variant="tip">
+  Use `t4g` instances (Graviton ARM processors) for cost savings — they offer up to 20% better price-performance compared to x86 equivalents for many workloads.
+</Aside>
+
+## Amazon Machine Images (AMIs)
+
+An AMI is a template that contains the OS and software configuration for an instance. AMIs are regional and identified by an ID (`ami-xxxxxxxx`).
+
+Common AMI sources:
+- **AWS-provided** — Amazon Linux 2, Ubuntu, Windows Server, RHEL, SUSE
+- **AWS Marketplace** — Third-party AMIs with pre-installed software
+- **Custom AMIs** — Created from running instances using `aws ec2 create-image`
+
+```bash
+# Search for available AMIs
+aws ec2 describe-images --owners amazon --filters "Name=name,Values=amzn2-ami-hvm-*-x86_64-gp2" --query 'Images[*].[ImageId,Name,CreationDate]' --output table
+```
+
+## Security Groups
+
+Security groups act as virtual firewalls for EC2 instances. They are **stateful** — if you allow inbound traffic, the outbound response is automatically allowed.
+
+```hcl
+resource "aws_security_group" "web_sg" {
+  name        = "web-server-sg"
+  description = "Allow HTTP and SSH"
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.0.0/8"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+```
+
+<Aside variant="caution">
+  Security group rules are evaluated as a whole — there is no DENY rule within a security group. To block specific traffic, use Network ACLs (stateless) at the subnet level.
+</Aside>
+
+## Pricing Models
+
+AWS offers four purchasing options for EC2:
+
+| Model | Description | Savings vs On-Demand | Best For |
+|-------|-------------|---------------------|----------|
+| **On-Demand** | Pay per hour/second, no commitment | None | Short-term, unpredictable workloads |
+| **Reserved** | 1 or 3 year commitment, partial/upfront | Up to 72% | Steady-state production workloads |
+| **Spot** | Bid on spare capacity, can be interrupted | Up to 90% | Fault-tolerant, stateless workloads |
+| **Savings Plans** | Flexible compute commitment ($/hour) | Up to 72% | Consistent compute across EC2, Fargate, Lambda |
+
+```bash
+# Request a Spot instance
+aws ec2 request-spot-instances \
+  --spot-price "0.05" \
+  --instance-count 1 \
+  --type "one-time" \
+  --launch-specification "{\"ImageId\":\"ami-0c55b159cbfafe1f0\",\"InstanceType\":\"t3.micro\"}"
+```
+
+## Placement Groups
+
+Placement groups control how instances are placed on underlying hardware:
+
+| Type | Strategy | Use Case |
+|------|----------|----------|
+| **Cluster** | Low-latency, same rack | HPC, tightly coupled workloads |
+| **Spread** | Distinct hardware | Critical instances, fault isolation |
+| **Partition** | Groups across partitions | Distributed systems (Hadoop, Cassandra) |
+
+```hcl
+resource "aws_placement_group" "cluster" {
+  name     = "hpc-cluster"
+  strategy = "cluster"
+}
+```
+
+## User Data and Bootstrapping
+
+User data scripts run at instance launch to automate configuration:
+
+```bash
+#!/bin/bash
+yum update -y
+yum install -y httpd
+systemctl start httpd
+systemctl enable httpd
+echo "<h1>Hello from $(hostname -f)</h1>" > /var/www/html/index.html
+```
+
+## Key Takeaways
+
+- EC2 instance types follow `{family}{gen}.{size}` — choose based on workload: general purpose (t/m), compute (c), memory (r/x), storage (i/d), accelerated (p/g/trn)
+- Security groups are **stateful** firewalls at the instance level — inbound rules control traffic, outbound responses are auto-allowed; no explicit DENY rules
+- Four pricing models: On-Demand (flexible), Reserved (steady-state, up to 72% off), Spot (fault-tolerant, up to 90% off), Savings Plans (compute-agnostic commitment)
+- AMIs are regional templates — source from AWS, Marketplace, or create custom images with `aws ec2 create-image`
+- Placement groups control hardware placement: Cluster (low-latency same rack), Spread (distinct hardware), Partition (groups across racks)
+- User data scripts bootstrap instances at launch using `#!/bin/bash` — ideal for installing packages and configuring services

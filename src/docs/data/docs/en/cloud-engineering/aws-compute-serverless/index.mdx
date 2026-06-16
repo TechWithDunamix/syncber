@@ -1,0 +1,53 @@
+---
+title: "Module 5: AWS Compute & Serverless"
+description: "Deep dive into AWS serverless and container compute — Lambda, ECS, EKS, API Gateway, and Step Functions for modern application architectures."
+sidebar:
+  order: 0
+  label: "Module Overview"
+tab: "cloud-engineering"
+---
+
+This module covers the modern compute landscape on AWS — from serverless functions to container orchestration. You will learn to build event-driven architectures and scalable APIs without managing servers.
+
+<Aside variant="info" title="Prerequisites">
+  Basic AWS knowledge (EC2, IAM, S3 from Module 4). Familiarity with Docker containers and REST APIs is helpful but not required.
+</Aside>
+
+## Module Objectives
+
+- Build and deploy AWS Lambda functions with various triggers and configurations
+- Run containerized applications on ECS Fargate and EKS
+- Design REST APIs with API Gateway and orchestrate workflows with Step Functions
+- Deploy a full serverless API with Lambda + API Gateway + DynamoDB
+
+## Topics
+
+| Lesson | Topics Covered |
+|--------|---------------|
+| **AWS Lambda** | Triggers, runtimes, versions, aliases, cold starts, VPC integration, reserved concurrency, best practices |
+| **Containers on AWS** | ECS (Fargate vs EC2), EKS, ECR, task definitions, services, auto scaling |
+| **API Gateway & Step Functions** | REST/HTTP/WebSocket APIs, usage plans, API keys, Step Functions workflows, error handling |
+| **Serverless Project** | Serverless API with Lambda + API Gateway + DynamoDB |
+
+## Key AWS CLI Commands
+
+```bash
+# Invoke a Lambda function
+aws lambda invoke --function-name my-function --payload '{"key":"value"}' response.json
+
+# List ECS clusters
+aws ecs list-clusters
+
+# List API Gateway APIs
+aws apigateway get-rest-apis
+```
+
+<Aside variant="tip">
+  Use `sam init` (AWS SAM CLI) to quickly scaffold serverless projects. SAM provides local testing with `sam local invoke` before deploying to AWS.
+</Aside>
+
+## Estimated Time
+
+- Lessons: 5 hours
+- Hands-on labs: 4 hours
+- Module project: 4 hours

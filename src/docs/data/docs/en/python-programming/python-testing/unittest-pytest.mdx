@@ -1,0 +1,274 @@
+---
+title: "Testing with unittest & pytest"
+description: "Write and run tests with Python's unittest and the pytest framework"
+sidebar:
+  order: 1
+  label: "Testing with unittest & pytest"
+tab: "python-programming"
+---
+
+## Why Test?
+
+Testing ensures your code works correctly and continues to work as you make changes.
+
+## unittest
+
+Python's built-in testing framework.
+
+```python
+# calculator.py
+def add(a, b):
+    return a + b
+
+def divide(a, b):
+    if b == 0:
+        raise ValueError("Cannot divide by zero")
+    return a / b
+```
+
+```python
+# test_calculator.py
+import unittest
+from calculator import add, divide
+
+class TestCalculator(unittest.TestCase):
+
+    def test_add_integers(self):
+        self.assertEqual(add(2, 3), 5)
+
+    def test_add_floats(self):
+        self.assertAlmostEqual(add(0.1, 0.2), 0.3, places=1)
+
+    def test_divide_normal(self):
+        self.assertEqual(divide(10, 2), 5.0)
+
+    def test_divide_by_zero(self):
+        with self.assertRaises(ValueError):
+            divide(10, 0)
+
+if __name__ == "__main__":
+    unittest.main()
+```
+
+```bash
+python -m unittest test_calculator.py
+# ....
+# Ran 4 tests in 0.001s
+# OK
+```
+
+### unittest Assertions
+
+```python
+self.assertEqual(a, b)        # a == b
+self.assertNotEqual(a, b)     # a != b
+self.assertTrue(x)            # bool(x) is True
+self.assertFalse(x)           # bool(x) is False
+self.assertIs(a, b)           # a is b
+self.assertIsNone(x)          # x is None
+self.assertIn(item, list)     # item in list
+self.assertAlmostEqual(a, b)  # floats within tolerance
+self.assertRaises(Exc, func)  # func raises Exc
+self.assertIsInstance(obj, cls)
+```
+
+### Setup and Teardown
+
+```python
+import unittest
+
+class TestDatabase(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        """Run once before all tests."""
+        cls.connection = "connected"
+
+    @classmethod
+    def tearDownClass(cls):
+        """Run once after all tests."""
+        cls.connection = None
+
+    def setUp(self):
+        """Run before each test."""
+        self.data = {"key": "value"}
+
+    def tearDown(self):
+        """Run after each test."""
+        self.data.clear()
+
+    def test_insert(self):
+        self.data["new"] = "data"
+        self.assertIn("new", self.data)
+
+    def test_delete(self):
+        del self.data["key"]
+        self.assertNotIn("key", self.data)
+```
+
+## pytest
+
+A more expressive testing framework (third-party, very popular).
+
+```bash
+pip install pytest
+```
+
+```python
+# test_math.py
+import pytest
+
+def test_addition():
+    assert add(2, 3) == 5
+
+def test_division_by_zero():
+    with pytest.raises(ValueError, match="Cannot divide"):
+        divide(10, 0)
+
+# Parametrized tests
+@pytest.mark.parametrize("a, b, expected", [
+    (2, 3, 5),
+    (0, 0, 0),
+    (-1, 1, 0),
+    (0.5, 0.5, 1.0),
+])
+def test_add_params(a, b, expected):
+    assert add(a, b) == expected
+
+# Fixtures
+@pytest.fixture
+def sample_data():
+    """Provide test data."""
+    return {"name": "Alice", "scores": [85, 92, 78]}
+
+def test_average(sample_data):
+    scores = sample_data["scores"]
+    assert sum(scores) / len(scores) == 85
+```
+
+### pytest Fixtures
+
+```python
+import pytest
+
+@pytest.fixture
+def db_connection():
+    """Set up and tear down database."""
+    conn = {"connected": True}  # Setup
+    yield conn                  # Provide to test
+    conn["connected"] = False   # Teardown
+
+@pytest.fixture(scope="module")
+def config():
+    """Shared across all tests in the module."""
+    return {"host": "localhost", "port": 5432}
+
+def test_query(db_connection):
+    assert db_connection["connected"] is True
+
+def test_config(config):
+    assert config["host"] == "localhost"
+```
+
+### pytest Features
+
+```python
+# Temporary directories
+def test_file_creation(tmp_path):
+    d = tmp_path / "subdir"
+    d.mkdir()
+    f = d / "test.txt"
+    f.write_text("hello")
+    assert f.read_text() == "hello"
+
+# Monkeypatching
+def test_env_var(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///test.db")
+    import os
+    assert os.environ["DATABASE_URL"] == "sqlite:///test.db"
+
+# Capturing output
+def test_print(capsys):
+    print("Hello!")
+    captured = capsys.readouterr()
+    assert captured.out == "Hello!\n"
+
+# Mocking
+from unittest.mock import Mock
+
+def test_mock():
+    mock = Mock(return_value=42)
+    assert mock() == 42
+    assert mock.called
+```
+
+### Running pytest
+
+```bash
+# Run all tests
+pytest
+
+# Verbose
+pytest -v
+
+# Run specific file
+pytest test_calculator.py
+
+# Run specific test
+pytest test_calculator.py::test_addition
+
+# Run tests matching pattern
+pytest -k "add"
+
+# Stop on first failure
+pytest -x
+
+# Show print statements
+pytest -s
+
+# Coverage report
+pip install pytest-cov
+pytest --cov=myapp tests/
+```
+
+## Test Organization
+
+```
+project/
+├── src/
+│   ├── calculator.py
+│   └── database.py
+└── tests/
+    ├── test_calculator.py
+    └── test_database.py
+```
+
+## Test-Driven Development (TDD)
+
+1. Write a failing test
+2. Write minimal code to make it pass
+3. Refactor
+
+```python
+# Step 1: Write test
+def test_is_palindrome():
+    assert is_palindrome("racecar") is True
+    assert is_palindrome("hello") is False
+
+# Step 2: Make it pass
+def is_palindrome(s):
+    return s == s[::-1]
+
+# Step 3: Refactor (if needed)
+```
+
+## Key Takeaways
+
+- `unittest` is built-in; `pytest` is more expressive and commonly preferred
+- `assertEqual`, `assertTrue`, `assertRaises` for unittest assertions
+- `pytest.raises()` and `pytest.mark.parametrize()` for concise tests
+- `@pytest.fixture` for setup/teardown with `yield`
+- `tmp_path`, `monkeypatch`, `capsys` for testing edge cases
+- Organize tests in a `tests/` directory mirroring your source
+- Run with `pytest -v` for verbose output, `pytest --cov` for coverage
+- TDD: red (failing test) → green (passing) → refactor

@@ -1,0 +1,118 @@
+---
+title: "Managed Databases"
+description: "Compare managed relational databases (RDS, Cloud SQL, Azure SQL), NoSQL databases (DynamoDB, Cosmos DB, Firestore), and caching layers (ElastiCache, Memorystore). Learn when to use each."
+sidebar:
+  order: 3
+  label: "Managed Databases"
+tab: "cloud-engineering"
+---
+
+
+Managed databases free you from the operational burden of installation, patching, backup, and replication. Every major cloud provider offers a portfolio of database services spanning relational, key-value, document, and caching engines.
+
+## Relational Databases (SQL)
+
+### Amazon RDS
+
+RDS supports six database engines: MySQL, PostgreSQL, MariaDB, Oracle, SQL Server, and Amazon Aurora (a MySQL/PostgreSQL-compatible engine).
+
+**Features:**
+- **Multi-AZ:** Synchronous standby replica in another AZ for high availability
+- **Read replicas:** Up to 15 asynchronous replicas for read-heavy workloads
+- **Automated backups:** Daily snapshot + 5-minute transaction log retention (configurable up to 35 days)
+- **Storage auto scaling:** Increases storage when free space drops below a threshold
+
+**Aurora** separates compute and storage. The storage layer is a distributed, self-healing cluster that replicates data across three AZs with 6 copies. It offers 5x the throughput of standard MySQL and 3x of standard PostgreSQL.
+
+<Aside variant="info">
+Choose Aurora when you need MySQL/PostgreSQL compatibility with higher performance and availability than standard RDS. Use standard RDS when you need engine-specific features (Oracle extensions, SQL Server integration) not available in Aurora.
+</Aside>
+
+### Azure SQL Database
+
+Fully managed SQL Server with built-in high availability, automatic tuning, and serverless compute options. Azure SQL Database offers:
+
+- **Elastic pools:** Share resources across databases
+- **Hyperscale tier:** Up to 100 TB per database with fast scaling
+- **Geo-replication:** Readable secondaries in paired regions
+
+### Cloud SQL (GCP)
+
+Managed MySQL, PostgreSQL, and SQL Server. Features include:
+
+- **Automatic storage increase:** No downtime
+- **Read replicas:** Cross-region support
+- **Private IP:** Connect via VPC peering, no public internet exposure
+
+## NoSQL Databases
+
+### Amazon DynamoDB
+
+Fully managed key-value and document database with single-digit millisecond performance at any scale.
+
+**Key concepts:**
+- **Partition key + sort key:** Determines data distribution across partitions
+- **On-demand vs. provisioned capacity:** On-demand for unpredictable workloads, provisioned for stable traffic
+- **DAX (DynamoDB Accelerator):** In-memory cache for microsecond response times
+- **Global tables:** Multi-region, multi-master replication
+
+<Aside variant="tip">
+Use DynamoDB for high-traffic applications with simple access patterns (lookups by primary key). If you need complex joins, aggregations, or ad-hoc queries, a relational database is usually a better fit.
+</Aside>
+
+| Feature | DynamoDB | Traditional RDBMS |
+|---------|----------|-------------------|
+| Query model | Key-value + secondary indexes | SQL with joins and aggregations |
+| Scaling | Automatic, unlimited | Vertical (larger instance) or read replicas |
+| Consistency | Eventual (strong optional) | ACID |
+| Unit of billing | RCU/WCU (read/write capacity units) | Instance hour + storage |
+
+### Azure Cosmos DB
+
+Globally distributed NoSQL database with multi-model support (document, key-value, graph, column-family). Cosmos DB guarantees single-digit-millisecond latency at the 99th percentile and offers five consistency levels from strong to eventual.
+
+### Firestore (GCP)
+
+Serverless document database with real-time synchronization, designed for mobile and web applications. It integrates with Firebase for authentication, hosting, and serverless functions.
+
+## Caching
+
+Caching layers sit in front of databases to reduce latency and offload read traffic.
+
+| Service | Platform | Engines | Use Case |
+|---------|----------|---------|----------|
+| ElastiCache | AWS | Redis, Memcached | Session store, query cache, rate limiting |
+| Azure Cache for Redis | Azure | Redis | Session store, content cache, pub/sub |
+| Memorystore | GCP | Redis, Memcached | Session store, cache, leaderboards |
+
+<Aside variant="caution">
+Caching introduces data staleness. Decide what staleness your application can tolerate. For user sessions, milliseconds matter. For product recommendations, minutes may be acceptable. Always configure appropriate TTLs (Time To Live).
+</Aside>
+
+## Choosing a Database
+
+| If you need… | Consider… |
+|--------------|-----------|
+| ACID compliance, complex joins, ad-hoc queries | RDS, Aurora, Cloud SQL, Azure SQL |
+| Massive throughput for simple key-value lookups | DynamoDB |
+| Global distribution with low-latency reads | DynamoDB Global Tables, Cosmos DB |
+| Real-time sync for mobile/web clients | Firestore |
+| Reduce read pressure on your primary database | ElastiCache, Memorystore |
+| Flexible document model with powerful queries | MongoDB Atlas (self-managed or via provider marketplace) |
+
+## Practical Example: E-Commerce Stack
+
+```
+User requests product page
+  └── Check ElastiCache for cached product data
+        ├── Cache hit → return immediately (< 1 ms)
+        └── Cache miss → query DynamoDB (product catalog)
+                         Query RDS (user account, order history):
+                           ├── RDS Primary (writes)
+                           └── RDS Read Replica (reads)
+```
+
+- **Product catalog:** DynamoDB — high throughput, simple key-value access by `product_id`.
+- **User accounts and orders:** RDS PostgreSQL — complex queries with joins and transactions.
+- **Session data:** ElastiCache Redis — fast read/write with TTL expiration.
+- **Search:** Could be added as a separate service (Amazon OpenSearch or a dedicated search index).

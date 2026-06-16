@@ -1,0 +1,88 @@
+---
+title: "Global Infrastructure"
+description: "Understand cloud provider regions, availability zones, and edge locations. Learn how to optimize latency, satisfy data residency requirements, and design for disaster recovery."
+sidebar:
+  order: 3
+  label: "Global Infrastructure"
+tab: "cloud-engineering"
+---
+
+
+Cloud providers operate physical data centers around the world, organized into a hierarchy of regions, availability zones, and edge locations. Understanding this topology is critical for building performant, resilient, and compliant systems.
+
+## Regions
+
+A region is a geographic area containing two or more availability zones. Each region is independent — data does not flow between regions unless you explicitly enable it. Examples: `us-east-1` (N. Virginia), `eu-west-1` (Ireland), `ap-southeast-1` (Singapore).
+
+When selecting a region, consider:
+
+- **Latency to users:** Deploy close to your user base. A region on the opposite side of the planet adds 100-300 ms of round-trip time.
+- **Data residency:** Some regulations (GDPR, Brazil's LGPD, China's Cybersecurity Law) require data to stay within national borders. Choose a region that satisfies these requirements.
+- **Service availability:** Not all services are available in every region. Newer services often launch in a subset of regions first.
+- **Pricing:** Resource costs vary by region. `us-east-1` is typically the least expensive; regions like `sa-east-1` (São Paulo) can be 30-60% more.
+
+<Aside variant="info">
+AWS currently operates over 30 regions, Azure over 60, and GCP over 40. Each provider publishes a region map and service availability table.
+</Aside>
+
+## Availability Zones
+
+An availability zone (AZ) is one or more discrete data centers within a region, each with independent power, cooling, and networking. AZs are connected by high-bandwidth, low-latency fiber, typically within 2 ms of each other.
+
+Designing for availability zone redundancy is the primary mechanism for high availability in the cloud:
+
+```
+Region: us-east-1
+├── us-east-1a (data center)
+├── us-east-1b (data center)
+├── us-east-1c (data center)
+└── us-east-1d (data center)
+```
+
+Deploying application instances across three AZs means that if one AZ fails, the remaining two continue serving traffic with no interruption.
+
+## Edge Locations
+
+Edge locations are points of presence (PoPs) that cache content closer to end users. They power content delivery networks (CDNs) like CloudFront (AWS), Azure CDN, and Cloud CDN (GCP).
+
+Edge locations do **not** run your application code (that is what regions and AZs are for). They cache static assets — images, JavaScript bundles, CSS, API responses — reducing latency and offloading origin servers.
+
+<Aside variant="tip">
+Use edge locations for static assets and use regional infrastructure for dynamic content. Services like Lambda@Edge or CloudFront Functions allow limited compute at the edge for tasks like URL rewrites or A/B testing.
+</Aside>
+
+## Latency Optimization
+
+End-to-end latency is the sum of several components:
+
+1. **Propagation delay:** Speed-of-light limitation (roughly 1 ms per 100 km of fiber).
+2. **Serialization delay:** Time to push bits onto a wire (negligible at modern speeds).
+3. **Queuing delay:** Time packets wait at routers.
+4. **Processing delay:** Time for the server to handle the request.
+
+To minimize latency: choose regions near your users, use a CDN for static content, and offload compute to edge locations when possible.
+
+## Data Residency and Sovereignty
+
+Many countries require that certain data types remain within their borders. Cloud providers address this through region isolation:
+
+- Data stored in `eu-central-1` (Frankfurt) never leaves Germany unless you explicitly replicate it.
+- AWS Artifact, Azure Compliance offerings, and GCP Compliance Reports provide documentation for regulatory audits.
+- Some providers offer dedicated regions for government workloads (AWS GovCloud, Azure Government).
+
+## Disaster Recovery Strategies
+
+Global infrastructure enables several disaster recovery patterns:
+
+| Strategy | RPO | RTO | Cost |
+|----------|-----|-----|------|
+| Backup and restore | Hours | Hours | Low |
+| Pilot light | Minutes | Tens of minutes | Medium |
+| Warm standby | Seconds | Minutes | Medium-High |
+| Active-active (multi-region) | Near zero | Near zero | High |
+
+RPO (Recovery Point Objective) measures acceptable data loss; RTO (Recovery Time Objective) measures acceptable downtime. Your DR strategy should match the criticality of your workload.
+
+<Aside variant="caution">
+Multi-region active-active architectures are complex and expensive. Most workloads are well-served by a single-region, multi-AZ deployment with backup to a second region.
+</Aside>

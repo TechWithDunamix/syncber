@@ -1,0 +1,280 @@
+---
+title: "Essential Standard Library Modules"
+description: "Deep dive into Python's most useful standard library modules"
+sidebar:
+  order: 1
+  label: "Essential Standard Library"
+tab: "python-programming"
+---
+
+Python's standard library is extensive. Here are the most essential modules.
+
+## `os` — Operating System Interface
+
+```python
+import os
+
+# Current directory
+os.getcwd()          # Current working directory
+os.chdir("/tmp")     # Change directory
+
+# File operations
+os.listdir(".")      # List directory contents
+os.mkdir("new_dir")  # Create directory
+os.makedirs("a/b/c", exist_ok=True)  # Create nested directories
+os.remove("file.txt")
+os.rename("old.txt", "new.txt")
+
+# Environment variables
+os.environ.get("HOME", "/default/path")
+os.environ["MY_VAR"] = "value"
+
+# Path info
+os.path.join("dir", "file.txt")  # Platform-correct path
+os.path.exists("file.txt")
+os.path.isfile("file.txt")
+os.path.isdir("mydir")
+```
+
+## `sys` — System-Specific Parameters
+
+```python
+import sys
+
+# Command-line arguments
+# sys.argv = ["script.py", "--verbose", "input.txt"]
+script_name = sys.argv[0]
+args = sys.argv[1:]
+
+# Exit program
+sys.exit(0)      # Success
+sys.exit(1)      # Error
+
+# Python version
+print(sys.version)        # 3.12.0 ...
+print(sys.version_info)   # sys.version_info(major=3, minor=12, ...)
+
+# Module search path
+print(sys.path)   # Directories Python searches for imports
+
+# Standard streams
+sys.stdout.write("Hello\n")
+sys.stderr.write("Error!\n")
+data = sys.stdin.read()
+```
+
+## `datetime` — Date and Time
+
+```python
+from datetime import datetime, date, time, timedelta, timezone
+
+# Current time
+now = datetime.now()
+today = date.today()
+
+# Create specific dates
+d = date(2024, 12, 25)
+t = time(14, 30, 0)
+dt = datetime(2024, 12, 25, 14, 30)
+
+# Formatting
+now.strftime("%Y-%m-%d %H:%M:%S")      # '2024-12-25 14:30:00'
+now.strftime("%A, %B %d")               # 'Wednesday, December 25'
+
+# Parsing
+parsed = datetime.strptime("2024-01-15", "%Y-%m-%d")
+
+# Arithmetic
+tomorrow = today + timedelta(days=1)
+next_week = today + timedelta(weeks=1)
+age = today - date(1990, 5, 15)
+
+# Timezone aware
+from zoneinfo import ZoneInfo  # Python 3.9+
+dt_utc = datetime.now(ZoneInfo("UTC"))
+dt_ny = dt_utc.astimezone(ZoneInfo("America/New_York"))
+```
+
+## `json` — JSON Encoding/Decoding
+
+```python
+import json
+
+data = {"name": "Alice", "scores": [85, 92, 78], "active": True}
+
+# String conversion
+json_str = json.dumps(data, indent=2)
+parsed = json.loads(json_str)
+
+# File operations
+with open("data.json", "w") as f:
+    json.dump(data, f, indent=2)
+
+with open("data.json") as f:
+    data = json.load(f)
+
+# Custom serialization
+from datetime import datetime
+
+def json_serializer(obj):
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    raise TypeError(f"Type {type(obj)} not serializable")
+
+data = {"time": datetime.now()}
+json.dumps(data, default=json_serializer)
+```
+
+## `re` — Regular Expressions
+
+```python
+import re
+
+# Basic matching
+pattern = r"\d+"  # One or more digits
+text = "Order 123: $45.99"
+
+match = re.search(pattern, text)
+if match:
+    print(match.group())  # '123'
+
+# All matches
+re.findall(r"\d+", text)        # ['123', '45', '99']
+re.findall(r"\d+\.\d+", text)   # ['45.99']
+
+# Substitution
+re.sub(r"\d+", "NUM", text)     # 'Order NUM: $NUM.NUM'
+
+# Splitting
+re.split(r"[,;\s]+", "a,b;c d")  # ['a', 'b', 'c', 'd']
+
+# Named groups
+pattern = r"(?P<area>\d{3})-(?P<num>\d{4})"
+m = re.search(pattern, "Call 555-1234")
+print(m.group("area"))  # '555'
+
+# Compile for performance
+phone_pattern = re.compile(r"\d{3}-\d{4}")
+phone_pattern.findall("555-1234, 555-5678")
+
+# Common patterns
+EMAIL = r"[\w.+-]+@[\w-]+\.[\w.]+"
+URL = r"https?://[\w./-]+"
+PHONE = r"\d{3}[-.]?\d{3}[-.]?\d{4}"
+```
+
+<Aside variant="tip">
+  Raw strings (`r"..."`) prevent Python from interpreting backslashes, making regex patterns much cleaner.
+</Aside>
+
+## `collections` — Specialized Containers
+
+```python
+from collections import Counter, defaultdict, namedtuple, deque, OrderedDict
+
+# Counter — count occurrences
+colors = ["red", "blue", "red", "green", "blue", "blue"]
+counts = Counter(colors)
+print(counts)             # Counter({'blue': 3, 'red': 2, 'green': 1})
+print(counts.most_common(2))  # [('blue', 3), ('red', 2)]
+
+# defaultdict — default values for missing keys
+dd = defaultdict(list)
+dd["a"].append(1)         # No KeyError — auto-creates list
+
+# namedtuple — lightweight objects
+Point = namedtuple("Point", ["x", "y"])
+p = Point(3, 4)
+print(p.x, p.y)           # 3 4
+
+# deque — double-ended queue
+dq = deque([1, 2, 3])
+dq.appendleft(0)          # deque([0, 1, 2, 3])
+dq.append(4)              # deque([0, 1, 2, 3, 4])
+dq.popleft()              # 0
+```
+
+## `itertools` — Iterator Tools
+
+```python
+from itertools import chain, product, permutations, combinations, groupby, cycle
+
+# chain — combine iterables
+list(chain([1, 2], [3, 4]))  # [1, 2, 3, 4]
+
+# product — Cartesian product
+list(product([1, 2], ["a", "b"]))
+# [(1, 'a'), (1, 'b'), (2, 'a'), (2, 'b')]
+
+# permutations
+list(permutations([1, 2, 3], 2))
+# [(1, 2), (1, 3), (2, 1), (2, 3), (3, 1), (3, 2)]
+
+# combinations
+list(combinations([1, 2, 3], 2))
+# [(1, 2), (1, 3), (2, 3)]
+
+# groupby — group sorted data
+data = [("a", 1), ("a", 2), ("b", 3)]
+for key, group in groupby(data, lambda x: x[0]):
+    print(key, list(group))
+
+# cycle — infinite loop
+colors = cycle(["red", "green", "blue"])
+next(colors)  # 'red'
+next(colors)  # 'green'
+```
+
+## `math`, `random`, `statistics`
+
+```python
+import math
+import random
+import statistics
+
+# math
+math.pi           # 3.14159...
+math.sqrt(16)     # 4.0
+math.ceil(3.2)    # 4
+math.floor(3.8)   # 3
+
+# random
+random.randint(1, 10)     # Random integer 1-10
+random.choice(["a", "b", "c"])  # Random element
+random.shuffle(items)      # Shuffle in place
+random.sample(population, 3)  # 3 unique elements
+
+# statistics
+data = [2, 4, 4, 4, 5, 5, 7, 9]
+statistics.mean(data)      # 5.0
+statistics.median(data)    # 4.5
+statistics.mode(data)      # 4
+statistics.stdev(data)     # Standard deviation
+```
+
+## `hashlib` and `secrets`
+
+```python
+import hashlib
+import secrets
+
+# Hashing
+text = "hello".encode()
+hashlib.md5(text).hexdigest()
+hashlib.sha256(text).hexdigest()
+
+# Secure random tokens
+secrets.token_hex(16)       # 32-char hex string
+secrets.token_urlsafe(16)   # URL-safe base64
+secrets.choice("abcd")      # Cryptographically secure choice
+```
+
+## Key Takeaways
+
+- `os` and `sys` for system interaction; use `pathlib.Path` instead of `os.path`
+- `datetime` with `ZoneInfo` for timezone-aware datetime
+- `json` for data serialization; `re` for pattern matching
+- `collections`: `Counter`, `defaultdict`, `namedtuple`, `deque`
+- `itertools`: `chain`, `product`, `permutations`, `combinations`, `groupby`
+- `math`, `random`, `statistics` for numerical operations
+- `hashlib` for hashing, `secrets` for cryptographic randomness

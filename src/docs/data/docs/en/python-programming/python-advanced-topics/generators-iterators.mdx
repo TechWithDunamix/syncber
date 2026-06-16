@@ -1,0 +1,273 @@
+---
+title: "Generators & Iterators"
+description: "Create memory-efficient sequences with generators and iterators"
+sidebar:
+  order: 1
+  label: "Generators & Iterators"
+tab: "python-programming"
+---
+
+Generators produce values on demand — they don't store the entire sequence in memory.
+
+## Generator Functions
+
+```python
+def count_up_to(n):
+    """Generator that yields numbers from 1 to n."""
+    i = 1
+    while i <= n:
+        yield i
+        i += 1
+
+# Using the generator
+counter = count_up_to(5)
+print(next(counter))  # 1
+print(next(counter))  # 2
+print(next(counter))  # 3
+
+# Iterate over remaining
+for num in counter:
+    print(num)  # 4, 5
+
+# Convert to list (defeats the memory benefit)
+numbers = list(count_up_to(10))
+```
+
+## Generator Expressions
+
+```python
+# Generator expression — like list comprehension but lazy
+squares = (x ** 2 for x in range(10))
+
+print(next(squares))  # 0
+print(next(squares))  # 1
+
+# More memory efficient than list comprehension
+sum(x ** 2 for x in range(1000000))  # No intermediate list
+```
+
+## Yield vs Return
+
+```python
+def lazy_sequence():
+    """Generator — can yield multiple values."""
+    yield 1
+    yield 2
+    yield 3
+
+def regular_sequence():
+    """Function — returns once."""
+    return [1, 2, 3]
+
+# Generator produces values on demand
+gen = lazy_sequence()
+for value in gen:
+    print(value)
+
+# After iteration, generator is exhausted
+print(list(gen))  # []
+
+# Function returns all at once
+result = regular_sequence()
+for value in result:
+    print(value)
+```
+
+## Generator Use Cases
+
+### Reading Large Files
+
+```python
+def read_large_file(filepath):
+    """Read file line by line without loading entire file."""
+    with open(filepath) as f:
+        for line in f:
+            yield line.strip()
+
+# Memory efficient — one line in memory at a time
+for line in read_large_file("huge_file.txt"):
+    process(line)
+```
+
+### Infinite Sequences
+
+```python
+def fibonacci():
+    """Infinite Fibonacci sequence generator."""
+    a, b = 0, 1
+    while True:
+        yield a
+        a, b = b, a + b
+
+# Take what you need
+fib = fibonacci()
+first_10 = [next(fib) for _ in range(10)]
+print(first_10)  # [0, 1, 1, 2, 3, 5, 8, 13, 21, 34]
+
+# Get first Fibonacci > 1000
+fib = fibonacci()
+for num in fib:
+    if num > 1000:
+        print(num)  # 1597
+        break
+```
+
+### Pipeline Pattern
+
+```python
+def read_lines(filename):
+    with open(filename) as f:
+        for line in f:
+            yield line
+
+def filter_lines(lines, pattern):
+    import re
+    for line in lines:
+        if re.search(pattern, line):
+            yield line
+
+def strip_lines(lines):
+    for line in lines:
+        yield line.strip()
+
+def capitalize_lines(lines):
+    for line in lines:
+        yield line.upper()
+
+# Pipeline — each step is lazy
+pipeline = capitalize_lines(
+    strip_lines(
+        filter_lines(
+            read_lines("data.txt"),
+            "ERROR"
+        )
+    )
+)
+
+for line in pipeline:
+    print(line)
+```
+
+## `yield from` — Delegating to Sub-generators
+
+```python
+def gen1():
+    yield 1
+    yield 2
+
+def gen2():
+    yield 3
+    yield 4
+
+def combined():
+    yield from gen1()
+    yield from gen2()
+
+print(list(combined()))  # [1, 2, 3, 4]
+
+# Flatten nested iterables
+def flatten(nested):
+    for item in nested:
+        if isinstance(item, (list, tuple)):
+            yield from flatten(item)
+        else:
+            yield item
+
+nested = [1, [2, [3, 4], 5], 6]
+print(list(flatten(nested)))  # [1, 2, 3, 4, 5, 6]
+```
+
+## Custom Iterators
+
+```python
+class CountDown:
+    """Custom iterator implementing the iterator protocol."""
+
+    def __init__(self, start):
+        self.current = start
+
+    def __iter__(self):
+        return self  # Iterators return themselves
+
+    def __next__(self):
+        if self.current <= 0:
+            raise StopIteration
+        value = self.current
+        self.current -= 1
+        return value
+
+for n in CountDown(5):
+    print(n)  # 5, 4, 3, 2, 1
+
+# You can also make any class iterable
+class Range:
+    """Iterable (not iterator) — returns new iterator each time."""
+
+    def __init__(self, start, end):
+        self.start = start
+        self.end = end
+
+    def __iter__(self):
+        return RangeIterator(self.start, self.end)
+
+class RangeIterator:
+    def __init__(self, start, end):
+        self.current = start
+        self.end = end
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.current >= self.end:
+            raise StopIteration
+        value = self.current
+        self.current += 1
+        return value
+```
+
+## `itertools` with Generators
+
+```python
+from itertools import islice, takewhile, dropwhile
+
+# Take first n items from infinite generator
+fib = fibonacci()
+first_20 = list(islice(fib, 20))
+
+# Take while condition is true
+fib = fibonacci()
+under_100 = list(takewhile(lambda x: x < 100, fib))
+
+# Skip while condition is true
+data = [1, 2, 3, 4, 5, 1, 2]
+result = list(dropwhile(lambda x: x < 4, data))
+# [4, 5, 1, 2]
+```
+
+## Generator.send() and .close()
+
+```python
+def echo():
+    """Generator that receives and yields values."""
+    while True:
+        received = yield
+        print(f"Received: {received}")
+
+gen = echo()
+next(gen)             # Prime the generator
+gen.send("hello")     # Received: hello
+gen.send("world")     # Received: world
+gen.close()           # GeneratorExit raised inside generator
+```
+
+## Key Takeaways
+
+- Generators use `yield` instead of `return` — they produce values lazily
+- Generator expressions: `(x for x in iterable)` — similar to list comprehensions but lazy
+- Generators are memory-efficient for large/infinite sequences
+- `yield from` delegates to sub-generators (useful for flattening)
+- Pipeline pattern: chain generators for memory-efficient data processing
+- Custom iterators implement `__iter__` and `__next__`
+- `itertools.islice` takes slices of infinite generators
+- Generators can receive values with `.send()` and be terminated with `.close()`

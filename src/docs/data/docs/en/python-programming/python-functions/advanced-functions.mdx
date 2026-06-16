@@ -1,0 +1,219 @@
+---
+title: "Advanced Functions"
+description: "Variable arguments, lambda functions, closures, and decorators"
+sidebar:
+  order: 2
+  label: "Advanced Functions"
+tab: "python-programming"
+---
+
+## Variable Arguments
+
+```python
+# *args — arbitrary positional arguments (tuple)
+def sum_all(*args):
+    return sum(args)
+
+print(sum_all(1, 2, 3, 4))  # 10
+
+# **kwargs — arbitrary keyword arguments (dict)
+def print_kwargs(**kwargs):
+    for key, value in kwargs.items():
+        print(f"{key}: {value}")
+
+print_kwargs(name="Alice", age=25, role="engineer")
+
+# Combined
+def complex_func(a, b, *args, **kwargs):
+    print(f"Positional: {a}, {b}")
+    print(f"Extra args: {args}")
+    print(f"Extra kwargs: {kwargs}")
+
+complex_func(1, 2, 3, 4, x=10, y=20)
+```
+
+### Unpacking Arguments
+
+```python
+# Unpack list/tuple into arguments
+def add(a, b, c):
+    return a + b + c
+
+nums = [1, 2, 3]
+print(add(*nums))  # 6 — unpacks list
+
+# Unpack dict into keyword arguments
+params = {"a": 10, "b": 20, "c": 30}
+print(add(**params))  # 60
+
+# Combining
+def connect(host, port, user, password):
+    print(f"{user}@{host}:{port}")
+
+config = {"host": "localhost", "port": 5432}
+creds = {"user": "admin", "password": "secret"}
+connect(**config, **creds)
+```
+
+## Lambda Functions
+
+Small anonymous functions — useful for short operations:
+
+```python
+# Syntax: lambda args: expression
+square = lambda x: x ** 2
+print(square(5))  # 25
+
+# Common use: sorting with key
+students = [("Alice", 85), ("Bob", 92), ("Charlie", 78)]
+sorted(students, key=lambda s: s[1])  # Sort by score
+# [('Charlie', 78), ('Alice', 85), ('Bob', 92)]
+
+# With map, filter, reduce
+numbers = [1, 2, 3, 4, 5]
+squares = list(map(lambda x: x ** 2, numbers))
+evens = list(filter(lambda x: x % 2 == 0, numbers))
+```
+
+<Aside variant="tip">
+  Lambda functions are limited to a single expression. For anything complex, use a regular `def` function.
+</Aside>
+
+## Closures
+
+A function that captures variables from its enclosing scope:
+
+```python
+def make_multiplier(factor):
+    """Return a function that multiplies by factor."""
+    def multiply(x):
+        return x * factor
+    return multiply
+
+double = make_multiplier(2)
+triple = make_multiplier(3)
+
+print(double(5))   # 10
+print(triple(5))   # 15
+```
+
+### Closure Use Case: Counter
+
+```python
+def make_counter():
+    count = 0
+
+    def counter():
+        nonlocal count
+        count += 1
+        return count
+
+    return counter
+
+counter_a = make_counter()
+counter_b = make_counter()
+
+print(counter_a())  # 1
+print(counter_a())  # 2
+print(counter_b())  # 1 — independent state
+```
+
+## Decorators
+
+Decorators wrap functions to add behavior:
+
+```python
+# Basic decorator
+def log_calls(func):
+    def wrapper(*args, **kwargs):
+        print(f"Calling {func.__name__}")
+        result = func(*args, **kwargs)
+        print(f"{func.__name__} returned {result}")
+        return result
+    return wrapper
+
+@log_calls
+def add(a, b):
+    return a + b
+
+add(3, 5)
+# Calling add
+# add returned 8
+```
+
+### Decorator with Arguments
+
+```python
+def repeat(n):
+    """Repeat function execution n times."""
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            for _ in range(n):
+                result = func(*args, **kwargs)
+            return result
+        return wrapper
+    return decorator
+
+@repeat(3)
+def say(message):
+    print(message)
+
+say("Hello!")
+# Hello!
+# Hello!
+# Hello!
+```
+
+### Practical Decorator: Timing
+
+```python
+import time
+
+def timer(func):
+    """Time function execution."""
+    def wrapper(*args, **kwargs):
+        start = time.perf_counter()
+        result = func(*args, **kwargs)
+        elapsed = time.perf_counter() - start
+        print(f"{func.__name__} took {elapsed:.4f}s")
+        return result
+    return wrapper
+
+@timer
+def slow_function():
+    time.sleep(0.5)
+    return "done"
+
+slow_function()
+# slow_function took 0.5002s
+```
+
+### Preserving Function Metadata
+
+```python
+from functools import wraps
+
+def my_decorator(func):
+    @wraps(func)  # Preserves func.__name__, __doc__, etc.
+    def wrapper(*args, **kwargs):
+        print("Before")
+        return func(*args, **kwargs)
+    return wrapper
+
+@my_decorator
+def greet(name):
+    """Greet someone."""
+    return f"Hello, {name}"
+
+print(greet.__name__)  # 'greet' (not 'wrapper' without @wraps)
+print(greet.__doc__)   # 'Greet someone.'
+```
+
+## Key Takeaways
+
+- `*args` collects extra positional args as a tuple; `**kwargs` collects keyword args as a dict
+- Unpack arguments with `*seq` and `**dict` when calling functions
+- Lambdas: `lambda args: expression` — single-expression anonymous functions
+- Closures capture enclosing scope variables; use `nonlocal` to modify them
+- Decorators wrap functions; use `@wraps` to preserve metadata
+- Decorators can take arguments with triple nesting: `def decorator(args): return wrapper`

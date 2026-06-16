@@ -1,0 +1,253 @@
+---
+title: "Multi-Tier App on Azure"
+description: "Deploy a multi-tier web application on Azure using VMs, Load Balancer, Azure SQL Database, and VNet — with Azure CLI scripts and architecture guidance."
+sidebar:
+  order: 99
+  label: "Module Project"
+tab: "cloud-engineering"
+---
+
+
+## Project Overview
+
+In this project you will deploy a three-tier web application on Azure:
+
+- **Web tier** — Nginx web servers behind a public Load Balancer
+- **Application tier** — Node.js API servers (internal, no public IP)
+- **Data tier** — Azure SQL Database with firewall rules
+
+## Architecture
+
+```
+Internet
+    │
+    ▼
+Azure Load Balancer (public, Layer 4)
+    │
+    ├── VM-1 (web-subnet, Nginx)
+    ├── VM-2 (web-subnet, Nginx)
+    │
+    ▼ (internal)
+Azure Internal Load Balancer
+    │
+    ├── VM-3 (app-subnet, Node.js API)
+    ├── VM-4 (app-subnet, Node.js API)
+    │
+    ▼
+Azure SQL Database (data-subnet firewall rules)
+```
+
+## Prerequisites
+
+- An Azure subscription (free trial works)
+- Azure CLI installed or Cloud Shell
+
+## Step 1: Create the Resource Group and VNet
+
+```bash
+az group create --name multi-tier-rg --location eastus
+
+az network vnet create \
+  --resource-group multi-tier-rg \
+  --name app-vnet \
+  --address-prefix 10.0.0.0/16 \
+  --subnet-name web-subnet \
+  --subnet-prefix 10.0.1.0/24
+
+az network vnet subnet create \
+  --resource-group multi-tier-rg \
+  --vnet-name app-vnet \
+  --name app-subnet \
+  --address-prefix 10.0.2.0/24
+
+az network vnet subnet create \
+  --resource-group multi-tier-rg \
+  --vnet-name app-vnet \
+  --name data-subnet \
+  --address-prefix 10.0.3.0/24
+```
+
+## Step 2: Deploy the Public Load Balancer
+
+```bash
+az network public-ip create \
+  --resource-group multi-tier-rg \
+  --name web-pip
+
+az network lb create \
+  --resource-group multi-tier-rg \
+  --name web-lb \
+  --public-ip-address web-pip \
+  --frontend-ip-name web-frontend \
+  --backend-pool-name web-backend
+
+az network lb probe create \
+  --resource-group multi-tier-rg \
+  --lb-name web-lb \
+  --name http-probe \
+  --protocol tcp \
+  --port 80
+
+az network lb rule create \
+  --resource-group multi-tier-rg \
+  --lb-name web-lb \
+  --name http-rule \
+  --protocol tcp \
+  --frontend-port 80 \
+  --backend-port 80 \
+  --frontend-ip-name web-frontend \
+  --backend-pool-name web-backend \
+  --probe-name http-probe
+```
+
+## Step 3: Create Web Tier VMs
+
+```bash
+# Create NICs with public load balancer association
+for i in 1 2; do
+  az network nic create \
+    --resource-group multi-tier-rg \
+    --name web-nic-$i \
+    --vnet-name app-vnet \
+    --subnet web-subnet \
+    --lb-name web-lb \
+    --lb-address-pools web-backend
+done
+
+# Provision VMs with custom data (Nginx install)
+for i in 1 2; do
+  az vm create \
+    --resource-group multi-tier-rg \
+    --name web-vm-$i \
+    --nics web-nic-$i \
+    --image Ubuntu2204 \
+    --size Standard_B1s \
+    --custom-data cloud-init-web.txt
+done
+```
+
+Create `cloud-init-web.txt`:
+
+```yaml
+#cloud-config
+package_update: true
+packages:
+  - nginx
+runcmd:
+  - systemctl enable nginx
+  - systemctl start nginx
+```
+
+## Step 4: Deploy Azure SQL Database
+
+```bash
+az sql server create \
+  --resource-group multi-tier-rg \
+  --name multi-tier-sql \
+  --admin-user dbadmin \
+  --admin-password "Str0ngP@ssword!"
+
+az sql db create \
+  --resource-group multi-tier-rg \
+  --server multi-tier-sql \
+  --name appdb \
+  --service-objective S0
+
+# Allow app subnet to access the database
+az sql server firewall-rule create \
+  --resource-group multi-tier-rg \
+  --server multi-tier-sql \
+  --name allow-app-subnet \
+  --start-ip-address 10.0.2.0 \
+  --end-ip-address 10.0.2.255
+```
+
+<Aside variant="caution">
+  In production, use VNet service endpoints or private endpoints (Azure Private Link) instead of firewall IP rules for database access. IP rules are shown here for simplicity.
+</Aside>
+
+## Step 5: Deploy the Internal Load Balancer and App Tier
+
+```bash
+az network lb create \
+  --resource-group multi-tier-rg \
+  --name app-lb \
+  --sku Standard \
+  --frontend-ip-name app-frontend \
+  --backend-pool-name app-backend \
+  --vnet-name app-vnet \
+  --subnet app-subnet
+
+az network lb probe create \
+  --resource-group multi-tier-rg \
+  --lb-name app-lb \
+  --name http-probe \
+  --protocol tcp \
+  --port 3000
+
+az network lb rule create \
+  --resource-group multi-tier-rg \
+  --lb-name app-lb \
+  --name api-rule \
+  --protocol tcp \
+  --frontend-port 3000 \
+  --backend-port 3000 \
+  --frontend-ip-name app-frontend \
+  --backend-pool-name app-backend \
+  --probe-name http-probe
+```
+
+## Step 6: Configure Network Security Groups
+
+```bash
+az network nsg create --resource-group multi-tier-rg --name web-nsg
+az network nsg create --resource-group multi-tier-rg --name app-nsg
+
+# Allow HTTP from internet to web tier
+az network nsg rule create \
+  --resource-group multi-tier-rg \
+  --nsg-name web-nsg \
+  --name allow-http \
+  --protocol tcp \
+  --destination-port-ranges 80 \
+  --access allow \
+  --priority 100
+
+# Allow traffic from web tier to app tier
+az network nsg rule create \
+  --resource-group multi-tier-rg \
+  --nsg-name app-nsg \
+  --name allow-web \
+  --protocol tcp \
+  --destination-port-ranges 3000 \
+  --source-address-prefixes 10.0.1.0/24 \
+  --access allow \
+  --priority 100
+```
+
+## Verification
+
+```bash
+# Get the public IP of the web load balancer
+az network public-ip show \
+  --resource-group multi-tier-rg \
+  --name web-pip \
+  --query ipAddress
+
+# Test the application
+curl http://<web-lb-public-ip>
+```
+
+## Cleanup
+
+```bash
+az group delete --name multi-tier-rg --yes --no-wait
+```
+
+<Aside variant="tip">
+  Use `--no-wait` to delete resources asynchronously. The command returns immediately and Azure handles the cleanup in the background.
+</Aside>
+
+## Summary
+
+You have deployed a three-tier application on Azure with VNet isolation, public and internal load balancers, NSG security rules, and Azure SQL Database. This architecture follows Azure best practices and can be extended with Auto Scaling (VMSS), CI/CD (Azure DevOps), and monitoring (Azure Monitor).

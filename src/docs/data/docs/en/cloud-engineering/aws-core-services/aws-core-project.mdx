@@ -1,0 +1,289 @@
+---
+title: "Module Project — Deploy Web App with EC2, S3, and IAM"
+description: "Build a production-ready web application stack using Terraform on AWS with EC2 compute, S3 storage, and IAM roles."
+sidebar:
+  order: 99
+  label: "Module Project"
+tab: "cloud-engineering"
+---
+
+In this project, you will deploy a full web application stack using Terraform. The application serves static assets from S3 and runs on EC2 instances with proper IAM roles — no hardcoded credentials.
+
+## Architecture
+
+```
+                    ┌─────────────┐
+                    │  Internet    │
+                    └──────┬──────┘
+                           │
+                    ┌──────┴──────┐
+                    │  Security    │
+                    │  Group       │
+                    │  (port 80)   │
+                    └──────┬──────┘
+                           │
+              ┌────────────┴────────────┐
+              │                         │
+      ┌───────┴───────┐       ┌────────┴────────┐
+      │   EC2 Web     │       │   S3 Static      │
+      │   Instance    │       │   Assets Bucket  │
+      │  (app server) │       │  (images, css)   │
+      └───────┬───────┘       └────────┬────────┘
+              │                        │
+              └──────────┬─────────────┘
+                         │
+                 ┌───────┴───────┐
+                 │    IAM Role   │
+                 │ (EC2 reads    │
+                 │  from S3)     │
+                 └───────────────┘
+```
+
+## Prerequisites
+
+- AWS account with programmatic access configured
+- Terraform installed (v1.5+)
+- AWS CLI configured with `aws configure`
+
+## Step 1: Terraform Configuration
+
+Create `main.tf`:
+
+```hcl
+provider "aws" {
+  region = var.aws_region
+}
+
+# S3 bucket for static assets
+resource "aws_s3_bucket" "static_assets" {
+  bucket = "${var.project_name}-static-${data.aws_caller_identity.current.account_id}"
+}
+
+resource "aws_s3_bucket_versioning" "static_versioning" {
+  bucket = aws_s3_bucket.static_assets.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "static_block" {
+  bucket                  = aws_s3_bucket.static_assets.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# IAM role for EC2 to access S3
+resource "aws_iam_role" "ec2_s3_role" {
+  name = "${var.project_name}-ec2-s3-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "ec2_s3_policy" {
+  name = "${var.project_name}-ec2-s3-policy"
+  role = aws_iam_role.ec2_s3_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          aws_s3_bucket.static_assets.arn,
+          "${aws_s3_bucket.static_assets.arn}/*"
+        ]
+      }
+    ]
+  })
+}
+
+resource "aws_iam_instance_profile" "ec2_profile" {
+  name = "${var.project_name}-instance-profile"
+  role = aws_iam_role.ec2_s3_role.name
+}
+
+# Security group
+resource "aws_security_group" "web_sg" {
+  name        = "${var.project_name}-web-sg"
+  description = "Allow HTTP traffic"
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = var.allowed_ssh_cidrs
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+# EC2 instance
+resource "aws_instance" "web_server" {
+  ami                    = data.aws_ami.amazon_linux.id
+  instance_type          = var.instance_type
+  iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
+  vpc_security_group_ids = [aws_security_group.web_sg.id]
+  user_data              = templatefile("user_data.sh", {
+    s3_bucket = aws_s3_bucket.static_assets.bucket
+  })
+
+  tags = {
+    Name = "${var.project_name}-web-server"
+  }
+}
+
+# Outputs
+output "web_server_public_ip" {
+  value = aws_instance.web_server.public_ip
+}
+
+output "static_assets_bucket" {
+  value = aws_s3_bucket.static_assets.bucket
+}
+```
+
+Create `variables.tf`:
+
+```hcl
+variable "aws_region" {
+  description = "AWS region"
+  type        = string
+  default     = "us-east-1"
+}
+
+variable "project_name" {
+  description = "Project name used for resource naming"
+  type        = string
+  default     = "solstice-webapp"
+}
+
+variable "instance_type" {
+  description = "EC2 instance type"
+  type        = string
+  default     = "t3.micro"
+}
+
+variable "allowed_ssh_cidrs" {
+  description = "CIDR blocks allowed for SSH"
+  type        = list(string)
+  default     = ["10.0.0.0/8"]
+}
+```
+
+Create `user_data.sh`:
+
+```bash
+#!/bin/bash
+yum update -y
+yum install -y httpd
+systemctl start httpd
+systemctl enable httpd
+
+# Copy static assets from S3
+aws s3 sync s3://${s3_bucket}/ /var/www/html/
+
+# Create a sample index page
+cat > /var/www/html/index.html << EOF
+<!DOCTYPE html>
+<html>
+<head><title>Solstice Web App</title></head>
+<body>
+<h1>Welcome to Solstice</h1>
+<p>Deployed via Terraform with EC2 + S3 + IAM</p>
+<p>Server: $(hostname -f)</p>
+</body>
+</html>
+EOF
+```
+
+Create `outputs.tf`:
+
+```hcl
+data "aws_caller_identity" "current" {}
+
+data "aws_ami" "amazon_linux" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["al2023-ami-*-x86_64"]
+  }
+}
+```
+
+## Step 2: Deploy
+
+```bash
+# Initialize Terraform
+terraform init
+
+# Preview the changes
+terraform plan
+
+# Apply the configuration
+terraform apply -auto-approve
+
+# Upload static assets to S3
+aws s3 cp assets/ s3://$(terraform output -raw static_assets_bucket)/ --recursive
+```
+
+## Step 3: Verify
+
+```bash
+# Get the public IP
+terraform output web_server_public_ip
+
+# Test the web server
+curl http://<public-ip>
+```
+
+## Step 4: Clean Up
+
+```bash
+# Empty the S3 bucket first (required for destroy)
+aws s3 rm s3://$(terraform output -raw static_assets_bucket)/ --recursive
+
+# Destroy all resources
+terraform destroy -auto-approve
+```
+
+<Aside variant="caution">
+  The S3 bucket must be empty before Terraform can destroy it. Use `aws s3 rm` with `--recursive` to delete all objects, including all versions if versioning is enabled.
+</Aside>
+
+## Deliverables
+
+- Terraform code that provisions EC2 + S3 + IAM resources
+- EC2 instance running a web server that reads from S3 without hardcoded credentials
+- IAM role with least-privilege S3 access policy
+- Working web server accessible via public IP

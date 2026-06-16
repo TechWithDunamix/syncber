@@ -1,0 +1,158 @@
+---
+title: "Compliance Frameworks"
+description: "Navigate SOC 2, PCI DSS, HIPAA, and GDPR requirements in the cloud using AWS Artifact, Azure Policy, GCP Assured Workloads, and compliance automation."
+sidebar:
+  order: 3
+  label: "Compliance Frameworks"
+tab: "cloud-engineering"
+---
+
+
+Compliance is the process of meeting regulatory and industry standards for security, privacy, and operational controls. This page covers the most common frameworks, how cloud providers support compliance, and how to automate compliance verification.
+
+## Major Compliance Frameworks
+
+### SOC 2
+
+SOC 2 (Service Organization Control 2) is an auditing framework developed by AICPA for service providers storing customer data. It is based on five Trust Service Criteria:
+
+| Criteria | What It Means |
+|----------|---------------|
+| **Security** | Protection against unauthorized access (mandatory for all SOC 2 reports) |
+| **Availability** | System is available for operation and use as committed |
+| **Processing Integrity** | System processing is complete, valid, accurate, timely, and authorized |
+| **Confidentiality** | Information designated as confidential is protected |
+| **Privacy** | Personal information is collected, used, retained, and disclosed in accordance with commitments |
+
+SOC 2 reports are **Type I** (point-in-time) or **Type II** (operational effectiveness over 6-12 months).
+
+### PCI DSS
+
+The Payment Card Industry Data Security Standard (PCI DSS) applies to any organization handling credit card data. Key requirements include:
+
+- **Requirement 3** — Protect stored cardholder data (encrypt PAN, render it unreadable)
+- **Requirement 4** — Encrypt transmission of cardholder data over open networks
+- **Requirement 7** — Restrict access to cardholder data by business need-to-know
+- **Requirement 10** — Track and monitor all access to cardholder data
+- **Requirement 11** — Regularly test security systems and processes
+
+### HIPAA
+
+The Health Insurance Portability and Accountability Act (HIPAA) applies to covered entities and business associates handling Protected Health Information (PHI). Key requirements:
+
+- **Privacy Rule** — Controls on use and disclosure of PHI
+- **Security Rule** — Administrative, physical, and technical safeguards (encryption, access controls, audit logs)
+- **Breach Notification Rule** — Notification within 60 days of discovered breach
+
+### GDPR
+
+The General Data Protection Regulation applies to organizations processing personal data of EU residents. Key principles:
+
+- **Data minimization** — Collect only what is necessary
+- **Right to erasure** — Users can request data deletion
+- **Data portability** — Users can export their data
+- **Breach notification** — Notify supervisory authority within 72 hours
+
+## Cloud Provider Compliance Tools
+
+### AWS Artifact
+
+AWS Artifact is a self-service portal for downloading AWS compliance reports and managing agreements:
+
+```bash
+# List available reports
+aws artifact list-reports --output table
+
+# Download a SOC 2 report
+aws artifact get-report \
+  --report-id "SOC-2-2024" \
+  --report-name "AWS SOC 2 Report" \
+  --region us-east-1
+```
+
+AWS Artifact also supports **Agreements** — a feature that lets you review and accept AWS Cloud Agreements (e.g., the Business Associate Addendum for HIPAA) directly through the console or API.
+
+### Azure Policy
+
+Azure Policy enforces compliance rules across your Azure environment. Define a policy to require encryption on all storage accounts:
+
+```bash
+# Assign a built-in policy
+az policy assignment create \
+  --name "require-storage-encryption" \
+  --policy "0b359823-92a1-4e33-aacd-23c8e7f3c741" \
+  --resource-group prod-rg
+
+# Check compliance state
+az policy state list \
+  --resource-group prod-rg \
+  --query "[?complianceState=='NonCompliant']"
+```
+
+### GCP Assured Workloads
+
+GCP Assured Workloads creates folders with enforced compliance controls (CJIS, FedRAMP, HIPAA):
+
+```bash
+# Create an Assured Workload for HIPAA
+gcloud assured workloads create \
+  --organization=my-org-id \
+  --location=us-central1 \
+  --compliance-regime=HIPAA \
+  --display-name="HIPAA Workload"
+  --labels=environment=production
+```
+
+### GCP Security Command Center
+
+Security Command Center provides centralized visibility into GCP compliance posture. The **CIS Benchmark** module checks resources against Center for Internet Security standards.
+
+<Aside variant="info">
+All three major cloud providers maintain certifications for SOC 2, PCI DSS, HIPAA, and ISO 27001 at the infrastructure layer. The shared responsibility model means you inherit the provider's compliance *for the infrastructure they manage*, but you must implement the controls for workloads and data you control.
+</Aside>
+
+## Compliance Automation
+
+Manual compliance checks do not scale. Automate using:
+
+### Terraform Compliance
+
+Use tools like `terraform-compliance` to run tests against your Terraform plan:
+
+```gherkin
+Scenario: Ensure S3 buckets are encrypted
+  Given I have AWS S3 Bucket defined
+  Then it must have server_side_encryption_configuration
+
+Scenario: Ensure security groups do not allow 0.0.0.0/0 on port 22
+  Given I have AWS Security Group defined
+  Then it must not have ingress with cidr_blocks "0.0.0.0/0"
+  And it must not have from_port "22"
+```
+
+### Config Rules (AWS)
+
+AWS Config Managed Rules evaluate resource configurations against compliance standards:
+
+```bash
+aws configservice put-config-rule \
+  --config-rule file://s3-bucket-ssl-requests-only.json
+```
+
+### Automated Evidence Collection
+
+Use a combination of tools to gather evidence for auditors:
+
+1. **AWS Config** — Record resource configuration history
+2. **CloudTrail** — Log all API calls (read + write)
+3. **GuardDuty** — Threat detection findings
+4. **Security Hub** — Aggregate findings and check against compliance standards (CIS, PCI DSS)
+5. **Custom Lambda functions** — Generate compliance reports and export to S3
+
+<Aside variant="tip">
+Store compliance evidence in a dedicated, immutable S3 bucket with Object Lock enabled. This prevents tampering and satisfies auditor requirements for record integrity.
+</Aside>
+
+## Summary
+
+Compliance in the cloud is a shared responsibility. Cloud providers give you the tools (Artifact, Policy, Assured Workloads) to demonstrate compliance, but you must implement the controls for your applications. Automate evidence collection and compliance checks using Config rules, Terraform compliance testing, and CI/CD pipeline gates.

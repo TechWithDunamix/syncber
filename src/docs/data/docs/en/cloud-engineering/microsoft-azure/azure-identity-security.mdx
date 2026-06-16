@@ -1,0 +1,116 @@
+---
+title: "Azure Identity & Security"
+description: "Learn Azure's identity and security services — Entra ID, RBAC, Azure Policy, Defender for Cloud, Key Vault, and managed identities — with CLI examples and best practices."
+sidebar:
+  order: 2
+  label: "Azure Identity & Security"
+tab: "cloud-engineering"
+---
+
+
+## Entra ID (formerly Azure Active Directory)
+
+Entra ID is Azure's cloud identity and access management service — the foundation of authentication and authorization in Azure. Unlike AWS IAM (which controls access to AWS APIs), Entra ID also handles user identity, device registration, and single sign-on (SSO) for SaaS applications.
+
+```bash
+# List users in your Entra ID tenant
+az ad user list --output table
+
+# Create a new user
+az ad user create \
+  --display-name "Jane Doe" \
+  --user-principal-name jane@contoso.com \
+  --password "P@ssw0rd123!" \
+  --mail-nickname jane
+```
+
+Entra ID supports Conditional Access policies — rules that evaluate user, device, location, and application state before granting access. For example, you can require MFA for all console logins but skip MFA for trusted office IP ranges.
+
+<Aside variant="info" title="Entra ID vs AWS IAM">
+  AWS IAM manages *infrastructure* access (API keys, roles for EC2/Lambda). Entra ID manages *user* identity (employees, guest users, device compliance). In modern architectures you use both — IAM for AWS resources, Entra ID for human authentication.
+</Aside>
+
+## RBAC (Role-Based Access Control)
+
+Azure RBAC defines *who* (security principal) can do *what* (role definition) to *which resource* (scope). Scopes are hierarchical: management group → subscription → resource group → resource.
+
+```bash
+# Assign Contributor role to a user at resource group scope
+az role assignment create \
+  --assignee jane@contoso.com \
+  --role Contributor \
+  --resource-group my-rg
+```
+
+Built-in roles include Owner, Contributor, Reader, and service-specific roles (e.g., Virtual Machine Contributor, Storage Blob Data Owner). You can also create custom roles.
+
+## Azure Policy
+
+Azure Policy enforces organizational compliance by evaluating resources against rules. Unlike RBAC (who can act), Policy governs *what resources are allowed*.
+
+```json
+{
+  "mode": "All",
+  "policyRule": {
+    "if": {
+      "field": "location",
+      "notIn": ["eastus", "westus", "westeurope"]
+    },
+    "then": { "effect": "deny" }
+  }
+}
+```
+
+This policy denies any resource creation outside approved regions. Azure Policy can also audit, append tags, or auto-remediate non-compliant resources.
+
+## Defender for Cloud
+
+Defender for Cloud is Azure's cloud security posture management (CSPM) and workload protection platform — comparable to AWS GuardDuty + Security Hub + Inspector combined.
+
+```bash
+# Enable Defender for Cloud on a subscription
+az security pricing create \
+  --name VirtualMachines \
+  --pricing-tier Standard
+```
+
+It provides:
+- **Secure score** — A percentage measuring your security posture
+- **Recommendations** — Actionable steps to harden resources
+- **Just-in-time VM access** — Lock down inbound ports and open them on approval
+- **File integrity monitoring** — Track OS and application file changes
+
+## Key Vault
+
+Azure Key Vault is a managed service for storing secrets, encryption keys, and certificates — equivalent to AWS Secrets Manager + KMS.
+
+```bash
+# Store a database connection string
+az keyvault secret set \
+  --vault-name my-vault \
+  --name db-connection \
+  --value "Server=tcp:my-server.database.windows.net;..."
+```
+
+Key Vault supports soft-delete and purge protection, and integrates with Azure RBAC and managed identities.
+
+## Managed Identities
+
+Managed identities provide Azure services with an automatically managed identity in Entra ID — no need to embed credentials in code.
+
+```bash
+# Enable system-assigned managed identity on a VM
+az vm identity assign \
+  --resource-group my-rg \
+  --name web-server
+```
+
+Once assigned, the VM can authenticate to any Azure resource that supports Entra ID authentication (Key Vault, Blob Storage, SQL Database) without storing any credentials.
+
+<Aside variant="tip">
+  Always use managed identities over service principals or access keys when possible. Managed identities rotate the credential automatically and eliminate the risk of leaked secrets.
+</Aside>
+
+## Summary
+
+Azure's security model centers on Entra ID for identity, RBAC for fine-grained authorization, Azure Policy for governance guardrails, and Defender for Cloud for continuous posture monitoring. Together these services give enterprises the controls needed for regulated workloads.

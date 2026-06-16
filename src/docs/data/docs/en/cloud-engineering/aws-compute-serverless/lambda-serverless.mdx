@@ -1,0 +1,183 @@
+---
+title: "AWS Lambda"
+description: "AWS Lambda is a serverless compute service that runs code in response to events. Learn triggers, runtimes, versions, cold starts, and best practices."
+sidebar:
+  order: 1
+  label: "AWS Lambda"
+tab: "cloud-engineering"
+---
+
+AWS Lambda runs your code in response to events and automatically manages the underlying compute resources. You are charged only for the compute time consumed.
+
+## Lambda Function Anatomy
+
+A Lambda function consists of:
+- **Runtime** — Python, Node.js, Java, Go, .NET, Ruby, or custom runtime
+- **Handler** — Entry point function that receives events and context
+- **Trigger** — Event source that invokes the function
+- **Execution Role** — IAM role granting permissions to AWS resources
+
+```python
+import json
+import boto3
+
+s3 = boto3.client('s3')
+
+def lambda_handler(event, context):
+    # event contains the trigger payload
+    bucket = event['Records'][0]['s3']['bucket']['name']
+    key = event['Records'][0]['s3']['object']['key']
+
+    # Process the object
+    response = s3.get_object(Bucket=bucket, Key=key)
+    content = response['Body'].read().decode('utf-8')
+
+    return {
+        'statusCode': 200,
+        'body': json.dumps({
+            'bucket': bucket,
+            'key': key,
+            'size': len(content)
+        })
+    }
+```
+
+## Triggers and Event Sources
+
+Lambda supports synchronous (push) and asynchronous (event) invocations:
+
+| Trigger | Type | Use Case |
+|---------|------|----------|
+| **S3** | Async | Process uploaded images, transform files |
+| **SQS** | Poll-based | Batch message processing, decoupling |
+| **SNS** | Async | Fan-out notifications |
+| **DynamoDB Streams** | Poll-based | Real-time table change processing |
+| **API Gateway** | Sync | Serverless REST API backend |
+| **EventBridge** | Async | Scheduled tasks, event-driven workflows |
+| **Kinesis** | Poll-based | Real-time data stream processing |
+
+```hcl
+resource "aws_lambda_function" "image_processor" {
+  filename      = "function.zip"
+  function_name = "image-processor"
+  role          = aws_iam_role.lambda_role.arn
+  handler       = "index.handler"
+  runtime       = "python3.12"
+  timeout       = 30
+  memory_size   = 256
+
+  environment {
+    variables = {
+      DEST_BUCKET = aws_s3_bucket.processed.bucket
+    }
+  }
+}
+
+# S3 trigger
+resource "aws_s3_bucket_notification" "upload_trigger" {
+  bucket = aws_s3_bucket.uploads.id
+
+  lambda_function {
+    lambda_function_arn = aws_lambda_function.image_processor.arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_suffix       = ".jpg"
+  }
+}
+```
+
+## Runtimes and Versions
+
+Lambda supports multiple runtime versions. Each has a deprecation schedule — plan upgrades accordingly.
+
+```bash
+# List supported runtimes
+aws lambda list-functions --query "Functions[*].Runtime" | sort -u
+
+# Publish a new version
+aws lambda publish-version --function-name image-processor
+
+# Create an alias pointing to version 2
+aws lambda create-alias \
+  --function-name image-processor \
+  --name "production" \
+  --function-version 2
+
+# Route 10% of traffic to version 3 for canary testing
+aws lambda update-alias \
+  --function-name image-processor \
+  --name "production" \
+  --function-version 2 \
+  --routing-config AdditionalVersionWeights={"3"=0.1}
+```
+
+## Cold Starts
+
+Cold starts occur when Lambda creates a new execution environment. Mitigation strategies:
+
+| Factor | Impact | Mitigation |
+|--------|--------|------------|
+| **Runtime** | Java/.NET start slower than Python/Node.js | Choose faster runtimes for latency-sensitive paths |
+| **Memory** | Larger memory = faster CPU allocation | Set memory proportional to workload |
+| **VPC** | ENI creation adds 2-10s | Use VPC with subnets in 2+ AZs; consider RDS Proxy |
+| **Code size** | Larger deployment packages delay loading | Minimize dependencies; use Lambda Layers |
+| **Concurrency** | First request per new instance is cold | Provisioned Concurrency for latency-critical functions |
+
+<Aside variant="info" title="Provisioned Concurrency">
+  For latency-sensitive applications, configure Provisioned Concurrency to keep a specified number of execution environments warm. You pay for the provisioned concurrency regardless of invocations.
+</Aside>
+
+```hcl
+resource "aws_lambda_provisioned_concurrency_config" "prod" {
+  function_name                     = aws_lambda_function.image_processor.name
+  qualifier                         = "production"
+  provisioned_concurrent_executions = 5
+}
+```
+
+## VPC Integration
+
+Lambda functions can access resources in a VPC (RDS, ElastiCache, internal load balancers). This requires an ENI in each subnet:
+
+```hcl
+resource "aws_lambda_function" "db_processor" {
+  filename      = "function.zip"
+  function_name = "db-processor"
+  role          = aws_iam_role.lambda_role.arn
+  handler       = "index.handler"
+  runtime       = "python3.12"
+  timeout       = 120
+
+  vpc_config {
+    subnet_ids         = var.private_subnet_ids
+    security_group_ids = [aws_security_group.lambda_sg.id]
+  }
+}
+```
+
+<Aside variant="caution">
+  VPC-connected Lambda functions lose internet access by default. To access external APIs, place the Lambda in private subnets with a NAT Gateway and route traffic through it.
+</Aside>
+
+## Best Practices
+
+- **Set reserved concurrency** — prevent a single function from exhausting account-level concurrency limits
+- **Use dead-letter queues (DLQ)** — capture failed async invocations to SQS or SNS for retry/debug
+- **Optimize deployment size** — use Lambda Layers for shared dependencies (max 250 MB total unzipped)
+- **Externalize configuration** — use environment variables, Parameter Store, or Secrets Manager (never hardcode)
+- **Structure functions for idempotency** — ensure processing the same event multiple times is safe, especially with at-least-once delivery from SQS/S3
+- **Monitor with CloudWatch** — track `InvocationCount`, `ErrorCount`, `Duration`, `ConcurrentExecutions`, and `Throttles`
+
+```bash
+# Set reserved concurrency (limit to 10 concurrent executions)
+aws lambda put-function-concurrency \
+  --function-name image-processor \
+  --reserved-concurrent-executions 10
+```
+
+## Key Takeaways
+
+- Lambda supports synchronous (API Gateway), async (S3/SNS/EventBridge), and poll-based (SQS/DynamoDB Streams/Kinesis) triggers
+- Versions create immutable snapshots; aliases provide stable references with weighted routing for canary deployments
+- Cold starts add latency on first invocation — mitigated by faster runtimes, larger memory, minimized code size, Provisioned Concurrency, and avoiding unneeded VPC connections
+- VPC integration requires subnets in 2+ AZs with security groups; internet access requires NAT Gateway
+- Best practices: reserved concurrency (account-level safety), DLQ (async failure handling), Lambda Layers (shared deps), idempotent handlers (safe replay), CloudWatch monitoring (observability)

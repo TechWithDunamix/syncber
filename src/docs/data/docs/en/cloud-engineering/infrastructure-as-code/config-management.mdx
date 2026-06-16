@@ -1,0 +1,222 @@
+---
+title: "Configuration Management"
+description: "Explore configuration management tools — Ansible, Chef, Puppet — and the immutable vs mutable infrastructure debate. Learn when to use each approach with practical examples."
+sidebar:
+  order: 3
+  label: "Configuration Management"
+tab: "cloud-engineering"
+---
+
+
+## Infrastructure Provisioning vs Configuration Management
+
+Provisioning tools (Terraform, CloudFormation) create and manage the *infrastructure* — VPCs, servers, databases, load balancers. Configuration management tools handle *what runs on those servers* — packages, services, files, users.
+
+| Tool | Provisions | Configures |
+|------|-----------|------------|
+| Terraform | ✅ VMs, networks, databases | ❌ (limited provisioner support) |
+| CloudFormation | ✅ AWS resources | ❌ |
+| Ansible | ❌ (limited) | ✅ Packages, services, files |
+| Chef / Puppet | ❌ | ✅ Packages, services, files |
+
+## Ansible
+
+Ansible is an agentless, push-based configuration management tool that uses YAML playbooks and SSH to configure servers. It is the most popular CM tool because of its simplicity.
+
+```yaml
+# playbook.yml
+---
+- name: Configure web server
+  hosts: webservers
+  become: yes
+  vars:
+    nginx_port: 80
+    app_version: "1.2.3"
+
+  tasks:
+    - name: Install Nginx
+      apt:
+        name: nginx
+        state: present
+        update_cache: yes
+
+    - name: Configure Nginx
+      template:
+        src: nginx.conf.j2
+        dest: /etc/nginx/nginx.conf
+      notify: restart nginx
+
+    - name: Deploy application
+      copy:
+        src: "app-v{{ app_version }}.tar.gz"
+        dest: /opt/app.tar.gz
+      notify: restart app
+
+  handlers:
+    - name: restart nginx
+      service:
+        name: nginx
+        state: restarted
+
+    - name: restart app
+      service:
+        name: my-app
+        state: restarted
+```
+
+```bash
+# Run the playbook
+ansible-playbook -i inventory/production playbook.yml
+```
+
+Ansible's agentless model (it uses SSH) means no software to install on target nodes. It works with almost any system running Python.
+
+## Chef
+
+Chef is a Ruby-based configuration management tool that uses a client-server architecture. Nodes run the Chef client, which pulls policies from the Chef server and converges the node to the desired state.
+
+```ruby
+# cookbooks/webserver/recipes/default.rb
+package 'nginx' do
+  action :install
+end
+
+template '/etc/nginx/nginx.conf' do
+  source 'nginx.conf.erb'
+  owner 'root'
+  group 'root'
+  mode '0644'
+  notifies :restart, 'service[nginx]'
+end
+
+service 'nginx' do
+  action [:enable, :start]
+end
+```
+
+Chef uses **recipes** (collections of resources), **cookbooks** (collections of recipes), and **run lists** (ordered list of recipes for a node).
+
+## Puppet
+
+Puppet uses a declarative DSL and a client-server model where nodes (agents) periodically check in with the Puppet server and apply the desired state.
+
+```puppet
+# manifests/site.pp
+node 'webserver.example.com' {
+  package { 'nginx':
+    ensure => installed,
+  }
+
+  file { '/etc/nginx/nginx.conf':
+    content => template('webserver/nginx.conf.erb'),
+    notify  => Service['nginx'],
+  }
+
+  service { 'nginx':
+    ensure => running,
+    enable => true,
+  }
+}
+```
+
+Puppet uses **Facter** to collect system facts (OS, memory, IP address) that can drive conditional logic in manifests.
+
+<Aside variant="info" title="CM Tool Comparison">
+  Ansible is the easiest to learn (YAML, no agent). Chef and Puppet are more powerful for large-scale deployments but have steeper learning curves (Ruby DSL). For cloud-native workloads, Ansible + Terraform is the most common combination.
+</Aside>
+
+## Immutable vs Mutable Infrastructure
+
+### Mutable Infrastructure
+
+Traditional approach: servers are provisioned, then updated in place over their lifetime.
+
+```
+Provision → SSH in → Update packages → Deploy code → Patch OS → (repeat)
+```
+
+**Pros**: Familiar, no need to reprovision for small changes, state is preserved.
+
+**Cons**: Configuration drift — servers diverge over time as manual changes accumulate. "Snowflake servers" that can't be reproduced.
+
+### Immutable Infrastructure
+
+Modern approach: servers are never modified after deployment. Every change creates a new server and destroys the old one.
+
+```hcl
+# Terraform + user_data for immutable deployments
+resource "aws_launch_template" "web" {
+  image_id      = data.aws_ami.amazon_linux_2.id
+  instance_type = "t3.micro"
+  user_data     = base64encode(templatefile("user_data.sh", {
+    app_version = var.app_version
+  }))
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_autoscaling_group" "web" {
+  launch_template {
+    id      = aws_launch_template.web.id
+    version = "$Latest"
+  }
+  min_size = 2
+  max_size = 10
+  tags = [{
+    key                 = "Name"
+    value              = "web-asg"
+    propagate_at_launch = true
+  }]
+}
+```
+
+```
+AMI (immutable image) → Launch Template → ASG → Rolling update
+```
+
+**Pros**: Reproducible, no drift, easy rollbacks (revert to previous AMI), consistent across environments.
+
+**Cons**: Slower deployments (must build new images), stateful data must be externalized (RDS, S3).
+
+<Aside variant="tip">
+  For cloud-native workloads, prefer immutable infrastructure for compute and Terraform/CloudFormation for provisioning. Use Ansible for bootstrapping during image builds (Packer), not for ongoing server management.
+</Aside>
+
+## Packer + Ansible: Immutable Image Pipeline
+
+```hcl
+# packer-template.pkr.hcl
+source "amazon-ebs" "web" {
+  ami_name      = "web-app-{{timestamp}}"
+  instance_type = "t3.micro"
+  region        = "us-east-1"
+  source_ami_filter {
+    filters = {
+      name                = "amzn2-ami-hvm-*-x86_64-gp2"
+      root-device-type    = "ebs"
+      virtualization-type = "hvm"
+    }
+    most_recent = true
+    owners      = ["amazon"]
+  }
+  ssh_username = "ec2-user"
+}
+
+build {
+  sources = ["source.amazon-ebs.web"]
+  provisioner "ansible" {
+    playbook_file = "./ansible/playbook.yml"
+  }
+}
+```
+
+```bash
+packer build packer-template.pkr.hcl
+```
+
+This builds a golden AMI with all packages and configuration baked in — no runtime SSH needed.
+
+## Summary
+
+Configuration management tools fall on a spectrum: Ansible (simple, agentless, YAML), Chef (Ruby DSL, pull-based), Puppet (declarative, fact-driven). Modern cloud architectures favor immutable infrastructure — building new golden images with Packer + Ansible rather than mutating servers in place. Terraform provisions the immutable infrastructure; configuration management tools handle the image baking process.

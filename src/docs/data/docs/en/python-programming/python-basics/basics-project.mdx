@@ -1,0 +1,126 @@
+---
+title: "Python Basics Project"
+description: "Build a number guessing game applying everything from Phase 1"
+sidebar:
+  order: 5
+  label: "Number Guessing Game"
+tab: "python-programming"
+---
+
+Apply what you've learned — variables, strings, control flow, and loops — by building a number guessing game.
+
+## Project: Number Guessing Game
+
+Create `guessing_game.py`:
+
+```python
+import random
+
+def main():
+    """Number guessing game with difficulty levels."""
+    print("=== Number Guessing Game ===")
+    print("I'll pick a number, you try to guess it.")
+
+    # Difficulty settings
+    print("\nChoose difficulty:")
+    print("1. Easy (1-10, unlimited guesses)")
+    print("2. Medium (1-50, 10 guesses)")
+    print("3. Hard (1-100, 7 guesses)")
+
+    difficulty = input("Enter 1, 2, or 3: ")
+
+    if difficulty == "1":
+        max_num = 10
+        max_guesses = None  # Unlimited
+    elif difficulty == "2":
+        max_num = 50
+        max_guesses = 10
+    elif difficulty == "3":
+        max_num = 100
+        max_guesses = 7
+    else:
+        print("Invalid choice, defaulting to Easy.")
+        max_num = 10
+        max_guesses = None
+
+    # Game logic
+    secret = random.randint(1, max_num)
+    guesses = 0
+    won = False
+
+    print(f"\nI'm thinking of a number between 1 and {max_num}.")
+
+    while True:
+        # Check if player has run out of guesses
+        if max_guesses and guesses >= max_guesses:
+            print(f"\nGame over! The number was {secret}.")
+            break
+
+        try:
+            guess = int(input("Your guess: "))
+        except ValueError:
+            print("Please enter a valid number.")
+            continue
+
+        guesses += 1
+
+        if guess < 1 or guess > max_num:
+            print(f"Guess between 1 and {max_num}.")
+        elif guess < secret:
+            print("Too low! Try higher.")
+        elif guess > secret:
+            print("Too high! Try lower.")
+        else:
+            won = True
+            break
+
+    if won:
+        print(f"\nCongratulations! You got it in {guesses} guesses!")
+        # Score feedback
+        if guesses == 1:
+            print("Incredible! First try!")
+        elif guesses <= 3:
+            print("Excellent guessing!")
+        elif guesses <= 6:
+            print("Good job!")
+        else:
+            print("You got there in the end!")
+
+    # Play again?
+    play_again = input("\nPlay again? (y/n): ").lower()
+    if play_again == "y":
+        main()
+    else:
+        print("Thanks for playing!")
+
+if __name__ == "__main__":
+    main()
+```
+
+## What You Practiced
+
+| Concept | How It's Used |
+|---------|---------------|
+| Variables | Track secret number, guesses, difficulty |
+| Strings | Input prompts, output messages |
+| Conditionals | `if/elif/else` for difficulty, guess comparison |
+| Loops | `while True` game loop |
+| Input/Output | `input()` for guesses, `print()` for feedback |
+| `try/except` | Handle invalid number input |
+| Functions | `main()` function, function calls |
+| `if __name__` | Script guard pattern |
+| Random | `random.randint()` for number generation |
+
+## Extensions
+
+Try adding these features:
+
+1. **Score tracking** — Track best score across sessions (store in a file)
+2. **Hint system** — Give hints like "divisible by 3" or "greater than 50"
+3. **High score table** — Store top 10 scores with player names
+4. **Multiplayer** — Two players take turns guessing
+5. **Time trials** — Add a timer and score based on speed
+
+<Aside variant="tip">
+  Save your high scores to a file using `open()` — something you'll learn more about in the Error Handling module!
+</Aside>

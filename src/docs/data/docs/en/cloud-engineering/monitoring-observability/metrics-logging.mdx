@@ -1,0 +1,135 @@
+---
+title: "Metrics & Logging"
+description: "Implement metrics collection and log management using CloudWatch, Azure Monitor, and GCP Cloud Monitoring with structured logging best practices."
+sidebar:
+  order: 1
+  label: "Metrics & Logging"
+tab: "cloud-engineering"
+---
+
+
+Metrics and logs form the first two pillars of observability. Metrics provide numeric time-series data (CPU utilization, request latency, error rates) that power dashboards and alerts. Logs provide granular event records — every API call, exception stack trace, and authentication attempt — that you query during incident investigation.
+
+## CloudWatch (AWS)
+
+CloudWatch is the native monitoring service for AWS. It collects metrics from most AWS services automatically (EC2 CPU, RDS connections, Lambda invocations) and supports custom metrics via the `PutMetricData` API.
+
+### CloudWatch Agent
+
+The CloudWatch Agent collects system-level metrics and logs from EC2 instances and on-premise servers. Install it and configure with a JSON file:
+
+```json
+{
+  "metrics": {
+    "namespace": "MyApp",
+    "metrics_collected": {
+      "cpu": { "measurement": ["cpu_usage_idle", "cpu_usage_iowait"] },
+      "mem": { "measurement": ["mem_used_percent"] },
+      "disk": { "measurement": ["disk_used_percent"], "resources": ["/"] }
+    }
+  },
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/var/log/myapp/application.log",
+            "log_group_name": "/myapp/application",
+            "log_stream_name": "{instance_id}"
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+### CloudWatch Logs Insights
+
+Query logs using a SQL-like syntax:
+
+```
+fields @timestamp, @message
+| filter @message like /ERROR|CRITICAL/
+| stats count() by @logStream
+| sort @timestamp desc
+| limit 20
+```
+
+<Aside variant="tip">
+Use CloudWatch Contributor Insights to identify the top contributors to errors — for example, the API endpoint or user agent generating the most 5xx responses.
+</Aside>
+
+## Azure Monitor
+
+Azure Monitor ingests metrics and logs from Azure resources, applications, and guest OS. **Metrics** are stored in a time-series database with 93 days of retention by default. **Logs** are stored in Log Analytics workspaces using Kusto Query Language (KQL).
+
+Example KQL to find failed requests over the last hour:
+
+```kql
+requests
+| where timestamp > ago(1h)
+| where success == false
+| project timestamp, name, resultCode, url
+| take 50
+```
+
+Azure Monitor also supports **Application Insights** for application performance monitoring — auto-instrument ASP.NET, Java, and Node.js apps with zero code changes.
+
+## GCP Cloud Monitoring
+
+GCP's Cloud Monitoring (formerly Stackdriver) collects metrics from GCP services and supports custom metrics through the ` Monitoring API v3`. It integrates tightly with **Cloud Logging** for log management.
+
+Create a custom metric with the gcloud CLI:
+
+```bash
+gcloud logging metrics create myapp-error-rate \
+  --description="Error rate for myapp" \
+  --log-filter="severity>=ERROR AND resource.type=cloud_run_revision"
+```
+
+## Structured Logging
+
+Structured logging outputs log entries as JSON rather than free-form text, making them parseable by log aggregation systems.
+
+**Python example using structlog:**
+
+```python
+import structlog
+
+logger = structlog.get_logger()
+logger.info("request_processed",
+    method="POST",
+    path="/api/orders",
+    status=201,
+    duration_ms=145
+)
+```
+
+**Node.js example using pino:**
+
+```javascript
+const pino = require('pino');
+const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
+
+logger.info({
+  method: 'GET',
+  path: '/api/products',
+  durationMs: 32
+}, 'request completed');
+```
+
+### Best Practices
+
+- **Include correlation IDs** — Pass a request-scoped ID through every service and log it in every entry
+- **Use consistent log levels** — DEBUG (diagnostic), INFO (normal operations), WARN (potential issues), ERROR (failures), FATAL (unrecoverable)
+- **Avoid sensitive data** — Never log passwords, tokens, PII, or credit card numbers; use a log sanitizer
+- **Set retention policies** — Hot storage for 30 days, cold storage for longer retention (S3 Glacier, Azure Cool Blob, GCP Nearline)
+
+<Aside variant="caution">
+Logging costs can grow quickly at scale. Monitor your log volume and set metric filters or log sampling to control costs. AWS charges ~$0.50/GB ingested, Azure ~$2.30/GB, GCP ~$0.50/GB.
+</Aside>
+
+## Summary
+
+Each cloud provider offers native metrics and logging services that share the same conceptual model — collect, store, query, alert. The key differentiator is the query language (CloudWatch Logs Insights, KQL, gcloud). Using structured JSON logs with correlation IDs ensures your logs remain actionable as your system grows.

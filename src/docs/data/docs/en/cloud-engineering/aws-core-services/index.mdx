@@ -1,0 +1,56 @@
+---
+title: "Module 4: AWS Core Services"
+description: "Deep dive into AWS foundational services — EC2 compute, S3 storage, IAM security, and infrastructure as code with Terraform."
+sidebar:
+  order: 0
+  label: "Module Overview"
+tab: "cloud-engineering"
+---
+
+This module covers the foundational AWS services you will use in virtually every cloud deployment. You will learn to provision compute, store objects, secure access, and automate infrastructure.
+
+<Aside variant="info" title="Prerequisites">
+  Familiarity with cloud computing concepts (IaaS, PaaS, SaaS) and basic Linux command-line skills. Completion of Module 1 (Cloud Fundamentals) is recommended.
+</Aside>
+
+## Module Objectives
+
+- Launch and configure EC2 instances with different instance types and pricing models
+- Implement S3 storage with lifecycle policies, versioning, and presigned URLs
+- Apply IAM best practices including least privilege, roles, and policies
+- Deploy a full stack using Terraform with EC2, S3, and IAM
+
+## Topics
+
+| Lesson | Topics Covered |
+|--------|---------------|
+| **EC2 Compute** | Instance types, AMIs, security groups, pricing models, placement groups, user data |
+| **S3 Storage** | Buckets, objects, storage classes, versioning, lifecycle policies, presigned URLs, event notifications |
+| **IAM & Security** | Users, groups, roles, policies, trust policies, least privilege, MFA, access analyzer |
+| **Module Project** | Deploy web app with EC2 + S3 + IAM roles via Terraform |
+
+## Key AWS CLI Commands
+
+```bash
+# Configure AWS CLI
+aws configure
+
+# List EC2 instances
+aws ec2 describe-instances --query 'Reservations[*].Instances[*].[InstanceId,State.Name,InstanceType]' --output table
+
+# List S3 buckets
+aws s3 ls
+
+# List IAM users
+aws iam list-users
+```
+
+<Aside variant="tip">
+  Install and configure the AWS CLI before starting this module. Use `aws configure` with your access key and secret key. Consider using named profiles with `aws configure --profile dev`.
+</Aside>
+
+## Estimated Time
+
+- Lessons: 4 hours
+- Hands-on labs: 3 hours
+- Module project: 3 hours

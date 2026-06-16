@@ -1,0 +1,300 @@
+---
+title: "CLI Project"
+description: "Build a full-featured CLI task manager with argparse and file storage"
+sidebar:
+  order: 3
+  label: "Task Manager CLI Project"
+tab: "python-programming"
+---
+
+Apply CLI tool patterns, file I/O, and data serialization to build a task manager.
+
+## Project: Task Manager CLI
+
+Create `taskcli.py`:
+
+```python
+#!/usr/bin/env python3
+"""A full-featured CLI task manager."""
+
+import argparse
+import json
+import os
+from datetime import datetime, date
+from pathlib import Path
+from typing import List, Optional, Dict, Any
+
+DATA_DIR = Path.home() / ".taskcli"
+DATA_FILE = DATA_DIR / "tasks.json"
+
+
+class Task:
+    """A single task."""
+
+    def __init__(self, id: int, title: str, priority: str = "medium",
+                 due_date: Optional[str] = None, project: str = "default"):
+        self.id = id
+        self.title = title
+        self.completed = False
+        self.priority = priority  # high, medium, low
+        self.created_at = datetime.now().isoformat()
+        self.due_date = due_date
+        self.project = project
+
+    def to_dict(self) -> Dict:
+        return self.__dict__
+
+    @classmethod
+    def from_dict(cls, data: Dict) -> "Task":
+        task = cls(data["id"], data["title"])
+        task.__dict__.update(data)
+        return task
+
+    def __str__(self):
+        status = "✓" if self.completed else "○"
+        due = f" [due: {self.due_date}]" if self.due_date else ""
+        return f"{status} [{self.priority:^6}] #{self.id:03d} {self.title}{due}"
+
+
+class TaskManager:
+    """Manage tasks with JSON persistence."""
+
+    def __init__(self):
+        self.tasks: List[Task] = []
+        self.next_id = 1
+        self._load()
+
+    def _load(self):
+        """Load tasks from JSON file."""
+        if DATA_FILE.exists():
+            try:
+                data = json.loads(DATA_FILE.read_text())
+                self.tasks = [Task.from_dict(t) for t in data["tasks"]]
+                self.next_id = data.get("next_id", len(self.tasks) + 1)
+            except (json.JSONDecodeError, KeyError):
+                self.tasks = []
+                self.next_id = 1
+
+    def _save(self):
+        """Save tasks to JSON file."""
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        data = {
+            "next_id": self.next_id,
+            "tasks": [t.to_dict() for t in self.tasks],
+        }
+        DATA_FILE.write_text(json.dumps(data, indent=2))
+
+    def add(self, title: str, priority: str = "medium",
+            due_date: Optional[str] = None, project: str = "default") -> Task:
+        """Add a new task."""
+        task = Task(self.next_id, title, priority, due_date, project)
+        self.tasks.append(task)
+        self.next_id += 1
+        self._save()
+        return task
+
+    def list(self, project: Optional[str] = None,
+             status: Optional[str] = None,
+             priority: Optional[str] = None) -> List[Task]:
+        """List tasks with optional filters."""
+        filtered = self.tasks[:]
+
+        if project:
+            filtered = [t for t in filtered if t.project == project]
+        if status == "done":
+            filtered = [t for t in filtered if t.completed]
+        elif status == "pending":
+            filtered = [t for t in filtered if not t.completed]
+        if priority:
+            filtered = [t for t in filtered if t.priority == priority]
+
+        return filtered
+
+    def complete(self, task_id: int) -> Optional[Task]:
+        """Mark a task as completed."""
+        for task in self.tasks:
+            if task.id == task_id:
+                task.completed = True
+                self._save()
+                return task
+        return None
+
+    def delete(self, task_id: int) -> bool:
+        """Delete a task."""
+        for i, task in enumerate(self.tasks):
+            if task.id == task_id:
+                self.tasks.pop(i)
+                self._save()
+                return True
+        return False
+
+    def get_projects(self) -> List[str]:
+        """Get all unique project names."""
+        return sorted(set(t.project for t in self.tasks))
+
+    def stats(self) -> Dict[str, Any]:
+        """Get task statistics."""
+        total = len(self.tasks)
+        done = sum(1 for t in self.tasks if t.completed)
+        pending = total - done
+        return {
+            "total": total,
+            "completed": done,
+            "pending": pending,
+            "completion_rate": (done / total * 100) if total > 0 else 0,
+            "projects": len(self.get_projects()),
+            "high_priority": sum(1 for t in self.tasks if t.priority == "high" and not t.completed),
+        }
+
+    def search(self, query: str) -> List[Task]:
+        """Search tasks by title."""
+        query = query.lower()
+        return [t for t in self.tasks if query in t.title.lower()]
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Task Manager CLI",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("--version", action="version", version="taskcli 1.0")
+
+    subparsers = parser.add_subparsers(dest="command", help="Commands")
+
+    # Add
+    add_parser = subparsers.add_parser("add", help="Add a new task")
+    add_parser.add_argument("title", help="Task title")
+    add_parser.add_argument("-p", "--priority", choices=["high", "medium", "low"],
+                            default="medium", help="Task priority")
+    add_parser.add_argument("-d", "--due", help="Due date (YYYY-MM-DD)")
+    add_parser.add_argument("--project", default="default", help="Project name")
+
+    # List
+    list_parser = subparsers.add_parser("list", aliases=["ls"], help="List tasks")
+    list_parser.add_argument("--project", help="Filter by project")
+    list_parser.add_argument("--status", choices=["done", "pending"],
+                             help="Filter by status")
+    list_parser.add_argument("--priority", choices=["high", "medium", "low"],
+                             help="Filter by priority")
+
+    # Done
+    done_parser = subparsers.add_parser("done", help="Mark task as complete")
+    done_parser.add_argument("task_id", type=int, help="Task ID")
+
+    # Delete
+    delete_parser = subparsers.add_parser("rm", help="Delete a task")
+    delete_parser.add_argument("task_id", type=int, help="Task ID")
+
+    # Projects
+    subparsers.add_parser("projects", help="List all projects")
+
+    # Stats
+    subparsers.add_parser("stats", help="Show task statistics")
+
+    # Search
+    search_parser = subparsers.add_parser("search", help="Search tasks")
+    search_parser.add_argument("query", help="Search query")
+
+    args = parser.parse_args()
+    manager = TaskManager()
+
+    if args.command == "add":
+        task = manager.add(args.title, args.priority, args.due, args.project)
+        print(f"Added task #{task.id}: {task.title}")
+
+    elif args.command in ("list", "ls"):
+        tasks = manager.list(args.project, args.status, args.priority)
+        if tasks:
+            # Group by project
+            from collections import defaultdict
+            grouped = defaultdict(list)
+            for t in tasks:
+                grouped[t.project].append(t)
+
+            for project in sorted(grouped):
+                print(f"\n[{project}]")
+                for task in grouped[project]:
+                    print(f"  {task}")
+        else:
+            print("No tasks found.")
+
+    elif args.command == "done":
+        task = manager.complete(args.task_id)
+        if task:
+            print(f"Completed: {task.title}")
+        else:
+            print(f"Task #{args.task_id} not found.")
+
+    elif args.command == "rm":
+        if manager.delete(args.task_id):
+            print(f"Deleted task #{args.task_id}")
+        else:
+            print(f"Task #{args.task_id} not found.")
+
+    elif args.command == "projects":
+        projects = manager.get_projects()
+        if projects:
+            print("Projects:")
+            for p in projects:
+                count = len(manager.list(project=p))
+                print(f"  {p} ({count} tasks)")
+        else:
+            print("No projects.")
+
+    elif args.command == "stats":
+        stats = manager.stats()
+        print("=== Task Statistics ===")
+        print(f"Total: {stats['total']}")
+        print(f"Completed: {stats['completed']}")
+        print(f"Pending: {stats['pending']}")
+        print(f"Completion: {stats['completion_rate']:.0f}%")
+        print(f"Projects: {stats['projects']}")
+        print(f"High priority pending: {stats['high_priority']}")
+
+    elif args.command == "search":
+        results = manager.search(args.query)
+        if results:
+            for task in results:
+                print(task)
+        else:
+            print("No matching tasks.")
+
+    else:
+        parser.print_help()
+
+
+if __name__ == "__main__":
+    main()
+```
+
+```bash
+# Usage examples
+python taskcli.py add "Buy groceries" --priority high --due 2024-12-25
+python taskcli.py add "Write report" --project work
+python taskcli.py list
+python taskcli.py done 1
+python taskcli.py projects
+python taskcli.py stats
+python taskcli.py search "report"
+```
+
+## What You Practiced
+
+| Concept | Usage |
+|---------|-------|
+| `argparse` | Subcommands, positional args, optional flags, choices, aliases |
+| JSON | Task persistence via `json.load`/`json.dump` |
+| `pathlib` | `Path.home() / ".taskcli"` for config directory |
+| `datetime` | Timestamps, due date handling |
+| Classes | `Task` and `TaskManager` with CRUD operations |
+| Filtering | List filtering by project, status, priority |
+| CLI patterns | `--dry-run`, `--version`, colored output, grouped listing |
+
+## Extensions
+
+1. **Tags** — Add `--tags` support; filter/search by tags
+2. **Recurring tasks** — Support daily/weekly/monthly recurring tasks
+3. **Notifications** — Desktop notifications for approaching due dates
+4. **Export/Import** — Export to CSV, import from Taskpaper/Todo.txt format
+5. **Interactive mode** — Add `taskcli interactive` with `cmd` module for REPL
+6. **Sync** — Sync tasks to a file (Dropbox/iCloud) for multi-device access

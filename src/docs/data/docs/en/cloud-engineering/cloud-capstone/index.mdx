@@ -1,0 +1,58 @@
+---
+title: "Module 12: Cloud Capstone"
+description: "Design and deploy a production-grade multi-region microservices application on AWS using CI/CD, observability, security, and infrastructure as code."
+sidebar:
+  order: 0
+  label: "Capstone Overview"
+tab: "cloud-engineering"
+---
+
+
+The Cloud Capstone is the culmination of everything you have learned across all four modules. You will design, implement, and document a production-grade microservices application deployed on AWS with multi-region high availability, CI/CD pipelines, full observability, and defense-in-depth security.
+
+## Project Scenario
+
+Your organization runs a customer-facing e-commerce platform that must serve users globally with 99.99% availability. The application consists of three microservices — **Product Service**, **Order Service**, and **User Service** — each with its own data store. Your task is to design and provision the full infrastructure using Terraform, deploy the services on ECS Fargate, and wire up monitoring, alerting, and security controls.
+
+## Requirements
+
+| Category | Requirement |
+|----------|-------------|
+| **Compute** | ECS Fargate with service auto-scaling across two regions |
+| **Database** | RDS PostgreSQL Multi-AZ (primary) + read replicas in second region |
+| **Caching** | ElastiCache Redis for session state and product catalog |
+| **Networking** | Custom VPCs with public/private subnets, NAT Gateways, Transit Gateway, VPC Peering |
+| **CI/CD** | CodePipeline + CodeBuild with testing, security scanning, and approval gates |
+| **Observability** | CloudWatch metrics + logs, X-Ray tracing, Grafana dashboards, SLO-based alerting |
+| **Security** | KMS envelope encryption, WAF, Shield Advanced, security groups, NACLs |
+| **IaC** | All infrastructure defined in Terraform modules with remote state |
+| **DNS/CDN** | Route 53 latency-based routing + CloudFront with WAF |
+| **Compliance** | SOC 2 control mapping, encryption at rest and in transit, audit logging |
+
+## Deliverables
+
+1. **Architecture diagram** — Multi-region VPC topology with all services and data flows
+2. **Terraform code** — Modular IaC covering networking, compute, database, caching, and security
+3. **CI/CD pipeline configuration** — buildspec files, stage definitions, approval workflows
+4. **Monitoring setup** — CloudWatch dashboards, X-Ray tracing config, Grafana data sources, alerting rules
+5. **Security documentation** — Encryption key hierarchy, WAF rule sets, network segmentation, compliance mapping
+6. **Incident response runbook** — Playbooks for common failure scenarios (region failover, database failover, DDoS)
+
+## Evaluation Criteria
+
+| Criterion | Weight |
+|-----------|--------|
+| Architecture correctness and completeness | 25% |
+| Terraform code quality and modularity | 20% |
+| Security controls implementation | 20% |
+| Monitoring and observability setup | 15% |
+| CI/CD pipeline design | 10% |
+| Documentation quality | 10% |
+
+<Aside variant="tip">
+Start by reviewing the Architecture Reference page, then build each Terraform module incrementally. Validate one module at a time before moving to the next.
+</Aside>
+
+## Submission
+
+Submit a GitHub repository with your Terraform modules, pipeline configurations, architecture diagram, and runbooks. Your repository README should explain the design decisions, trade-offs, and how to deploy the infrastructure.

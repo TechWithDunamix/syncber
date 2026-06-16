@@ -1,0 +1,55 @@
+---
+title: "Module 6: AWS Architecture"
+description: "Design scalable, resilient, and cost-optimized architectures on AWS. Master the Well-Architected Framework, high availability, disaster recovery, and migration strategies."
+sidebar:
+  order: 0
+  label: "Module Overview"
+tab: "cloud-engineering"
+---
+
+This module focuses on architectural best practices for designing and operating reliable, secure, and cost-effective systems on AWS. You will apply the Well-Architected Framework to real-world scenarios.
+
+<Aside variant="info" title="Prerequisites">
+  Completion of Modules 4 and 5 (AWS Core Services and Compute & Serverless). Understanding of EC2, S3, Lambda, IAM, and networking fundamentals is required.
+</Aside>
+
+## Module Objectives
+
+- Apply the six pillars of the AWS Well-Architected Framework to architecture reviews
+- Design highly available and disaster-resilient architectures across AZs and regions
+- Evaluate and plan cloud migration strategies using the 7 Rs framework
+- Design and document a multi-region high-availability web application architecture
+
+## Topics
+
+| Lesson | Topics Covered |
+|--------|---------------|
+| **Well-Architected Framework** | 6 pillars, design principles, Well-Architected Tool, architectural reviews |
+| **High Availability & DR** | Multi-AZ, multi-region, RPO/RTO, DR strategies (backup & restore, pilot light, warm standby, active-active) |
+| **Migration Strategies** | 7 Rs, Migration Evaluator, MGN, DataSync, Snowball, migration planning |
+| **Architecture Project** | Design HA multi-region web app architecture with documentation |
+
+## Key AWS CLI Commands
+
+```bash
+# List availability zones
+aws ec2 describe-availability-zones --region us-east-1
+
+# Check service health
+aws health describe-events --region us-east-1
+
+# Describe account limits
+aws service-quotas get-service-quota \
+  --service-code ec2 \
+  --quota-code L-12345678
+```
+
+<Aside variant="tip">
+  Use the AWS Well-Architected Tool in the AWS Console to run automated reviews. The `aws wellarchitected` CLI supports creating workloads and listing lens reviews programmatically.
+</Aside>
+
+## Estimated Time
+
+- Lessons: 4 hours
+- Hands-on labs: 3 hours
+- Module project: 4 hours

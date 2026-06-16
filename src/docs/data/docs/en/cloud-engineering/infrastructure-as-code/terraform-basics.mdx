@@ -1,0 +1,205 @@
+---
+title: "Terraform Basics"
+description: "Learn Terraform fundamentals — HCL syntax, providers, resources, state management, modules, workspaces, and Terraform Cloud — with practical examples for AWS, Azure, and GCP."
+sidebar:
+  order: 1
+  label: "Terraform Basics"
+tab: "cloud-engineering"
+---
+
+
+## What is Terraform?
+
+Terraform is an open-source IaC tool by HashiCorp that enables you to define and provision cloud infrastructure using a declarative configuration language (HCL). It is cloud-agnostic, supporting AWS, Azure, GCP, and 2000+ providers.
+
+## HCL Syntax
+
+HCL (HashiCorp Configuration Language) is Terraform's native language. A Terraform configuration consists of blocks — `terraform`, `provider`, `resource`, `variable`, `output`, and `module`.
+
+```hcl
+terraform {
+  required_version = ">= 1.6"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
+provider "aws" {
+  region = "us-east-1"
+}
+
+resource "aws_s3_bucket" "data" {
+  bucket = "my-terraform-bucket-2024"
+  tags = {
+    Name        = "Data Bucket"
+    Environment = "Production"
+  }
+}
+```
+
+## Providers
+
+Providers are plugins that expose resources for a specific platform. The `required_providers` block declares which providers your configuration needs.
+
+```hcl
+provider "azurerm" {
+  features {}
+  subscription_id = var.azure_subscription_id
+}
+
+resource "azurerm_resource_group" "main" {
+  name     = "terraform-rg"
+  location = "eastus"
+}
+```
+
+## Resources and Data Sources
+
+**Resources** are infrastructure objects you create, update, and destroy. **Data sources** read information from existing infrastructure.
+
+```hcl
+# Resource: creates a new VPC
+resource "aws_vpc" "main" {
+  cidr_block = "10.0.0.0/16"
+}
+
+# Data source: reads the current AWS account ID
+data "aws_caller_identity" "current" {}
+
+output "account_id" {
+  value = data.aws_caller_identity.current.account_id
+}
+```
+
+## State Management
+
+Terraform tracks the mapping between your configuration and real-world resources in a **state file**. By default this is `terraform.tfstate` on your local machine, but production setups use remote state backends.
+
+```hcl
+terraform {
+  backend "s3" {
+    bucket         = "my-tf-state-bucket"
+    key            = "production/network/terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "tf-state-locks"
+    encrypt        = true
+  }
+}
+```
+
+<Aside variant="tip">
+  Always use a remote backend with state locking (S3 + DynamoDB, Azure Storage + blob lease, or Terraform Cloud) for team environments. Local state leads to conflicts and data loss.
+</Aside>
+
+## Modules
+
+Modules are reusable Terraform configurations — the fundamental unit of composition and reuse.
+
+```hcl
+module "vpc" {
+  source = "terraform-aws-modules/vpc/aws"
+  version = "5.0.0"
+
+  name = "my-vpc"
+  cidr = "10.0.0.0/16"
+  azs  = ["us-east-1a", "us-east-1b"]
+  private_subnets = ["10.0.1.0/24", "10.0.2.0/24"]
+  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24"]
+
+  enable_nat_gateway = true
+  enable_vpn_gateway = false
+  tags = {
+    Environment = "production"
+  }
+}
+```
+
+The Terraform Registry (`registry.terraform.io`) hosts thousands of community and verified modules.
+
+## Workspaces
+
+Workspaces allow you to manage multiple environments (dev, staging, production) with the same configuration.
+
+```bash
+# Create and use a workspace
+terraform workspace new dev
+terraform workspace new prod
+terraform workspace select dev
+terraform apply
+```
+
+Each workspace has its own state file, enabling environment-specific variables and resource tracking.
+
+## Workspace-Specific Variables
+
+```hcl
+variable "instance_count" {
+  description = "Number of EC2 instances"
+  type        = number
+}
+
+# terraform.tfvars.dev
+instance_count = 1
+
+# terraform.tfvars.prod
+instance_count = 3
+```
+
+```bash
+terraform apply -var-file="terraform.tfvars.prod"
+```
+
+## Terraform Cloud
+
+Terraform Cloud is HashiCorp's managed service for remote state, team collaboration, policy enforcement (Sentinel), and run triggers.
+
+```hcl
+terraform {
+  cloud {
+    organization = "my-org"
+    workspaces {
+      name = "network-prod"
+    }
+  }
+}
+```
+
+```bash
+terraform login
+terraform init
+terraform apply
+```
+
+Terraform Cloud provides:
+- Remote state with encryption at rest and in transit
+- VCS-driven runs (plan on PR, apply on merge to main)
+- Cost estimation for AWS resources
+- Policy as Code with Sentinel
+- Run tasks integrating external tools (e.g., security scanners)
+
+## Core Workflow
+
+```bash
+# Initialize providers and modules
+terraform init
+
+# Preview changes
+terraform plan
+
+# Apply changes
+terraform apply
+
+# Destroy resources
+terraform destroy
+```
+
+<Aside variant="info" title="Plan Before Apply">
+  Always review `terraform plan` output before running `apply`. The plan shows exactly what Terraform will create, modify, or destroy — your safety net against unintended changes.
+</Aside>
+
+## Summary
+
+Terraform's cloud-agnostic HCL, modular architecture, and robust state management make it the most widely adopted IaC tool. Combined with remote backends and Terraform Cloud, it provides a production-ready foundation for managing infrastructure at any scale.

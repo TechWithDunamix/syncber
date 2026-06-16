@@ -1,0 +1,137 @@
+---
+title: "Capstone Project Overview"
+description: "Build a complete Python application applying everything you've learned"
+sidebar:
+  order: 1
+  label: "Capstone Overview"
+tab: "python-programming"
+---
+
+## Capstone Project: Personal Finance Tracker
+
+Apply everything from this course — data structures, OOP, file I/O, testing, CLI — to build a personal finance tracker.
+
+### Project Requirements
+
+Build a command-line personal finance application with these features:
+
+**Core Features**
+- Add, edit, delete transactions (income/expense)
+- Categorize transactions
+- View balance, monthly summaries, category breakdowns
+- Search/filter transactions
+- Export data to CSV/JSON
+
+**Technical Requirements**
+- Object-oriented design with classes
+- Persistent storage (JSON file or SQLite)
+- At least 3 test files with pytest
+- Type hints throughout
+- Docstrings on all public methods
+- CLI with argparse
+
+### Architecture
+
+```
+finance_tracker/
+├── __init__.py
+├── models.py          # Transaction, Category classes
+├── storage.py         # JSON/SQLite persistence
+├── analysis.py        # Reports, summaries, charts (ASCII)
+├── cli.py             # Command-line interface
+└── tests/
+    ├── test_models.py
+    ├── test_storage.py
+    └── test_analysis.py
+```
+
+### Suggested Modules
+
+**`models.py`** — Define your data models:
+
+```python
+from dataclasses import dataclass
+from datetime import datetime
+from decimal import Decimal
+from typing import Optional
+from enum import Enum
+
+class TransactionType(Enum):
+    INCOME = "income"
+    EXPENSE = "expense"
+
+@dataclass
+class Category:
+    name: str
+    budget: Optional[Decimal] = None
+
+@dataclass
+class Transaction:
+    id: int
+    amount: Decimal
+    type: TransactionType
+    category: str
+    description: str
+    date: datetime
+    created_at: datetime
+```
+
+**`storage.py`** — Handle persistence:
+
+```python
+class Storage:
+    def load(self) -> list[Transaction]: ...
+    def save(self, transactions: list[Transaction]): ...
+    def add_transaction(self, transaction: Transaction): ...
+    def delete_transaction(self, transaction_id: int): ...
+
+class JSONStorage(Storage):
+    """JSON file-based storage."""
+
+class SQLiteStorage(Storage):
+    """SQLite database storage (bonus)."""
+```
+
+**`analysis.py`** — Create reports:
+
+```python
+class Analyzer:
+    def balance(self) -> Decimal: ...
+    def monthly_summary(self, year: int, month: int) -> dict: ...
+    def category_breakdown(self) -> dict: ...
+    def cash_flow(self) -> list[tuple[str, Decimal]]: ...
+```
+
+**`cli.py`** — User interface:
+
+```python
+class CLI:
+    def add_transaction(self, args): ...
+    def list_transactions(self, args): ...
+    def show_balance(self): ...
+    def monthly_report(self, args): ...
+    def export(self, args): ...
+```
+
+### Development Steps
+
+1. **Start with models** — Define dataclasses for Transaction and Category
+2. **Add storage** — Implement JSON persistence with CRUD operations
+3. **Build analysis** — Create summary and reporting functions
+4. **Create CLI** — Wire everything together with argparse
+5. **Write tests** — Test each module independently
+6. **Polish** — Add error handling, input validation, and documentation
+
+### Deliverables
+
+Submit a working CLI application that can:
+1. `finance.py add -a 50.00 -t income -c Food -d "Lunch"`
+2. `finance.py list --month 12 --year 2024`
+3. `finance.py balance`
+4. `finance.py report --monthly`
+5. `finance.py export --format csv`
+6. `finance.py categories --budget`
+
+<Aside variant="tip">
+  Start simple, then add features. A working app with basic features is better than a half-finished app with all features planned.
+</Aside>

@@ -1,0 +1,113 @@
+---
+title: "Block Storage"
+description: "Learn about block storage in the cloud — Amazon EBS and instance store, Azure Managed Disks, Google Persistent Disks. Compare SSD vs. HDD, encryption, snapshots, and performance."
+sidebar:
+  order: 2
+  label: "Block Storage"
+tab: "cloud-engineering"
+---
+
+
+Block storage provides raw, formatted storage volumes that attach to virtual machines. Unlike object storage (accessed via HTTP API), block storage appears as a device — `/dev/xvda` on Linux or `E:` on Windows — and is typically formatted with a filesystem.
+
+## Provider Comparison
+
+| Feature | AWS EBS | Azure Managed Disks | GCP Persistent Disks |
+|---------|---------|-------------------|---------------------|
+| Max volume size | 64 TB | 32 TB | 64 TB |
+| Max IOPS per volume | 260,000 (io2 Block Express) | 160,000 (Ultra Disk) | 100,000 (pd-extreme) |
+| Max throughput | 7,500 MB/s | 2,000 MB/s | 1,200 MB/s |
+| Snapshot capability | Incremental to S3 | Incremental to Blob Storage | Incremental to Cloud Storage |
+| Multi-attach | io1/io2 (read/write for cluster) | Shared disks (read/write) | Read-only |
+
+## SSD vs. HDD
+
+Block storage volumes come in two families:
+
+### SSD-backed
+
+| Type | Use Case | Max IOPS | Max Throughput |
+|------|----------|----------|---------------|
+| gp3 (AWS) | General purpose, boot volumes | 16,000 | 1,000 MB/s |
+| io2 (AWS) | Critical database workloads | 260,000 | 7,500 MB/s |
+| pd-ssd (GCP) | General purpose | 30,000 | 400 MB/s |
+| pd-extreme (GCP) | High-performance databases | 100,000 | 1,200 MB/s |
+
+### HDD-backed
+
+| Type | Use Case | Max IOPS | Max Throughput |
+|------|----------|----------|---------------|
+| st1 (AWS) | Streaming, big data, log processing | 500 | 500 MB/s |
+| sc1 (AWS) | Cold data, infrequent access | 250 | 250 MB/s |
+
+<Aside variant="tip">
+For boot volumes, gp3 (AWS) or pd-ssd (GCP) provide excellent performance at low cost. Do not use HDD-backed volumes for operating system disks — boot performance will be poor.
+</Aside>
+
+## EBS vs. Instance Store
+
+AWS EC2 offers two types of block storage:
+
+| Attribute | EBS (Elastic Block Store) | Instance Store |
+|-----------|--------------------------|----------------|
+| Persistence | Survives instance stop/termination | Ephemeral — lost on stop/termination |
+| Performance | Network-attached, variable | Physically attached to the host, maximum performance |
+| Backup | Snapshots, replication | Must be managed externally |
+| Use case | Persistent data, databases | Temporary data, caches, scratch space |
+
+<Aside variant="caution">
+Never store irreplaceable data on instance store volumes. If the instance stops, fails, or is terminated, all data on instance store volumes is permanently lost.
+</Aside>
+
+## Encryption
+
+Block storage encryption protects data at rest:
+
+- **AWS EBS**: Enable EBS encryption by default. Use KMS keys (customer-managed or AWS-managed).
+- **Azure Managed Disks**: SSE with platform-managed or customer-managed keys.
+- **GCP Persistent Disks**: Default encryption with CMEK or CSEK options.
+
+Encryption is transparent to the instance — data is decrypted on read with no performance impact.
+
+## Snapshots and Backup
+
+Snapshots capture the state of a block storage volume at a point in time:
+
+- **Incremental:** Only changed blocks are stored after the initial snapshot.
+- **Cross-region:** Copy snapshots to another region for disaster recovery.
+- **Automated:** Use AWS Backup, Azure Backup, or scheduled snapshots.
+
+**Restoring from a snapshot:** Create a new volume from the snapshot. The volume is fully usable immediately, with background restoration of data blocks (lazy loading).
+
+## Choosing Between Object and Block Storage
+
+| Criteria | Object Storage (S3) | Block Storage (EBS) |
+|----------|-------------------|-------------------|
+| Access pattern | HTTP API | Filesystem mount |
+| Performance | ~100-500 MB/s per partition | Up to 260,000 IOPS per volume |
+| Max single file size | 5 TB | Volume size limit |
+| Concurrent access | Multiple readers/writers | Single instance (except multi-attach) |
+| Cost | ~$0.023/GB/month (Standard) | ~$0.08/GB/month (gp3) |
+| Use case | Static assets, backups, data lakes | Operating systems, databases, apps |
+
+## Practical Example: Web Application Architecture
+
+```
+┌─────────────────────┐
+│  Elastic Load Balancer  │
+└─────────┬───────────┘
+          │
+┌─────────▼───────────┐
+│  EC2 (web/app tier)  │
+│  Boot volume: gp3    │
+│  50 GB, 3000 IOPS    │
+└─────────┬───────────┘
+          │
+┌─────────▼───────────┐
+│  RDS (database tier) │
+│  io2 volume: 500 GB   │
+│  10,000 IOPS         │
+└─────────────────────┘
+```
+
+The web/application servers use gp3 volumes — cost-effective with good performance for general workloads. The database uses io2 volumes with provisioned IOPS for consistent, predictable performance. Daily snapshots of the database volume enable point-in-time recovery.

@@ -1,0 +1,188 @@
+---
+title: "Defining Functions"
+description: "Create reusable code with Python functions — parameters, return values, and scope"
+sidebar:
+  order: 1
+  label: "Defining Functions"
+tab: "python-programming"
+---
+
+Functions are reusable blocks of code that take inputs, perform work, and return outputs.
+
+## Basic Function Syntax
+
+```python
+def greet(name):
+    """Say hello to someone."""
+    return f"Hello, {name}!"
+
+# Call the function
+message = greet("Alice")
+print(message)  # Hello, Alice!
+```
+
+## Parameters and Arguments
+
+```python
+# Positional parameters
+def add(a, b):
+    return a + b
+
+add(3, 5)  # 8
+
+# Default parameters
+def power(base, exponent=2):
+    return base ** exponent
+
+power(4)      # 16 (4²)
+power(4, 3)   # 64 (4³)
+
+# Keyword arguments
+def describe(name, age, role):
+    return f"{name} is {age}, works as {role}"
+
+describe(name="Alice", role="engineer", age=25)
+# Order doesn't matter with keywords
+
+# Required vs optional
+def connect(host, port=5432, timeout=30):
+    """host is required; port and timeout have defaults."""
+    pass
+```
+
+<Aside variant="caution">
+  Default parameter values are evaluated **once** at function definition time. Never use mutable defaults like `[]` or `{}`.
+</Aside>
+
+### Mutable Default Pitfall
+
+```python
+# BAD — all calls share the same list
+def add_item(item, items=[]):
+    items.append(item)
+    return items
+
+print(add_item(1))  # [1]
+print(add_item(2))  # [1, 2] — reused the same list!
+
+# GOOD — use None and create a new list each call
+def add_item(item, items=None):
+    if items is None:
+        items = []
+    items.append(item)
+    return items
+```
+
+## Return Values
+
+```python
+# Single return value
+def square(n):
+    return n ** 2
+
+# Multiple return values (as tuple)
+def min_max(items):
+    return min(items), max(items)
+
+low, high = min_max([3, 1, 4, 1, 5])
+print(low, high)  # 1 5
+
+# Early return
+def divide(a, b):
+    if b == 0:
+        return None  # Early exit
+    return a / b
+
+# Implicit None
+def log(message):
+    print(f"[LOG]: {message}")
+    # No return statement — returns None
+```
+
+## Docstrings
+
+```python
+def calculate_bmi(weight_kg, height_m):
+    """Calculate Body Mass Index.
+
+    Args:
+        weight_kg: Weight in kilograms
+        height_m: Height in meters
+
+    Returns:
+        BMI as a float, or None if invalid input
+    """
+    if weight_kg <= 0 or height_m <= 0:
+        return None
+    return weight_kg / (height_m ** 2)
+
+# Access docstring
+print(calculate_bmi.__doc__)
+help(calculate_bmi)
+```
+
+## Scope and Variables
+
+```python
+global_var = "I'm global"
+
+def scope_demo():
+    local_var = "I'm local"
+    print(global_var)     # Accessible
+    # print(local_var)    # Only accessible inside function
+
+scope_demo()
+# print(local_var)  # NameError!
+
+# Modifying global variables
+counter = 0
+
+def increment():
+    global counter       # Must declare global to modify
+    counter += 1
+
+increment()
+print(counter)  # 1
+
+# Enclosing scope (nested functions)
+def outer():
+    x = "outer"
+
+    def inner():
+        nonlocal x       # Modify enclosing scope variable
+        x = "inner"
+        print(x)
+
+    inner()
+    print(x)             # "inner" — modified by inner()
+
+outer()
+```
+
+## Type Hints for Functions
+
+```python
+def greet(name: str, greeting: str = "Hello") -> str:
+    """Type-annotated function."""
+    return f"{greeting}, {name}!"
+
+# Type hints are documentation — not enforced at runtime
+greet("Alice")           # OK
+greet(42)                # Also runs fine — no runtime check
+
+# More complex types
+from typing import List, Optional, Dict, Tuple
+
+def process(items: List[int]) -> Dict[str, Optional[int]]:
+    return {"min": min(items), "max": max(items)}
+```
+
+## Key Takeaways
+
+- Functions use `def`, parameters, and `return`
+- Default parameters are evaluated once — avoid mutable defaults
+- Use `None` as default for mutable parameters, create new inside function
+- Functions can return multiple values as tuples
+- `global` and `nonlocal` modify outer scope variables
+- Docstrings with `"""` document function behavior — accessible via `help()`
+- Type hints document expected types but aren't enforced

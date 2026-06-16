@@ -1,0 +1,190 @@
+---
+title: "Containers on AWS"
+description: "Run containerized applications on AWS using ECS, EKS, and ECR. Learn Fargate vs EC2 launch types, task definitions, services, and auto scaling."
+sidebar:
+  order: 2
+  label: "Containers on AWS"
+tab: "cloud-engineering"
+---
+
+AWS offers multiple services for running containers: ECS (Amazon's native orchestrator), EKS (managed Kubernetes), and ECR (container registry).
+
+## Amazon ECR
+
+Elastic Container Registry stores Docker images securely. It integrates with IAM for access control.
+
+```bash
+# Authenticate Docker to ECR
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 123456789012.dkr.ecr.us-east-1.amazonaws.com
+
+# Create a repository
+aws ecr create-repository --repository-name my-app --region us-east-1
+
+# Tag and push an image
+docker tag my-app:latest 123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app:latest
+docker push 123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app:latest
+```
+
+## ECS — Task Definitions
+
+A task definition is the blueprint for running containers — it describes CPU, memory, port mappings, environment variables, and IAM role:
+
+```hcl
+resource "aws_ecs_task_definition" "app" {
+  family                   = "my-app-task"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = "256"
+  memory                   = "512"
+  execution_role_arn       = aws_iam_role.ecs_execution.arn
+  task_role_arn            = aws_iam_role.ecs_task.arn
+
+  container_definitions = jsonencode([
+    {
+      name      = "app"
+      image     = "${aws_ecr_repository.app.repository_url}:latest"
+      essential = true
+      portMappings = [
+        {
+          containerPort = 3000
+          hostPort      = 3000
+          protocol      = "tcp"
+        }
+      ]
+      environment = [
+        {
+          name  = "DB_HOST"
+          value = aws_rds_cluster.app.endpoint
+        }
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = "/ecs/my-app"
+          "awslogs-region"        = "us-east-1"
+          "awslogs-stream-prefix" = "ecs"
+        }
+      }
+    }
+  ])
+}
+```
+
+## Fargate vs EC2 Launch Type
+
+| Feature | Fargate (Serverless) | EC2 (Managed) |
+|---------|---------------------|---------------|
+| **Infrastructure management** | AWS manages servers | You manage cluster instances |
+| **Pricing** | Pay per vCPU/memory per second | Pay for EC2 instances + unused capacity |
+| **Isolation** | Per-task | Shared instances (or dedicated) |
+| **Custom AMIs** | Not supported | Supported |
+| **GPU workloads** | Not supported | Supported |
+| **Ephemeral storage** | 20 GB (up to 200 GB) | Instance store + EBS |
+
+<Aside variant="tip">
+  Choose Fargate for most stateless microservices — it eliminates cluster management overhead. Use EC2 launch type for GPU workloads, custom AMIs, or high-throughput batch processing where you need to optimize instance utilization.
+</Aside>
+
+## ECS Service
+
+A service manages running tasks behind a load balancer with auto scaling:
+
+```hcl
+resource "aws_ecs_service" "app" {
+  name            = "my-app-service"
+  cluster         = aws_ecs_cluster.main.id
+  task_definition = aws_ecs_task_definition.app.arn
+  desired_count   = 2
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    subnets         = var.private_subnet_ids
+    security_groups = [aws_security_group.ecs_tasks.id]
+  }
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.app.arn
+    container_name   = "app"
+    container_port   = 3000
+  }
+
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
+}
+
+resource "aws_appautoscaling_target" "app" {
+  max_capacity       = 10
+  min_capacity       = 2
+  resource_id        = "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.app.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  service_namespace  = "ecs"
+}
+
+resource "aws_appautoscaling_policy" "app_cpu" {
+  name               = "cpu-scaling-policy"
+  policy_type        = "TargetTrackingScaling"
+  resource_id        = aws_appautoscaling_target.app.resource_id
+  scalable_dimension = aws_appautoscaling_target.app.scalable_dimension
+  service_namespace  = aws_appautoscaling_target.app.service_namespace
+
+  target_tracking_scaling_policy_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = "ECSServiceAverageCPUUtilization"
+    }
+    target_value = 70
+  }
+}
+```
+
+## Amazon EKS
+
+EKS provides managed Kubernetes control plane. Worker nodes run in your account:
+
+```hcl
+module "eks" {
+  source  = "terraform-aws-modules/eks/aws"
+  version = "~> 20.0"
+
+  cluster_name    = "my-eks-cluster"
+  cluster_version = "1.29"
+
+  vpc_id     = var.vpc_id
+  subnet_ids = var.private_subnet_ids
+
+  eks_managed_node_groups = {
+    main = {
+      instance_types = ["t3.medium"]
+      min_size       = 2
+      max_size       = 10
+      desired_size   = 2
+    }
+  }
+}
+```
+
+```bash
+# Connect to EKS cluster
+aws eks update-kubeconfig --name my-eks-cluster --region us-east-1
+
+# Deploy an application
+kubectl create deployment nginx --image=nginx
+kubectl expose deployment nginx --port=80 --type=LoadBalancer
+
+# Scale
+kubectl scale deployment nginx --replicas=5
+```
+
+<Aside variant="caution">
+  EKS control plane costs $0.10/hour ($72/month) regardless of usage. For simpler container workloads, ECS Fargate is significantly more cost-effective. Reserve EKS for teams requiring Kubernetes-specific tooling, custom operators, or multi-cloud portability.
+</Aside>
+
+## Key Takeaways
+
+- ECR stores Docker images with IAM access control — authenticate via `aws ecr get-login-password` before push/pull
+- Task definitions are the container blueprint (CPU, memory, port mappings, IAM roles, log config) — required for both ECS and EKS
+- Fargate is serverless (pay per vCPU/memory per second, no cluster management); EC2 launch type supports GPUs, custom AMIs, and optimized instance utilization
+- ECS Services maintain desired task count behind ALB with deployment circuit breakers and App Auto Scaling (CPU/memory tracking)
+- EKS provides managed Kubernetes ($0.10/hr control plane) with worker nodes in your account — use when you need Kubernetes-native APIs, operators, or multi-cloud portability
+- App Auto Scaling supports target tracking (CPU, memory, ALB request count) and step scaling for custom metrics

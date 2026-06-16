@@ -1,0 +1,244 @@
+---
+title: "Advanced OOP Features"
+description: "Descriptors, metaclasses, slots, enums, and protocols"
+sidebar:
+  order: 2
+  label: "Advanced OOP Features"
+tab: "python-programming"
+---
+
+## Descriptors
+
+Descriptors control attribute access with `__get__`, `__set__`, `__delete__`:
+
+```python
+class ValidatedAttribute:
+    """Descriptor that validates attribute values."""
+
+    def __init__(self, validator):
+        self.validator = validator
+        self.data = {}
+
+    def __get__(self, obj, objtype=None):
+        if obj is None:
+            return self
+        return self.data.get(id(obj))
+
+    def __set__(self, obj, value):
+        if not self.validator(value):
+            raise ValueError(f"Invalid value: {value}")
+        self.data[id(obj)] = value
+
+    def __delete__(self, obj):
+        del self.data[id(obj)]
+
+
+def positive(value):
+    return isinstance(value, (int, float)) and value > 0
+
+def non_empty_string(value):
+    return isinstance(value, str) and len(value) > 0
+
+
+class Product:
+    name = ValidatedAttribute(non_empty_string)
+    price = ValidatedAttribute(positive)
+
+    def __init__(self, name, price):
+        self.name = name
+        self.price = price
+
+p = Product("Widget", 9.99)
+print(p.name, p.price)  # Widget 9.99
+
+# p.price = -5  # ValueError!
+```
+
+## Properties vs Descriptors
+
+```python
+# Property — simple getter/setter
+class Circle:
+    def __init__(self, radius):
+        self._radius = radius
+
+    @property
+    def radius(self):
+        return self._radius
+
+    @radius.setter
+    def radius(self, value):
+        if value < 0:
+            raise ValueError("Radius must be positive")
+        self._radius = value
+
+# Descriptor — reusable across classes
+# (Use when the same validation pattern appears in multiple classes)
+```
+
+## Slots
+
+Save memory by preventing `__dict__` creation:
+
+```python
+class Point:
+    __slots__ = ("x", "y")  # Only these attributes allowed
+
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+p = Point(3, 4)
+print(p.x, p.y)     # 3 4
+# p.z = 5           # AttributeError!
+# print(p.__dict__) # AttributeError — no __dict__
+
+# Slots save ~50% memory per instance
+```
+
+## Enumerations
+
+```python
+from enum import Enum, auto, IntEnum
+
+class Color(Enum):
+    RED = "ff0000"
+    GREEN = "00ff00"
+    BLUE = "0000ff"
+
+class Priority(IntEnum):
+    LOW = 1
+    MEDIUM = 2
+    HIGH = 3
+
+# Usage
+print(Color.RED.value)      # ff0000
+print(Color.RED.name)       # RED
+print(Priority.HIGH > Priority.LOW)  # True — IntEnum supports comparison
+
+# Iteration
+for color in Color:
+    print(color)
+
+# Auto-values
+class Status(Enum):
+    PENDING = auto()
+    ACTIVE = auto()
+    INACTIVE = auto()
+
+print(Status.PENDING.value)  # 1
+
+# Enum as type hint
+def set_status(s: Status):
+    print(f"Status set to {s.value}")
+```
+
+## Protocols (Structural Subtyping)
+
+Python 3.8+ has `Protocol` for static duck typing:
+
+```python
+from typing import Protocol
+
+class Drawable(Protocol):
+    def draw(self) -> str:
+        ...
+
+class Circle:
+    def draw(self) -> str:
+        return "Drawing circle"
+
+class Square:
+    def draw(self) -> str:
+        return "Drawing square"
+
+class Triangle:
+    def draw(self) -> str:
+        return "Drawing triangle"
+
+def render(shapes: list[Drawable]):
+    for shape in shapes:
+        print(shape.draw())
+
+# Works without explicit inheritance
+render([Circle(), Square()])
+```
+
+## Metaclasses (Advanced)
+
+Metaclasses are classes of classes — they control class creation:
+
+```python
+class SingletonMeta(type):
+    """Metaclass for singleton pattern."""
+    _instances = {}
+
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            cls._instances[cls] = super().__call__(*args, **kwargs)
+        return cls._instances[cls]
+
+class Database(metaclass=SingletonMeta):
+    def __init__(self):
+        self.connected = False
+
+    def connect(self):
+        self.connected = True
+
+# Both vars refer to the same instance
+db1 = Database()
+db2 = Database()
+print(db1 is db2)  # True
+```
+
+## Operator Overloading
+
+```python
+class Money:
+    exchange_rates = {"USD": 1.0, "EUR": 1.1, "GBP": 1.3}
+
+    def __init__(self, amount, currency="USD"):
+        self.amount = amount
+        self.currency = currency
+
+    def __add__(self, other):
+        if isinstance(other, Money):
+            total = self.amount + other.to_currency(self.currency).amount
+            return Money(total, self.currency)
+        return NotImplemented
+
+    def __sub__(self, other):
+        if isinstance(other, Money):
+            total = self.amount - other.to_currency(self.currency).amount
+            return Money(total, self.currency)
+        return NotImplemented
+
+    def __mul__(self, factor):
+        if isinstance(factor, (int, float)):
+            return Money(self.amount * factor, self.currency)
+        return NotImplemented
+
+    def __rmul__(self, factor):
+        return self.__mul__(factor)
+
+    def __repr__(self):
+        return f"{self.currency} {self.amount:.2f}"
+
+usd = Money(100, "USD")
+eur = Money(50, "EUR")
+
+print(usd + eur)   # USD 155.00 (50 EUR = 55 USD)
+print(eur + usd)   # EUR 140.91 (100 USD = 90.91 EUR)
+print(usd * 2)     # USD 200.00
+print(3 * eur)     # EUR 150.00
+```
+
+## Key Takeaways
+
+- Descriptors (`__get__`/`__set__`) enable reusable attribute behavior
+- `__slots__` reduces memory by preventing `__dict__`
+- `Enum` and `IntEnum` provide type-safe constants
+- `Protocol` enables structural subtyping (static duck typing)
+- Metaclasses control class creation — use sparingly
+- Operator overloading (`__add__`, `__mul__`, etc.) customizes arithmetic
+- Properties are simpler than descriptors for single-use cases

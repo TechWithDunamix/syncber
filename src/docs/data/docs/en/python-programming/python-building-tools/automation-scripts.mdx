@@ -1,0 +1,245 @@
+---
+title: "Automation Scripts"
+description: "Automate repetitive tasks with Python scripts"
+sidebar:
+  order: 2
+  label: "Automation Scripts"
+tab: "python-programming"
+---
+
+## File Organization Automation
+
+```python
+"""Organize files in a directory by type."""
+import shutil
+from pathlib import Path
+from collections import defaultdict
+
+# Category mapping
+FILE_CATEGORIES = {
+    "images": [".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp"],
+    "documents": [".pdf", ".docx", ".txt", ".md", ".csv", ".xlsx"],
+    "code": [".py", ".js", ".ts", ".html", ".css", ".json", ".yaml"],
+    "archives": [".zip", ".tar", ".gz", ".rar"],
+    "media": [".mp3", ".mp4", ".mov", ".avi"],
+}
+
+def organize_by_category(directory: str, dry_run: bool = False):
+    """Organize files into category folders."""
+    base = Path(directory)
+    stats = defaultdict(int)
+
+    for filepath in base.iterdir():
+        if filepath.is_file():
+            # Find category
+            category = "other"
+            for cat, extensions in FILE_CATEGORIES.items():
+                if filepath.suffix.lower() in extensions:
+                    category = cat
+                    break
+
+            target_dir = base / category
+            target_path = target_dir / filepath.name
+
+            if dry_run:
+                print(f"Would move: {filepath.name} → {category}/")
+            else:
+                target_dir.mkdir(exist_ok=True)
+                # Handle name conflicts
+                counter = 1
+                while target_path.exists():
+                    stem = filepath.stem
+                    target_path = target_dir / f"{stem}_{counter}{filepath.suffix}"
+                    counter += 1
+                filepath.rename(target_path)
+
+            stats[category] += 1
+
+    return dict(stats)
+```
+
+## Backup Automation
+
+```python
+"""Automated backup script with rotation."""
+import shutil
+from pathlib import Path
+from datetime import datetime, timedelta
+import json
+
+class BackupManager:
+    def __init__(self, source_dir, backup_dir, max_backups=7):
+        self.source = Path(source_dir)
+        self.backup = Path(backup_dir)
+        self.max_backups = max_backups
+
+    def create_backup(self):
+        """Create a timestamped backup."""
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_name = f"backup_{timestamp}"
+        backup_path = self.backup / backup_name
+
+        self.backup.mkdir(exist_ok=True)
+        shutil.copytree(self.source, backup_path)
+
+        # Save metadata
+        metadata = {
+            "source": str(self.source),
+            "created": datetime.now().isoformat(),
+            "size_bytes": sum(
+                p.stat().st_size for p in backup_path.rglob("*") if p.is_file()
+            ),
+        }
+        (backup_path / "_metadata.json").write_text(json.dumps(metadata, indent=2))
+
+        print(f"Backup created: {backup_name}")
+        self._rotate_backups()
+        return backup_path
+
+    def _rotate_backups(self):
+        """Remove old backups beyond max_backups."""
+        backups = sorted(self.backup.glob("backup_*"))
+        while len(backups) > self.max_backups:
+            oldest = backups.pop(0)
+            shutil.rmtree(oldest)
+            print(f"Removed old backup: {oldest.name}")
+
+    def list_backups(self):
+        """List all available backups."""
+        backups = sorted(self.backup.glob("backup_*"), reverse=True)
+        for bp in backups:
+            meta_file = bp / "_metadata.json"
+            if meta_file.exists():
+                meta = json.loads(meta_file.read_text())
+                print(f"{bp.name} — {meta['created']} ({meta['size_bytes']:,} bytes)")
+            else:
+                print(bp.name)
+```
+
+## Email Automation
+
+```python
+"""Send automated emails with Python."""
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from string import Template
+
+class EmailSender:
+    def __init__(self, smtp_server, smtp_port, username, password):
+        self.server = smtp_server
+        self.port = smtp_port
+        self.username = username
+        self.password = password
+
+    def send(self, to_email, subject, body, html_body=None):
+        """Send an email."""
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = self.username
+        msg["To"] = to_email
+
+        msg.attach(MIMEText(body, "plain"))
+        if html_body:
+            msg.attach(MIMEText(html_body, "html"))
+
+        with smtplib.SMTP(self.server, self.port) as server:
+            server.starttls()
+            server.login(self.username, self.password)
+            server.send_message(msg)
+
+    def send_template(self, to_email, template_file, **kwargs):
+        """Send email from a template."""
+        template = Template(Path(template_file).read_text())
+        body = template.substitute(**kwargs)
+        return self.send(to_email, "Notification", body)
+
+# Usage (requires SMTP credentials):
+# sender = EmailSender("smtp.gmail.com", 587, "user@gmail.com", "password")
+# sender.send("recipient@example.com", "Hello!", "This is a test.")
+```
+
+## Scheduled Tasks
+
+```python
+"""Schedule Python scripts to run at intervals."""
+import schedule  # pip install schedule
+import time
+
+def backup_job():
+    print(f"Running backup at {time.strftime('%H:%M:%S')}")
+
+def cleanup_job():
+    print("Cleaning up temp files...")
+
+def report_job():
+    print("Generating daily report...")
+
+# Schedule jobs
+schedule.every().hour.do(backup_job)
+schedule.every().day.at("03:00").do(cleanup_job)
+schedule.every().monday.at("09:00").do(report_job)
+schedule.every(30).minutes.do(backup_job)
+
+while True:
+    schedule.run_pending()
+    time.sleep(1)
+```
+
+## Log Monitoring
+
+```python
+"""Monitor log files for patterns."""
+import time
+import re
+from pathlib import Path
+
+class LogWatcher:
+    def __init__(self, logfile, patterns=None):
+        self.logfile = Path(logfile)
+        self.patterns = patterns or {
+            "ERROR": re.compile(r"ERROR|CRITICAL", re.IGNORECASE),
+            "WARN": re.compile(r"WARN|WARNING", re.IGNORECASE),
+        }
+        self.position = self.logfile.stat().st_size if self.logfile.exists() else 0
+
+    def watch(self, interval=1):
+        """Follow log file like `tail -f`."""
+        print(f"Watching {self.logfile}...")
+
+        while True:
+            if not self.logfile.exists():
+                time.sleep(interval)
+                continue
+
+            current_size = self.logfile.stat().st_size
+            if current_size < self.position:
+                # File was rotated
+                self.position = 0
+
+            if current_size > self.position:
+                with open(self.logfile) as f:
+                    f.seek(self.position)
+                    for line in f:
+                        self._process_line(line.rstrip())
+                self.position = f.tell()
+
+            time.sleep(interval)
+
+    def _process_line(self, line):
+        for level, pattern in self.patterns.items():
+            if pattern.search(line):
+                print(f"[{level}] {line}")
+```
+
+## Key Takeaways
+
+- `shutil` for file copy/move; `pathlib` for path operations
+- Use `--dry-run` flag to preview destructive operations safely
+- `datetime` for timestamped backup names and rotation
+- `smtplib` + `email.mime` for sending emails
+- `schedule` library for cron-like task scheduling
+- File watchers track file position for tail-like monitoring
+- Always handle name conflicts in file operations
+- Use `_metadata.json` files to attach info to backups/archives
+- Automate before you need to — schedule cleanup, backup, and reporting

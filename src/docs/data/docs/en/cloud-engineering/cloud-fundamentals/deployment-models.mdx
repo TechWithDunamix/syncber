@@ -1,0 +1,75 @@
+---
+title: "Deployment Models"
+description: "Compare public cloud, private cloud, hybrid cloud, and multicloud strategies. Understand the shared responsibility model and when to use each approach."
+sidebar:
+  order: 2
+  label: "Deployment Models"
+tab: "cloud-engineering"
+---
+
+
+Choosing where to run your workloads is one of the most consequential architecture decisions you will make. This page covers the four major deployment models and the shared responsibility model that governs who secures what.
+
+## Public Cloud
+
+In the public cloud model, a third-party provider owns and operates the infrastructure while consumers provision resources over the internet. AWS, Microsoft Azure, and Google Cloud are the dominant public cloud providers.
+
+**Best for:** startups, variable workloads, applications needing global reach, teams that want to minimize operational overhead.
+
+**Trade-offs:** You share the hypervisor with other tenants (though isolation is strong), you cannot control the physical hardware, and egress bandwidth can become expensive at scale.
+
+## Private Cloud
+
+A private cloud is dedicated to a single organization. It can run on-premises in your own data center or be hosted by a third party. The key distinction is that resources are not shared with other tenants.
+
+**Best for:** regulated industries (finance, healthcare, government), workloads with strict data sovereignty requirements, organizations that already have significant data center investment.
+
+**Trade-offs:** You retain responsibility for hardware lifecycle, capacity planning, and operational overhead. The elasticity ceiling is your physical capacity.
+
+## Hybrid Cloud
+
+Hybrid cloud connects public and private cloud environments, allowing data and applications to move between them. A typical pattern: keep sensitive data on-premises while using public cloud for burst compute capacity.
+
+**Best for:** organizations undergoing gradual migration, workloads with variable peaks that exceed private capacity, disaster recovery architectures spanning on-prem and cloud.
+
+<Aside variant="caution">
+Hybrid cloud adds network complexity. Ensure your connectivity (Direct Connect, ExpressRoute, or VPN) provides sufficient bandwidth and latency characteristics before architecting split workloads.
+</Aside>
+
+## Multicloud
+
+Multicloud means using two or more public cloud providers simultaneously. This is distinct from hybrid — multicloud is about provider diversity rather than mixing on-prem and cloud.
+
+**Best for:** avoiding vendor lock-in, using best-of-breed services from different providers (e.g., GCP for data analytics, AWS for compute), geographic coverage where one provider lacks local regions.
+
+**Trade-offs:** You must manage multiple IAM systems, billing consoles, and networking models. Operational complexity rises significantly.
+
+## Shared Responsibility Model
+
+Security in the cloud is a partnership. Every provider follows a shared responsibility model:
+
+| Layer | Provider Responsible | Customer Responsible |
+|-------|---------------------|---------------------|
+| Physical security, hardware, networking | Always | Never |
+| Hypervisor, host OS | Always | Never |
+| Virtual network controls | Varies | Varies |
+| Guest OS, applications, data | Never | Always |
+| Identity and access management | Never | Always |
+| Network traffic encryption | Never | Always |
+
+<Aside variant="danger">
+A common mistake is assuming the provider secures your data. They secure the infrastructure; you secure what runs on it — including OS patching, firewall rules, encryption, and IAM policies.
+</Aside>
+
+The split changes based on the service model. In Infrastructure as a Service (IaaS) you manage more; in Software as a Service (SaaS) the provider manages nearly everything.
+
+## Choosing a Model
+
+Consider these factors:
+
+- **Compliance:** Regulations like HIPAA, PCI-DSS, or GDPR may mandate data location or isolation level.
+- **Cost:** Public cloud has no upfront cost but can surprise at scale; private cloud is capital-intensive but predictable.
+- **Latency:** On-premises private cloud offers the lowest latency for latency-sensitive workloads.
+- **Vendor strategy:** Multicloud provides leverage in negotiations and fallback if a provider has an outage.
+
+Most organizations end up with a mix — a hybrid or multicloud strategy that balances control, cost, and agility.

@@ -1,0 +1,331 @@
+---
+title: "Testing Project"
+description: "Build a test suite for a data processing library"
+sidebar:
+  order: 3
+  label: "Testing Project"
+tab: "python-programming"
+---
+
+Apply unittest/pytest patterns to build a comprehensive test suite.
+
+## Project: Data Processing Library with Test Suite
+
+### Library: `dataprocessor/__init__.py`
+
+```python
+"""A small data processing library to demonstrate testing."""
+
+from typing import List, Dict, Any, Optional
+import json
+import csv
+import io
+
+
+def clean_text(text: str) -> str:
+    """Clean and normalize text."""
+    if not text:
+        return ""
+    return " ".join(text.strip().split())
+
+
+def filter_by_threshold(values: List[float], threshold: float) -> List[float]:
+    """Filter values above a threshold."""
+    return [v for v in values if v > threshold]
+
+
+def group_by_key(data: List[Dict], key: str) -> Dict[Any, List[Dict]]:
+    """Group a list of dicts by a key."""
+    result = {}
+    for item in data:
+        k = item.get(key)
+        if k not in result:
+            result[k] = []
+        result[k].append(item)
+    return result
+
+
+def parse_csv(content: str) -> List[Dict[str, str]]:
+    """Parse CSV string content."""
+    reader = csv.DictReader(io.StringIO(content))
+    return list(reader)
+
+
+def to_json(data: Any, indent: int = 2) -> str:
+    """Serialize data to JSON."""
+    return json.dumps(data, indent=indent)
+```
+
+### Test Suite: `tests/test_dataprocessor.py`
+
+```python
+"""Comprehensive test suite for the dataprocessor library."""
+
+import pytest
+from dataprocessor import (
+    clean_text,
+    filter_by_threshold,
+    group_by_key,
+    parse_csv,
+    to_json,
+)
+
+
+class TestCleanText:
+    """Tests for clean_text function."""
+
+    def test_removes_extra_whitespace(self):
+        assert clean_text("hello    world") == "hello world"
+
+    def test_removes_leading_trailing_spaces(self):
+        assert clean_text("  hello  ") == "hello"
+
+    def test_handles_empty_string(self):
+        assert clean_text("") == ""
+
+    def test_handles_none(self):
+        assert clean_text(None) == ""
+
+    def test_preserves_single_spaces(self):
+        assert clean_text("hello world") == "hello world"
+
+    def test_handles_newlines_and_tabs(self):
+        assert clean_text("hello\n\tworld") == "hello world"
+
+
+class TestFilterByThreshold:
+    """Tests for filter_by_threshold function."""
+
+    def test_filters_above_threshold(self):
+        result = filter_by_threshold([1, 5, 3, 8, 2], 3)
+        assert result == [5, 8]
+
+    def test_handles_empty_list(self):
+        assert filter_by_threshold([], 5) == []
+
+    def test_handles_equal_values(self):
+        """Values equal to threshold should NOT be included."""
+        result = filter_by_threshold([5, 10, 15], 10)
+        assert result == [15]
+
+    def test_handles_negative_values(self):
+        result = filter_by_threshold([-5, 0, 5, -2], -3)
+        assert result == [0, 5]
+
+    @pytest.mark.parametrize("values, threshold, expected", [
+        ([1.1, 2.2, 3.3], 2.0, [2.2, 3.3]),
+        ([0.5, 0.6, 0.7], 0.65, [0.7]),
+        ([100], 50, [100]),
+        ([1, 2, 3], 10, []),
+    ])
+    def test_various_inputs(self, values, threshold, expected):
+        assert filter_by_threshold(values, threshold) == expected
+
+
+class TestGroupByKey:
+    """Tests for group_by_key function."""
+
+    def test_groups_by_key(self):
+        data = [
+            {"type": "fruit", "name": "apple"},
+            {"type": "fruit", "name": "banana"},
+            {"type": "vegetable", "name": "carrot"},
+        ]
+        result = group_by_key(data, "type")
+        assert len(result["fruit"]) == 2
+        assert len(result["vegetable"]) == 1
+
+    def test_handles_missing_key(self):
+        data = [{"name": "apple"}, {"type": "fruit", "name": "banana"}]
+        result = group_by_key(data, "type")
+        assert None in result  # Missing key grouped under None
+
+    def test_handles_empty_list(self):
+        assert group_by_key([], "key") == {}
+
+    def test_preserves_order_within_groups(self):
+        data = [
+            {"g": 1, "name": "first"},
+            {"g": 2, "name": "second"},
+            {"g": 1, "name": "third"},
+        ]
+        result = group_by_key(data, "g")
+        assert result[1][0]["name"] == "first"
+        assert result[1][1]["name"] == "third"
+
+
+class TestParseCSV:
+    """Tests for parse_csv function."""
+
+    def test_parses_basic_csv(self):
+        csv_content = "name,age\nAlice,30\nBob,25"
+        result = parse_csv(csv_content)
+        assert len(result) == 2
+        assert result[0]["name"] == "Alice"
+        assert result[1]["age"] == "25"
+
+    def test_handles_empty_content(self):
+        assert parse_csv("") == []
+
+    def test_handles_header_only(self):
+        result = parse_csv("name,age")
+        assert result == []
+
+    def test_handles_quoted_fields(self):
+        csv_content = 'name,description\nAlice,"Hello, World!"'
+        result = parse_csv(csv_content)
+        assert result[0]["description"] == "Hello, World!"
+
+    def test_handles_different_delimiter(self):
+        import csv, io
+        content = "name|age\nAlice|30"
+        reader = csv.DictReader(io.StringIO(content), delimiter="|")
+        result = list(reader)
+        assert result[0]["name"] == "Alice"
+
+
+class TestToJSON:
+    """Tests for to_json function."""
+
+    def test_serializes_dict(self):
+        data = {"name": "Alice", "age": 30}
+        result = to_json(data)
+        assert '"name"' in result
+        assert '"Alice"' in result
+
+    def test_serializes_list(self):
+        result = to_json([1, 2, 3])
+        assert result == "[\n  1,\n  2,\n  3\n]"
+
+    def test_indent_parameter(self):
+        """Should allow custom indentation."""
+        result = to_json({"a": 1}, indent=4)
+        assert "    " in result  # 4-space indent
+
+    def test_roundtrip(self):
+        """JSON → parse → JSON should preserve data."""
+        import json
+        original = {"name": "Alice", "scores": [1, 2, 3]}
+        serialized = to_json(original)
+        parsed = json.loads(serialized)
+        assert parsed == original
+
+
+class TestIntegration:
+    """Integration tests combining multiple functions."""
+
+    def test_full_pipeline(self):
+        """End-to-end test: create data, process, verify."""
+        # Arrange
+        data = [
+            {"name": "Alice", "score": 85},
+            {"name": "Bob", "score": 42},
+            {"name": "Charlie", "score": 73},
+        ]
+
+        # Act: filter then group
+        passing = [d for d in data if d["score"] > 50]
+        grouped = group_by_key(passing, "score")
+
+        # Assert
+        assert 85 in grouped
+        assert 73 in grouped
+        assert 42 not in grouped  # Filtered out
+
+    def _create_test_csv(self):
+        """Helper to create test data."""
+        return "product,price\nWidget,9.99\nGadget,24.99"
+
+    def test_csv_to_json_pipeline(self):
+        """Parse CSV, transform, and convert to JSON."""
+        csv_content = self._create_test_csv()
+        parsed = parse_csv(csv_content)
+
+        # Convert prices to float
+        for item in parsed:
+            item["price"] = float(item["price"])
+
+        # Filter cheap items
+        cheap = [item for item in parsed if item["price"] < 15]
+
+        result = to_json(cheap)
+        assert "Widget" in result
+        assert "Gadget" not in result
+
+
+# Fixtures for shared test data
+@pytest.fixture
+def sample_people():
+    return [
+        {"name": "Alice", "age": 30, "city": "NYC"},
+        {"name": "Bob", "age": 25, "city": "SF"},
+        {"name": "Charlie", "age": 35, "city": "NYC"},
+    ]
+
+
+def test_group_by_city(sample_people):
+    """Using fixture for test data."""
+    result = group_by_key(sample_people, "city")
+    assert len(result["NYC"]) == 2
+    assert len(result["SF"]) == 1
+
+
+# Fixture with teardown
+@pytest.fixture
+def temp_json_file(tmp_path):
+    """Create a temp JSON file for testing."""
+    import json
+    filepath = tmp_path / "test.json"
+    data = {"test": True}
+    filepath.write_text(json.dumps(data))
+    yield filepath
+    # Teardown: file is automatically cleaned up by tmp_path
+
+
+def test_read_json_file(temp_json_file):
+    """Test reading from a JSON file."""
+    import json
+    data = json.loads(temp_json_file.read_text())
+    assert data["test"] is True
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])
+```
+
+## Running the Tests
+
+```bash
+# Run all tests
+pytest tests/ -v
+
+# Run with coverage
+pytest tests/ --cov=dataprocessor --cov-report=term-missing
+
+# Run specific test class
+pytest tests/test_dataprocessor.py::TestCleanText -v
+
+# Run tests matching keyword
+pytest -k "parametrize" -v
+```
+
+## What You Practiced
+
+| Concept | Usage |
+|---------|-------|
+| `pytest` | Test functions, classes, fixtures, parametrize |
+| Assertions | `assert x == y`, `assert x in y` |
+| Parametrize | Multiple inputs for the same test logic |
+| Fixtures | `sample_people`, `temp_json_file` with setup/teardown |
+| Edge cases | Empty lists, None values, boundary conditions |
+| Integration | End-to-end pipeline tests combining functions |
+| `tmp_path` | Built-in fixture for temp files |
+| Test organization | Classes group related tests; descriptive names |
+
+## Extensions
+
+1. **Property-based testing** — Use `hypothesis` to generate test cases
+2. **Mock external APIs** — Use `unittest.mock` to mock network calls
+3. **Snapshot testing** — Use `pytest-snapshot` for complex outputs
+4. **Performance tests** — Add benchmark tests with `pytest-benchmark`
+5. **Test documentation** — Generate test report with `pytest-html`

@@ -1,0 +1,249 @@
+---
+title: "Module 11 Project: Secure Architecture"
+description: "Design and deploy a secure three-tier architecture on AWS with KMS envelope encryption, WAF rules, security group segmentation, and automated compliance scanning."
+sidebar:
+  order: 99
+  label: "Module Project"
+tab: "cloud-engineering"
+---
+
+
+In this project you will implement a defense-in-depth security architecture for a three-tier web application on AWS. The project covers encryption, network segmentation, WAF configuration, and compliance automation.
+
+## Architecture Overview
+
+The application consists of three tiers, each in its own subnet layer:
+
+1. **Web tier** — ALB in public subnets, WAF attached, CloudFront distribution
+2. **App tier** — ECS Fargate in private subnets
+3. **Data tier** — RDS PostgreSQL Multi-AZ in isolated subnets
+
+## Step 1: Implement KMS Envelope Encryption
+
+Create a key hierarchy with a master key in KMS and data keys for each service:
+
+```hcl
+resource "aws_kms_key" "app_key" {
+  description             = "Master key for application encryption"
+  deletion_window_in_days = 30
+  enable_key_rotation     = true
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "Enable IAM User Permissions"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        }
+        Action   = "kms:*"
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_kms_alias" "app_key_alias" {
+  name          = "alias/app-master-key"
+  target_key_id = aws_kms_key.app_key.id
+}
+```
+
+Enable encryption on RDS and EBS using the KMS key:
+
+```hcl
+resource "aws_db_instance" "postgres" {
+  engine         = "postgres"
+  storage_encrypted = true
+  kms_key_id     = aws_kms_key.app_key.arn
+  # ... other config
+}
+```
+
+## Step 2: Configure Network Segmentation
+
+Use security groups to enforce least-privilege traffic between tiers:
+
+```hcl
+# Web tier security group
+resource "aws_security_group" "web_sg" {
+  name        = "web-tier-sg"
+  description = "Allow HTTPS from CloudFront only"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    from_port       = 443
+    to_port         = 443
+    protocol        = "tcp"
+    cidr_blocks     = []  # Only CloudFront
+    # Use a prefix list for CloudFront IPs
+    prefix_list_ids = [aws_ec2_managed_prefix_list.cloudfront.id]
+  }
+
+  egress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    security_groups = [aws_security_group.app_sg.id]
+  }
+}
+
+# App tier security group
+resource "aws_security_group" "app_sg" {
+  name        = "app-tier-sg"
+  description = "Allow HTTPS from web tier only"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    from_port       = 443
+    to_port         = 443
+    protocol        = "tcp"
+    security_groups = [aws_security_group.web_sg.id]
+  }
+
+  egress {
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    security_groups = [aws_security_group.data_sg.id]
+  }
+}
+
+# Data tier security group
+resource "aws_security_group" "data_sg" {
+  name        = "data-tier-sg"
+  description = "Allow PostgreSQL from app tier only"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
+    security_groups = [aws_security_group.app_sg.id]
+  }
+}
+```
+
+## Step 3: Deploy WAF with Managed Rules
+
+```hcl
+resource "aws_wafv2_web_acl" "app_waf" {
+  name        = "app-waf"
+  scope       = "REGIONAL"
+
+  default_action { allow {} }
+
+  rule {
+    name     = "AWS-AWSManagedRulesCommonRuleSet"
+    priority = 0
+    override_action { none {} }
+    statement {
+      managed_rule_group_statement {
+        vendor_name = "AWS"
+        name        = "AWSManagedRulesCommonRuleSet"
+      }
+    }
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "AWSCommonRules"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  rule {
+    name     = "rate-limit-2000"
+    priority = 1
+    action   { block {} }
+    statement {
+      rate_based_statement {
+        limit              = 2000
+        aggregate_key_type = "IP"
+      }
+    }
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "RateLimit"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  visibility_config {
+    cloudwatch_metrics_enabled = true
+    metric_name                = "AppWAF"
+    sampled_requests_enabled   = true
+  }
+}
+
+resource "aws_wafv2_web_acl_association" "alb_assoc" {
+  resource_arn = aws_lb.web.arn
+  web_acl_arn  = aws_wafv2_web_acl.app_waf.arn
+}
+```
+
+## Step 4: Compliance Automation
+
+Set up AWS Config rules to detect non-compliant resources automatically:
+
+```bash
+# Enable AWS Config
+aws configservice subscribe \
+  --s3-bucket my-config-bucket \
+  --sns-topic arn:aws:sns:us-east-1:123456789012:config-topic \
+  --iam-role arn:aws:iam::123456789012:role/aws-service-role/config.amazonaws.com
+
+# Enable security-specific managed rules
+aws configservice put-config-rule \
+  --config-rule '{
+    "ConfigRuleName": "s3-bucket-ssl-requests-only",
+    "Source": {
+      "Owner": "AWS",
+      "SourceIdentifier": "S3_BUCKET_SSL_REQUESTS_ONLY"
+    }
+  }'
+```
+
+Set up Security Hub to aggregate findings and check against PCI DSS controls:
+
+```bash
+aws securityhub enable-security-hub \
+  --enable-standards "arn:aws:securityhub:us-east-1::standards/pci-dss/v/3.2.1"
+
+aws securityhub batch-update-findings \
+  --finding-identifiers file://findings.json \
+  --workflow Status=RESOLVED
+```
+
+## Step 5: Encrypt Data in Transit
+
+Create a wildcard ACM certificate and attach it to CloudFront and ALB:
+
+```hcl
+resource "aws_acm_certificate" "app_cert" {
+  domain_name       = "*.myapp.com"
+  validation_method = "DNS"
+
+  subject_alternative_names = ["myapp.com"]
+}
+
+resource "aws_cloudfront_distribution" "cdn" {
+  viewer_certificate {
+    acm_certificate_arn = aws_acm_certificate.app_cert.arn
+    ssl_support_method  = "sni-only"
+  }
+  # ... other config
+}
+```
+
+## Validation Checklist
+
+- [ ] KMS key exists with rotation enabled and alias set
+- [ ] RDS and EBS volumes are encrypted with the KMS key
+- [ ] Security groups allow traffic only between adjacent tiers
+- [ ] WAF blocks SQL injection and XSS attempts against the ALB
+- [ ] CloudFront enforces HTTPS-only connections
+- [ ] AWS Config rules report no non-compliant resources
+- [ ] Security Hub shows zero critical PCI DSS violations
+
+## Summary
+
+This project implements defense-in-depth across encryption, network segmentation, WAF, and compliance monitoring. The Terraform code can be adapted for Azure (Key Vault + Azure Firewall + Policy) or GCP (Cloud KMS + Cloud Armor + Assured Workloads) by swapping service modules.

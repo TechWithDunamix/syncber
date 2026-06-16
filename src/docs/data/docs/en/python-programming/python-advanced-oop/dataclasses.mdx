@@ -1,0 +1,170 @@
+---
+title: "Dataclasses"
+description: "Simplify class creation with Python dataclasses"
+sidebar:
+  order: 1
+  label: "Dataclasses"
+tab: "python-programming"
+---
+
+Dataclasses automatically generate `__init__`, `__repr__`, `__eq__`, and more.
+
+## Basic Dataclass
+
+```python
+from dataclasses import dataclass
+
+@dataclass
+class Point:
+    x: float
+    y: float
+
+# __init__ auto-generated
+p1 = Point(3.0, 4.0)
+p2 = Point(3.0, 4.0)
+
+# __repr__ auto-generated
+print(p1)  # Point(x=3.0, y=4.0)
+
+# __eq__ auto-generated
+print(p1 == p2)  # True
+```
+
+## Default Values and Field Types
+
+```python
+from dataclasses import dataclass, field
+from typing import List
+
+@dataclass
+class Student:
+    name: str
+    grades: List[float] = field(default_factory=list)
+    active: bool = True
+    year: int = 1
+
+s = Student("Alice")
+print(s)  # Student(name='Alice', grades=[], active=True, year=1)
+```
+
+<Aside variant="caution">
+  Never use mutable defaults like `grades=[]` directly — always use `field(default_factory=list)`.
+</Aside>
+
+## Immutable Dataclasses
+
+```python
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class Config:
+    host: str
+    port: int = 5432
+
+cfg = Config("localhost")
+# cfg.port = 8080  # FrozenInstanceError!
+```
+
+## Advanced Field Configuration
+
+```python
+from dataclasses import dataclass, field
+
+@dataclass
+class Product:
+    name: str
+    price: float
+    quantity: int = 0
+
+    # Computed field — not in __init__
+    @property
+    def total_value(self) -> float:
+        return self.price * self.quantity
+
+    # Post-init processing
+    def __post_init__(self):
+        if self.price < 0:
+            raise ValueError("Price cannot be negative")
+```
+
+## Inheritance with Dataclasses
+
+```python
+from dataclasses import dataclass
+
+@dataclass
+class Person:
+    name: str
+    age: int
+
+@dataclass
+class Employee(Person):
+    employee_id: str
+    department: str = "Engineering"
+
+emp = Employee("Alice", 30, "E001")
+print(emp)  # Employee(name='Alice', age=30, employee_id='E001', department='Engineering')
+```
+
+## Comparison and Ordering
+
+```python
+from dataclasses import dataclass
+
+@dataclass(order=True)
+class Priority:
+    level: int
+    description: str = field(compare=False)  # exclude from comparison
+
+tasks = [Priority(3, "low"), Priority(1, "high"), Priority(2, "medium")]
+sorted_tasks = sorted(tasks)  # Sorted by level
+print([t.level for t in sorted_tasks])  # [1, 2, 3]
+```
+
+## Serialization
+
+```python
+from dataclasses import dataclass, asdict, astuple
+import json
+
+@dataclass
+class User:
+    name: str
+    email: str
+    age: int
+
+user = User("Alice", "alice@example.com", 30)
+
+# To dict
+print(asdict(user))
+# {'name': 'Alice', 'email': 'alice@example.com', 'age': 30}
+
+# To tuple
+print(astuple(user))
+# ('Alice', 'alice@example.com', 30)
+
+# To JSON
+print(json.dumps(asdict(user)))
+# {"name": "Alice", "email": "alice@example.com", "age": 30}
+```
+
+## Dataclass vs Regular Class Comparison
+
+| Feature | Regular Class | Dataclass |
+|---------|--------------|-----------|
+| `__init__` | Manual | Auto |
+| `__repr__` | Manual | Auto |
+| `__eq__` | Manual | Auto |
+| `__hash__` | Manual | Auto (if frozen) |
+| `__lt__`, etc. | Manual | With `order=True` |
+| Boilerplate | Lots | Minimal |
+
+## Key Takeaways
+
+- `@dataclass` auto-generates `__init__`, `__repr__`, `__eq__`
+- Use `field(default_factory=list)` for mutable defaults
+- `frozen=True` makes instances immutable and hashable
+- `__post_init__` runs after `__init__` for validation
+- `asdict()` and `astuple()` convert to standard types
+- Dataclasses work well with JSON serialization
+- Available since Python 3.7 (or `dataclasses` backport for 3.6)

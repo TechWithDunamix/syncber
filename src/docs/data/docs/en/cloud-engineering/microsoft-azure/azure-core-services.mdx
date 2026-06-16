@@ -1,0 +1,146 @@
+---
+title: "Azure Core Services"
+description: "Explore Azure's core compute, storage, and networking services — VMs, VMSS, App Service, AKS, Functions, Blob Storage, VNet, and Load Balancer — with AWS comparisons and CLI examples."
+sidebar:
+  order: 1
+  label: "Azure Core Services"
+tab: "cloud-engineering"
+---
+
+
+## Compute Services
+
+### Azure Virtual Machines (VMs)
+
+Azure VMs are IaaS compute instances analogous to AWS EC2. You choose an image (Windows Server, Ubuntu, Red Hat, or custom), a size (general-purpose, compute-optimized, memory-optimized), and a region.
+
+```bash
+az vm create \
+  --resource-group my-rg \
+  --name web-server \
+  --image Ubuntu2204 \
+  --size Standard_B2s \
+  --admin-username azureuser \
+  --generate-ssh-keys
+```
+
+Azure differentiates with **availability sets** (fault domains + update domains) and **availability zones** (physical separation within a region). An availability set spreads VMs across multiple racks; availability zones spread them across separate data centers.
+
+### Virtual Machine Scale Sets (VMSS)
+
+VMSS is Azure's managed auto-scaling group, equivalent to AWS Auto Scaling Groups + Launch Templates. It automatically adjusts VM count based on metrics like CPU or memory.
+
+```json
+{
+  "type": "Microsoft.Compute/virtualMachineScaleSets",
+  "apiVersion": "2024-03-01",
+  "properties": {
+    "sku": { "name": "Standard_DS2_v2", "capacity": 2 },
+    "upgradePolicy": { "mode": "Automatic" },
+    "virtualMachineProfile": {
+      "storageProfile": {
+        "imageReference": { "publisher": "Canonical", "offer": "UbuntuServer", "sku": "22.04-LTS", "version": "latest" }
+      },
+      "osProfile": { "computerNamePrefix": "vmss", "adminUsername": "azureuser" }
+    }
+  }
+}
+```
+
+### App Service
+
+Azure App Service is a fully managed PaaS offering for web apps, REST APIs, and mobile backends. It supports .NET, Java, Node.js, Python, and PHP — comparable to AWS Elastic Beanstalk but with deeper Windows integration.
+
+```bash
+az webapp create \
+  --resource-group my-rg \
+  --plan my-plan \
+  --name my-node-app \
+  --runtime "NODE:20-lts"
+```
+
+### Azure Kubernetes Service (AKS)
+
+AKS is Azure's managed Kubernetes offering (like AWS EKS). It handles the control plane for free and automates upgrades, scaling, and security patching for worker nodes.
+
+```bash
+az aks create \
+  --resource-group my-rg \
+  --name my-cluster \
+  --node-count 3 \
+  --enable-managed-identity
+```
+
+### Azure Functions
+
+Azure Functions is a serverless compute service (competitor to AWS Lambda). It supports triggers from HTTP, Blob Storage, queues, Event Grid, and Cosmos DB.
+
+```csharp
+// C# HTTP-triggered function
+public static async Task<IActionResult> Run(
+    HttpRequest req, ILogger log)
+{
+    string name = req.Query["name"];
+    return new OkObjectResult($"Hello, {name}");
+}
+```
+
+## Storage Services
+
+### Blob Storage
+
+Azure Blob Storage is the equivalent of AWS S3 — object storage for unstructured data. It offers three tiers: Hot (frequent access), Cool (infrequent), and Archive (long-term).
+
+```bash
+az storage container create \
+  --name my-container \
+  --account-name mystorageaccount \
+  --public-access blob
+```
+
+Blob Storage integrates with Azure CDN for global content delivery and supports lifecycle management policies for tier transitions.
+
+## Networking Services
+
+### Virtual Network (VNet)
+
+Azure VNet is analogous to AWS VPC. It provides network isolation, subnets, and peering across regions.
+
+```bash
+az network vnet create \
+  --resource-group my-rg \
+  --name my-vnet \
+  --address-prefix 10.0.0.0/16 \
+  --subnet-name web-subnet \
+  --subnet-prefix 10.0.1.0/24
+```
+
+### Load Balancer
+
+Azure Load Balancer operates at Layer 4 (TCP/UDP) and supports both public and internal load balancing. Azure Application Gateway is the Layer 7 alternative (like AWS ALB).
+
+```bash
+az network lb create \
+  --resource-group my-rg \
+  --name my-lb \
+  --frontend-ip-name my-frontend \
+  --backend-pool-name my-backend
+```
+
+<Aside variant="info" title="AWS Mapping">
+  VNet → VPC, Load Balancer → ALB/NLB, Application Gateway → ALB, Traffic Manager → Route 53, VPN Gateway → VPN Gateway, ExpressRoute → Direct Connect.
+</Aside>
+
+## Management Tools
+
+Azure offers three primary management surfaces:
+
+- **Azure Portal** — Web UI for resource management
+- **Azure CLI** — Cross-platform CLI (`az` commands)
+- **ARM Templates / Bicep** — Infrastructure as Code with JSON or declarative DSL
+
+<Aside variant="tip">
+  Use `az` commands in the Azure Cloud Shell (accessible from the portal) to avoid local setup.
+</Aside>
+
+The core services you learned here — compute, storage, networking — form the building blocks for every architecture you will deploy on Azure.

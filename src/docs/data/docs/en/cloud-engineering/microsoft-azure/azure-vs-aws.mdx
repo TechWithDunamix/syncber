@@ -1,0 +1,80 @@
+---
+title: "Azure vs AWS"
+description: "A detailed comparison of Azure and AWS services, hybrid cloud with Azure Stack, enterprise features, and guidance on when to choose Azure over AWS."
+sidebar:
+  order: 3
+  label: "Azure vs AWS"
+tab: "cloud-engineering"
+---
+
+
+## Service Mapping
+
+Azure and AWS offer roughly equivalent services with different names and management surfaces. This table maps the most commonly used services:
+
+| Category | AWS | Azure |
+|----------|-----|-------|
+| Compute (IaaS) | EC2 | Virtual Machines |
+| Compute (PaaS) | Elastic Beanstalk | App Service |
+| Containers | ECS / EKS | Container Instances / AKS |
+| Serverless | Lambda | Functions |
+| Object Storage | S3 | Blob Storage |
+| Block Storage | EBS | Managed Disks |
+| File Storage | EFS | Azure Files |
+| Relational DB | RDS | SQL Database / Database for MySQL |
+| NoSQL | DynamoDB | Cosmos DB |
+| VPC | VPC | Virtual Network |
+| Load Balancer | ALB / NLB | Load Balancer / Application Gateway |
+| DNS | Route 53 | Azure DNS / Traffic Manager |
+| CDN | CloudFront | Azure CDN / Front Door |
+| Identity | IAM | Entra ID (formerly Azure AD) |
+| Key Management | KMS | Key Vault |
+| Monitoring | CloudWatch | Monitor |
+| Security Hub | GuardDuty + Security Hub | Defender for Cloud |
+| Resource Groups | Resource Groups & TagEditor | Resource Groups + Management Groups |
+
+## Hybrid Cloud: Azure Stack
+
+Azure's strongest differentiator is **Azure Stack** — a portfolio of products that extends Azure services to on-premises data centers. Azure Stack Hub runs Azure services in your own data center; Azure Stack HCI provides hyperconverged infrastructure; Azure Stack Edge brings compute to edge locations.
+
+```bash
+# Deploy a VM on Azure Stack Hub (same API as global Azure)
+az vm create \
+  --resource-group onprem-rg \
+  --name edge-vm \
+  --image Ubuntu2204 \
+  --size Standard_DS2_v2
+```
+
+The key advantage: the same ARM templates, Azure CLI, and portal experience work across cloud and on-premises. This is critical for industries with data residency requirements (banking, healthcare, government).
+
+## Enterprise Features
+
+Azure is deeply integrated with the Microsoft ecosystem:
+
+- **Active Directory sync** — Extend on-prem AD to Entra ID via Azure AD Connect
+- **SQL Server** — Lift-and-shift SQL Server to Azure SQL VM or Managed Instance
+- **Microsoft 365** — Native SSO, compliance, and identity integration
+- **Visual Studio** — Dev/Test pricing and Azure credits for Visual Studio subscribers
+- **Cost Management** — Enterprise Agreement (EA) and Microsoft Customer Agreement (MCA) billing
+
+Azure also offers **Azure Arc** — a control plane that extends Azure management to any infrastructure (AWS, GCP, on-prem). With Arc you can apply Azure Policy, Defender for Cloud, and GitOps configurations to non-Azure resources.
+
+## When to Choose Azure
+
+Choose Azure when:
+
+- Your organization is **Microsoft-centric** (Windows Server, Active Directory, SQL Server, .NET)
+- You need **hybrid cloud** capabilities with consistent management across on-prem and cloud
+- **Data residency** requirements demand on-premises Azure Stack deployments
+- Your team has **C# / .NET expertise**
+- You need **SAP on the cloud** — Azure runs more SAP workloads than any other provider
+- **Enterprise licensing** — Existing Microsoft licenses (Windows Server, SQL Server) can be reused via Azure Hybrid Benefit, reducing costs
+
+<Aside variant="info" title="Market Reality">
+  Most enterprises are multicloud. AWS leads in raw service count and market share; Azure leads in enterprise integration and hybrid scenarios. GCP leads in data and AI. The best choice depends on your specific workload requirements and organizational context.
+</Aside>
+
+## Summary
+
+AWS and Azure offer comparable core services, but Azure's hybrid cloud story (Azure Stack, Azure Arc) and enterprise identity integration (Entra ID, Active Directory) make it the preferred platform for Microsoft-centric organizations. Understanding both allows you to design multicloud architectures that use each provider's strengths.

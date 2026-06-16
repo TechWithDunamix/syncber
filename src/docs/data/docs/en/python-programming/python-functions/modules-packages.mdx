@@ -1,0 +1,219 @@
+---
+title: "Modules & Packages"
+description: "Organize Python code with modules, packages, and pip"
+sidebar:
+  order: 3
+  label: "Modules & Packages"
+tab: "python-programming"
+---
+
+Modules and packages let you organize code across multiple files and reuse third-party libraries.
+
+## Modules
+
+A module is any `.py` file. Create `math_utils.py`:
+
+```python
+# math_utils.py
+def add(a, b):
+    return a + b
+
+def multiply(a, b):
+    return a * b
+
+PI = 3.14159
+```
+
+Import and use it:
+
+```python
+# Different import styles
+import math_utils
+print(math_utils.add(5, 3))        # 8
+
+from math_utils import multiply
+print(multiply(4, 5))              # 20
+
+from math_utils import PI
+print(PI)                          # 3.14159
+
+from math_utils import add as addition
+print(addition(1, 2))              # 3
+```
+
+## Module Search Path
+
+Python looks for modules in `sys.path`:
+
+```python
+import sys
+print(sys.path)
+# ['', '/usr/lib/python3.12', '/usr/local/lib/python3.12/site-packages', ...]
+```
+
+## The `if __name__` Guard
+
+```python
+# calculator.py
+def add(a, b): return a + b
+def sub(a, b): return a - b
+
+# This code runs ONLY when executed directly, not when imported
+if __name__ == "__main__":
+    # Test the module
+    print(add(5, 3))    # 8
+    print(sub(10, 4))   # 6
+```
+
+```python
+# main.py — just imports, no test output
+import calculator
+print(calculator.add(1, 2))  # 3 (test code doesn't run)
+```
+
+## Packages
+
+A package is a directory with `__init__.py`:
+
+```
+project/
+├── main.py
+└── shapes/
+    ├── __init__.py
+    ├── circle.py
+    └── rectangle.py
+```
+
+```python
+# shapes/__init__.py — package initialization (can be empty)
+from .circle import area as circle_area
+from .rectangle import area as rect_area
+
+# shapes/circle.py
+def area(radius):
+    return 3.14159 * radius ** 2
+
+# shapes/rectangle.py
+def area(width, height):
+    return width * height
+```
+
+```python
+# main.py
+from shapes import circle_area, rect_area
+print(circle_area(5))
+print(rect_area(4, 6))
+```
+
+## Using `pip`
+
+The Python package installer:
+
+```bash
+# Install a package
+pip install requests
+
+# Install specific version
+pip install requests==2.31.0
+
+# Install from requirements file
+pip install -r requirements.txt
+
+# List installed packages
+pip list
+
+# Uninstall
+pip uninstall requests
+```
+
+### Requirements File
+
+```
+# requirements.txt
+requests==2.31.0
+flask>=3.0
+numpy
+pytest
+```
+
+## Virtual Environments
+
+Isolate project dependencies:
+
+```bash
+# Create
+python -m venv venv
+
+# Activate (Linux/macOS)
+source venv/bin/activate
+
+# Activate (Windows)
+venv\Scripts\activate
+
+# Deactivate
+deactivate
+```
+
+```bash
+# Best practice: create venv, activate, then install
+python -m venv venv
+source venv/bin/activate
+pip install requests flask
+pip freeze > requirements.txt
+```
+
+## Common Built-in Modules
+
+```python
+import os          # Operating system interface
+import sys         # System-specific parameters
+import math        # Mathematical functions
+import random      # Random number generation
+import datetime    # Date and time handling
+import json        # JSON encoding/decoding
+import re          # Regular expressions
+import pathlib     # Object-oriented file paths
+import csv         # CSV file reading/writing
+```
+
+## Relative vs Absolute Imports
+
+```python
+# Absolute imports (preferred)
+from shapes.circle import area
+
+# Relative imports (inside packages only)
+from .circle import area    # sibling module
+from ..utils import config  # parent package
+```
+
+## Common Pitfalls
+
+```python
+# Circular imports — avoid!
+# a.py imports b.py, b.py imports a.py
+
+# Name shadowing — don't name modules same as builtins
+# Don't create math.py, json.py, etc.
+
+# Import order convention:
+# 1. Standard library
+# 2. Third-party
+# 3. Local modules
+import os
+import sys
+
+import requests
+import flask
+
+from myapp import config
+```
+
+## Key Takeaways
+
+- Every `.py` file is a module; every directory with `__init__.py` is a package
+- `if __name__ == "__main__"` prevents test code from running on import
+- Use `pip` to install third-party packages, `requirements.txt` to track them
+- Virtual environments isolate project dependencies
+- Packages support `__init__.py` for initialization and `__all__` for export control
+- Avoid circular imports and name collisions with built-in modules

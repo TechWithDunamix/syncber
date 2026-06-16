@@ -1,0 +1,570 @@
+---
+title: "Capstone — Reference Implementation"
+description: "A working reference implementation of the finance tracker"
+sidebar:
+  order: 2
+  label: "Reference Implementation"
+tab: "python-programming"
+---
+
+Here's a complete reference implementation. Use it as a guide or compare your approach.
+
+### `finance_tracker/models.py`
+
+```python
+"""Data models for the finance tracker."""
+
+from dataclasses import dataclass, field
+from datetime import datetime
+from decimal import Decimal
+from enum import Enum
+from typing import Optional
+
+
+class TransactionType(Enum):
+    INCOME = "income"
+    EXPENSE = "expense"
+
+
+@dataclass
+class Transaction:
+    """A single financial transaction."""
+
+    id: int
+    amount: Decimal
+    transaction_type: TransactionType
+    category: str
+    description: str
+    date: datetime
+    created_at: datetime = field(default_factory=datetime.now)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "amount": str(self.amount),
+            "type": self.transaction_type.value,
+            "category": self.category,
+            "description": self.description,
+            "date": self.date.isoformat(),
+            "created_at": self.created_at.isoformat(),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Transaction":
+        return cls(
+            id=data["id"],
+            amount=Decimal(data["amount"]),
+            transaction_type=TransactionType(data["type"]),
+            category=data["category"],
+            description=data["description"],
+            date=datetime.fromisoformat(data["date"]),
+            created_at=datetime.fromisoformat(data["created_at"]),
+        )
+
+
+DEFAULT_CATEGORIES = {
+    "income": ["Salary", "Freelance", "Investments", "Gifts"],
+    "expense": ["Food", "Housing", "Transport", "Utilities",
+                "Entertainment", "Healthcare", "Education", "Shopping"],
+}
+```
+
+### `finance_tracker/storage.py`
+
+```python
+"""JSON-based persistence for the finance tracker."""
+
+import json
+from pathlib import Path
+from typing import List, Optional
+
+from .models import Transaction
+
+
+class TransactionStorage:
+    """Handle JSON persistence of transactions."""
+
+    def __init__(self, filepath: Optional[Path] = None):
+        self.filepath = filepath or Path.home() / ".finance_tracker" / "transactions.json"
+        self.filepath.parent.mkdir(parents=True, exist_ok=True)
+
+    def load(self) -> List[Transaction]:
+        """Load all transactions from storage."""
+        if not self.filepath.exists():
+            return []
+        try:
+            data = json.loads(self.filepath.read_text())
+            return [Transaction.from_dict(item) for item in data]
+        except (json.JSONDecodeError, KeyError):
+            return []
+
+    def save(self, transactions: List[Transaction]):
+        """Save all transactions to storage."""
+        data = [t.to_dict() for t in transactions]
+        self.filepath.write_text(json.dumps(data, indent=2))
+
+    def add(self, transaction: Transaction) -> Transaction:
+        """Add a single transaction."""
+        transactions = self.load()
+        transactions.append(transaction)
+        self.save(transactions)
+        return transaction
+
+    def delete(self, transaction_id: int) -> bool:
+        """Delete a transaction by ID."""
+        transactions = self.load()
+        for i, t in enumerate(transactions):
+            if t.id == transaction_id:
+                transactions.pop(i)
+                self.save(transactions)
+                return True
+        return False
+
+    def get_next_id(self) -> int:
+        """Get the next available transaction ID."""
+        transactions = self.load()
+        if not transactions:
+            return 1
+        return max(t.id for t in transactions) + 1
+
+    def clear(self):
+        """Clear all transactions (for testing)."""
+        if self.filepath.exists():
+            self.filepath.unlink()
+```
+
+### `finance_tracker/analysis.py`
+
+```python
+"""Analysis and reporting for the finance tracker."""
+
+from collections import defaultdict
+from datetime import datetime
+from decimal import Decimal
+from typing import Dict, List, Tuple
+
+from .models import Transaction, TransactionType
+
+
+class FinanceAnalyzer:
+    """Generate financial reports and summaries."""
+
+    def __init__(self, transactions: List[Transaction]):
+        self.transactions = sorted(transactions, key=lambda t: t.date)
+
+    def balance(self) -> Decimal:
+        """Calculate current balance."""
+        total = Decimal("0")
+        for t in self.transactions:
+            if t.transaction_type == TransactionType.INCOME:
+                total += t.amount
+            else:
+                total -= t.amount
+        return total
+
+    def total_income(self) -> Decimal:
+        return sum(
+            (t.amount for t in self.transactions
+             if t.transaction_type == TransactionType.INCOME),
+            Decimal("0"),
+        )
+
+    def total_expenses(self) -> Decimal:
+        return sum(
+            (t.amount for t in self.transactions
+             if t.transaction_type == TransactionType.EXPENSE),
+            Decimal("0"),
+        )
+
+    def monthly_summary(self, year: int, month: int) -> Dict:
+        """Get summary for a specific month."""
+        monthly = [
+            t for t in self.transactions
+            if t.date.year == year and t.date.month == month
+        ]
+        analyzer = FinanceAnalyzer(monthly)
+        return {
+            "month": f"{year}-{month:02d}",
+            "income": analyzer.total_income(),
+            "expenses": analyzer.total_expenses(),
+            "net": analyzer.balance(),
+            "transaction_count": len(monthly),
+        }
+
+    def category_breakdown(self) -> Dict[str, Decimal]:
+        """Get total expenses by category."""
+        breakdown = defaultdict(Decimal)
+        for t in self.transactions:
+            if t.transaction_type == TransactionType.EXPENSE:
+                breakdown[t.category] += t.amount
+        return dict(sorted(breakdown.items(), key=lambda x: x[1], reverse=True))
+
+    def income_by_category(self) -> Dict[str, Decimal]:
+        """Get total income by category."""
+        breakdown = defaultdict(Decimal)
+        for t in self.transactions:
+            if t.transaction_type == TransactionType.INCOME:
+                breakdown[t.category] += t.amount
+        return dict(sorted(breakdown.items(), key=lambda x: x[1], reverse=True))
+
+    def cash_flow(self, months: int = 6) -> List[Tuple[str, Decimal, Decimal]]:
+        """Get monthly cash flow for the last N months."""
+        if not self.transactions:
+            return []
+
+        latest = max(t.date for t in self.transactions)
+        flow = []
+        for i in range(months - 1, -1, -1):
+            year = latest.year
+            month = latest.month - i
+            while month < 1:
+                month += 12
+                year -= 1
+            summary = self.monthly_summary(year, month)
+            flow.append((
+                f"{year}-{month:02d}",
+                summary["income"],
+                summary["expenses"],
+            ))
+        return flow
+
+    def top_expenses(self, n: int = 5) -> List[Transaction]:
+        """Get the N largest expenses."""
+        expenses = [t for t in self.transactions
+                    if t.transaction_type == TransactionType.EXPENSE]
+        return sorted(expenses, key=lambda t: t.amount, reverse=True)[:n]
+```
+
+### `finance_tracker/cli.py`
+
+```python
+"""Command-line interface for the finance tracker."""
+
+import argparse
+from datetime import datetime
+from decimal import Decimal, InvalidOperation
+from pathlib import Path
+from typing import Optional
+
+from .models import Transaction, TransactionType, DEFAULT_CATEGORIES
+from .storage import TransactionStorage
+from .analysis import FinanceAnalyzer
+
+
+class FinanceCLI:
+    """CLI handler for the finance tracker."""
+
+    def __init__(self):
+        self.storage = TransactionStorage()
+
+    def _get_analyzer(self) -> FinanceAnalyzer:
+        transactions = self.storage.load()
+        return FinanceAnalyzer(transactions)
+
+    def add(self, args):
+        """Add a new transaction."""
+        try:
+            amount = Decimal(str(args.amount))
+            if amount <= 0:
+                raise ValueError("Amount must be positive")
+        except (InvalidOperation, ValueError):
+            print("Error: Invalid amount")
+            return
+
+        try:
+            txn_type = TransactionType(args.type)
+        except ValueError:
+            print(f"Error: Type must be 'income' or 'expense'")
+            return
+
+        if args.date:
+            try:
+                date = datetime.strptime(args.date, "%Y-%m-%d")
+            except ValueError:
+                print("Error: Date must be YYYY-MM-DD")
+                return
+        else:
+            date = datetime.now()
+
+        transaction = Transaction(
+            id=self.storage.get_next_id(),
+            amount=amount,
+            transaction_type=txn_type,
+            category=args.category,
+            description=args.description,
+            date=date,
+        )
+        self.storage.add(transaction)
+        print(f"Added: {transaction}")
+
+    def list(self, args):
+        """List transactions with optional filters."""
+        transactions = self.storage.load()
+
+        if args.month and args.year:
+            transactions = [
+                t for t in transactions
+                if t.date.year == args.year and t.date.month == args.month
+            ]
+
+        if args.type:
+            try:
+                txn_type = TransactionType(args.type)
+                transactions = [t for t in transactions
+                                if t.transaction_type == txn_type]
+            except ValueError:
+                pass
+
+        if args.category:
+            transactions = [t for t in transactions
+                            if t.category.lower() == args.category.lower()]
+
+        if not transactions:
+            print("No transactions found.")
+            return
+
+        print(f"{'ID':<4} {'Date':<12} {'Type':<8} {'Amount':<10} {'Category':<15} Description")
+        print("-" * 75)
+        for t in transactions:
+            print(f"{t.id:<4} {t.date.strftime('%Y-%m-%d'):<12} "
+                  f"{t.transaction_type.value:<8} ${t.amount:<8.2f} "
+                  f"{t.category:<15} {t.description}")
+
+        total = sum(t.amount for t in transactions)
+        print("-" * 75)
+        print(f"{'Total:':>34} ${total:.2f}")
+
+    def balance(self, args):
+        """Show current balance."""
+        analyzer = self._get_analyzer()
+        bal = analyzer.balance()
+        income = analyzer.total_income()
+        expenses = analyzer.total_expenses()
+        print(f"Total Income:  ${income:>8.2f}")
+        print(f"Total Expenses: ${expenses:>8.2f}")
+        print(f"{'─' * 25}")
+        print(f"Balance:       ${bal:>8.2f}")
+
+    def report(self, args):
+        """Generate financial report."""
+        analyzer = self._get_analyzer()
+
+        if args.monthly:
+            now = datetime.now()
+            year = args.year or now.year
+            month = args.month or now.month
+            summary = analyzer.monthly_summary(year, month)
+            print(f"\n=== Monthly Report: {summary['month']} ===")
+            print(f"Income:  ${summary['income']:>8.2f}")
+            print(f"Expenses: ${summary['expenses']:>8.2f}")
+            print(f"Net:     ${summary['net']:>8.2f}")
+            print(f"Transactions: {summary['transaction_count']}")
+        else:
+            print(f"\n=== Category Breakdown ===")
+            for cat, amount in analyzer.category_breakdown().items():
+                bar = "█" * int(amount / max(analyzer.category_breakdown().values()) * 30)
+                print(f"  {cat:<15} ${amount:<8.2f} {bar}")
+
+            print(f"\n=== Top 5 Expenses ===")
+            for t in analyzer.top_expenses(5):
+                print(f"  ${t.amount:<8.2f} {t.date.strftime('%Y-%m-%d')} {t.category} — {t.description}")
+
+            if args.forecast:
+                print(f"\n=== Cash Flow (Last 6 Months) ===")
+                for period, income, expenses in analyzer.cash_flow(6):
+                    print(f"  {period}: +${income:<8.2f} -${expenses:<8.2f} = ${income - expenses:.2f}")
+
+    def export(self, args):
+        """Export transactions to CSV or JSON."""
+        import csv
+        import json
+
+        transactions = self.storage.load()
+        if not transactions:
+            print("No transactions to export.")
+            return
+
+        output_path = Path(args.output) if args.output else Path("transactions_export.csv")
+
+        if args.format == "csv":
+            with open(output_path, "w", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow(["ID", "Date", "Type", "Amount", "Category", "Description"])
+                for t in transactions:
+                    writer.writerow([
+                        t.id, t.date.strftime("%Y-%m-%d"),
+                        t.transaction_type.value, str(t.amount),
+                        t.category, t.description,
+                    ])
+        else:
+            data = [t.to_dict() for t in transactions]
+            output_path.write_text(json.dumps(data, indent=2))
+
+        print(f"Exported {len(transactions)} transactions to {output_path}")
+
+
+def create_parser() -> argparse.ArgumentParser:
+    """Create the argument parser."""
+    parser = argparse.ArgumentParser(
+        description="Personal Finance Tracker",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+
+    sub = parser.add_subparsers(dest="command")
+
+    # add
+    add_p = sub.add_parser("add", help="Add a transaction")
+    add_p.add_argument("-a", "--amount", required=True, help="Transaction amount")
+    add_p.add_argument("-t", "--type", choices=["income", "expense"], required=True)
+    add_p.add_argument("-c", "--category", default="General", help="Category")
+    add_p.add_argument("-d", "--description", default="", help="Description")
+    add_p.add_argument("--date", help="Date (YYYY-MM-DD, default: today)")
+
+    # list
+    list_p = sub.add_parser("list", aliases=["ls"], help="List transactions")
+    list_p.add_argument("--month", type=int, help="Month (1-12)")
+    list_p.add_argument("--year", type=int, help="Year (e.g., 2024)")
+    list_p.add_argument("--type", choices=["income", "expense"], help="Filter by type")
+    list_p.add_argument("--category", help="Filter by category")
+
+    # balance
+    sub.add_parser("balance", help="Show balance")
+
+    # report
+    report_p = sub.add_parser("report", help="Generate report")
+    report_p.add_argument("--monthly", action="store_true", help="Monthly summary")
+    report_p.add_argument("--month", type=int, help="Month for report")
+    report_p.add_argument("--year", type=int, help="Year for report")
+    report_p.add_argument("--forecast", action="store_true", help="Show cash flow")
+
+    # export
+    export_p = sub.add_parser("export", help="Export transactions")
+    export_p.add_argument("--format", choices=["csv", "json"], default="csv")
+    export_p.add_argument("-o", "--output", help="Output file path")
+
+    return parser
+
+
+def main():
+    parser = create_parser()
+    args = parser.parse_args()
+
+    cli = FinanceCLI()
+
+    commands = {
+        "add": cli.add,
+        "list": cli.list,
+        "ls": cli.list,
+        "balance": cli.balance,
+        "report": cli.report,
+        "export": cli.export,
+    }
+
+    if args.command in commands:
+        commands[args.command](args)
+    else:
+        parser.print_help()
+
+
+if __name__ == "__main__":
+    main()
+```
+
+### Test Files
+
+**`finance_tracker/tests/test_models.py`**:
+
+```python
+import pytest
+from datetime import datetime
+from decimal import Decimal
+from finance_tracker.models import Transaction, TransactionType
+
+
+class TestTransaction:
+    def test_create_transaction(self):
+        t = Transaction(
+            id=1, amount=Decimal("50.00"),
+            transaction_type=TransactionType.INCOME,
+            category="Salary", description="Payment",
+            date=datetime.now(),
+        )
+        assert t.amount == Decimal("50.00")
+        assert t.transaction_type == TransactionType.INCOME
+
+    def test_to_dict_roundtrip(self):
+        t = Transaction(
+            id=1, amount=Decimal("25.50"),
+            transaction_type=TransactionType.EXPENSE,
+            category="Food", description="Lunch",
+            date=datetime(2024, 12, 1),
+        )
+        data = t.to_dict()
+        t2 = Transaction.from_dict(data)
+        assert t.id == t2.id
+        assert t.amount == t2.amount
+        assert t.transaction_type == t2.transaction_type
+```
+
+**`finance_tracker/tests/test_analysis.py`**:
+
+```python
+from decimal import Decimal
+from datetime import datetime
+from finance_tracker.models import Transaction, TransactionType
+from finance_tracker.analysis import FinanceAnalyzer
+
+
+def make_tx(id, amount, type_, category, days_ago=0):
+    from datetime import timedelta
+    return Transaction(
+        id=id, amount=Decimal(str(amount)),
+        transaction_type=type_, category=category,
+        description="test", date=datetime.now() - timedelta(days=days_ago),
+    )
+
+
+class TestFinanceAnalyzer:
+    def test_balance(self):
+        transactions = [
+            make_tx(1, 1000, TransactionType.INCOME, "Salary", 10),
+            make_tx(2, 200, TransactionType.EXPENSE, "Food", 5),
+            make_tx(3, 50, TransactionType.EXPENSE, "Transport", 1),
+        ]
+        analyzer = FinanceAnalyzer(transactions)
+        assert analyzer.balance() == Decimal("750.00")
+
+    def test_category_breakdown(self):
+        transactions = [
+            make_tx(1, 100, TransactionType.EXPENSE, "Food", 5),
+            make_tx(2, 200, TransactionType.EXPENSE, "Food", 3),
+            make_tx(3, 50, TransactionType.EXPENSE, "Transport", 1),
+        ]
+        analyzer = FinanceAnalyzer(transactions)
+        breakdown = analyzer.category_breakdown()
+        assert breakdown["Food"] == Decimal("300.00")
+        assert breakdown["Transport"] == Decimal("50.00")
+```
+
+### Setup and Run
+
+```bash
+# Create the package structure
+mkdir -p finance_tracker/tests
+
+# Create __init__.py files
+touch finance_tracker/__init__.py
+touch finance_tracker/tests/__init__.py
+
+# Install in development mode
+pip install -e .
+
+# Run the CLI
+python -m finance_tracker.cli add -a 1000 -t income -c Salary -d "January pay"
+python -m finance_tracker.cli add -a 200 -t expense -c Food -d "Groceries"
+python -m finance_tracker.cli balance
+python -m finance_tracker.cli report --forecast
+
+# Run tests
+pytest finance_tracker/tests/ -v
+```

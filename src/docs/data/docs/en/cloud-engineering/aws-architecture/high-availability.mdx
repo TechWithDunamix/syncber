@@ -1,0 +1,222 @@
+---
+title: "High Availability & Disaster Recovery"
+description: "Design for high availability and disaster recovery on AWS. Learn multi-AZ, multi-region architectures, RPO/RTO targets, and DR strategies."
+sidebar:
+  order: 2
+  label: "High Availability & DR"
+tab: "cloud-engineering"
+---
+
+High availability (HA) and disaster recovery (DR) are critical for production workloads. AWS infrastructure spans multiple Availability Zones (AZs) and regions to support resilient designs.
+
+## Availability Zones and Regions
+
+An **Availability Zone** is one or more physically isolated data centers with independent power, cooling, and networking. A **Region** is a geographic area with 2+ AZs connected by low-latency fiber.
+
+| Concept | Failure Scope | AWS Mitigation |
+|---------|--------------|----------------|
+| **AZ failure** | Single data center outage | Deploy across 3 AZs |
+| **Region failure** | Entire geographic area outage | Multi-region DR strategy |
+| **Service failure** | AWS service degradation | Use multi-service architecture |
+| **Human error** | Misconfiguration | IaC, automated rollback, change management |
+
+## Multi-AZ Architecture
+
+```hcl
+# Application Load Balancer across 3 AZs
+resource "aws_lb" "web_alb" {
+  name               = "web-alb"
+  internal           = false
+  load_balancer_type = "application"
+  subnets            = var.public_subnet_ids  # 3 AZs
+}
+
+# Auto Scaling group across AZs
+resource "aws_autoscaling_group" "web_asg" {
+  name               = "web-asg"
+  min_size           = 3
+  max_size           = 15
+  desired_capacity   = 3
+  vpc_zone_identifier = var.private_subnet_ids  # 3 AZs
+
+  launch_template {
+    id      = aws_launch_template.web.id
+    version = "$Latest"
+  }
+
+  health_check_type         = "ELB"
+  health_check_grace_period = 60
+}
+
+# RDS Multi-AZ
+resource "aws_db_instance" "main" {
+  engine         = "postgres"
+  instance_class = "db.r6g.large"
+  multi_az       = true  # Synchronous standby replica in another AZ
+  storage_type   = "io1"
+  iops           = 3000
+}
+```
+
+## RPO and RTO
+
+- **Recovery Point Objective (RPO)** — maximum acceptable data loss measured in time. How far back in time will data be lost?
+- **Recovery Time Objective (RTO)** — maximum acceptable downtime. How long until the system is restored?
+
+```
+RPO ── data loss window ──►|◄── RTO (downtime) ──►
+Time:  [--backup--]  [--FAILURE--]  [--recovery--]
+```
+
+## DR Strategies
+
+| Strategy | RTO | RPO | Cost | Complexity | Description |
+|----------|-----|-----|------|------------|-------------|
+| **Backup & Restore** | Hours | 24 hours | Low | Low | Restore from S3/Glacier backups |
+| **Pilot Light** | ~10 min | ~10 min | Medium | Medium | Core services running in DR region (smallest footprint) |
+| **Warm Standby** | ~1 min | ~1 min | High | Medium | DR region running at reduced capacity |
+| **Active-Active** | Near-zero | Near-zero | Very High | High | Both regions serving traffic simultaneously |
+
+### Backup & Restore (RTO: hours, RPO: 24h)
+
+The simplest and cheapest strategy. Backups are stored in S3 or Glacier and restored when needed.
+
+```bash
+# Automated EBS snapshots
+aws ec2 create-snapshots \
+  --instance-specification InstanceId=i-1234567890abcdef0,ExcludeBootVolume=false \
+  --description "Daily backup $(date +%Y-%m-%d)"
+
+# Cross-region copy
+aws ec2 copy-snapshot \
+  --source-region us-east-1 \
+  --source-snapshot-id snap-1234567890abcdef0 \
+  --destination-region us-west-2 \
+  --description "DR copy"
+```
+
+### Pilot Light (RTO: ~10 min, RPO: ~10 min)
+
+Core infrastructure (data, networking) runs in the DR region. Application servers are stopped or scaled to minimum.
+
+```
+Primary Region              DR Region
+┌──────────────────┐      ┌──────────────────┐
+│ App Servers (ON) │      │ App Servers (OFF)│
+│ DB (Active)      │─repl─│ DB (Standby)     │
+│ Route53 (Active) │      │ Route53 (Standby)│
+└──────────────────┘      └──────────────────┘
+  │                             │
+  └─────────── Traffic ─────────┘       (All traffic to primary)
+  → On failover: start app servers, switch DNS
+```
+
+### Warm Standby (RTO: ~1 min, RPO: ~1 min)
+
+DR region runs at reduced capacity (e.g., 50%). Scaling resources up during failover is faster than provisioning new ones.
+
+```hcl
+resource "aws_autoscaling_group" "dr_asg" {
+  name             = "dr-app-asg"
+  min_size         = 2    # Reduced capacity
+  max_size         = 20
+  desired_capacity = 2
+
+  launch_template {
+    id      = aws_launch_template.dr_app.id
+    version = "$Latest"
+  }
+}
+```
+
+### Active-Active (RTO: near-zero, RPO: near-zero)
+
+Both regions serve traffic using a global load balancer. Data is replicated bidirectionally.
+
+```
+                    ┌─────────────────────┐
+                    │  Route53 (Latency)   │
+                    │  or Global Accel.    │
+                    └──────┬──────────────┘
+                           │
+              ┌────────────┴────────────┐
+              │                         │
+     ┌────────┴────────┐      ┌────────┴────────┐
+     │  us-east-1      │      │  eu-west-1      │
+     │ ┌────────────┐  │      │ ┌────────────┐  │
+     │ │ ALB        │  │      │ │ ALB        │  │
+     │ ├────────────┤  │      │ ├────────────┤  │
+     │ │ App (ASG)  │  │      │ │ App (ASG)  │  │
+     │ ├────────────┤  │      │ ├────────────┤  │
+     │ │ DynamoDB   │──┼─repl─┼─│ DynamoDB   │  │
+     │ │ Global     │  │      │ │ Global     │  │
+     │ │ Tables     │  │      │ │ Tables     │  │
+     │ └────────────┘  │      │ └────────────┘  │
+     └─────────────────┘      └─────────────────┘
+```
+
+```hcl
+# DynamoDB global tables for active-active
+resource "aws_dynamodb_table" "global_app" {
+  name         = "AppData"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "id"
+
+  attribute {
+    name = "id"
+    type = "S"
+  }
+
+  replicas {
+    region_name = "eu-west-1"
+  }
+
+  replicas {
+    region_name = "ap-southeast-1"
+  }
+}
+```
+
+<Aside variant="danger">
+  Active-active is complex — you must handle data conflicts, eventual consistency, and cross-region latency. Use DynamoDB Global Tables (last-writer-wins) or multi-master CockroachDB. Not all databases support this model.
+</Aside>
+
+## Health Checks and Failover
+
+```hcl
+# Route53 failover routing
+resource "aws_route53_record" "app" {
+  zone_id = var.hosted_zone_id
+  name    = "app.example.com"
+  type    = "A"
+
+  failover_routing_policy {
+    type = "PRIMARY"
+  }
+
+  set_identifier = "primary"
+  alias {
+    zone_id                = aws_lb.web_alb.zone_id
+    name                   = aws_lb.web_alb.dns_name
+    evaluate_target_health = true
+  }
+}
+
+resource "aws_route53_health_check" "primary" {
+  fqdn              = "app.example.com"
+  port              = 443
+  type              = "HTTPS"
+  resource_path     = "/health"
+  failure_threshold = 3
+  request_interval  = 30
+}
+```
+
+## Key Takeaways
+
+- AWS Regions contain 2+ AZs with independent power, cooling, and networking — always deploy across 3 AZs for production workloads
+- RPO (data loss tolerance) and RTO (downtime tolerance) drive DR strategy selection — define both before choosing a pattern
+- Four DR strategies: Backup & Restore (low cost, hours RTO), Pilot Light (medium cost, ~10 min RTO), Warm Standby (high cost, ~1 min RTO), Active-Active (very high cost, near-zero RTO)
+- Multi-AZ for high availability: ALB + Auto Scaling across 3 AZs, RDS Multi-AZ (synchronous standby), Route53 health checks
+- Multi-region requires Route53 routing (failover/latency/geolocation), cross-region replication (DynamoDB Global Tables, Aurora Global, S3 CRR), and health checks for automated failover
+- Active-Active is the most complex — requires bi-directional data replication, conflict handling, and global traffic management

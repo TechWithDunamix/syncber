@@ -1,0 +1,170 @@
+---
+title: "Working with CSV & JSON Data"
+description: "Process CSV, JSON, and SQLite data with Python"
+sidebar:
+  order: 1
+  label: "CSV & JSON Data"
+tab: "python-programming"
+---
+
+## CSV Files
+
+```python
+import csv
+
+# Reading CSV
+with open("data.csv", "r") as f:
+    reader = csv.DictReader(f)
+    for row in reader:
+        print(row["name"], row["age"])
+
+# Writing CSV
+with open("output.csv", "w", newline="") as f:
+    writer = csv.DictWriter(f, fieldnames=["name", "age", "email"])
+    writer.writeheader()
+    writer.writerow({"name": "Alice", "age": 30, "email": "alice@example.com"})
+
+# Custom delimiter
+with open("data.tsv", "r") as f:
+    reader = csv.DictReader(f, delimiter="\t")
+```
+
+## JSON
+
+```python
+import json
+
+# Reading
+with open("data.json") as f:
+    data = json.load(f)
+
+# Writing with formatting
+with open("data.json", "w") as f:
+    json.dump(data, f, indent=2, sort_keys=True)
+
+# Serialize custom objects
+from datetime import datetime
+
+def serialize(obj):
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    raise TypeError(f"Type {type(obj)} not serializable")
+
+data = {"time": datetime.now()}
+json_str = json.dumps(data, default=serialize, indent=2)
+```
+
+## SQLite Databases
+
+```python
+import sqlite3
+
+# Connect (creates file if not exists)
+conn = sqlite3.connect("app.db")
+cursor = conn.cursor()
+
+# Create table
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        email TEXT UNIQUE,
+        age INTEGER
+    )
+""")
+
+# Insert
+cursor.execute(
+    "INSERT INTO users (name, email, age) VALUES (?, ?, ?)",
+    ("Alice", "alice@example.com", 30),
+)
+conn.commit()
+
+# Query
+cursor.execute("SELECT * FROM users WHERE age > ?", (25,))
+for row in cursor.fetchall():
+    print(f"ID: {row[0]}, Name: {row[1]}")
+
+# Using row factory for named columns
+conn.row_factory = sqlite3.Row
+cursor = conn.cursor()
+cursor.execute("SELECT * FROM users")
+for row in cursor.fetchall():
+    print(row["name"], row["email"])
+
+# Close
+conn.close()
+```
+
+## HTTP Requests with `urllib`
+
+```python
+from urllib.request import urlopen, Request
+from urllib.parse import urlencode
+import json
+
+# GET request
+response = urlopen("https://api.github.com/users/python")
+data = json.loads(response.read())
+print(data["login"])
+
+# GET with params
+params = urlencode({"q": "python", "page": 1})
+response = urlopen(f"https://api.github.com/search/repositories?{params}")
+
+# POST request
+req = Request(
+    "https://httpbin.org/post",
+    data=json.dumps({"key": "value"}).encode(),
+    headers={"Content-Type": "application/json"},
+)
+response = urlopen(req)
+print(response.status)  # 200
+```
+
+## Working with APIs (requests library)
+
+```python
+import requests
+
+# GET
+response = requests.get("https://api.github.com/users/python")
+data = response.json()
+print(data["login"], data["public_repos"])
+
+# POST
+response = requests.post(
+    "https://httpbin.org/post",
+    json={"key": "value"},
+    headers={"Authorization": "Bearer token123"},
+)
+print(response.status_code)  # 201
+print(response.json())
+
+# Error handling
+try:
+    response = requests.get("https://api.github.com/users/nonexistent12345")
+    response.raise_for_status()  # Raises for 4xx/5xx
+except requests.exceptions.HTTPError as e:
+    print(f"HTTP error: {e}")
+except requests.exceptions.ConnectionError:
+    print("Connection failed")
+except requests.exceptions.Timeout:
+    print("Request timed out")
+
+# Session with connection pooling
+session = requests.Session()
+session.headers.update({"User-Agent": "MyApp/1.0"})
+
+response = session.get("https://httpbin.org/headers")
+print(response.json())
+```
+
+## Key Takeaways
+
+- CSV: `csv.DictReader`/`csv.DictWriter` for structured data
+- JSON: `json.load()`/`json.dump()` with `indent` and `default` parameters
+- SQLite: `sqlite3` with parameterized queries (`?` placeholders)
+- HTTP: `requests` library is simpler than `urllib` for API calls
+- Use sessions (`requests.Session()`) for connection reuse
+- Always handle HTTP errors with `raise_for_status()`

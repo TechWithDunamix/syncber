@@ -1,0 +1,119 @@
+---
+title: "Load Balancing"
+description: "Explore cloud load balancer types — Application, Network, and Classic — along with Azure Load Balancer and GCP Cloud Load Balancing. Learn auto scaling strategies and health check configuration."
+sidebar:
+  order: 3
+  label: "Load Balancing"
+tab: "cloud-engineering"
+---
+
+
+Load balancers distribute incoming traffic across multiple targets — EC2 instances, containers, or Lambda functions — improving availability, fault tolerance, and scalability. Every cloud provider offers managed load balancing with different feature sets.
+
+## AWS Elastic Load Balancing
+
+AWS offers three load balancer types:
+
+### Application Load Balancer (ALB)
+
+Operates at Layer 7 (HTTP/HTTPS). Routes requests based on content — path, host header, query string, or HTTP method.
+
+**Best for:** HTTP/HTTPS applications, microservices, container-based architectures.
+
+**Example rules:**
+- `/api/*` → target group of API servers
+- `/images/*` → target group of image servers
+- Host: `app.example.com` → one target group, Host: `admin.example.com` → another
+
+ALBs support WebSocket, HTTP/2, and gRPC. They terminate TLS and offload SSL certificate management from your instances.
+
+### Network Load Balancer (NLB)
+
+Operates at Layer 4 (TCP/UDP). Handles millions of requests per second with ultra-low latency.
+
+**Best for:** TCP/UDP workloads, extreme performance requirements, static IP addresses for whitelisting.
+
+NLBs preserve the client's source IP address, which ALBs do not by default. They also support TLS termination and can be combined with ALBs in a front-end NLB → back-end ALB pattern.
+
+### Gateway Load Balancer (GWLB)
+
+Operates at Layer 3 (IP). Used for transparent network appliances — firewalls, intrusion detection, packet inspection.
+
+**Best for:** Inserting third-party virtual appliances into your traffic flow (e.g., Palo Alto, Fortinet).
+
+## Azure Load Balancer
+
+Azure offers several load-balancing options:
+
+- **Azure Load Balancer** (Layer 4) — Distributes TCP/UDP traffic, similar to NLB.
+- **Application Gateway** (Layer 7) — HTTP/HTTPS load balancer with WAF, URL-based routing, and SSL termination.
+- **Traffic Manager** (DNS-level) — Global traffic routing based on latency, geography, or priority.
+- **Azure Front Door** (global Layer 7) — Combines CDN, WAF, and load balancing at the edge.
+
+## GCP Cloud Load Balancing
+
+GCP offers a unified load-balancing approach:
+
+- **External HTTP(S) Load Balancer** — Global, Layer 7, single anycast IP for all regions.
+- **External TCP/UDP Load Balancer** — Regional Layer 4, protocol forwarding.
+- **Internal Load Balancer** — For traffic within a VPC.
+- **SSL Proxy / TCP Proxy** — Global termination for non-HTTP protocols.
+
+GCP's global load balancer is unique — a single anycast IP address serves traffic worldwide, routing users to the nearest backend region.
+
+<Aside variant="info">
+GCP's global HTTP load balancer uses Google's global network and edge cache, so a single frontend IP works across all regions. AWS and Azure require per-region load balancers with a global DNS service for multi-region load balancing.
+</Aside>
+
+## Health Checks
+
+Load balancers regularly probe targets to determine if they are healthy. A health check configuration includes:
+
+- **Protocol** — HTTP, HTTPS, TCP, or gRPC
+- **Path** (for HTTP) — e.g., `/healthz`
+- **Interval** — How often to check (e.g., 30 seconds)
+- **Threshold** — Number of consecutive failures before marking unhealthy (e.g., 3)
+- **Timeout** — How long to wait for a response
+
+<Aside variant="tip">
+Design your health check endpoint to validate that the application is genuinely functional — not just that the process is running. Checking a static file tells you the web server is up, but it will not detect an application deadlock. A proper health check connects to the database and runs a lightweight query.
+</Aside>
+
+## Auto Scaling
+
+Auto scaling dynamically adjusts the number of instances based on demand. A scaling policy includes:
+
+- **Metric** — CPU utilization, memory, request count per target, or a custom CloudWatch metric
+- **Target value** — e.g., maintain average CPU at 60%
+- **Cooldown period** — Wait time between scaling activities to allow metrics to stabilize
+- **Min / Max / Desired capacity** — Boundaries for the scaling group
+
+```
+Auto Scaling Group
+  Min: 2
+  Max: 10
+  Desired: 3
+  Scaling Policy: Target tracking at 60% CPU
+```
+
+### Scaling Strategies
+
+- **Dynamic scaling** — Reacts to real-time metrics.
+- **Scheduled scaling** — Predictable patterns (e.g., scale up at 8 AM, scale down at 8 PM).
+- **Predictive scaling** — Uses machine learning to forecast demand and scale proactively (AWS only).
+
+## Putting It Together
+
+A production architecture in a single region:
+
+```
+Internet → ALB (public subnets, AZ A + B)
+            ├── Auto Scaling Group (private subnets, AZ A)
+            └── Auto Scaling Group (private subnets, AZ B)
+```
+
+The ALB spreads traffic across healthy instances in both AZs. If one AZ fails, traffic routes entirely to the remaining AZ. Auto scaling replaces unhealthy instances automatically.
+
+<Aside variant="caution">
+Always distribute instances across at least two availability zones. A single-AZ deployment has no redundancy — if that AZ fails, your application goes down regardless of how many instances are running.
+</Aside>

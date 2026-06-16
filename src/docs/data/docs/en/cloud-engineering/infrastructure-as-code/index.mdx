@@ -1,0 +1,25 @@
+---
+title: "Module 9: Infrastructure as Code"
+description: "Master infrastructure as Code with Terraform, AWS CloudFormation, and configuration management tools. Learn declarative provisioning, state management, and immutable infrastructure patterns."
+sidebar:
+  order: 0
+  label: "Module Overview"
+tab: "cloud-engineering"
+---
+
+
+Infrastructure as Code (IaC) is the practice of managing cloud resources through machine-readable definition files rather than manual CLI commands or clicking through a console. This module covers the three major IaC paradigms: Terraform (cloud-agnostic provisioning), CloudFormation (AWS-native provisioning), and configuration management tools like Ansible.
+
+We begin with **Terraform Basics** — HashiCorp Configuration Language (HCL), providers, resources, state management, modules, workspaces, and Terraform Cloud. Terraform is the industry-standard IaC tool, supporting all major cloud providers plus hundreds of third-party services.
+
+Next, **AWS CloudFormation** covers templates, resources, parameters, change sets, stacks, and StackSets. You will learn how CloudFormation differs from Terraform and when each tool is appropriate.
+
+**Configuration Management** explores Ansible, Chef, and Puppet, contrasting immutable infrastructure (provisioning new resources for each change) with mutable infrastructure (updating existing resources in place).
+
+The module concludes with a **capstone project** where you deploy a VPC, EC2 instances, and RDS database entirely through Terraform — demonstrating real-world IaC practices.
+
+<Aside variant="info" title="Prerequisites">
+  Module 1 (Cloud Fundamentals) and Module 2 (AWS Core Services) recommended. Basic familiarity with YAML and JSON is helpful.
+</Aside>
+
+By the end of this module you will be able to write Terraform configurations for multi-cloud deployments, understand when to use Terraform vs CloudFormation, manage configuration drift with Ansible, and apply immutable infrastructure principles to your provisioning workflows.

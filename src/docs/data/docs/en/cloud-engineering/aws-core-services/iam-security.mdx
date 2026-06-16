@@ -1,0 +1,160 @@
+---
+title: "IAM & Security"
+description: "AWS Identity and Access Management (IAM) controls access to AWS services. Learn users, groups, roles, policies, trust policies, and security best practices."
+sidebar:
+  order: 3
+  label: "IAM & Security"
+tab: "cloud-engineering"
+---
+
+AWS Identity and Access Management (IAM) is the service that securely controls access to AWS resources. It is a global service — policies apply across all regions.
+
+## IAM Users
+
+An IAM user represents a person or service that interacts with AWS. Each user has a unique ARN and can have passwords (console access) and access keys (programmatic access).
+
+```bash
+# Create an IAM user
+aws iam create-user --user-name devops-engineer
+
+# Create access key for CLI access
+aws iam create-access-key --user-name devops-engineer
+
+# Apply a managed policy directly to a user
+aws iam attach-user-policy --user-name devops-engineer --policy-arn arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+```
+
+<Aside variant="tip">
+  Avoid using the root user for daily tasks. Create admin users with MFA and attach the `AdministratorAccess` policy only when needed. Enable MFA on the root account immediately.
+</Aside>
+
+## IAM Groups
+
+Groups are collections of users. Attach policies to groups rather than individual users to simplify management:
+
+```hcl
+resource "aws_iam_group" "developers" {
+  name = "developers"
+}
+
+resource "aws_iam_group_policy_attachment" "developers_s3" {
+  group      = aws_iam_group.developers.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+}
+```
+
+## IAM Roles
+
+Roles are identities that are assumed by trusted entities — users, AWS services, or external identity providers. Roles have temporary credentials via AWS Security Token Service (STS).
+
+```hcl
+resource "aws_iam_role" "ec2_s3_access" {
+  name = "ec2-s3-access-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ec2_s3_full" {
+  role       = aws_iam_role.ec2_s3_access.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+}
+```
+
+## Policy Types
+
+IAM policies are JSON documents that define permissions. They follow this structure:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::my-app-assets-2024",
+        "arn:aws:s3:::my-app-assets-2024/*"
+      ],
+      "Condition": {
+        "IpAddress": {
+          "aws:SourceIp": "10.0.0.0/8"
+        }
+      }
+    }
+  ]
+}
+```
+
+| Policy Type | Scope | Use Case |
+|-------------|-------|----------|
+| **AWS Managed** | AWS-defined, cross-account | Standard permissions (e.g., `AmazonS3ReadOnlyAccess`) |
+| **Customer Managed** | Customer-defined, reusable | Organization-specific policies |
+| **Inline** | Embedded in a single entity | One-off permissions, small teams |
+
+## Trust Policies
+
+Trust policies define who can assume a role. Unlike identity-based policies (what the role can do), trust policies control who can use the role:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::123456789012:root"
+      },
+      "Action": "sts:AssumeRole",
+      "Condition": {
+        "Bool": {
+          "aws:MultiFactorAuthPresent": "true"
+        }
+      }
+    }
+  ]
+}
+```
+
+## Best Practices
+
+<Aside variant="info" title="Least Privilege">
+  Start with minimum permissions and grant additional access only as needed. Use IAM Access Analyzer to identify unused permissions and generate least-privilege policies.
+</Aside>
+
+- **Use roles for EC2** — never store access keys on instances; attach an instance profile with a role instead
+- **Enable MFA** — require MFA for console login, sensitive API calls, and role assumption
+- **Rotate credentials** — rotate access keys every 90 days, deactivate unused keys
+- **Use conditions** — restrict access with `aws:SourceIp`, `aws:RequestedRegion`, `aws:MultiFactorAuthPresent`
+- **Audit with CloudTrail** — enable CloudTrail to log all API calls for auditing and incident response
+- **Apply a permissions boundary** — set maximum permissions for users/roles to prevent privilege escalation
+
+```bash
+# Analyze unused access
+aws accessanalyzer create-analyzer --analyzer-name "org-analyzer" --type ACCOUNT
+
+# List unused access findings
+aws accessanalyzer list-findings --analyzer-arn "arn:aws:access-analyzer:us-east-1:123456789012:analyzer/org-analyzer"
+```
+
+## Key Takeaways
+
+- IAM is global and regionless — policies apply across all AWS regions
+- Users represent people/entities with long-term credentials (password + access keys); roles provide temporary credentials via STS and should be preferred for cross-service access
+- Groups simplify permission management — attach policies to groups, not individual users
+- Policy evaluation: explicit DENY overrides any ALLOW; by default all actions are denied (implicit deny)
+- Trust policies control **who** can assume a role; identity policies control **what** the role can do
+- Least privilege is the foundational security principle — start minimal, use Access Analyzer to refine, audit with CloudTrail

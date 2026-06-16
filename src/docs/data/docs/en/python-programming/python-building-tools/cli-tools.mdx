@@ -1,0 +1,272 @@
+---
+title: "Building CLI Tools with Python"
+description: "Create command-line tools using argparse, click, and file operations"
+sidebar:
+  order: 1
+  label: "Building CLI Tools"
+tab: "python-programming"
+---
+
+Python is excellent for building CLI tools. Use `argparse` for built-in parsing, or `click`/`typer` for more features.
+
+## Basic CLI with `argparse`
+
+```python
+# file_tool.py
+import argparse
+from pathlib import Path
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="File utility tool",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  file_tool.py info data.txt
+  file_tool.py stats /path/to/dir --types
+  file_tool.py organize ~/Downloads --dry-run
+        """,
+    )
+
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+
+    # Info command
+    info_parser = subparsers.add_parser("info", help="Show file information")
+    info_parser.add_argument("file", help="Path to file")
+    info_parser.add_argument("--hash", action="store_true", help="Show file hash")
+
+    # Stats command
+    stats_parser = subparsers.add_parser("stats", help="Show directory statistics")
+    stats_parser.add_argument("directory", help="Path to directory")
+    stats_parser.add_argument("--types", action="store_true", help="Show file types breakdown")
+
+    # Organize command
+    org_parser = subparsers.add_parser("organize", help="Organize files by type")
+    org_parser.add_argument("directory", help="Directory to organize")
+    org_parser.add_argument("--dry-run", action="store_true", help="Preview changes")
+    org_parser.add_argument("--target", help="Target directory for organized files")
+
+    args = parser.parse_args()
+
+    if args.command == "info":
+        show_file_info(Path(args.file), show_hash=args.hash)
+    elif args.command == "stats":
+        show_directory_stats(Path(args.directory), show_types=args.types)
+    elif args.command == "organize":
+        organize_directory(Path(args.directory), dry_run=args.dry_run, target=args.target)
+    else:
+        parser.print_help()
+
+
+def show_file_info(filepath: Path, show_hash: bool = False):
+    import hashlib
+
+    if not filepath.exists():
+        print(f"Error: {filepath} not found")
+        return
+
+    print(f"File: {filepath.name}")
+    print(f"Size: {filepath.stat().st_size:,} bytes")
+    print(f"Modified: {filepath.stat().st_mtime}")
+
+    if show_hash:
+        sha256 = hashlib.sha256(filepath.read_bytes()).hexdigest()
+        print(f"SHA256: {sha256}")
+
+
+def show_directory_stats(dirpath: Path, show_types: bool = False):
+    from collections import Counter
+
+    if not dirpath.is_dir():
+        print(f"Error: {dirpath} is not a directory")
+        return
+
+    files = [p for p in dirpath.rglob("*") if p.is_file()]
+    total_size = sum(p.stat().st_size for p in files)
+
+    print(f"Directory: {dirpath}")
+    print(f"Total files: {len(files)}")
+    print(f"Total size: {total_size:,} bytes")
+
+    if show_types and files:
+        extensions = Counter(p.suffix.lower() for p in files)
+        print("\nBy extension:")
+        for ext, count in extensions.most_common(10):
+            print(f"  {ext or '(no ext)'}: {count}")
+
+
+def organize_directory(dirpath: Path, dry_run: bool = False, target: Path = None):
+    target_dir = target or dirpath
+
+    for filepath in dirpath.iterdir():
+        if filepath.is_file():
+            ext = filepath.suffix.lstrip(".").lower() or "no_extension"
+            ext_dir = target_dir / ext
+            dest = ext_dir / filepath.name
+
+            if dry_run:
+                print(f"[DRY RUN] Move: {filepath} → {dest}")
+            else:
+                ext_dir.mkdir(exist_ok=True)
+                filepath.rename(dest)
+                print(f"Moved: {filepath.name} → {ext}/")
+
+
+if __name__ == "__main__":
+    main()
+```
+
+```bash
+# Usage
+python file_tool.py info data.txt --hash
+python file_tool.py stats ~/Documents --types
+python file_tool.py organize ~/Downloads --dry-run
+```
+
+## CLI with `click`
+
+```bash
+pip install click
+```
+
+```python
+import click
+from pathlib import Path
+
+@click.group()
+@click.version_option("1.0.0")
+def cli():
+    """File utility tool."""
+    pass
+
+@cli.command()
+@click.argument("filepath", type=click.Path(exists=True))
+@click.option("--hash", "show_hash", is_flag=True, help="Show file hash")
+def info(filepath, show_hash):
+    """Show file information."""
+    p = Path(filepath)
+    click.echo(f"File: {p.name}")
+    click.echo(f"Size: {p.stat().st_size:,} bytes")
+
+    if show_hash:
+        import hashlib
+        sha = hashlib.sha256(p.read_bytes()).hexdigest()
+        click.echo(f"SHA256: {sha}")
+
+@cli.command()
+@click.argument("directory", type=click.Path(exists=True, file_okay=False))
+@click.option("--types", is_flag=True, help="Show file types")
+def stats(directory, types):
+    """Show directory statistics."""
+    p = Path(directory)
+    files = list(p.rglob("*"))
+    click.echo(f"Files: {len(files)}")
+
+if __name__ == "__main__":
+    cli()
+```
+
+## Environment Variables
+
+```python
+import os
+from dotenv import load_dotenv  # pip install python-dotenv
+
+# Load .env file
+load_dotenv()
+
+# Read config
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///default.db")
+DEBUG = os.getenv("DEBUG", "false").lower() == "true"
+
+# .env file:
+# DATABASE_URL=postgres://localhost/mydb
+# DEBUG=true
+```
+
+## Configuration Management
+
+```python
+import configparser
+import json
+from pathlib import Path
+
+# INI config
+config = configparser.ConfigParser()
+config.read("config.ini")
+
+# config.ini:
+# [database]
+# host = localhost
+# port = 5432
+# [app]
+# debug = true
+
+db_host = config["database"]["host"]
+db_port = config.getint("database", "port")
+debug = config.getboolean("app", "debug")
+
+# JSON config
+with open("config.json") as f:
+    config = json.load(f)
+
+# config.json:
+# {"database": {"host": "localhost", "port": 5432}}
+```
+
+## Making Scripts Runnable
+
+```python
+#!/usr/bin/env python3
+"""Shebang line for Unix — makes file directly executable."""
+
+# After adding shebang, run:
+# chmod +x script.py
+# ./script.py
+```
+
+## Packaging CLI Tools
+
+```
+# project structure:
+my-cli-tool/
+├── pyproject.toml
+└── src/
+    └── mytool/
+        ├── __init__.py
+        └── cli.py
+```
+
+```toml
+# pyproject.toml
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "my-cli-tool"
+version = "1.0.0"
+
+[project.scripts]
+mytool = "mytool.cli:main"
+```
+
+```bash
+# Install locally in dev mode
+pip install -e .
+
+# Now `mytool` is available as a command
+mytool --help
+```
+
+## Key Takeaways
+
+- `argparse` for built-in CLI argument parsing with subcommands
+- `click`/`typer` for more ergonomic CLI with decorators
+- Use `subparsers` for multi-command tools (git-like)
+- `--dry-run` flag for previewing destructive operations
+- Environment variables via `os.getenv()` or `python-dotenv`
+- Config files via `configparser` (INI) or `json.load()` (JSON)
+- Shebang `#!/usr/bin/env python3` makes scripts directly executable
+- Package CLI tools with `pyproject.toml` `[project.scripts]` entry points
+- Use `argparse.RawDescriptionHelpFormatter` for formatted help text

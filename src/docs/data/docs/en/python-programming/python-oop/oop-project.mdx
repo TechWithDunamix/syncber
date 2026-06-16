@@ -1,0 +1,226 @@
+---
+title: "OOP Project"
+description: "Build a library management system using classes, inheritance, and composition"
+sidebar:
+  order: 3
+  label: "Library Management System"
+tab: "python-programming"
+---
+
+Apply OOP concepts — classes, inheritance, polymorphism, composition — to build a library management system.
+
+## Project: Library Management System
+
+Create `library_system.py`:
+
+```python
+from abc import ABC, abstractmethod
+from datetime import datetime, timedelta
+from typing import List, Optional
+
+
+class LibraryItem(ABC):
+    """Abstract base for all library items."""
+
+    def __init__(self, item_id: str, title: str):
+        self.item_id = item_id
+        self.title = title
+        self.is_borrowed = False
+        self.borrower: Optional["Member"] = None
+        self.due_date: Optional[datetime] = None
+
+    @abstractmethod
+    def get_type(self) -> str:
+        """Return the type of library item."""
+        pass
+
+    @abstractmethod
+    def late_fee_per_day(self) -> float:
+        """Return late fee per day for this item type."""
+        pass
+
+    def borrow(self, member: "Member", days: int = 14):
+        if self.is_borrowed:
+            raise ValueError(f"'{self.title}' is already borrowed")
+        self.is_borrowed = True
+        self.borrower = member
+        self.due_date = datetime.now() + timedelta(days=days)
+        member.borrowed_items.append(self)
+        print(f"'{self.title}' borrowed by {member.name}")
+
+    def return_item(self):
+        if not self.is_borrowed:
+            raise ValueError(f"'{self.title}' is not borrowed")
+        days_overdue = (datetime.now() - self.due_date).days if self.due_date else 0
+        fee = max(0, days_overdue) * self.late_fee_per_day()
+
+        self.borrower.borrowed_items.remove(self)
+        self.is_borrowed = False
+        self.borrower = None
+        self.due_date = None
+
+        if fee > 0:
+            print(f"'{self.title}' returned. Late fee: ${fee:.2f}")
+        else:
+            print(f"'{self.title}' returned on time.")
+
+    def __str__(self):
+        status = "Available"
+        if self.is_borrowed:
+            days_left = (self.due_date - datetime.now()).days if self.due_date else 0
+            status = f"Borrowed (due in {days_left} days)"
+        return f"[{self.get_type()}] {self.title} — {status}"
+
+
+class Book(LibraryItem):
+    def get_type(self):
+        return "Book"
+
+    def late_fee_per_day(self):
+        return 0.50
+
+
+class DVD(LibraryItem):
+    def get_type(self):
+        return "DVD"
+
+    def late_fee_per_day(self):
+        return 1.00
+
+
+class Magazine(LibraryItem):
+    def get_type(self):
+        return "Magazine"
+
+    def late_fee_per_day(self):
+        return 0.25
+
+
+class Member:
+    """Library member with borrowed items."""
+
+    def __init__(self, name: str, member_id: str):
+        self.name = name
+        self.member_id = member_id
+        self.borrowed_items: List[LibraryItem] = []
+
+    def borrow(self, item: LibraryItem, days: int = 14):
+        if len(self.borrowed_items) >= 5:
+            print(f"{self.name} has reached the borrowing limit!")
+            return
+        item.borrow(self, days)
+
+    def return_item(self, item: LibraryItem):
+        item.return_item()
+
+    def __str__(self):
+        return f"{self.name} (ID: {self.member_id}, Items: {len(self.borrowed_items)})"
+
+
+class Library:
+    """The library — manages catalog and members."""
+
+    def __init__(self, name: str):
+        self.name = name
+        self.catalog: List[LibraryItem] = []
+        self.members: List[Member] = []
+
+    def add_item(self, item: LibraryItem):
+        self.catalog.append(item)
+
+    def register_member(self, name: str, member_id: str) -> Member:
+        member = Member(name, member_id)
+        self.members.append(member)
+        return member
+
+    def search_by_title(self, query: str) -> List[LibraryItem]:
+        query = query.lower()
+        return [item for item in self.catalog if query in item.title.lower()]
+
+    def search_by_type(self, item_type: str) -> List[LibraryItem]:
+        return [item for item in self.catalog if item.get_type().lower() == item_type.lower()]
+
+    def list_available(self) -> List[LibraryItem]:
+        return [item for item in self.catalog if not item.is_borrowed]
+
+    def list_overdue(self) -> List[LibraryItem]:
+        now = datetime.now()
+        return [item for item in self.catalog
+                if item.is_borrowed and item.due_date and item.due_date < now]
+
+    def generate_report(self):
+        print(f"\n=== {self.name} Report ===")
+        print(f"Total items: {len(self.catalog)}")
+        print(f"Available: {len(self.list_available())}")
+        print(f"Borrowed: {len(self.catalog) - len(self.list_available())}")
+        print(f"Overdue: {len(self.list_overdue())}")
+        print(f"Members: {len(self.members)}")
+
+
+def demo():
+    """Demonstrate the library system."""
+
+    # Create library
+    library = Library("City Library")
+
+    # Add items
+    library.add_item(Book("B001", "The Great Gatsby"))
+    library.add_item(Book("B002", "1984"))
+    library.add_item(Book("B003", "To Kill a Mockingbird"))
+    library.add_item(DVD("D001", "Inception"))
+    library.add_item(DVD("D002", "The Matrix"))
+    library.add_item(Magazine("M001", "National Geographic"))
+    library.add_item(Magazine("M002", "Scientific American"))
+
+    # Register members
+    alice = library.register_member("Alice", "M001")
+    bob = library.register_member("Bob", "M002")
+
+    # Borrow items
+    print("\n--- Borrowing ---")
+    gatsby = library.search_by_title("gatsby")[0]
+    alice.borrow(gatsby)
+
+    inception = library.search_by_title("inception")[0]
+    bob.borrow(inception)
+
+    # Search
+    print("\n--- Search Results ---")
+    for item in library.search_by_type("book"):
+        print(f"  {item}")
+
+    print("\n--- Available Items ---")
+    for item in library.list_available():
+        print(f"  {item}")
+
+    # Return
+    print("\n--- Returns ---")
+    alice.return_item(gatsby)
+
+    # Report
+    library.generate_report()
+
+
+if __name__ == "__main__":
+    demo()
+```
+
+## What You Practiced
+
+| Concept | Usage |
+|---------|-------|
+| Abstract classes | `LibraryItem` ABC with abstract methods |
+| Inheritance | `Book`, `DVD`, `Magazine` extend `LibraryItem` |
+| Polymorphism | `get_type()`, `late_fee_per_day()` differ per type |
+| Composition | `Library` has `catalog` and `members`; `Member` has `borrowed_items` |
+| Properties | Item status, overdue calculation |
+| Type hints | Full type annotations on all methods |
+| Encapsulation | Items track their own state |
+
+## Extensions
+
+1. **Reservations** — Allow members to reserve items that are currently borrowed
+2. **Rating system** — Members can rate items they've borrowed
+3. **Categories** — Group items by genre/subject
+4. **Renewals** — Allow extending the due date once per item
+5. **Fines tracking** — Track total fines per member, prevent borrowing if fines exceed limit

@@ -1,0 +1,214 @@
+---
+title: "Collections Project"
+description: "Build a contact book manager using lists, dicts, tuples, and sets"
+sidebar:
+  order: 4
+  label: "Contact Book Project"
+tab: "python-programming"
+---
+
+Apply lists, dictionaries, tuples, and sets to build a contact book application.
+
+## Project: Contact Book
+
+Create `contact_book.py`:
+
+```python
+from collections import defaultdict
+import json
+import os
+
+DATA_FILE = "contacts.json"
+
+class ContactBook:
+    """A simple contact book using Python collections."""
+
+    def __init__(self):
+        self.contacts = {}  # {name: {"phone": str, "email": str, "tags": set}}
+        self._load()
+
+    def _load(self):
+        """Load contacts from JSON file."""
+        if os.path.exists(DATA_FILE):
+            with open(DATA_FILE) as f:
+                raw = json.load(f)
+            # Convert tags back to sets
+            for name, info in raw.items():
+                info["tags"] = set(info["tags"])
+            self.contacts = raw
+
+    def _save(self):
+        """Save contacts to JSON file."""
+        to_save = {}
+        for name, info in self.contacts.items():
+            to_save[name] = {**info, "tags": list(info["tags"])}
+        with open(DATA_FILE, "w") as f:
+            json.dump(to_save, f, indent=2)
+
+    def add(self, name, phone, email, tags=None):
+        """Add or update a contact."""
+        if name not in self.contacts:
+            self.contacts[name] = {"phone": "", "email": "", "tags": set()}
+
+        self.contacts[name]["phone"] = phone
+        self.contacts[name]["email"] = email
+        if tags:
+            self.contacts[name]["tags"] |= set(tags)  # Union with existing tags
+
+        self._save()
+        print(f"Saved contact: {name}")
+
+    def search(self, query):
+        """Search contacts by name, phone, or email."""
+        query = query.lower()
+        results = []
+        for name, info in self.contacts.items():
+            if (query in name.lower()
+                    or query in info["phone"]
+                    or query in info["email"].lower()):
+                results.append((name, info))
+        return results
+
+    def get_by_tag(self, tag):
+        """Get all contacts with a specific tag."""
+        return [(name, info)
+                for name, info in self.contacts.items()
+                if tag in info["tags"]]
+
+    def get_all_tags(self):
+        """Get all unique tags across all contacts."""
+        all_tags = set()
+        for info in self.contacts.values():
+            all_tags |= info["tags"]
+        return sorted(all_tags)
+
+    def list_all(self):
+        """Return all contacts sorted by name."""
+        return sorted(self.contacts.items())
+
+    def delete(self, name):
+        """Delete a contact."""
+        if name in self.contacts:
+            del self.contacts[name]
+            self._save()
+            print(f"Deleted: {name}")
+        else:
+            print(f"Contact not found: {name}")
+
+    def merge_duplicates(self):
+        """Merge contacts with the same phone number."""
+        by_phone = defaultdict(list)
+        for name, info in self.contacts.items():
+            by_phone[info["phone"]].append((name, info))
+
+        merged = {}
+        for phone, matches in by_phone.items():
+            if len(matches) > 1:
+                # Merge into the first entry
+                primary_name, primary_info = matches[0]
+                primary_info["tags"] = set()
+                for _, info in matches:
+                    primary_info["tags"] |= info["tags"]
+                merged[primary_name] = primary_info
+            else:
+                name, info = matches[0]
+                merged[name] = info
+
+        self.contacts = merged
+        self._save()
+
+
+def main():
+    book = ContactBook()
+
+    while True:
+        print("\n=== Contact Book ===")
+        print("1. Add contact")
+        print("2. Search contacts")
+        print("3. List all")
+        print("4. Search by tag")
+        print("5. Delete contact")
+        print("6. Show all tags")
+        print("7. Exit")
+
+        choice = input("\nChoose: ")
+
+        if choice == "1":
+            name = input("Name: ")
+            phone = input("Phone: ")
+            email = input("Email: ")
+            tags = input("Tags (comma-separated): ").split(",")
+            tags = [t.strip() for t in tags if t.strip()]
+            book.add(name, phone, email, tags)
+
+        elif choice == "2":
+            query = input("Search: ")
+            results = book.search(query)
+            if results:
+                for name, info in results:
+                    tags = ", ".join(sorted(info["tags"]))
+                    print(f"\n{name}")
+                    print(f"  Phone: {info['phone']}")
+                    print(f"  Email: {info['email']}")
+                    print(f"  Tags: [{tags}]")
+            else:
+                print("No results found.")
+
+        elif choice == "3":
+            contacts = book.list_all()
+            if contacts:
+                for name, info in contacts:
+                    print(f"{name} — {info['phone']}")
+            else:
+                print("No contacts yet.")
+
+        elif choice == "4":
+            tag = input("Tag: ")
+            results = book.get_by_tag(tag)
+            if results:
+                for name, info in results:
+                    print(f"{name} — {info['phone']}")
+            else:
+                print(f"No contacts with tag: {tag}")
+
+        elif choice == "5":
+            name = input("Name to delete: ")
+            book.delete(name)
+
+        elif choice == "6":
+            tags = book.get_all_tags()
+            if tags:
+                print("All tags:", ", ".join(tags))
+            else:
+                print("No tags yet.")
+
+        elif choice == "7":
+            print("Goodbye!")
+            break
+
+        else:
+            print("Invalid choice.")
+
+if __name__ == "__main__":
+    main()
+```
+
+## What You Practiced
+
+| Concept | Usage |
+|---------|-------|
+| `dict` | Store contacts with name as key |
+| `set` | Tags with union, membership, deduplication |
+| `list` | Search results, sorted listing |
+| `tuple` | Iterating `.items()` pairs |
+| `defaultdict` | Grouping by phone number |
+| Comprehensions | List, set, and dict comprehensions |
+| File I/O | JSON serialization for persistence |
+
+## Extensions
+
+1. **Favorites** — Add a boolean `favorite` field and a "favorites only" listing
+2. **Groups** — Allow contacts to belong to multiple groups; list by group
+3. **Birthday reminders** — Add birthday field; show upcoming birthdays
+4. **Import/export CSV** — Add CSV import/export for interoperability
+5. **Phone number validation** — Validate phone format on add/update

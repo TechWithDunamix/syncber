@@ -1,0 +1,101 @@
+---
+title: "Object Storage"
+description: "Deep dive into object storage with S3, Azure Blob Storage, and Google Cloud Storage. Learn about storage classes, lifecycle policies, versioning, encryption, and access control."
+sidebar:
+  order: 1
+  label: "Object Storage"
+tab: "cloud-engineering"
+---
+
+
+Object storage is the most widely used cloud storage paradigm. It stores data as objects — the data itself, metadata (key-value pairs), and a globally unique identifier — in a flat address space. There is no filesystem hierarchy, though prefixes like `images/cats/` simulate one.
+
+## Provider Comparison
+
+| Feature | AWS S3 | Azure Blob Storage | Google Cloud Storage |
+|---------|--------|-------------------|---------------------|
+| Namespace | Bucket → Object | Storage Account → Container → Blob | Bucket → Object |
+| Durability | 99.999999999% (11 nines) | 99.999999999% (11 nines) | 99.999999999% (11 nines) |
+| Consistency | Read-after-write for PUT of new objects (eventual for overwrites) | Strong for all operations | Strong for all operations |
+| Max object size | 5 TB | 4.75 TB | 5 TB |
+
+## Storage Classes
+
+Object storage tiers let you optimize cost based on access frequency:
+
+| AWS S3 Class | Use Case | Retrieval Time | Cost (per GB/month) |
+|--------------|----------|---------------|-------------------|
+| S3 Standard | Frequently accessed data | Immediate | ~$0.023 |
+| S3 Intelligent-Tiering | Unknown or changing access patterns | Immediate | ~$0.023 + monitoring fee |
+| S3 Standard-IA | Infrequent access, rapid retrieval needed | Immediate | ~$0.0125 |
+| S3 One Zone-IA | Recreatable data in a single AZ | Immediate | ~$0.01 |
+| S3 Glacier Instant Retrieval | Archive with millisecond retrieval | Milliseconds | ~$0.004 |
+| S3 Glacier Flexible Retrieval | Archive, backup | Minutes to hours | ~$0.0036 |
+| S3 Glacier Deep Archive | Long-term archive (7+ years) | 12-48 hours | ~$0.00099 |
+
+<Aside variant="tip">
+Use S3 Intelligent-Tiering when you are unsure about access patterns. It automatically moves objects between tiers based on usage. The monitoring fee is worthwhile when it prevents accidental overpayment for Standard storage on cold data.
+</Aside>
+
+Azure Blob Storage uses similar tiers: Hot (frequent), Cool (infrequent), Cold (rare), and Archive (offline). GCP uses Standard, Nearline (30-day minimum), Coldline (90-day minimum), and Archive (365-day minimum).
+
+## Lifecycle Policies
+
+Lifecycle policies automate transitions between storage classes. Example AWS policy:
+
+```
+Rule 1: Transition objects to S3 Standard-IA after 30 days
+Rule 2: Transition to S3 Glacier Instant Retrieval after 90 days
+Rule 3: Transition to S3 Glacier Deep Archive after 365 days
+Rule 4: Expire (delete) after 7 years
+```
+
+This pattern — frequently accessed data in Standard, then automatic tiering to cheaper storage — is the standard approach for logs, backups, and user-generated content.
+
+<Aside variant="caution">
+Lifecycle transitions cost money per object. Small objects (under 128 KB) are often not cost-effective to transition. Evaluate the cost of transitions against the storage savings.
+</Aside>
+
+## Versioning and Durability
+
+Object storage achieves 11 nines of durability by automatically replicating data across multiple devices and facilities within a region. Versioning protects against accidental deletion or overwrite:
+
+- Each object modification creates a new version.
+- Deleting an object adds a delete marker instead of removing data.
+- Old versions can be restored or permanently deleted by lifecycle policy.
+
+## Access Control
+
+| Mechanism | Scope | Description |
+|-----------|-------|-------------|
+| IAM policies | User/role level | Grant or deny actions on buckets/objects |
+| Bucket policies | Bucket level | JSON policy document attached to the bucket |
+| ACLs | Object level | Legacy; prefer bucket policies or IAM |
+| Pre-signed URLs | Temporary | Time-limited URLs granting access to a specific object |
+
+<Aside variant="danger">
+Never make an S3 bucket publicly writable. Use pre-signed URLs for uploads and bucket policies that restrict access to known IAM roles. A publicly writable bucket will quickly fill with illegal content and generate massive bills.
+</Aside>
+
+## Encryption
+
+Object storage supports encryption at multiple layers:
+
+- **Server-side encryption (SSE):** The provider encrypts data before writing to disk.
+  - SSE-S3: Amazon-managed keys (AES-256).
+  - SSE-KMS: AWS KMS-managed keys (auditable, region-specific).
+  - SSE-C: Customer-provided keys (provider does not store the key).
+- **Client-side encryption:** You encrypt data before uploading; the provider never sees plaintext.
+- **In-transit encryption:** HTTPS (TLS) for all API calls.
+
+## Practical Example: Media Hosting
+
+A photo-sharing platform uses these patterns:
+
+1. Users upload via **pre-signed URLs** — safe, time-limited write access without exposing credentials.
+2. Images are stored in S3 Standard (hot tier for frequently viewed content).
+3. A lifecycle policy moves images older than 6 months to S3 Glacier Instant Retrieval.
+4. Images are served through **CloudFront**, which caches at edge locations.
+5. A bucket policy restricts direct S3 access to the CloudFront OAI.
+
+This architecture serves billions of requests monthly at a fraction of the cost of storing everything on Standard or, worse, on local disk.

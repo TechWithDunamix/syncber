@@ -121,16 +121,76 @@ const sidebarNavData: DocsSidebarNavData = {
           title: "Aperçu du Cours",
         },
         {
-          id: "python-basics",
-          title: "Bases de Python",
+          id: "phase-1-python-foundations",
+          title: "Phase 1 : Fondamentaux de Python",
+          children: [
+            {
+              id: "python-basics",
+              title: "Bases de Python",
+            },
+            {
+              id: "python-collections",
+              title: "Structures de Données & Collections",
+            },
+            {
+              id: "python-functions",
+              title: "Fonctions & Modules",
+            },
+          ],
         },
         {
-          id: "python-intermediate",
-          title: "Python Intermédiaire",
+          id: "phase-2-python-oop",
+          title: "Phase 2 : Python Orienté Objet",
+          children: [
+            {
+              id: "python-oop",
+              title: "Programmation Orientée Objet",
+            },
+            {
+              id: "python-advanced-oop",
+              title: "Techniques POO Avancées",
+            },
+            {
+              id: "python-error-handling",
+              title: "Gestion d'Erreurs & E/S Fichiers",
+            },
+          ],
         },
         {
-          id: "python-advanced",
-          title: "Python Avancé",
+          id: "phase-3-python-proficiency",
+          title: "Phase 3 : Maîtrise de Python",
+          children: [
+            {
+              id: "python-standard-library",
+              title: "Exploration de la Bibliothèque Standard",
+            },
+            {
+              id: "python-advanced-topics",
+              title: "Sujets Python Avancés",
+            },
+            {
+              id: "python-testing",
+              title: "Tests & Débogage",
+            },
+          ],
+        },
+        {
+          id: "phase-4-python-in-practice",
+          title: "Phase 4 : Python en Pratique",
+          children: [
+            {
+              id: "python-data-tools",
+              title: "Travail avec les Données",
+            },
+            {
+              id: "python-building-tools",
+              title: "Création d'Outils Python",
+            },
+            {
+              id: "python-project",
+              title: "Projet de Fin de Parcours",
+            },
+          ],
         },
       ],
     },
@@ -145,16 +205,76 @@ const sidebarNavData: DocsSidebarNavData = {
           title: "Aperçu du Cours",
         },
         {
-          id: "cloud-fundamentals",
-          title: "Fondamentaux du Cloud",
+          id: "phase-1-cloud-foundations",
+          title: "Phase 1 : Fondamentaux du Cloud",
+          children: [
+            {
+              id: "cloud-fundamentals",
+              title: "Fondamentaux du Cloud",
+            },
+            {
+              id: "cloud-networking",
+              title: "Réseau Cloud",
+            },
+            {
+              id: "cloud-storage-databases",
+              title: "Stockage & Bases de Données",
+            },
+          ],
         },
         {
-          id: "aws-services",
-          title: "Services AWS",
+          id: "phase-2-aws-deep-dive",
+          title: "Phase 2 : Plongée AWS",
+          children: [
+            {
+              id: "aws-core-services",
+              title: "Services Principaux AWS",
+            },
+            {
+              id: "aws-compute-serverless",
+              title: "Calcul & Serverless",
+            },
+            {
+              id: "aws-architecture",
+              title: "Architecture & Meilleures Pratiques",
+            },
+          ],
         },
         {
-          id: "azure-gcp",
-          title: "Azure & GCP",
+          id: "phase-3-multi-cloud-iac",
+          title: "Phase 3 : Multi-Cloud & IaC",
+          children: [
+            {
+              id: "microsoft-azure",
+              title: "Microsoft Azure",
+            },
+            {
+              id: "google-cloud-platform",
+              title: "Google Cloud Platform",
+            },
+            {
+              id: "infrastructure-as-code",
+              title: "Infrastructure as Code",
+            },
+          ],
+        },
+        {
+          id: "phase-4-cloud-operations",
+          title: "Phase 4 : Opérations Cloud",
+          children: [
+            {
+              id: "monitoring-observability",
+              title: "Surveillance & Observabilité",
+            },
+            {
+              id: "cloud-security-compliance",
+              title: "Sécurité & Conformité",
+            },
+            {
+              id: "cloud-capstone",
+              title: "Projet de Fin de Parcours",
+            },
+          ],
         },
       ],
     },

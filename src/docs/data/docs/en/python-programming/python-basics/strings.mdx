@@ -1,0 +1,136 @@
+---
+title: "Strings"
+description: "Master Python strings — creation, manipulation, formatting, and methods"
+sidebar:
+  order: 3
+  label: "Strings"
+tab: "python-programming"
+---
+
+Strings are sequences of characters. Python treats strings as first-class objects with rich functionality.
+
+## Creating Strings
+
+```python
+# Single or double quotes — both work
+single = 'Hello'
+double = "World"
+
+# Triple quotes for multiline
+multiline = """This is a
+multiline string"""
+
+# No char type — single chars are strings of length 1
+letter = "A"
+print(len(letter))  # 1
+```
+
+## String Indexing and Slicing
+
+```python
+text = "Python"
+
+# Indexing — 0-based
+text[0]    # 'P'
+text[-1]   # 'n' — negative indexes from the end
+
+# Slicing — [start:stop:step]
+text[0:3]     # 'Pyt' — indexes 0, 1, 2
+text[:3]      # 'Pyt' — start defaults to 0
+text[3:]      # 'hon' — stop defaults to end
+text[::2]     # 'Pto' — every 2nd character
+text[::-1]    # 'nohtyP' — reverse
+```
+
+## F-Strings (Python 3.6+)
+
+The modern way to format strings:
+
+```python
+name = "Alice"
+age = 25
+
+# Basic f-string
+print(f"{name} is {age} years old")
+# Alice is 25 years old
+
+# Expressions inside
+print(f"Next year, {name} will be {age + 1}")
+
+# Formatting numbers
+pi = 3.14159
+print(f"Pi to 2 decimals: {pi:.2f}")      # 3.14
+print(f"Percentage: {0.25:.1%}")           # 25.0%
+
+# Padding and alignment
+print(f"|{'left':<10}|")    # |left      |
+print(f"|{'right':>10}|")   # |     right|
+print(f"|{'center':^10}|")  # |  center  |
+```
+
+<Aside variant="tip">
+  F-strings are preferred over `.format()` and `%` formatting for readability and performance.
+</Aside>
+
+## Common String Methods
+
+```python
+text = "  Hello, Python World!  "
+
+# Case manipulation
+text.upper()            # '  HELLO, PYTHON WORLD!  '
+text.lower()            # '  hello, python world!  '
+text.title()            # '  Hello, Python World!  '
+text.swapcase()         # '  hELLO, pYTHON wORLD!  '
+
+# Searching
+text.find("Python")     # 9 — index of first occurrence
+text.find("Java")       # -1 — not found
+text.count("o")         # 3
+"Python" in text        # True
+
+# Validation
+"hello".isalpha()      # True
+"123".isdigit()        # True
+"hello123".isalnum()   # True
+"   ".isspace()        # True
+
+# Manipulation
+text.strip()           # 'Hello, Python World!' — removes leading/trailing whitespace
+text.replace("Python", "Java")  # '  Hello, Java World!  '
+"a,b,c".split(",")     # ['a', 'b', 'c']
+"-".join(["a", "b", "c"])  # 'a-b-c'
+```
+
+## Escape Sequences
+
+```python
+# Common escapes
+print("Line 1\nLine 2")     # newline
+print("Tab\tseparated")     # tab
+print("Quote: \"")          # literal quote
+print("Backslash: \\")      # literal backslash
+
+# Raw strings — ignore escapes (great for paths/regex)
+path = r"C:\Users\name"
+regex = r"\d+\.\d+"
+```
+
+## String Immutability
+
+```python
+# Strings are immutable — cannot change in place
+text = "hello"
+# text[0] = "H"  # TypeError!
+
+# Must create a new string
+text = "H" + text[1:]  # 'Hello'
+```
+
+## Key Takeaways
+
+- Strings use f-strings for formatting — `f"{variable}"`
+- Slicing: `string[start:stop:step]` — negative indexes count from the end
+- Common methods: `.strip()`, `.split()`, `.join()`, `.replace()`, `.find()`
+- Strings are immutable — operations return new strings
+- Use raw strings (`r"..."`) for paths and regex patterns

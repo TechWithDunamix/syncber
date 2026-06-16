@@ -1,0 +1,107 @@
+---
+title: "Module Project: Multi-Tier VPC Architecture"
+description: "Design a production-grade VPC with public, private, and database subnets across multiple availability zones. Apply VPC design, subnetting, routing, and security group concepts from the module."
+sidebar:
+  order: 99
+  label: "Module Project"
+tab: "cloud-engineering"
+---
+
+
+## Project Overview
+
+Design a multi-tier VPC architecture for a production web application. This is a conceptual design exercise — you will produce a written architecture decision record (ADR) with an accompanying network diagram description.
+
+**Scenario:** You work for a fintech startup that is launching a personal finance dashboard. The application consists of:
+
+- A React frontend served from an S3 bucket through CloudFront
+- A Node.js API running on EC2 (or ECS Fargate)
+- A PostgreSQL database on RDS
+- Redis for session caching on ElastiCache
+- All traffic must be encrypted in transit
+
+## Requirements
+
+1. **High availability** — Survive an availability zone failure
+2. **Security** — No direct internet access to application servers or databases
+3. **Cost efficiency** — Minimize NAT Gateway costs in development
+4. **Scalability** — Application tier must auto scale based on CPU
+5. **Compliance** — Financial data must stay within `us-east-1`
+
+## Architecture Design
+
+### VPC and CIDR
+
+Allocate `10.0.0.0/16` — this provides room for growth. Reserve the top half (`10.0.128.0/17`) for future use (e.g., a second VPC or expansion).
+
+### Subnet Layout
+
+Deploy across two availability zones (us-east-1a and us-east-1b):
+
+| Tier | Subnet CIDR | AZ | Route to IGW? | Route to NAT? |
+|------|-------------|----|---------------|---------------|
+| Public A | `10.0.1.0/24` | us-east-1a | Yes | N/A |
+| Public B | `10.0.2.0/24` | us-east-1b | Yes | N/A |
+| Private App A | `10.0.10.0/24` | us-east-1a | No | Yes |
+| Private App B | `10.0.11.0/24` | us-east-1b | No | Yes |
+| Private DB A | `10.0.20.0/24` | us-east-1a | No | No |
+| Private DB B | `10.0.21.0/24` | us-east-1b | No | No |
+
+<Aside variant="info">
+Database subnets have no route to the internet at all — not even through a NAT Gateway. This ensures the database cannot make outbound connections and cannot be reached from outside the VPC.
+</Aside>
+
+### Security Groups
+
+| Security Group | Inbound Rules | Outbound Rules |
+|---------------|---------------|----------------|
+| ALB SG | HTTP (80), HTTPS (443) from `0.0.0.0/0` | All traffic to App SG |
+| App SG | HTTP (8080) from ALB SG | HTTPS to RDS SG (port 5432), Redis SG (port 6379), NAT for updates |
+| RDS SG | PostgreSQL (5432) from App SG | None |
+| ElastiCache SG | Redis (6379) from App SG | None |
+
+### Route Tables
+
+| Route Table | Routes |
+|-------------|--------|
+| Public RT | `10.0.0.0/16 → local`, `0.0.0.0/0 → igw-xxx` |
+| Private App RT | `10.0.0.0/16 → local`, `0.0.0.0/0 → nat-xxx` |
+| Private DB RT | `10.0.0.0/16 → local` only |
+
+## Traffic Flow
+
+```
+User → CloudFront → ALB (public subnet A + B)
+                     ├── EC2 / ECS (private app A + B)
+                     ├── ElastiCache Redis (private db A + B)
+                     └── RDS PostgreSQL (private db A + B)
+```
+
+- CloudFront terminates TLS at the edge, forwards HTTPS to the ALB.
+- ALB terminates TLS and forwards HTTP to the application servers.
+- Application servers connect to RDS and ElastiCache within the private database subnets.
+- NAT Gateway in public subnet A provides outbound internet for app servers (patch downloads, external API calls).
+
+<Aside variant="caution">
+A single NAT Gateway in one AZ is a single point of failure for outbound traffic. For production, deploy a NAT Gateway in each AZ and add corresponding route table entries for private subnets in that AZ.
+</Aside>
+
+## Cost Optimization
+
+| Strategy | Savings |
+|----------|---------|
+| Use a single NAT Gateway in dev, one per AZ in prod | ~$30/month per NAT gateway in dev |
+| Use reserved instances for RDS if workload is predictable | Up to 60% vs. on-demand |
+| Right-size EC2 instance types based on load testing | Variable |
+| Use S3 for CloudFront origin with OAI (no ALB needed for static requests) | Reduces ALB data processing costs |
+
+## Reflection Questions
+
+1. **Why place the NAT Gateway in a public subnet?** It needs an IGW route to reach the internet for the private subnets it serves.
+2. **What happens if us-east-1a fails?** ALB, app instances, and RDS in us-east-1b continue serving traffic. ElastiCache requires careful replication setup for multi-AZ.
+3. **How would you handle database failover?** RDS Multi-AZ automatically provisions a standby in the other AZ and fails over if the primary becomes unavailable.
+4. **If you needed to peer this VPC with a corporate data center, what must be true about CIDR ranges?** They must not overlap — which is why we chose `10.0.0.0/16` from a range that does not conflict with typical corporate networks.
+
+## Deliverable
+
+Write an ADR covering: VPC CIDR justification, subnet layout, security group rules, routing strategy, and cost optimization decisions. Include a text-based network diagram (or draw.io / Lucidchart) showing traffic flow across all tiers.

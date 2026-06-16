@@ -1,0 +1,276 @@
+---
+title: "Architecture Reference"
+description: "Reference architecture for the Cloud Capstone project — VPC design, ECS Fargate, RDS multi-AZ, ElastiCache, ALB, Route 53, CloudFront, WAF, CI/CD, monitoring, encryption, and Terraform IaC."
+sidebar:
+  order: 1
+  label: "Architecture Reference"
+tab: "cloud-engineering"
+---
+
+
+This page provides the reference architecture for the capstone project. Use this as a blueprint when designing your own infrastructure. Every component below should be provisioned using Terraform modules with remote state stored in S3 with DynamoDB locking.
+
+## Global Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                      Route 53                           │
+│              (Latency-based routing)                     │
+└────────────────────┬────────────────────────────────────┘
+                     │
+┌────────────────────▼────────────────────────────────────┐
+│                    CloudFront                            │
+│              (WAF attached, HTTPS only)                  │
+└────────────────────┬────────────────────────────────────┘
+                     │
+┌────────────────────▼────────────────────────────────────┐
+│            ALB (us-east-1 & eu-west-1)                   │
+│          (Cross-zone, deletion protection)               │
+└────────────────────┬────────────────────────────────────┘
+                     │
+┌────────────────────▼────────────────────────────────────┐
+│          ECS Fargate (us-east-1 & eu-west-1)             │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐              │
+│  │ Product  │  │  Order   │  │  User    │              │
+│  │ Service  │  │  Service │  │  Service │              │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘              │
+│       │              │              │                    │
+│  ┌────▼─────┐  ┌────▼─────┐  ┌────▼─────┐              │
+│  │  Aurora  │  │ Aurora   │  │ Aurora   │              │
+│  │  Primary │  │ Primary  │  │ Primary  │              │
+│  └──────────┘  └──────────┘  └──────────┘              │
+│       ▲              ▲              ▲                    │
+│       │    Cross-Region Replication   │                    │
+│       ▼              ▼              ▼                    │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐              │
+│  │ Aurora   │  │ Aurora   │  │ Aurora   │              │
+│  │ Read     │  │ Read     │  │ Read     │              │
+│  │ Replica  │  │ Replica  │  │ Replica  │              │
+│  └──────────┘  └──────────┘  └──────────┘              │
+│                    ┌──────────┐                          │
+│                    │ElastiCache│                          │
+│                    │  Redis   │                          │
+│                    └──────────┘                          │
+└─────────────────────────────────────────────────────────┘
+```
+
+## VPC Design
+
+Each region gets a dedicated VPC with the following CIDR allocation:
+
+```
+us-east-1:  10.1.0.0/16
+eu-west-1:  10.2.0.0/16
+```
+
+Each VPC has three tiers across three availability zones:
+
+| Subnet Type | CIDR (per AZ) | Purpose |
+|-------------|---------------|---------|
+| **Public** | 10.1.1.0/24, 10.1.2.0/24, 10.1.3.0/24 | ALB, NAT Gateway, Bastion |
+| **Private App** | 10.1.10.0/24, 10.1.11.0/24, 10.1.12.0/24 | ECS Fargate tasks |
+| **Private Data** | 10.1.20.0/24, 10.1.21.0/24, 10.1.22.0/24 | RDS, ElastiCache |
+
+Connect the two regions via **Transit Gateway** or **VPC Peering** for cross-region communication. Use a **Transit Gateway** if you plan to add more regions or on-premise connectivity later.
+
+<Aside variant="tip">
+Use a centralized **Transit Gateway** even for two regions. It makes adding a third region or a Direct Connect connection trivial later and avoids the complexity of full-mesh VPC peering.
+</Aside>
+
+## ECS Fargate Configuration
+
+Each microservice runs as a separate ECS service in its own task definition:
+
+```hcl
+resource "aws_ecs_task_definition" "product_service" {
+  family                   = "product-service"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = "512"
+  memory                   = "1024"
+  execution_role_arn       = aws_iam_role.ecs_execution.arn
+  task_role_arn            = aws_iam_role.ecs_task.arn
+
+  container_definitions = jsonencode([
+    {
+      name  = "product-service"
+      image = "${aws_ecr_repository.product.repository_url}:latest"
+      portMappings = [{ containerPort = 8080, protocol = "tcp" }]
+      environment = [
+        { name = "DB_HOST", value = aws_rds_cluster.product.cluster_endpoint },
+        { name = "REDIS_HOST", value = aws_elasticache_replication_group.main.primary_endpoint_address }
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = "/ecs/product-service"
+          "awslogs-region"        = var.aws_region
+          "awslogs-stream-prefix" = "ecs"
+        }
+      }
+    }
+  ])
+}
+```
+
+Service auto-scaling uses CloudWatch metric targets:
+
+```hcl
+resource "aws_appautoscaling_target" "product" {
+  service_namespace  = "ecs"
+  resource_id        = "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.product.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  min_capacity       = 2
+  max_capacity       = 20
+}
+
+resource "aws_appautoscaling_policy" "product_cpu" {
+  name               = "product-cpu-auto-scaling"
+  service_namespace  = "ecs"
+  resource_id        = aws_appautoscaling_target.product.resource_id
+  scalable_dimension = "ecs:service:DesiredCount"
+  policy_type        = "TargetTrackingScaling"
+
+  target_tracking_scaling_policy_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = "ECSServiceAverageCPUUtilization"
+    }
+    target_value = 70
+  }
+}
+```
+
+## RDS Multi-AZ with Cross-Region Replication
+
+Deploy Aurora PostgreSQL with a primary cluster in us-east-1 and a cross-region read replica in eu-west-1:
+
+```hcl
+resource "aws_rds_cluster" "product_primary" {
+  cluster_identifier      = "product-db-primary"
+  engine                  = "aurora-postgresql"
+  engine_mode             = "provisioned"
+  database_name           = "products"
+  master_username         = "dbadmin"
+  master_password         = random_password.db.result
+  storage_encrypted       = true
+  kms_key_id             = aws_kms_key.rds.arn
+  backup_retention_period = 35
+  preferred_backup_window = "03:00-04:00"
+  vpc_security_group_ids  = [aws_security_group.data_sg.id]
+  db_subnet_group_name    = aws_db_subnet_group.data.name
+}
+
+resource "aws_rds_cluster_instance" "product_primary_instances" {
+  count              = 2
+  identifier         = "product-db-primary-${count.index}"
+  cluster_identifier = aws_rds_cluster.product_primary.id
+  instance_class     = "db.r6g.large"
+  engine             = aws_rds_cluster.product_primary.engine
+  engine_version     = aws_rds_cluster.product_primary.engine_version
+}
+```
+
+## CI/CD Pipeline
+
+The pipeline uses CodePipeline with CodeBuild and approval gates:
+
+```yaml
+# buildspec.yml
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.11
+    commands:
+      - pip install -r requirements.txt
+      - pip install bandit safety
+  pre_build:
+    commands:
+      - bandit -r src/ --exit-zero
+      - safety check --full-report
+      - docker login -u AWS -p $(aws ecr get-login-password) $AWS_ACCOUNT.dkr.ecr.$AWS_REGION.amazonaws.com
+  build:
+    commands:
+      - docker build -t product-service .
+      - docker tag product-service:latest $ECR_REPO:latest
+      - docker push $ECR_REPO:latest
+  post_build:
+    commands:
+      - printf '[{"name":"product-service","imageUri":"%s:latest"}]' $ECR_REPO > imagedefinitions.json
+artifacts:
+  files:
+    - imagedefinitions.json
+```
+
+Pipeline stages:
+
+1. **Source** — GitHub repository (webhook trigger)
+2. **Build** — CodeBuild runs tests, security scanning, Docker build/push
+3. **Staging Deploy** — Deploy to staging ECS service
+4. **Integration Test** — Run smoke tests against staging
+5. **Approval** — Manual approval gate
+6. **Production Deploy** — Deploy to production ECS service (canary deploy)
+
+## Observability Stack
+
+| Component | Service | Purpose |
+|-----------|---------|---------|
+| Metrics | CloudWatch + Custom Metrics | CPU, memory, request count, error rate, business metrics |
+| Logs | CloudWatch Logs + Grafana Loki | Application logs with structured JSON |
+| Tracing | X-Ray + OpenTelemetry Collector | Distributed traces, service map |
+| Dashboards | Grafana (provisioned) | Unified view across CloudWatch, Prometheus, Loki |
+| Alerting | CloudWatch Alarms + Grafana Alerting | SLO-based burn rate alerts routed to on-call |
+
+## Security Controls
+
+| Control | Implementation |
+|---------|---------------|
+| **Encryption at rest** | KMS envelope encryption for RDS, EBS, S3, ElastiCache |
+| **Encryption in transit** | TLS 1.3 via ACM (CloudFront + ALB), mTLS between services |
+| **WAF** | AWS Managed Rules + rate-based blocking |
+| **DDoS** | Shield Advanced |
+| **Network segmentation** | Security groups per tier, NACL subnet-level deny lists |
+| **IAM** | Least-privilege roles, task roles for ECS, service roles for RDS |
+| **Secrets** | AWS Secrets Manager, rotated automatically |
+| **Audit** | CloudTrail (management + data events), Config rules |
+
+## Terraform Module Structure
+
+```
+terraform/
+  modules/
+    vpc/              — VPC, subnets, route tables, NAT Gateways, TG attachments
+    ecs-cluster/      — ECS cluster, capacity providers, task definitions, services
+    rds-aurora/       — DB cluster, instances, subnet groups, parameter groups
+    elasticache/      — Redis replication group, subnet group, parameter group
+    alb/              — ALB, target groups, listeners, WAF association
+    route53/          — DNS zones, records, health checks
+    cloudfront/       — Distribution, origin, WAF association, behaviors
+    ci-cd/            — CodePipeline, CodeBuild, ECR repositories
+    monitoring/       — CloudWatch dashboards, alarms, log groups
+    security/         — KMS keys, WAF ACLs, Shield, Secrets Manager, IAM roles
+    s3-backend/       — S3 bucket, DynamoDB table for Terraform state
+  environments/
+    dev/              — Smaller instances, single AZ
+    staging/          — Full multi-AZ, no cross-region
+    prod/             — Multi-region, all features
+```
+
+## Incident Response Runbook Template
+
+Each runbook should include:
+
+1. **Detection** — What alert fires, what SLI/SLO is breached
+2. **Triage** — Check Grafana dashboard, X-Ray traces, CloudWatch Logs
+3. **Mitigation** — Specific steps (e.g., failover to secondary region)
+4. **Resolution** — Apply fix, verify, update runbook
+5. **Post-mortem** — Root cause, timeline, action items
+
+<Aside variant="info">
+Store runbooks alongside your Terraform code in a `runbooks/` directory. Keep them in version control so they evolve with the infrastructure.
+</Aside>
+
+## Summary
+
+This reference architecture brings together every concept from the course: VPC design, container orchestration, database high availability, global traffic routing, CI/CD, observability, and defense-in-depth security. Use it as the starting point for your capstone project and adapt it to your specific requirements.

@@ -1,0 +1,175 @@
+---
+title: "Module 10 Project: Monitoring Stack"
+description: "Deploy a complete monitoring stack with CloudWatch custom metrics and logs, X-Ray distributed tracing, and Grafana dashboards wired to AWS and Prometheus data sources."
+sidebar:
+  order: 99
+  label: "Module Project"
+tab: "cloud-engineering"
+---
+
+
+In this project you will deploy a full monitoring stack for a sample microservices application running on AWS ECS Fargate. The stack covers all three observability pillars: metrics and logs via CloudWatch, distributed tracing via X-Ray, and unified visualization via Grafana connected to both CloudWatch and Prometheus data sources.
+
+## Prerequisites
+
+- AWS account with programmatic access configured
+- Terraform installed (v1.5+)
+- Docker installed
+- Basic familiarity with ECS Fargate and CloudWatch
+
+## Step 1: Deploy the Sample Application
+
+Deploy a simple two-service application (order-service and payment-service) on ECS Fargate:
+
+```hcl
+resource "aws_ecs_task_definition" "order_service" {
+  family                   = "order-service"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = "256"
+  memory                   = "512"
+
+  container_definitions = jsonencode([
+    {
+      name  = "order-service"
+      image = "nginx:alpine"
+      portMappings = [{ containerPort = 80, protocol = "tcp" }]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = "/ecs/order-service"
+          "awslogs-region"        = "us-east-1"
+          "awslogs-stream-prefix" = "ecs"
+        }
+      }
+    }
+  ])
+}
+```
+
+## Step 2: Configure CloudWatch Custom Metrics
+
+Instrument the application to emit custom business metrics. Use the CloudWatch agent in the ECS task as a sidecar, or call `PutMetricData` directly from the application code:
+
+```python
+import boto3
+
+cloudwatch = boto3.client('cloudwatch')
+
+def emit_order_metric(order_count):
+    cloudwatch.put_metric_data(
+        Namespace='OrderService',
+        MetricData=[
+            {
+                'MetricName': 'OrdersPlaced',
+                'Value': order_count,
+                'Unit': 'Count',
+                'Dimensions': [
+                    {'Name': 'Environment', 'Value': 'production'}
+                ]
+            }
+        ]
+    )
+```
+
+Create a CloudWatch dashboard to visualize these metrics:
+
+```bash
+aws cloudwatch put-dashboard \
+  --dashboard-name "OrderService-Overview" \
+  --dashboard-body file://dashboard.json
+```
+
+## Step 3: Enable X-Ray Tracing
+
+Add the X-Ray daemon as a sidecar container to each ECS task definition. Instrument the Python application with the X-Ray SDK:
+
+```python
+from aws_xray_sdk.core import xray_recorder
+from aws_xray_sdk.ext.flask.middleware import XRayMiddleware
+
+app = Flask(__name__)
+xray_recorder.configure(service='order-service')
+XRayMiddleware(app, xray_recorder)
+
+@app.route('/api/orders')
+@xray_recorder.capture('list_orders')
+def list_orders():
+    with xray_recorder.in_subsegment('query_db'):
+        result = database.query("SELECT * FROM orders")
+    return jsonify(result)
+```
+
+Verify traces appear in the X-Ray console under **Service Map**.
+
+## Step 4: Deploy Grafana with Provisioned Data Sources
+
+Run Grafana in a Docker container with pre-configured data sources:
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+services:
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./datasources:/etc/grafana/provisioning/datasources
+      - ./dashboards:/etc/grafana/provisioning/dashboards
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+```
+
+Provision CloudWatch and Prometheus data sources:
+
+```yaml
+# datasources/cloudwatch.yaml
+apiVersion: 1
+datasources:
+  - name: CloudWatch
+    type: cloudwatch
+    access: proxy
+    jsonData:
+      authType: default
+      defaultRegion: us-east-1
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://otel-collector:8889
+```
+
+## Step 5: Create Alerting Rules
+
+Define CloudWatch alarms for key metrics:
+
+```bash
+aws cloudwatch put-metric-alarm \
+  --alarm-name "OrderService-HighErrorRate" \
+  --alarm-description "Alert when error rate exceeds 1% for 5 minutes" \
+  --metric-name ErrorRate \
+  --namespace OrderService \
+  --statistic Average \
+  --period 300 \
+  --evaluation-periods 2 \
+  --threshold 1 \
+  --comparison-operator GreaterThanThreshold \
+  --alarm-actions arn:aws:sns:us-east-1:123456789012:ops-topic
+```
+
+## Step 6: Configure Grafana Alerting
+
+Use Grafana's built-in alerting engine to create SLO-based alerts. Set a rule that fires when the 99th percentile latency exceeds 500ms for more than 5 minutes, routed to the on-call Slack channel via the Grafana Alerting webhook.
+
+## Validation Checklist
+
+- [ ] CloudWatch dashboard shows all custom metrics for both services
+- [ ] Log groups capture application logs with correct timestamps
+- [ ] X-Ray service map displays both services and their connections
+- [ ] Grafana dashboard panels display CloudWatch and Prometheus data
+- [ ] Alarms trigger SNS notifications when error rate crosses threshold
+- [ ] Grafana alert fires and delivers to the configured notification channel
+
+## Summary
+
+This project combines the native AWS monitoring stack (CloudWatch + X-Ray) with Grafana for unified visualization. The same architecture extends to multi-account and multi-region setups — provision Grafana once, add data sources for each account and region, and centralize observability.

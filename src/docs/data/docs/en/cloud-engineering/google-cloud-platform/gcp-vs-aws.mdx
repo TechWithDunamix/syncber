@@ -1,0 +1,101 @@
+---
+title: "GCP vs AWS"
+description: "A detailed comparison of Google Cloud and AWS services, GCP's Kubernetes leadership and data/AI strengths, Anthos multicloud capabilities, and when to choose GCP."
+sidebar:
+  order: 3
+  label: "GCP vs AWS"
+tab: "cloud-engineering"
+---
+
+
+## Service Mapping
+
+GCP and AWS offer equivalent services with different names and architectural philosophies. GCP tends toward global, managed services; AWS offers more granular, regional services.
+
+| Category | AWS | GCP |
+|----------|-----|-----|
+| Compute (IaaS) | EC2 | Compute Engine |
+| Compute (PaaS) | Elastic Beanstalk | App Engine |
+| Containers (managed) | ECS | Cloud Run |
+| Containers (K8s) | EKS | GKE |
+| Serverless | Lambda | Cloud Functions (1st gen) / Cloud Run (2nd gen) |
+| Object Storage | S3 | Cloud Storage |
+| Block Storage | EBS | Persistent Disk |
+| File Storage | EFS | Filestore |
+| Relational DB | RDS | Cloud SQL |
+| NoSQL | DynamoDB | Firestore / Bigtable |
+| Data Warehouse | Redshift | BigQuery |
+| Data Streaming | Kinesis | Dataflow |
+| Message Queue | SQS / SNS | Pub/Sub |
+| VPC | VPC (regional) | VPC (global) |
+| Load Balancer | ALB / NLB (regional) | Cloud Load Balancing (global) |
+| DNS | Route 53 | Cloud DNS |
+| CDN | CloudFront | Cloud CDN |
+| ML Platform | SageMaker | Vertex AI |
+| Monitoring | CloudWatch | Cloud Monitoring |
+| Secrets | Secrets Manager | Secret Manager |
+
+## Kubernetes Leadership
+
+GCP's Kubernetes story is unmatched. Kubernetes was originally designed and open-sourced by Google (based on Borg). GKE offers features that EKS and AKS have only recently begun matching:
+
+- **Autopilot** — Fully managed node lifecycle and scaling
+- **GKE Enterprise** — Multi-cluster networking, Config Sync, and Policy Controller
+- **Workload Identity** — Fine-grained IAM for Kubernetes service accounts
+- **GKE Sandbox** — gVisor-based container isolation for untrusted workloads
+
+```bash
+# Create an Autopilot cluster in GKE
+gcloud container clusters create-auto auto-cluster \
+  --region us-central1
+```
+
+<Aside variant="info" title="Managed K8s Comparison">
+  GKE is generally considered the most mature managed Kubernetes offering. EKS offers the tightest AWS service integration. AKS offers the lowest operational overhead for Windows containers and .NET workloads.
+</Aside>
+
+## Data and AI Strength
+
+GCP's data services are built on the same infrastructure that powers Google Search, YouTube, and Ads. Key advantages:
+
+- **BigQuery** — Serverless, petabyte-scale analytics without cluster management (vs. Redshift which requires provisioning)
+- **Dataflow** — Unified stream/batch with auto-scaling (vs. Kinesis + Glue which require separate pipelines)
+- **Pub/Sub** — Global, low-latency messaging at Google-scale (vs. SQS which is regional)
+- **Vertex AI** — Unified ML platform with foundation models, AutoML, and custom training (vs. SageMaker's fragmented service family)
+
+BigQuery's serverless model is particularly disruptive for data warehousing — you pay for storage and queries consumed, with no clusters to manage. For companies running large-scale analytics, BigQuery alone can be a reason to choose GCP.
+
+## Anthos: Multicloud and Hybrid
+
+Anthos is GCP's platform for managing workloads across GCP, AWS, Azure, and on-premises clusters — similar to Azure Arc but with a Kubernetes-first approach.
+
+- **Anthos Service Mesh** — Istio-based traffic management and security
+- **Anthos Config Management** — GitOps-driven policy enforcement
+- **Anthos Bare Metal** — Run GKE on-premises without VMware
+- **Migrate for Anthos** — Lift containers from VMs into GKE
+
+```bash
+# Register a non-GCP cluster with Anthos
+gcloud container hub memberships register my-aws-cluster \
+  --context aws-cluster-context \
+  --project my-project
+```
+
+## When to Choose GCP
+
+Choose GCP when:
+
+- Your workloads are **Kubernetes-native** and you want the best managed K8s platform
+- You are building **data analytics or AI/ML pipelines** and want serverless infrastructure
+- You need a **global network** — GCP's fiber network connects data centers in 40+ regions with low latency
+- Your team uses **containers and microservices** — Cloud Run and GKE offer the smoothest developer experience
+- You are price-sensitive — GCP's sustained-use discounts and committed-use discounts (1 or 3 years) are automatically applied
+- You want **open-source compatibility** — GCP leads in open-source contributions (Kubernetes, TensorFlow, Apache Beam, Istio)
+
+<Aside variant="info" title="Multicloud Reality">
+  Most organizations use multiple clouds. A common pattern is AWS for general infrastructure + GCP for data analytics + Azure for identity and enterprise workloads. Understanding each provider's strengths enables you to choose the right platform for each workload.
+</Aside>
+
+## Summary
+
+GCP differentiates through Kubernetes maturity (GKE), serverless data analytics (BigQuery), unified ML platform (Vertex AI), and global networking. While AWS offers more services and broader ecosystem, GCP's focused strengths in data, AI, and containers make it the best choice for specific workload profiles.

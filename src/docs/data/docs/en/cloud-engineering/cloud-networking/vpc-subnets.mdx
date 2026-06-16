@@ -1,0 +1,90 @@
+---
+title: "VPCs & Subnets"
+description: "Design Virtual Private Clouds with CIDR blocks, public and private subnets, route tables, internet and NAT gateways. Compare security groups and network ACLs for defense in depth."
+sidebar:
+  order: 1
+  label: "VPCs & Subnets"
+tab: "cloud-engineering"
+---
+
+
+A Virtual Private Cloud (VPC) is your logically isolated network within a public cloud provider. Every AWS, Azure, or GCP resource you launch lives in a VPC or equivalent virtual network.
+
+## CIDR and IP Addressing
+
+VPCs are defined by a Classless Inter-Domain Routing (CIDR) block — a range of IP addresses. Common choices:
+
+- `/16` (65,536 IPs) — large, suitable for complex multi-tier architectures
+- `/20` (4,096 IPs) — medium, typical for most applications
+- `/24` (256 IPs) — small, for simple or test workloads
+
+**Best practice:** Choose a CIDR range that does not overlap with your other networks (on-premises data centers, other VPCs, partner networks). Overlapping CIDRs prevent peering and VPN connections. The RFC 1918 private ranges are standard:
+
+- `10.0.0.0/8` — largest, best for complex environments
+- `172.16.0.0/12` — medium range
+- `192.168.0.0/16` — common in home/small office networks
+
+<Aside variant="tip">
+Always reserve CIDR space for future growth. You can add secondary CIDR blocks later, but it is easier to start with a /16 and subdivide it than to expand a too-small VPC.
+</Aside>
+
+## Subnets
+
+A subnet is a subdivision of a VPC's CIDR block, residing in a single availability zone. Subnets are either **public** (traffic can route through an internet gateway) or **private** (no direct internet access).
+
+### Public Subnets
+
+Public subnets have a route table entry pointing `0.0.0.0/0` to an internet gateway (IGW). Resources in public subnets — load balancers, bastion hosts, NAT gateways — can receive inbound traffic from the internet.
+
+### Private Subnets
+
+Private subnets have no direct route to the internet. Resources in private subnets — application servers, databases — cannot be reached from the internet. For outbound internet access (e.g., downloading OS patches), route traffic through a NAT gateway in a public subnet.
+
+```
+VPC: 10.0.0.0/16
+├── Public Subnet A (10.0.1.0/24) — us-east-1a
+├── Public Subnet B (10.0.2.0/24) — us-east-1b
+├── Private Subnet A (10.0.3.0/24) — us-east-1a
+└── Private Subnet B (10.0.4.0/24) — us-east-1b
+```
+
+## Route Tables
+
+Each subnet is associated with a route table that determines where traffic is directed. An entry like `0.0.0.0/0 → igw-12345` sends all internet-bound traffic to the internet gateway. Route tables also handle traffic between subnets within the VPC (the local route, automatically added) and traffic to peered VPCs or VPNs.
+
+## Internet Gateway vs. NAT Gateway
+
+| Component | Purpose | Direction |
+|-----------|---------|-----------|
+| Internet Gateway (IGW) | Enables inbound and outbound internet access for public subnets | Bidirectional |
+| NAT Gateway | Enables outbound internet access for private subnets (e.g., OS updates) | Unidirectional (outbound only) |
+
+<Aside variant="caution">
+A NAT Gateway is a managed service that costs approximately $30/month + data processing charges. For development environments, consider a NAT instance (an EC2 AMI that performs NAT) to reduce cost. For production, the managed NAT Gateway is preferred for reliability.
+</Aside>
+
+## Security Groups vs. Network ACLs
+
+Security groups and network ACLs (NACLs) both filter traffic but operate at different layers.
+
+| Attribute | Security Group | Network ACL |
+|-----------|---------------|-------------|
+| Scope | Instance-level (attached to ENI) | Subnet-level |
+| State | Stateful (return traffic allowed automatically) | Stateless (return traffic must be explicitly allowed) |
+| Rules | Allow only | Allow and deny |
+| Evaluation | All rules evaluated before decision | Rules evaluated in numerical order |
+| Default | Outbound all traffic allowed | Inbound and outbound all traffic denied |
+
+<Aside variant="info">
+Use security groups as your primary instance firewall. Use NACLs as a secondary layer for subnet-wide rules — for example, blocking traffic from a specific IP range at the subnet boundary.
+</Aside>
+
+## VPC Design Patterns
+
+**Single-tier:** One subnet for all resources. Simple but insecure — rarely used in production.
+
+**Two-tier:** Public subnets for load balancers, private subnets for application servers. Databases may share the app tier subnet.
+
+**Three-tier:** Public subnets for load balancers, private subnets for app servers, separate private subnets for databases. This is the standard production pattern.
+
+**VPC peering:** Connect VPCs across accounts or regions using a peering connection (non-transitive, hub-and-spoke topology). For transitive routing, use a transit gateway.

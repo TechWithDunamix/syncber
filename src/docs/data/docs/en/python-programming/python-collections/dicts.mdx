@@ -1,0 +1,220 @@
+---
+title: "Dictionaries"
+description: "Key-value mapping with Python dictionaries"
+sidebar:
+  order: 3
+  label: "Dictionaries"
+tab: "python-programming"
+---
+
+Dictionaries map keys to values — Python's built-in hash table implementation.
+
+## Creating Dictionaries
+
+```python
+# Empty dict
+empty = {}
+empty = dict()
+
+# With initial values
+user = {
+    "name": "Alice",
+    "age": 25,
+    "email": "alice@example.com"
+}
+
+# Using dict() constructor
+dict(name="Bob", age=30)  # Keys become strings: {'name': 'Bob', 'age': 30}
+
+# From pairs
+dict([("a", 1), ("b", 2)])  # {'a': 1, 'b': 2}
+
+# Dict comprehension
+squares = {x: x ** 2 for x in range(5)}
+# {0: 0, 1: 1, 2: 4, 3: 9, 4: 9}
+```
+
+## Accessing and Modifying
+
+```python
+user = {"name": "Alice", "age": 25}
+
+# Access
+user["name"]          # 'Alice'
+user.get("name")      # 'Alice'
+user.get("phone")     # None — no error
+user.get("phone", "N/A")  # 'N/A' — default value
+
+# Check key existence
+"name" in user        # True
+"phone" not in user   # True
+
+# Modify
+user["age"] = 26      # Update existing key
+user["phone"] = "555-0123"  # Add new key
+
+# Safe access without KeyError
+# user["phone"]       # KeyError if key missing
+user.get("phone")     # None
+```
+
+<Aside variant="danger">
+  Accessing a missing key with `dict[key]` raises `KeyError`. Always use `.get()` when the key might not exist.
+</Aside>
+
+## Dictionary Methods
+
+```python
+user = {"name": "Alice", "age": 25, "role": "admin"}
+
+# Keys, values, items
+user.keys()      # dict_keys(['name', 'age', 'role'])
+user.values()    # dict_values(['Alice', 25, 'admin'])
+user.items()     # dict_items([('name', 'Alice'), ('age', 25), ('role', 'admin')])
+
+# These are views — they reflect changes to the dict
+keys = user.keys()
+user["email"] = "alice@example.com"
+print(keys)      # dict_keys(['name', 'age', 'role', 'email'])
+
+# Removing
+removed = user.pop("role")     # Removes and returns value — 'admin'
+last = user.popitem()          # Removes and returns last inserted item (Python 3.7+)
+del user["age"]                # Removes key — KeyError if missing
+user.clear()                   # Empty the dict
+
+# Merging (Python 3.9+)
+a = {"x": 1, "y": 2}
+b = {"y": 3, "z": 4}
+merged = a | b       # {'x': 1, 'y': 3, 'z': 4}
+a |= b               # Updates a in place
+```
+
+## Iterating Dictionaries
+
+```python
+user = {"name": "Alice", "age": 25, "role": "admin"}
+
+# Keys (default)
+for key in user:
+    print(key)
+
+# Values
+for value in user.values():
+    print(value)
+
+# Key-value pairs
+for key, value in user.items():
+    print(f"{key}: {value}")
+
+# Sorted iteration
+for key in sorted(user):
+    print(f"{key}: {user[key]}")
+```
+
+## Dictionary Patterns
+
+### Counting with Dictionaries
+
+```python
+# Count occurrences
+text = "mississippi"
+counts = {}
+for char in text:
+    counts[char] = counts.get(char, 0) + 1
+# {'m': 1, 'i': 4, 's': 4, 'p': 2}
+
+# Using collections.Counter
+from collections import Counter
+counts = Counter(text)
+# Counter({'i': 4, 's': 4, 'p': 2, 'm': 1})
+```
+
+### Grouping
+
+```python
+from collections import defaultdict
+
+# Group words by first letter
+words = ["apple", "banana", "avocado", "cherry", "blueberry"]
+groups = defaultdict(list)
+for word in words:
+    groups[word[0]].append(word)
+
+print(dict(groups))
+# {'a': ['apple', 'avocado'], 'b': ['banana', 'blueberry'], 'c': ['cherry']}
+```
+
+### Default Values
+
+```python
+from collections import defaultdict
+
+# Automatically creates default for missing keys
+dd = defaultdict(int)
+dd["a"] += 1      # No KeyError — int() defaults to 0
+print(dd["a"])    # 1
+print(dd["b"])    # 0 — auto-created
+
+# Other defaults
+defaultdict(list)  # [] for missing keys
+defaultdict(set)   # set() for missing keys
+defaultdict(lambda: "N/A")  # Custom default
+```
+
+### Ordered Dictionaries (Python 3.7+)
+
+```python
+# Since Python 3.7, regular dicts preserve insertion order
+# OrderedDict is still useful for equality comparisons
+
+from collections import OrderedDict
+od = OrderedDict()
+od["a"] = 1
+od["b"] = 2
+od.move_to_end("a")  # Move 'a' to the end
+```
+
+## Dictionary Comprehensions
+
+```python
+# Basic
+squares = {x: x ** 2 for x in range(5)}
+
+# With condition
+even_squares = {x: x ** 2 for x in range(10) if x % 2 == 0}
+
+# Invert a dictionary
+original = {"a": 1, "b": 2, "c": 3}
+inverted = {v: k for k, v in original.items()}
+# {1: 'a', 2: 'b', 3: 'c'}
+```
+
+## Hashing and Keys
+
+Dictionary keys must be **hashable** (immutable):
+
+```python
+# Valid keys: int, float, str, tuple (with hashable elements), frozenset
+# Invalid keys: list, set, dict (mutable — not hashable)
+
+valid = {
+    42: "integer",
+    3.14: "float",
+    "hello": "string",
+    (1, 2): "tuple",
+    frozenset({1, 2}): "frozenset",
+}
+
+# invalid = {[1, 2]: "list"}  # TypeError: unhashable type: 'list'
+```
+
+## Key Takeaways
+
+- Dicts map keys to values — keys must be hashable (immutable)
+- Use `.get(key, default)` for safe access instead of `[]`
+- `.items()` gives key-value pairs for iteration
+- `defaultdict` and `Counter` from collections handle missing-key patterns
+- Dict comprehensions: `{key: value for item in iterable}`
+- Since Python 3.7, dicts maintain insertion order
+- Use `|` operator (3.9+) for merging dicts

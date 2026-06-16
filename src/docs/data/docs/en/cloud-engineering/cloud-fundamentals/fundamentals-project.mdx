@@ -1,0 +1,91 @@
+---
+title: "Module Project: Static Website on S3 & CloudFront"
+description: "Design and reason through a real-world cloud architecture: hosting a static website on Amazon S3 with CloudFront as a CDN. A conceptual project that reinforces global infrastructure and deployment model concepts."
+sidebar:
+  order: 99
+  label: "Module Project"
+tab: "cloud-engineering"
+---
+
+
+## Project Overview
+
+In this conceptual project you will design a cloud architecture for hosting a static website using Amazon S3 and CloudFront. The goal is not to click buttons in a console but to reason through the trade-offs, identify the components, and explain your decisions — exactly as a cloud engineer would during an architecture review.
+
+**Scenario:** You work for a digital agency that builds marketing sites for clients. Each site is a collection of HTML, CSS, JavaScript, and images — no server-side rendering, no database. You need a cost-effective, fast, and secure hosting solution that can scale from a few hundred visitors to millions during a campaign.
+
+## Architecture Components
+
+```
+Users
+  │
+  ▼
+CloudFront (CDN) ───► S3 Bucket (Origin)
+  │
+  ▼
+Route 53 (DNS)
+```
+
+### S3 Bucket
+
+Amazon S3 stores the website files. The bucket is configured for **static website hosting** and is **not publicly accessible directly** — all traffic goes through CloudFront.
+
+**Key decisions:**
+
+- Bucket name must be globally unique across all AWS accounts.
+- Enable "Block Public Access" — the bucket policy grants read access *only* to the CloudFront distribution's origin access identity (OAI).
+- Use versioning to roll back to previous deployments if needed.
+
+### CloudFront Distribution
+
+CloudFront is the content delivery network that sits in front of the S3 bucket. It caches responses at edge locations worldwide.
+
+**Key decisions:**
+
+- **Price class:** Use Price Class All (all edge locations) for global audiences, or Price Class 100 (only North America and Europe) to reduce cost.
+- **Caching:** Set TTLs based on content type. JavaScript bundles can be cached for a year with fingerprinting (e.g., `app.a1b2c3.js`); HTML files might use a shorter TTL.
+- **HTTPS:** Require HTTPS between viewers and CloudFront, and between CloudFront and S3.
+- **Custom error pages:** Configure a friendly `404.html` instead of the default CloudFront error message.
+
+<Aside variant="tip">
+Use origin access identity (OAI) to ensure the S3 bucket can only be accessed through CloudFront, never directly. This prevents users from bypassing the CDN—and your caching strategy—and reduces cost.
+</Aside>
+
+### Route 53
+
+Route 53 provides DNS resolution, mapping your custom domain (e.g., `www.example.com`) to the CloudFront distribution. Create an A record aliased to the CloudFront distribution endpoint. This is free (no charge for alias records pointing to AWS resources).
+
+## Security Considerations
+
+| Concern | Mitigation |
+|---------|------------|
+| Direct S3 access | OAI + bucket policy that denies all traffic except CloudFront |
+| HTTPS enforcement | CloudFront viewer protocol policy set to redirect HTTP to HTTPS |
+| DDoS | AWS Shield Standard (included free) + CloudFront's distributed edge |
+| Cost spikes in case of traffic surge | CloudFront provides caching; S3 transfer costs are low; set billing alerts |
+
+## Cost Estimation
+
+For a typical marketing site with 500,000 monthly visitors:
+
+| Service | Estimated Monthly Cost |
+|---------|----------------------|
+| S3 (1 GB storage, ~5 GB transfer) | ~$0.50 |
+| CloudFront (5 GB out, 500K requests) | ~$1.20 |
+| Route 53 (1 hosted zone, 1 million queries) | ~$1.00 |
+| **Total** | **~$2.70** |
+
+## Reflection Questions
+
+1. **Why should traffic go through CloudFront instead of directly to S3?** Consider latency, cost, DDoS protection, and HTTPS.
+2. **What happens if the S3 bucket in us-east-1 goes down?** CloudFront would return cached responses for objects within their TTL. For uncached requests, the site would be unavailable.
+3. **How would you handle a custom domain with HTTPS?** Request a certificate in AWS Certificate Manager (us-east-1) and attach it to the CloudFront distribution.
+4. **When would S3 static hosting be insufficient?** If the site needs server-side logic, user authentication, or a database, you need serverless (Lambda, API Gateway) or container-based compute.
+
+<Aside variant="info">
+This architecture serves millions of requests per month for pennies. It is the same pattern used by countless production websites — including the AWS documentation site itself.
+</Aside>
+
+## Deliverable
+
+Write a one-page architecture decision record (ADR) that documents your component choices, security posture, and cost estimate. Be prepared to explain why you chose S3 + CloudFront over alternatives like a web server on EC2, GitHub Pages, or Netlify.

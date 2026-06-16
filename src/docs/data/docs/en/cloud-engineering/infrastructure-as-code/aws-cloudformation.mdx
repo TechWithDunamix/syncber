@@ -1,0 +1,160 @@
+---
+title: "AWS CloudFormation"
+description: "Learn AWS CloudFormation — templates, resources, parameters, change sets, stacks, and StackSets — with YAML examples and a comparison to Terraform."
+sidebar:
+  order: 2
+  label: "CloudFormation"
+tab: "cloud-engineering"
+---
+
+
+## What is CloudFormation?
+
+AWS CloudFormation is a native IaC service that lets you model AWS resources using JSON or YAML templates. It provisions resources in an ordered, predictable fashion and rolls back on failure.
+
+## Templates
+
+CloudFormation templates are YAML or JSON documents that declare the AWS resources you want to provision. Every template has a `Resources` section and optional `Parameters`, `Mappings`, `Conditions`, and `Outputs`.
+
+```yaml
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "S3 bucket with versioning enabled"
+
+Resources:
+  DataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${AWS::AccountId}-data-bucket"
+      VersioningConfiguration:
+        Status: Enabled
+      Tags:
+        - Key: Environment
+          Value: Production
+
+Outputs:
+  BucketName:
+    Description: "Name of the created bucket"
+    Value: !Ref DataBucket
+```
+
+## Resources and Intrinsic Functions
+
+Resources are declared with a `Type` (e.g., `AWS::EC2::VPC`, `AWS::RDS::DBInstance`) and `Properties`. AWS CloudFormation provides intrinsic functions for dynamic template values:
+
+| Function | Purpose |
+|----------|---------|
+| `!Ref` | Returns the physical ID of a resource or parameter value |
+| `!Sub` | Substitutes variables in a string |
+| `!GetAtt` | Returns an attribute of a resource |
+| `!Join` | Joins values with a delimiter |
+| `!Select` | Returns an element from a list |
+| `!FindInMap` | Returns a value from a mapping |
+| `!If` | Conditional value based on a condition |
+
+```yaml
+Resources:
+  WebServer:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
+      InstanceType: !If [IsProduction, t3.medium, t3.micro]
+      SecurityGroups:
+        - !Ref WebSecurityGroup
+```
+
+## Parameters
+
+Parameters allow you to pass values into templates at stack creation time — making templates reusable across environments.
+
+```yaml
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues:
+      - dev
+      - staging
+      - production
+    Default: dev
+    Description: "Deployment environment"
+
+  VpcCIDR:
+    Type: String
+    Default: "10.0.0.0/16"
+    AllowedPattern: "\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}/\\d{1,2}"
+```
+
+## Change Sets
+
+Change sets let you preview how proposed changes will affect running resources before applying them — equivalent to `terraform plan`.
+
+```bash
+aws cloudformation create-change-set \
+  --stack-name my-stack \
+  --template-body file://updated-template.yaml \
+  --change-set-name my-change-set
+
+aws cloudformation describe-change-set \
+  --change-set-name my-change-set
+
+aws cloudformation execute-change-set \
+  --change-set-name my-change-set
+```
+
+## Stacks and StackSets
+
+A **stack** is a single instance of a CloudFormation template. A **StackSet** lets you deploy the same template across multiple accounts and regions from a single operation.
+
+```bash
+# Create a StackSet
+aws cloudformation create-stack-set \
+  --stack-set-name vpc-baseline \
+  --template-body file://vpc-template.yaml
+
+# Deploy to multiple accounts and regions
+aws cloudformation create-stack-instances \
+  --stack-set-name vpc-baseline \
+  --accounts 123456789012 234567890123 \
+  --regions us-east-1 eu-west-1
+```
+
+StackSets are the standard way to enforce baseline infrastructure (guardrails, logging, networking) across an AWS Organization.
+
+<Aside variant="info" title="StackSet Requirements">
+  StackSets require trusted execution IAM roles and organizational unit (OU) targeting. They are typically configured by the cloud center of excellence team.
+</Aside>
+
+## CloudFormation vs Terraform
+
+| Aspect | CloudFormation | Terraform |
+|--------|---------------|-----------|
+| Scope | AWS-only | Multi-cloud (2000+ providers) |
+| Language | JSON / YAML | HCL (HashiCorp Configuration Language) |
+| State | Managed by AWS (no state file) | Local or remote state file |
+| Drift Detection | Built-in (`detect-stack-drift`) | Requires `terraform plan` |
+| Rollbacks | Automatic on failure | Manual (state manipulation) |
+| Modules | Nested stacks | Registry modules with versioning |
+| Policy | Service Control Policies (SCP) | Sentinel / OPA |
+| Pricing | Free (no additional cost) | Free CLI; Terraform Cloud paid tiers |
+| Learning Curve | Easier for AWS-only teams | Steeper but more transferable |
+
+## When to Use Each
+
+Use **CloudFormation** when:
+- You are **AWS-only** and want the tightest AWS integration
+- You need **automatic rollbacks** on failure
+- You want **no state file to manage** (AWS handles it)
+- Your organization uses **Service Catalog** and StackSets heavily
+
+Use **Terraform** when:
+- You are **multi-cloud** or use non-AWS providers (Datadog, Cloudflare, Kubernetes)
+- You want **reusable modules** with versioned registries
+- Your team values **HCL's readability** over JSON/YAML
+- You need **state management** for complex dependency graphs
+
+<Aside variant="caution">
+  CloudFormation templates can become deeply nested with `!Sub` and `!Join`, making them harder to read than equivalent HCL. Terraform's HCL syntax is generally more expressive and maintainable for complex infrastructure.
+</Aside>
+
+## Summary
+
+CloudFormation is the native IaC solution for AWS-only teams, offering seamless integration, automatic rollbacks, and StackSets for multi-account deployments. Terraform is the better choice for multi-cloud environments and teams that value HCL's expressiveness and the Terraform Registry's module ecosystem.

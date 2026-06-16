@@ -1,0 +1,151 @@
+---
+title: "Encryption & KMS"
+description: "Master cloud encryption services — KMS, CloudHSM, Key Vault — and implement envelope encryption, TLS certificate management, and data protection at rest and in transit."
+sidebar:
+  order: 1
+  label: "Encryption & KMS"
+tab: "cloud-engineering"
+---
+
+
+Encryption is the foundation of data protection in the cloud. This page covers the key management services on each provider, the envelope encryption model, encryption at rest and in transit, and certificate management with ACM.
+
+## Key Management Services
+
+### AWS KMS
+
+AWS Key Management Service (KMS) creates and manages cryptographic keys. KMS is integrated with over 50 AWS services — enabling transparent encryption for S3, EBS, RDS, Lambda environment variables, and more.
+
+```bash
+# Create a symmetric KMS key
+aws kms create-key \
+  --description "Encryption key for production RDS" \
+  --key-usage ENCRYPT_DECRYPT \
+  --origin AWS_KMS
+
+# Create an alias
+aws kms create-alias \
+  --alias-name alias/prod-rds-key \
+  --target-key-id <key-id>
+
+# Encrypt a secret
+aws kms encrypt \
+  --key-id alias/prod-rds-key \
+  --plaintext fileb://secret.txt \
+  --output text \
+  --query CiphertextBlob | base64 --decode > secret.encrypted
+```
+
+KMS uses **envelope encryption** internally — your data is encrypted with a data key, which itself is encrypted with a KMS master key. This means you can encrypt large objects without sending data to KMS:
+
+```python
+import boto3
+
+kms = boto3.client('kms')
+
+# Generate a data key
+response = kms.generate_data_key(
+    KeyId='alias/prod-rds-key',
+    KeySpec='AES_256'
+)
+data_key = response['Plaintext']
+encrypted_data_key = response['CiphertextBlob']
+
+# Encrypt data locally with the plaintext data key
+from cryptography.fernet import Fernet
+fernet = Fernet(data_key)
+encrypted_data = fernet.encrypt(b"Sensitive customer data")
+
+# Discard the plaintext data key, store only encrypted_data + encrypted_data_key
+```
+
+### AWS CloudHSM
+
+CloudHSM provides dedicated hardware security modules (HSMs) for workloads that require FIPS 140-2 Level 3 compliance or direct control over the HSM appliance. Use cases include:
+- PKI and digital signing
+- Oracle TDE (Transparent Data Encryption)
+- Custom key store in KMS (you create keys in your own HSM)
+
+### Azure Key Vault
+
+Azure Key Vault stores keys, secrets, and certificates. It supports HSM-backed keys (Premium tier) and integrates with Azure services:
+
+```bash
+# Create a Key Vault
+az keyvault create \
+  --name myprodkeyvault \
+  --resource-group prod-rg \
+  --location eastus \
+  --sku premium
+
+# Store a secret
+az keyvault secret set \
+  --vault-name myprodkeyvault \
+  --name db-connection-string \
+  --value "Server=prod-db;Database=orders;..."
+
+# Enable disk encryption on a VM
+az vm encryption enable \
+  --resource-group prod-rg \
+  --name web-vm \
+  --disk-encryption-keyvault myprodkeyvault
+```
+
+### GCP Cloud KMS
+
+GCP Cloud KMS manages keys with IAM integration and supports symmetric and asymmetric keys:
+
+```bash
+# Create a key ring and key
+gcloud kms keyrings create prod-keyring --location global
+gcloud kms keys create db-key \
+  --location global \
+  --keyring prod-keyring \
+  --purpose encryption
+
+# Encrypt a file
+gcloud kms encrypt \
+  --location global \
+  --keyring prod-keyring \
+  --key db-key \
+  --plaintext-file secret.txt \
+  --ciphertext-file secret.txt.enc
+```
+
+<Aside variant="info">
+Cloud KMS supports Automatic Key Rotation schedules — set it once and keys rotate transparently without any application changes.
+</Aside>
+
+## Encryption at Rest vs. In Transit
+
+| Context | At Rest | In Transit |
+|---------|---------|------------|
+| **Storage** | S3 SSE-S3/SSE-KMS, EBS encryption, RDS encryption | S3 HTTPS endpoints, TLS for all API calls |
+| **Compute** | Encrypted EBS volumes, Lambda env var encryption | TLS between services, mTLS for service mesh |
+| **Database** | RDS encryption, DynamoDB at rest, ElastiCache encryption | RDS TLS connections, DynamoDB HTTPS |
+| **Messaging** | SQS SSE, SNS SSE | SQS HTTPS, SNS HTTPS |
+
+## AWS Certificate Manager (ACM)
+
+ACM provisions, manages, and rotates TLS certificates for use with CloudFront, ALB, and API Gateway:
+
+```bash
+# Request a public certificate
+aws acm request-certificate \
+  --domain-name api.myapp.com \
+  --validation-method DNS \
+  --subject-alternative-names api-staging.myapp.com
+
+# List certificates
+aws acm list-certificates --includes keyTypes=EC_prime256v1
+```
+
+ACM automatically renews certificates before expiration. If you need to import your own certificate (e.g., from a third-party CA), use `import-certificate` — but note that ACM cannot auto-renew imported certificates.
+
+<Aside variant="caution">
+ACM certificates in us-east-1 are required for CloudFront distributions. If you attach an ACM certificate to a CloudFront distribution, it must be in us-east-1 regardless of where your origin is.
+</Aside>
+
+## Summary
+
+KMS (and its equivalents on Azure and GCP) make encryption operationally straightforward while keeping keys isolated from the data they protect. Envelope encryption lets you balance security with performance. Combined with ACM for TLS, these services give you encryption at rest and in transit with minimal operational overhead.
