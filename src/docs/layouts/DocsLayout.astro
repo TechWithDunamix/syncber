@@ -7,6 +7,7 @@ import DocsPagination from "@/docs/components/nav/DocsPagination.astro";
 import SidebarNav from "@/docs/components/nav/SidebarNav.astro";
 import TableOfContents from "@/docs/components/table-of-contents/TableOfContents.astro";
 import TocLink from "@/docs/components/table-of-contents/TocLink.astro";
+import CourseGuard from "@/docs/components/course/CourseGuard.astro";
 import { siteSettings } from "@/docs/config/siteSettings.json";
 import { getAdjacentPages } from "@/docs/js/docsUtils";
 import { getLocaleFromUrl } from "@/docs/js/localeUtils";
@@ -85,6 +86,11 @@ const { prev, next } = await getAdjacentPages(doc.id, currLocale, tabId);
             <div class="flex">
               <h1 class="docs-h1 docs-text-gradient mb-8 pb-1">{title}</h1>
             </div>
+            {
+              ["iam-pam-professional", "full-stack-development", "python-programming", "cloud-engineering", "cybersecurity", "data-science-ml", "devops-cicd", "mobile-app-development"].includes(tabId) && (
+                <CourseGuard courseId={tabId} courseTitle={title} />
+              )
+            }
             <div class="docs-markdown-content">
               <slot />
             </div>

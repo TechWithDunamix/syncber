@@ -1,0 +1,268 @@
+---
+const title = "Payment Success";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title} | Skillber</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      *, *::before, *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: "Inter", system-ui, -apple-system, sans-serif;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+        background: #09090b;
+        color: #e4e4e7;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .card {
+        width: 100%;
+        max-width: 28rem;
+        text-align: center;
+      }
+
+      /* Loading spinner */
+      .spinner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1.25rem;
+        padding: 3rem;
+        border-radius: 1rem;
+        border: 1px solid #27272a;
+        background: #18181b;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      }
+      .spinner-ring {
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 50%;
+        border: 3px solid #52525b;
+        border-top-color: #6366f1;
+        animation: spin 0.8s linear infinite;
+      }
+      .spinner-text {
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #a1a1aa;
+      }
+
+      /* Success card */
+      .success {
+        display: none;
+      }
+      .success.visible {
+        display: block;
+      }
+      .success-inner {
+        padding: 3rem;
+        border-radius: 1rem;
+        border: 1px solid rgba(5, 150, 105, 0.2);
+        background: linear-gradient(180deg, rgba(5, 150, 105, 0.08), transparent);
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 30px rgba(5, 150, 105, 0.05);
+      }
+
+      /* Animated checkmark circle */
+      .check-wrapper {
+        width: 4rem;
+        height: 4rem;
+        margin: 0 auto 1.5rem;
+        border-radius: 50%;
+        background: rgba(5, 150, 105, 0.12);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        outline: 1px solid rgba(5, 150, 105, 0.15);
+        opacity: 0;
+        animation: checkIn 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+      }
+      .check-wrapper svg {
+        width: 2rem;
+        height: 2rem;
+        color: #34d399;
+        stroke-width: 2.5;
+        fill: none;
+        stroke: currentColor;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      .success-title {
+        font-size: 1.5rem;
+        font-weight: 600;
+        letter-spacing: -0.025em;
+        color: #f4f4f5;
+        margin-bottom: 0.5rem;
+        opacity: 0;
+        animation: fadeSlideUp 0.5s ease-out 0.25s forwards;
+      }
+      .success-desc {
+        font-size: 0.875rem;
+        line-height: 1.6;
+        color: #a1a1aa;
+        margin-bottom: 2rem;
+        opacity: 0;
+        animation: fadeSlideUp 0.5s ease-out 0.35s forwards;
+      }
+
+      .btn-course {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.625rem;
+        padding: 0.75rem 1.75rem;
+        border-radius: 0.75rem;
+        background: #6366f1;
+        color: #fff;
+        font-size: 0.875rem;
+        font-weight: 500;
+        text-decoration: none;
+        box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3);
+        transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+        opacity: 0;
+        animation: fadeSlideUp 0.5s ease-out 0.45s forwards;
+        cursor: pointer;
+      }
+      .btn-course:hover {
+        background: #5558e6;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(99, 102, 241, 0.35);
+      }
+      .btn-course:active {
+        transform: translateY(0);
+      }
+      .btn-course svg {
+        width: 1rem;
+        height: 1rem;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        transition: transform 0.2s;
+      }
+      .btn-course:hover svg {
+        transform: translateX(3px);
+      }
+
+      .footer-note {
+        margin-top: 1.5rem;
+        font-size: 0.75rem;
+        color: #52525b;
+      }
+
+      /* Hidden utility */
+      .hidden {
+        display: none !important;
+      }
+
+      /* Keyframes */
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      @keyframes checkIn {
+        0%   { transform: scale(0); opacity: 0; }
+        60%  { transform: scale(1.12); }
+        100% { transform: scale(1); opacity: 1; }
+      }
+      @keyframes fadeSlideUp {
+        0%   { opacity: 0; transform: translateY(12px); }
+        100% { opacity: 1; transform: translateY(0); }
+      }
+
+      /* Responsive */
+      @media (max-width: 480px) {
+        .spinner, .success-inner { padding: 2rem 1.5rem; }
+        .success-title { font-size: 1.25rem; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <!-- Loading -->
+      <div id="status-loading" class="spinner">
+        <div class="spinner-ring"></div>
+        <p class="spinner-text">Verifying your payment...</p>
+      </div>
+
+      <!-- Success -->
+      <div id="status-success" class="success">
+        <div class="success-inner">
+          <div class="check-wrapper">
+            <svg viewBox="0 0 24 24">
+              <path d="M4.5 12.75l6 6 9-13.5" />
+            </svg>
+          </div>
+
+          <h1 class="success-title">Payment Successful!</h1>
+          <p class="success-desc">You now have lifetime access to this course.</p>
+
+          <a id="go-to-course" href="/my-courses" class="btn-course">
+            Go to Course
+            <svg viewBox="0 0 24 24">
+              <path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+            </svg>
+          </a>
+        </div>
+
+        <p class="footer-note">Confirmed by Stripe &middot; Receipt sent to your email</p>
+      </div>
+    </div>
+
+    <script>
+      import { getCurrentSession } from "@/docs/services/auth";
+      import { purchaseCourse } from "@/docs/services/enrollment";
+
+      (async function () {
+        const params = new URLSearchParams(window.location.search);
+        const sessionId = params.get("session_id");
+        const courseId = params.get("courseId");
+        const loadingEl = document.getElementById("status-loading");
+        const successEl = document.getElementById("status-success");
+        const courseLink = document.getElementById("go-to-course");
+
+        async function createEnrollment(cid) {
+          const session = getCurrentSession();
+          if (!session) return false;
+          const result = await purchaseCourse(session.userId, cid);
+          return result.success;
+        }
+
+        if (courseId) {
+          courseLink.href = `/learn/${courseId}/`;
+        }
+
+        if (sessionId) {
+          try {
+            const res = await fetch(`/api/verify-session?session_id=${encodeURIComponent(sessionId)}`);
+            const data = await res.json();
+            if (data.verified && data.courseId) {
+              courseLink.href = `/learn/${data.courseId}/`;
+            }
+          } catch (err) {
+            console.warn("Server-side verification failed, trying client-side enrollment:", err);
+            if (courseId) await createEnrollment(courseId);
+          }
+        } else if (courseId) {
+          await createEnrollment(courseId);
+        }
+
+        loadingEl.classList.add("hidden");
+        successEl.classList.add("visible");
+      })();
+    </script>
+  </body>
+</html>

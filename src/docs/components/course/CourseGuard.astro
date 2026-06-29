@@ -1,0 +1,227 @@
+---
+interface Props {
+  courseId: string;
+  courseTitle: string;
+}
+
+const { courseId, courseTitle } = Astro.props;
+---
+
+<div id="course-guard" data-course-id={courseId} data-course-title={courseTitle}>
+  <!-- Fullscreen loading state -->
+  <div id="guard-loading" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div class="rounded-xl bg-card p-8 text-center shadow-2xl">
+      <div class="border-accent mx-auto h-8 w-8 animate-spin rounded-full border-2 border-t-transparent"></div>
+      <p class="text-muted-foreground mt-4 text-sm">Checking access...</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  import { getCurrentSession } from "@/docs/services/auth";
+  import { getCourseInfo, hasAccess } from "@/docs/services/enrollment";
+
+  function runCheckAccess() {
+    const guardEl = document.getElementById("course-guard");
+    if (!guardEl) return;
+    const courseId = guardEl.dataset.courseId!;
+    const courseTitle = guardEl.dataset.courseTitle!;
+    const loadingEl = document.getElementById("guard-loading");
+    if (!loadingEl) return;
+
+    async function checkAccess() {
+      const session = getCurrentSession();
+
+      if (!session) {
+        const redirect = encodeURIComponent(window.location.pathname);
+        window.location.href = `/login?redirect=${redirect}`;
+        return;
+      }
+
+      try {
+        const access = await hasAccess(session.userId, courseId);
+
+        if (access) {
+          loadingEl.remove();
+          return;
+        }
+
+        loadingEl.remove();
+        showPurchaseOverlay(session.userId, courseId, courseTitle);
+      } catch (err) {
+        console.error("CourseGuard checkAccess failed:", err);
+        loadingEl.remove();
+        showError("Unable to verify access. Please try again.");
+      }
+    }
+
+    checkAccess();
+  }
+
+  runCheckAccess();
+
+  function showError(message: string) {
+    const el = document.createElement("div");
+    el.className = "fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4";
+    el.innerHTML = `
+      <div class="w-full max-w-sm rounded-2xl border bg-card p-8 text-center shadow-2xl">
+        <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-error/10 text-2xl">⚠️</div>
+        <p class="text-foreground mb-6 text-sm">${message}</p>
+        <a href="/" class="bg-accent text-accent-foreground hover:bg-accent/90 inline-flex items-center gap-2 rounded-full px-6 py-2.5 text-sm font-medium transition-colors">Go Home</a>
+      </div>
+    `;
+    document.body.appendChild(el);
+  }
+
+  function showPurchaseOverlay(userId: string, cId: string, cTitle: string) {
+    const info = getCourseInfo(cId);
+
+    document.body.style.overflow = "hidden";
+
+    const overlay = document.createElement("div");
+    overlay.id = "purchase-overlay";
+    overlay.className =
+      "fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm";
+
+    overlay.innerHTML = `
+      <div
+        class="relative w-full max-w-lg"
+        style="animation: modalEnter 0.25s ease-out"
+      >
+        <style>
+          @keyframes modalEnter {
+            from { opacity: 0; transform: scale(0.95) translateY(10px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+          }
+        </style>
+
+        <div class="relative overflow-hidden rounded-2xl border bg-card shadow-2xl">
+          <button
+            id="modal-close"
+            class="text-muted-foreground hover:text-foreground hover:bg-muted absolute top-4 right-4 z-10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors"
+            aria-label="Close"
+          >
+            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+
+          <div class="p-8 pt-10 sm:p-10">
+            <div class="mb-5 flex justify-center">
+              <div class="flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-accent/20 to-accent/5 text-4xl shadow-sm ring-1 ring-accent/10">
+                ${info?.icon || "📖"}
+              </div>
+            </div>
+
+            <h2 class="text-foreground mb-2 text-center font-heading text-2xl font-medium tracking-wide">${cTitle}</h2>
+
+            <p class="text-muted-foreground mb-6 text-center text-sm leading-relaxed">
+              ${info?.description || "Unlock this course and start building in-demand skills today."}
+            </p>
+
+            <div class="bg-muted/50 mb-7 rounded-xl border p-5">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-muted-foreground text-xs font-medium uppercase tracking-wider">Price</p>
+                  <div class="text-foreground mt-0.5 text-3xl font-bold">$${info?.price.toFixed(2) || "49.99"}</div>
+                </div>
+                <div class="flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1">
+                  <svg class="h-3.5 w-3.5 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                  </svg>
+                  <span class="text-emerald-600 dark:text-emerald-400 text-xs font-medium">Lifetime access</span>
+                </div>
+              </div>
+            </div>
+
+            <div id="purchase-error" class="hidden mb-4 rounded-lg bg-error/10 p-3 text-center text-sm font-medium text-error"></div>
+
+            <button
+              id="purchase-btn"
+              class="bg-accent text-accent-foreground hover:bg-accent/90 inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-full px-6 py-3 text-base font-medium transition-colors disabled:opacity-50"
+            >
+              Purchase — $${info?.price.toFixed(2) || "49.99"}
+            </button>
+
+            <div class="mt-4 text-center">
+              <a
+                href="/my-courses"
+                class="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm font-medium transition-colors"
+              >
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Back to My Courses
+              </a>
+            </div>
+          </div>
+
+          <div class="border-t bg-muted/30 px-10 py-3">
+            <p class="text-muted-foreground text-center text-xs">
+              🔒 Secured by Stripe
+            </p>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    document.getElementById("modal-close")?.addEventListener("click", () => {
+      document.body.style.overflow = "";
+      window.location.href = "/my-courses";
+    });
+
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) {
+        document.body.style.overflow = "";
+        window.location.href = "/my-courses";
+      }
+    });
+
+    document.getElementById("purchase-btn")?.addEventListener("click", async () => {
+      const btn = document.getElementById("purchase-btn") as HTMLButtonElement;
+      const errEl = document.getElementById("purchase-error") as HTMLDivElement;
+
+      btn.disabled = true;
+      btn.innerHTML = `
+        <span class="inline-flex items-center gap-2">
+          <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          Redirecting to payment...
+        </span>
+      `;
+      errEl.classList.add("hidden");
+
+      try {
+        const res = await fetch("/api/create-checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId,
+            courseId: cId,
+            courseTitle: cTitle,
+            amount: info?.price || 49.99,
+          }),
+        });
+
+        const data = await res.json();
+
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          throw new Error(data.error || "Failed to create checkout session");
+        }
+      } catch (err) {
+        console.error("Checkout error:", err);
+        errEl.textContent = "Could not reach payment server. Is the Stripe server running?";
+        errEl.classList.remove("hidden");
+        btn.disabled = false;
+        btn.innerHTML = `Purchase — $${info?.price.toFixed(2) || "49.99"}`;
+      }
+    });
+  }
+
+</script>

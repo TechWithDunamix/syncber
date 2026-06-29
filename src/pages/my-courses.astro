@@ -1,0 +1,109 @@
+---
+import { getLocaleFromUrl } from "@/docs/js/localeUtils";
+import { getTranslatedData } from "@/docs/js/translationUtils";
+import DocsLandingLayout from "@/docs/layouts/DocsLandingLayout.astro";
+
+const currLocale = getLocaleFromUrl(Astro.url);
+const siteData = getTranslatedData("siteData", currLocale);
+---
+
+<DocsLandingLayout title="My Courses — Skillber" description="View your enrolled courses.">
+  <main id="main-content" class="docs-home-container flex-1 py-20">
+    <div class="mb-12 text-center">
+      <h1 class="font-heading text-foreground mb-2 text-3xl font-medium tracking-wide md:text-4xl">
+        My Courses
+      </h1>
+      <p class="text-muted-foreground text-sm">Courses you've purchased and are currently learning</p>
+    </div>
+
+    <!-- Loading state (shown by JS) -->
+    <div id="loading-state" class="py-20 text-center">
+      <div class="border-accent mx-auto h-8 w-8 animate-spin rounded-full border-2 border-t-transparent"></div>
+      <p class="text-muted-foreground mt-4 text-sm">Loading your courses...</p>
+    </div>
+
+    <!-- Enrolled courses grid (populated by JS) -->
+    <div id="courses-grid" class="hidden mx-auto grid max-w-4xl gap-6 sm:grid-cols-2 lg:grid-cols-3"></div>
+
+    <!-- Empty state (shown by JS) -->
+    <div id="empty-state" class="hidden py-20 text-center">
+      <p class="text-5xl">📚</p>
+      <h2 class="text-foreground mt-4 text-xl font-medium">No courses yet</h2>
+      <p class="text-muted-foreground mt-2 text-sm">Purchase a course to start learning.</p>
+      <a
+        href="/"
+        class="bg-accent text-accent-foreground hover:bg-accent/90 mt-6 inline-flex items-center gap-2 rounded-full px-6 py-2.5 text-sm font-medium transition-colors"
+      >
+        Browse Courses
+      </a>
+    </div>
+
+    <!-- Not logged in state (shown by JS) -->
+    <div id="unauth-state" class="hidden py-20 text-center">
+      <p class="text-5xl">🔒</p>
+      <h2 class="text-foreground mt-4 text-xl font-medium">Not logged in</h2>
+      <p class="text-muted-foreground mt-2 text-sm">Log in to see your enrolled courses.</p>
+      <a
+        href="/login?redirect=/my-courses"
+        class="bg-accent text-accent-foreground hover:bg-accent/90 mt-6 inline-flex items-center gap-2 rounded-full px-6 py-2.5 text-sm font-medium transition-colors"
+      >
+        Log In
+      </a>
+    </div>
+  </main>
+</DocsLandingLayout>
+
+<script>
+  import { getCurrentSession } from "@/docs/services/auth";
+  import { getEnrolledCourses, getCourseInfo } from "@/docs/services/enrollment";
+
+  const session = getCurrentSession();
+
+  const loadingEl = document.getElementById("loading-state")!;
+  const gridEl = document.getElementById("courses-grid")!;
+  const emptyEl = document.getElementById("empty-state")!;
+  const unauthEl = document.getElementById("unauth-state")!;
+
+  if (!session) {
+    loadingEl.classList.add("hidden");
+    unauthEl.classList.remove("hidden");
+  } else {
+    (async () => {
+      const enrollments = await getEnrolledCourses(session.userId);
+
+      loadingEl.classList.add("hidden");
+
+      if (enrollments.length === 0) {
+        emptyEl.classList.remove("hidden");
+      } else {
+        gridEl.classList.remove("hidden");
+
+        for (const enrollment of enrollments) {
+          const info = getCourseInfo(enrollment.courseId);
+          const card = document.createElement("a");
+          card.href = `/learn/${enrollment.courseId}/`;
+          card.className =
+            "group rounded-xl border bg-card p-6 transition-all duration-200 hover:border-accent hover:shadow-lg hover:-translate-y-1";
+
+          card.innerHTML = `
+            <div class="mb-3 text-3xl">${info?.icon || "📖"}</div>
+            <h3 class="text-foreground group-hover:text-accent mb-2 text-lg font-medium">${enrollment.courseTitle}</h3>
+            <p class="text-muted-foreground mb-4 text-sm leading-relaxed">${info?.description || ""}</p>
+            <div class="text-muted-foreground flex items-center justify-between text-xs">
+              <span>${info?.pages || "?"} pages</span>
+              <span>${new Date(enrollment.purchasedAt).toLocaleDateString()}</span>
+            </div>
+            <div class="mt-4 flex items-center gap-1 text-sm font-medium text-accent">
+              Continue Learning
+              <svg class="h-4 w-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          `;
+
+          gridEl.appendChild(card);
+        }
+      }
+    })();
+  }
+</script>

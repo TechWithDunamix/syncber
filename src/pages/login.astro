@@ -1,0 +1,102 @@
+---
+import { getLocaleFromUrl } from "@/docs/js/localeUtils";
+import { getTranslatedData } from "@/docs/js/translationUtils";
+import DocsLandingLayout from "@/docs/layouts/DocsLandingLayout.astro";
+
+const currLocale = getLocaleFromUrl(Astro.url);
+const siteData = getTranslatedData("siteData", currLocale);
+---
+
+<DocsLandingLayout title="Log In — Skillber" description="Log in to your Skillber account.">
+  <main class="flex flex-1 items-center justify-center px-4 py-24">
+    <div class="w-full max-w-sm">
+      <div class="mb-8 text-center">
+        <h1 class="font-heading text-foreground mb-2 text-3xl font-medium tracking-wide">
+          Welcome Back
+        </h1>
+        <p class="text-muted-foreground text-sm">Log in to continue your learning journey</p>
+      </div>
+
+      <form id="login-form" class="space-y-5" novalidate method="post">
+        <div>
+          <label for="email" class="text-foreground mb-1.5 block text-sm font-medium">Email</label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            required
+            placeholder="you@example.com"
+            class="border-input bg-background text-foreground placeholder:text-muted-foreground focus:border-accent focus:ring-accent/20 w-full rounded-lg border px-4 py-2.5 text-sm transition-colors focus:ring-4 focus:outline-none"
+          />
+        </div>
+
+        <div>
+          <label for="password" class="text-foreground mb-1.5 block text-sm font-medium">Password</label>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            required
+            minlength={6}
+            placeholder="Enter your password"
+            class="border-input bg-background text-foreground placeholder:text-muted-foreground focus:border-accent focus:ring-accent/20 w-full rounded-lg border px-4 py-2.5 text-sm transition-colors focus:ring-4 focus:outline-none"
+          />
+        </div>
+
+        <p id="login-error" class="hidden rounded-lg bg-error/10 p-3 text-sm font-medium text-error"></p>
+
+        <button
+          type="submit"
+          id="login-btn"
+          class="bg-accent text-accent-foreground hover:bg-accent/90 inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium transition-colors disabled:opacity-50"
+        >
+          Log In
+        </button>
+      </form>
+
+      <p class="text-muted-foreground mt-6 text-center text-sm">
+        Don't have an account?&nbsp;
+        <a href="/signup" class="text-accent hover:text-accent/80 font-medium transition-colors">Sign up</a>
+      </p>
+    </div>
+  </main>
+</DocsLandingLayout>
+
+<script>
+  import { login } from "@/docs/services/auth";
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const params = new URLSearchParams(window.location.search);
+    const errorMsg = params.get("error");
+    if (errorMsg) {
+      const errorEl = document.getElementById("login-error") as HTMLParagraphElement;
+      errorEl.textContent = errorMsg;
+      errorEl.classList.remove("hidden");
+    }
+  });
+
+  document.getElementById("login-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById("login-btn") as HTMLButtonElement;
+    const errorEl = document.getElementById("login-error") as HTMLParagraphElement;
+    const email = (document.getElementById("email") as HTMLInputElement).value;
+    const password = (document.getElementById("password") as HTMLInputElement).value;
+
+    errorEl.classList.add("hidden");
+    btn.disabled = true;
+    btn.textContent = "Logging in...";
+
+    const result = await login(email, password);
+
+    if (result.success && result.data) {
+      const params = new URLSearchParams(window.location.search);
+      const redirect = params.get("redirect") || "/my-courses";
+      window.location.href = redirect;
+    } else {
+      errorEl.textContent = result.error || "Login failed. Please try again.";
+      errorEl.classList.remove("hidden");
+      btn.disabled = false;
+      btn.textContent = "Log In";
+    }
+  });
+</script>

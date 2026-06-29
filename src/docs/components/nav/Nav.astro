@@ -73,6 +73,36 @@ const siteData = getTranslatedData("siteData", currLocale);
         <ThemeToggle class="hidden md:flex" size="md" />
 
         {locales.length > 1 && <LanguageSelect class="ml-1 hidden md:flex" />}
+
+        <!-- Auth buttons -->
+        <div id="auth-desktop" class="ml-3 hidden items-center gap-2 md:flex">
+          <a
+            href="/login"
+            class="docs-primary-focus text-foreground hover:text-accent rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
+          >
+            Log In
+          </a>
+          <a
+            href="/signup"
+            id="signup-btn-desktop"
+            class="bg-accent text-accent-foreground hover:brightness-110 rounded-lg px-4 py-1.5 text-sm font-semibold shadow-sm transition-all"
+          >
+            Create Account
+          </a>
+          <a
+            href="/my-courses"
+            id="my-courses-btn-desktop"
+            class="bg-accent text-accent-foreground hover:brightness-110 hidden rounded-lg px-4 py-1.5 text-sm font-semibold shadow-sm transition-all"
+          >
+            My Courses
+          </a>
+          <button
+            id="logout-btn-desktop"
+            class="text-muted-foreground hover:text-foreground hidden cursor-pointer rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
+          >
+            Log Out
+          </button>
+        </div>
       </div>
     </div>
   </nav>
@@ -91,8 +121,66 @@ const siteData = getTranslatedData("siteData", currLocale);
             <ThemeToggle />
             {locales.length > 1 && <MobileLanguageSelect />}
           </div>
+          <div slot="after-links" id="auth-mobile" class="mt-4 flex flex-col gap-2 border-t pt-4">
+            <a href="/login" class="docs-nav__link--base rounded-lg px-3 py-2 text-sm font-medium">
+              Log In
+            </a>
+            <a
+              href="/signup"
+              id="signup-btn-mobile"
+              class="bg-accent text-accent-foreground hover:brightness-110 rounded-lg px-3 py-2 text-center text-sm font-semibold transition-all"
+            >
+              Create Account
+            </a>
+            <a
+              href="/my-courses"
+              id="my-courses-btn-mobile"
+              class="docs-nav__link--base hidden rounded-lg px-3 py-2 text-sm font-medium"
+            >
+              My Courses
+            </a>
+            <button
+              id="logout-btn-mobile"
+              class="text-muted-foreground hover:text-foreground hidden cursor-pointer rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors"
+            >
+              Log Out
+            </button>
+          </div>
         </SidebarNav>
       </div>
     </DialogContent>
   </Dialog>
 </div>
+
+<script>
+  import { getCurrentSession, logout, refreshSession } from "@/docs/services/auth";
+
+  async function updateAuthUI() {
+    await refreshSession();
+    const session = getCurrentSession();
+    const isLoggedIn = !!session;
+
+    // Desktop
+    document.querySelectorAll("#auth-desktop a[href='/login']").forEach((el) => el.classList.toggle("hidden", isLoggedIn));
+    document.getElementById("signup-btn-desktop")?.classList.toggle("hidden", isLoggedIn);
+    document.getElementById("my-courses-btn-desktop")?.classList.toggle("hidden", !isLoggedIn);
+    document.getElementById("logout-btn-desktop")?.classList.toggle("hidden", !isLoggedIn);
+
+    // Mobile
+    document.querySelectorAll("#auth-mobile a[href='/login']").forEach((el) => el.classList.toggle("hidden", isLoggedIn));
+    document.getElementById("signup-btn-mobile")?.classList.toggle("hidden", isLoggedIn);
+    document.getElementById("my-courses-btn-mobile")?.classList.toggle("hidden", !isLoggedIn);
+    document.getElementById("logout-btn-mobile")?.classList.toggle("hidden", !isLoggedIn);
+  }
+
+  document.getElementById("logout-btn-desktop")?.addEventListener("click", () => {
+    logout();
+    window.location.href = "/";
+  });
+  document.getElementById("logout-btn-mobile")?.addEventListener("click", () => {
+    logout();
+    window.location.href = "/";
+  });
+
+  updateAuthUI();
+</script>

@@ -1,0 +1,25 @@
+---
+const title = "Payment Cancelled";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title} | Skillber</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="flex min-h-screen items-center justify-center bg-neutral-950 p-4">
+    <div class="w-full max-w-md text-center">
+      <div class="rounded-2xl border border-neutral-800 bg-neutral-900 p-10">
+        <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-neutral-700 text-3xl">&#x2190;</div>
+        <h1 class="text-neutral-100 mb-2 font-heading text-2xl font-medium">Payment Cancelled</h1>
+        <p class="text-neutral-400 mb-6 text-sm">Your payment was not completed. No charges were made.</p>
+        <a href="/my-courses" class="inline-flex items-center gap-2 rounded-full bg-neutral-700 px-6 py-2.5 text-sm font-medium text-neutral-200 transition-colors hover:bg-neutral-600">
+          Back to My Courses
+        </a>
+      </div>
+    </div>
+  </body>
+</html>
