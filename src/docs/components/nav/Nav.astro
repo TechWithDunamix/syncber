@@ -182,5 +182,9 @@ const siteData = getTranslatedData("siteData", currLocale);
     window.location.href = "/";
   });
 
+  // Run on initial page load
   updateAuthUI();
+
+  // Re-run on View Transition client-side navigations
+  document.addEventListener("astro:after-swap", updateAuthUI);
 </script>
