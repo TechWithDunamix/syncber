@@ -8,7 +8,8 @@ import AutoImport from "astro-auto-import";
 import expressiveCode, { createInlineSvgUrl } from "astro-expressive-code";
 import icon from "astro-icon";
 import remarkMermaid from "./src/docs/plugins/remark-mermaid.mjs";
-import node from "@astrojs/node";
+// import node from "@astrojs/node";
+import vercel from "@astrojs/vercel"
 
 // tabler icons "clipboard-check"
 const copySvg = createInlineSvgUrl(
@@ -17,7 +18,8 @@ const copySvg = createInlineSvgUrl(
 
 // https://astro.build/config
 export default defineConfig({
-  adapter: node({ mode: "standalone" }),
+  // adapter: node({ mode: "standalone" }),
+  adapter:vercel(),
   markdown: {
     remarkPlugins: [remarkMermaid],
   },
