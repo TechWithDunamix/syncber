@@ -140,13 +140,18 @@ export async function hasAccess(
 ): Promise<boolean> {
   try {
     const sb = requireSupabase();
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 8000);
+
     const { data } = await sb
       .from("enrollments")
       .select("id")
       .eq("user_id", userId)
       .eq("course_id", courseId)
+      .abortSignal(controller.signal)
       .maybeSingle();
 
+    clearTimeout(t);
     return !!data;
   } catch {
     return false;
