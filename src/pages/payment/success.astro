@@ -230,15 +230,40 @@ const title = "Payment Success";
         const params = new URLSearchParams(window.location.search);
         const sessionId = params.get("session_id");
         const courseId = params.get("courseId");
+        const type = params.get("type");
         const loadingEl = document.getElementById("status-loading");
         const successEl = document.getElementById("status-success");
         const courseLink = document.getElementById("go-to-course");
+        const successTitle = document.querySelector(".success-title");
+        const successDesc = document.querySelector(".success-desc");
 
         async function createEnrollment(cid) {
           const session = getCurrentSession();
           if (!session) return false;
           const result = await purchaseCourse(session.userId, cid);
           return result.success;
+        }
+
+        // Full platform purchase flow — single backend call verifies + purchases all courses
+        if (type === "full-platform" && sessionId) {
+          try {
+            const res = await fetch(`/api/verify-full-platform?session_id=${encodeURIComponent(sessionId)}`);
+            const data = await res.json();
+            if (data.verified) {
+              if (successTitle) successTitle.textContent = "Full Platform Access Granted!";
+              if (successDesc) {
+                const count = data.courseCount;
+                successDesc.textContent = `You now have access to all ${count} courses.`;
+              }
+              courseLink.textContent = "Go to My Courses";
+            }
+          } catch (err) {
+            console.error("Full platform verification failed:", err);
+          }
+          courseLink.href = "/my-courses";
+          loadingEl.classList.add("hidden");
+          successEl.classList.add("visible");
+          return;
         }
 
         if (courseId) {

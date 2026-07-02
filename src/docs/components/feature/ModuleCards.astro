@@ -158,17 +158,66 @@ const moduleData: ModuleItem[] = [
             <span class="text-6xl font-bold tracking-tight text-foreground">249.99</span>
           </div>
           <p class="text-muted-foreground mb-6 text-base">for six months of access</p>
-          <a
-            href={getLocalizedRoute(currLocale, `/${docsRoute}/iam-pam-professional`)}
-            class="inline-flex items-center gap-2 rounded-xl bg-accent px-8 py-3 text-base font-semibold text-accent-foreground shadow-lg shadow-accent/25 transition-all duration-200 hover:brightness-110 hover:shadow-xl hover:shadow-accent/30 active:scale-[0.97]"
+          <button
+            id="full-platform-btn"
+            class="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-accent px-8 py-3 text-base font-semibold text-accent-foreground shadow-lg shadow-accent/25 transition-all duration-200 hover:brightness-110 hover:shadow-xl hover:shadow-accent/30 active:scale-[0.97]"
           >
             Get Started
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" />
             </svg>
-          </a>
+          </button>
         </div>
       </div>
     </div>
   </div>
 </section>
+
+<script>
+  import { getCurrentSession } from "@/docs/services/auth";
+
+  const btn = document.getElementById("full-platform-btn");
+  if (btn) {
+    btn.addEventListener("click", async () => {
+      const session = getCurrentSession();
+      if (!session) {
+        window.location.href = "/login?redirect=/";
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = `
+        <span class="inline-flex items-center gap-2">
+          <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          Redirecting to payment...
+        </span>
+      `;
+
+      try {
+        const res = await fetch("/api/create-checkout-full-platform", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: session.userId }),
+        });
+
+        const data = await res.json();
+
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          throw new Error(data.error || "Failed to create checkout session");
+        }
+      } catch (err) {
+        console.error("Full platform checkout error:", err);
+        btn.disabled = false;
+        btn.innerHTML = `Get Started
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" />
+          </svg>`;
+      }
+    });
+  }
+</script>
