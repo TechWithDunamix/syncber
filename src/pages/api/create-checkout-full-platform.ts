@@ -16,7 +16,7 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    const origin = new URL(request.url).origin;
+    const BASE = "https://skillber.net";
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
@@ -36,8 +36,8 @@ export const POST: APIRoute = async ({ request }) => {
         isFullPlatform: "true",
         courses: "iam-pam-professional,full-stack-development,python-programming,cloud-engineering,cybersecurity,data-science-ml,devops-cicd,mobile-app-development",
       },
-      success_url: `${origin}/payment/success?session_id={CHECKOUT_SESSION_ID}&type=full-platform`,
-      cancel_url: `${origin}/payment/cancel`,
+      success_url: `${BASE}/payment/success?session_id={CHECKOUT_SESSION_ID}&type=full-platform`,
+      cancel_url: `${BASE}/payment/cancel`,
     });
 
     return new Response(JSON.stringify({ sessionId: session.id, url: session.url }), {

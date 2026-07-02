@@ -16,7 +16,7 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    const origin = new URL(request.url).origin;
+    const BASE = "https://skillber.net";
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
@@ -32,8 +32,8 @@ export const POST: APIRoute = async ({ request }) => {
         },
       ],
       metadata: { userId, courseId },
-      success_url: `${origin}/payment/success?session_id={CHECKOUT_SESSION_ID}&courseId=${courseId}`,
-      cancel_url: `${origin}/payment/cancel`,
+      success_url: `${BASE}/payment/success?session_id={CHECKOUT_SESSION_ID}&courseId=${courseId}`,
+      cancel_url: `${BASE}/payment/cancel`,
     });
 
     return new Response(JSON.stringify({ sessionId: session.id, url: session.url }), {
