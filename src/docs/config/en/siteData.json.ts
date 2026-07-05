@@ -3,7 +3,7 @@ import type { DocsSiteData } from "../types/configDataTypes";
 const docsSiteData: DocsSiteData = {
   title: "Skillber",
   description:
-    "A comprehensive skill-building platform covering IAM & PAM, cybersecurity, full stack development, Python, cloud engineering, data science, DevOps, and mobile app development.",
+    "A comprehensive skill-building platform covering IAM & PAM, cyber security and SOC analyst, full stack development, Python, cloud engineering, data science, DevOps, and mobile app development.",
   navSocials: [
     // {
     //   social: "GitHub",

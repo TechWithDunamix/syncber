@@ -1,0 +1,66 @@
+---
+title: "SOC Analyst Flashcards"
+description: "Test your knowledge of SOC operations — analyst tiers, triage methodology, tools, playbooks, and career progression."
+sidebar:
+  order: 9
+  label: "Flashcards"
+tab: "cybersecurity"
+---
+
+Test your understanding of the SOC Analyst module. Click a card to flip it between question and answer.
+
+<FlashCardDeck>
+  <FlashCard question="What are the three tiers in a typical SOC and their primary functions?" answer="Tier 1 (Triage Analyst): Monitor SIEM, triage alerts, classify events. Tier 2 (Incident Handler): Investigate escalated incidents, collect evidence, contain threats. Tier 3 (Threat Hunter): Proactively hunt for threats, perform advanced forensics, create detection rules." />
+  
+  <FlashCard question="What are the five dispositions a T1 analyst can assign to an alert?" answer="1. True Positive (TP) — confirmed malicious. 2. False Positive (FP) — alert triggered but no threat. 3. Benign Activity — malicious-looking but legitimate. 4. Suspicious — cannot determine with available info. 5. Confirmed Incident — active breach requiring immediate response." />
+  
+  <FlashCard question="What is the recommended escalation SLA for a P1 (Critical) alert?" answer="Acknowledge within 5 minutes, Triage within 15 minutes, Escalate within 30 minutes. If not acknowledged in 5 minutes, auto-escalate to L2 on-call." />
+  
+  <FlashCard question="What is the Target 2013 breach T1 lesson?" answer="Unacknowledged P1 alerts in the SIEM were dismissed for weeks because there was NO auto-escalation mechanism. Every alert must have an escalation path — if not acknowledged in 5/15/30 minutes, it auto-escalates to senior analysts." />
+  
+  <FlashCard question="What is the difference between a SIEM and an EDR?" answer="SIEM (Security Information and Event Management) aggregates logs from across the environment (firewalls, servers, cloud) and correlates them. EDR (Endpoint Detection and Response) focuses on endpoint telemetry — process execution, network connections, file operations — on individual devices." />
+  
+  <FlashCard question="What does SOAR stand for and what does it do?" answer="Security Orchestration, Automation, and Response. SOAR automates repetitive SOC tasks (enrichment, containment) through playbooks, reducing response time from hours to minutes." />
+  
+  <FlashCard question="What are the four phases of the NIST SP 800-61 Incident Response Lifecycle?" answer="1. Preparation. 2. Detection & Analysis. 3. Containment, Eradication & Recovery. 4. Post-Incident Activity." />
+  
+  <FlashCard question="What is the Order of Volatility in forensics?" answer="The sequence for collecting evidence based on how quickly it changes: CPU registers > RAM > network connections > running processes > disk > backups. Collect the most volatile data first because it disappears quickly." />
+  
+  <FlashCard question="What are the five SOC models?" answer="Internal SOC (in-house team), MSSP (outsourced), Hybrid (internal + MSSP), Co-Managed (MSSP handles T1, internal handles T2-T3), Virtual SOC (distributed remote team)." />
+  
+  <FlashCard question="What is a playbook vs a runbook vs a procedure?" answer="Playbook: End-to-end incident response process (e.g., Phishing Response). Runbook: Specific technical steps (e.g., how to use URLScan). Procedure: Organizational policy (e.g., Data Classification Policy). Playbooks are broader, runbooks are more detailed technical guides." />
+  
+  <FlashCard question="What is the recommended staffing ratio for a 24/7 SOC?" answer="5-6 analysts per seat (to cover shifts, PTO, and sick leave). A minimum viable 24/7 SOC requires 8-10 analysts total." />
+  
+  <FlashCard question="What is the difference between static and dynamic malware analysis?" answer="Static analysis examines malware without executing it (file type, hashes, strings, PE headers, YARA rules). Dynamic analysis executes the malware in a sandbox to observe behavior (network traffic, process creation, registry changes)." />
+  
+  <FlashCard question="What are the three essential metrics every SOC should track?" answer="MTTD (Mean Time to Detect) — time from compromise to detection. MTTR (Mean Time to Respond) — time from detection to containment. False Positive Rate — FPs as percentage of total alerts." />
+  
+  <FlashCard question="What is threat hunting and how does it differ from alert-driven detection?" answer="Threat hunting proactively searches for threats that evaded existing detection, using hypotheses based on threat intelligence. Unlike alert-driven detection (reactive), hunting finds unknown threats by analyzing baseline behavior and looking for anomalies." />
+  
+  <FlashCard question="What is the Pyramid of Pain in threat intelligence?" answer="A model showing how difficult it is for attackers to change different indicators. From easiest (bottom) to hardest (top): Hash values → IP addresses → Domain names → Network/host artifacts → Tools → TTPs. TTPs (Tactics, Techniques, Procedures) are the hardest for attackers to change." />
+  
+  <FlashCard question="What is a chain of custody form and why is it important?" answer="A document that tracks evidence from collection through analysis to court presentation. It records who handled the evidence, when, and what was done. Critical for evidence admissibility in legal proceedings and regulatory investigations." />
+  
+  <FlashCard question="What are common types of false positive root causes?" answer="Environmental noise (35% — legitimate activity looking malicious), Misconfiguration (25% — thresholds too low), Outdated rules (20% — rules no longer relevant), Legitimate software behavior (15% — approved tools triggering detection), Vulnerability scanners (5% — scanning tools setting off rules)." />
+  
+  <FlashCard question="What is the recommended certification path for SOC analysts?" answer="L1: CompTIA Security+ or GSEC or BTL1. L2: GCIH (Incident Handling) or GCFA (Forensic Analysis) or CISSP. L3: GREM (Reverse Engineering) or GXPN (Exploit Research) or OSCP." />
+  
+  <FlashCard question="What is a typical day-in-the-life breakdown for a T1 SOC analyst?" answer="~45% monitoring and triage, ~20% investigation, ~15% training and development, ~10% shift handover and documentation, ~10% false positive analysis and tuning." />
+  
+  <FlashCard question="What is the average breakout time (attacker lateral movement) according to CrowdStrike?" answer="79 minutes. This means from initial compromise, an attacker can begin spreading laterally in just over an hour. T1 triage must happen faster than this." />
+  
+  <FlashCard question="What is the most important T1 contribution to SOC improvement?" answer="The tuning feedback loop. T1 analysts who identify false positive patterns and suggest rule tuning improvements directly reduce alert volume and improve the entire SOC's efficiency." />
+  
+  <FlashCard question="What is the purpose of a purple team exercise?" answer="A collaborative exercise where red team performs attack techniques and blue team tests detection capabilities. The goal is to identify detection gaps and improve detection rules, not to compete. Findings are used to create new detection rules." />
+  
+  <FlashCard question="What is Velociraptor and how is it used in SOC operations?" answer="Velociraptor is an open-source endpoint visibility and hunting tool. It allows T3 analysts to deploy VQL (Velociraptor Query Language) queries across thousands of endpoints simultaneously for threat hunting, forensic collection, and real-time monitoring." />
+  
+  <FlashCard question="What are the containment options available to a T2 analyst, ordered by speed?" answer="1. Host isolation (EDR — seconds). 2. Account disable (seconds). 3. Network block (firewall ACL — minutes). 4. Session termination (minutes). 5. Application quarantine (minutes). 6. Network segmentation (hours — needs change management)." />
+  
+  <FlashCard question="What is the difference between an MSSP and a co-managed SOC?" answer="MSSP handles ALL SOC functions (T1-T3) for the client. Co-managed SOC splits responsibility — MSSP handles T1 triage while the internal team handles T2 investigation and T3 hunting. Co-managed gives more internal control." />
+</FlashCardDeck>
+
+<Aside variant="tip">
+Review any cards you got wrong by navigating to the corresponding module page for a deeper explanation.
+</Aside>

@@ -1,0 +1,557 @@
+---
+title: "Alert Analysis & Triage"
+description: "Master alert triage methodology — enrichment pipeline, severity classification, false positive analysis, common alert types, and practical triage exercises with decision frameworks."
+sidebar:
+  order: 6
+  label: "Alert Analysis & Triage"
+tab: "cybersecurity"
+---
+
+Alert triage is the highest-leverage skill in the SOC. A Tier 1 analyst who can accurately triage 100 alerts per shift — correctly identifying the 5 that need escalation and the 95 that can be closed — is worth more than three analysts who escalate everything to Tier 2.
+
+According to the **2024 Ponemon Cost of a Data Breach Report**, the average SOC generates **11,000+ alerts per day**, of which **58% are false positives**, **33% are benign/redundant**, and only **9% require investigation**. Of those 9%, only **1-2% turn out to be true incidents.**
+
+## The Triage Challenge
+
+```yaml
+Daily Alert Volume (Mid-Size Enterprise):
+  └─ Total alerts generated: 11,000
+  └─ SIEM correlation reduces to: 3,000 - 5,000
+  └─ After initial enrichment/deduplication: 500 - 1,000
+  └─ True positives: 10 - 30 (1-3%)
+  └─ False positives: 300 - 600 (55-65%)
+  └─ Benign (legitimate admin activity): 150 - 300 (25-35%)
+  └─ Escalated to L2: 30 - 80 (5-10%)
+
+Without proper triage:
+  └─ L2 analysts spend 60% of time on false positives
+  └─ True positives have longer dwell times (missed in noise)
+  └─ Alert fatigue leads to missed critical alerts
+  └─ SOC effectiveness drops by 40%+ 
+```
+
+## Triage Maturity Model
+
+| Level | Name | Characteristics | Triage Accuracy | FP Rate |
+|-------|------|----------------|-----------------|---------|
+| **1** | **Reactive** | Manual triage, no enrichment, basic SIEM rules, no tuning | < 50% | > 60% |
+| **2** | **Standardized** | Playbook-driven triage, basic enrichment, documented processes | 50-70% | 40-60% |
+| **3** | **Enriched** | Automated enrichment, threat intel integration, SOAR-assisted, tuned rules | 70-85% | 25-40% |
+| **4** | **Predictive** | ML-based scoring, automated response for known patterns, continuous tuning | 85-95% | < 20% |
+
+Most SOCs operate at Level 2. The goal is to reach Level 3, where automation handles routine enrichment and analysts focus on decision-making.
+
+## The Enrichment Pipeline
+
+Before an alert reaches an analyst, it should pass through an enrichment pipeline:
+
+```yaml
+Enrichment Sources:
+  └─ Internal Context:
+       Asset Criticality: Is this a domain controller, file server, CEO workstation?
+       User Role: Is the user in finance, HR, engineering, or IT?
+       User Risk Score: Based on past security incidents, training compliance
+       Host Baseline: What is normal for this system? (OS, software, network profile)
+       Peer Comparison: Do other similar users/systems behave the same way?
+  
+  └─ External Threat Intel:
+       IP Reputation: VirusTotal, AbuseIPDB, GreyNoise, AlienVault OTX
+       Domain Reputation: WHOIS age, VirusTotal, DomainTools, RiskIQ
+       File Hash: VirusTotal, Hybrid Analysis, Intezer
+       URL: URLScan, PhishTank, Browserling sandbox
+       Email: Header analysis (SPF/DKIM/DMARC), sender reputation
+  
+  └─ Historical Context:
+       Past Alerts: Has this IP/host/user triggered alerts before?
+       Recent Changes: Any recent system changes, group membership changes, privilege changes?
+       Pattern Analysis: Is this part of a broader campaign targeting multiple users?
+```
+
+### Automated Enrichment Workflow
+
+```
+RAW ALERT (from SIEM)
+      │
+      ▼
+[ENRICHMENT PIPELINE — SOAR]
+      │
+      ├─ Extract IPs → VirusTotal, GreyNoise, AbuseIPDB
+      │    └─ Results added as alert tags (malicious/suspicious/unknown)
+      │
+      ├─ Extract Hashes → VirusTotal, Hybrid Analysis
+      │    └─ Detection ratio added as alert tag
+      │
+      ├─ Extract Domains → WHOIS age, VirusTotal, URLScan
+      │    └─ Domain age and reputation added
+      │
+      ├─ Extract User → Active Directory lookup, HR system
+      │    └─ Role, department, manager, risk score added
+      │
+      ├─ Check Asset → CMDB, asset inventory
+      │    └─ Criticality, OS, installed software, owner added
+      │
+      └─ Check History → Previous 24h alerts on same entities
+           └─ Alert count and relationship graph added
+      │
+      ▼
+[ENRICHED ALERT — ready for analyst triage]
+```
+
+## Triage Decision Framework
+
+A structured methodology for every alert:
+
+### Step 1: Alert Intake (< 1 minute)
+
+```yaml
+Quick scan:
+  └─ Rule Name: What detection rule fired?
+  └─ Severity: P1-P4 (from SIEM or enrichment)
+  └─ Source: IP, hostname, user
+  └─ Destination: IP, hostname, URL
+  └─ Time: When did this happen? Is it real-time or retrospective?
+  └─ Enrichment Tags: Did automation already enrich this? What tags were added?
+```
+
+### Step 2: Initial Classification (< 2 minutes)
+
+```yaml
+Decision Tree:
+  1. Is the source on a known blocklist?
+     → Check enrichment tags: "vt_malicious", "greynoise_malicious"
+     → Yes: Direction = likely TP
+     → No: Continue
+  
+  2. Is the destination known-malicious?
+     → Check VT, URLScan tags
+     → Yes: Direction = likely TP
+     → No: Continue
+  
+  3. Does this match a known false positive pattern?
+     → Check FP knowledge base
+     → Yes: Direction = likely FP
+     → No: Continue
+  
+  4. Is there a clear business justification?
+     → Is this from a known scanner? Authorized test? Admin tool?
+     → Yes: Direction = likely Benign
+     → No: Continue
+  
+  5. Does this match user/host baseline?
+     → Is the user normally active at this time? 
+     → Is the host normally making these connections?
+     → No deviation: Direction = likely Benign
+     → Significant deviation: Direction = Suspicious/TP
+```
+
+### Step 3: Deep Triage (5-15 minutes for complex alerts)
+
+For alerts that cannot be immediately classified:
+
+```yaml
+For IP-based alerts:
+  └─ Check IP on VirusTotal: Detections, community comments, related samples
+  └─ Check IP on GreyNoise: Is it internet background noise or targeted?
+  └─ Check IP on AbuseIPDB: Reported for similar activity?
+  └─ Check IP geolocation: Known adversary region? Expected region for business?
+  └─ Check IP ASN: Hosting provider? VPN? Residential ISP? TOR exit node?
+  └─ Check IP history: Has it touched other systems in our environment?
+
+For Hash-based alerts:
+  └─ Check hash on VirusTotal: Detection ratio, type classification, first seen
+  └─ Check hash on Hybrid Analysis: Behavioral sandbox report
+  └─ Check file name and path: Expected location? Temp folder?
+  └─ Check file metadata: Signer, compilation timestamp, file version
+  └─ Check process lineage: What launched this file? What did it launch?
+
+For User-based alerts:
+  └─ Check user's recent login history: Normal locations? New devices?
+  └─ Check user's group membership: Recent changes?
+  └─ Check user's recent activity: Unusual access patterns?
+  └─ Check with manager/user: Direct inquiry if appropriate
+  └─ Check peer comparison: Are other users in same department acting normally?
+
+For Network-based alerts:
+  └─ Check firewall logs: Allowed/denied, volume, connection duration
+  └─ Check proxy logs: URL accessed, User-Agent, content-type, upload size
+  └─ Check DNS logs: Domain queried, frequency, TTL, query type
+  └─ Check NetFlow: Connection duration, bytes transferred, ports used
+  └─ Check PCAP: Deep packet inspection (if available)
+```
+
+### Step 4: Severity Classification
+
+Assign severity based on the combination of:
+
+```yaml
+Threat Severity (Technical):
+  └─ Critical: Active ransomware, data exfiltration, nation-state APT
+  └─ High: Malware infection, compromised account, lateral movement
+  └─ Medium: Phishing attempt, brute force (blocked), policy violation
+  └─ Low: Information gathering, failed logins (below threshold), spam
+
+Asset Criticality (Business Context):
+  └─ Critical: Domain controller, file server, CEO/C-suite, PCI data processor
+  └─ High: Database server, application server, finance/HR users
+  └─ Medium: Employee workstations, departmental file shares
+  └─ Low: Test/dev systems, vendor access, guest network
+
+Final Severity = Max(Threat Severity, Asset Criticality Adjustment)
+  └─ Phishing on CEO (Low threat + Critical asset) = High
+  └─ Malware on test server (High threat + Low asset) = Medium
+  └─ Ransomware on file server (Critical + Critical) = Critical
+```
+
+## False Positive Analysis
+
+False positives are the single largest source of SOC inefficiency. Understanding their root causes is essential:
+
+### FP Root Cause Categories
+
+| Category | % of FPs | Description | Example |
+|----------|----------|-------------|---------|
+| **Environmental Noise** | 35% | Legitimate activity that looks malicious | Backup server scanning, monitoring tool traffic |
+| **Misconfiguration** | 25% | Rule threshold too low, exclusions missing | 3 failed logins = alert (should be 10) |
+| **Outdated Rule** | 20% | Rule no longer relevant after system changes | Alert for service no longer used |
+| **Legitimate Software Behavior** | 15% | Approved software triggers detection | IT admin tools, VPN clients, MDM agents |
+| **Vulnerability Scanner** | 5% | Scanning tools trigger detection rules | Nessus, Qualys, automated pentests |
+
+### False Positive Tuning Process
+
+```
+IDENTIFY FP → DOCUMENT PATTERN → ANALYZE ROOT CAUSE → TUNE → MONITOR
+```
+
+```yaml
+Example Tuning Cycle:
+  Rule: "Multiple Failed Logins — 10+ in 5 minutes"
+  
+  FP Pattern: SQLBACKUP$ service account triggers this every night at 2 AM
+              during database backup operations
+  Root Cause: Service account uses SQL auth which creates failed logins
+              during backup enumeration
+  
+  Tuning Action: Add SQLBACKUP$ to account exclusion list
+  Risk Assessment: Low — service account has no interactive logon rights
+  Monitoring Period: 7 days — verify no true positives missed
+  
+  Result: 200 fewer FPs per day (17% reduction in total alert volume)
+```
+
+### False Positive Documentation Template
+
+Every FP should be documented for pattern recognition:
+
+```
+FP DOCUMENTATION
+─────────────────
+Date: 2026-03-15
+Analyst: Jane Smith, T1 SOC
+Rule: Windows - Multiple Failed Logins (Rule ID: WIN-AUTH-004)
+Alert Count Before Tuning: ~250/day
+
+FP PATTERN:
+  Source: BACKUP$ service account
+  Target: SQL-01 through SQL-10
+  Time: 2:00 AM - 3:30 AM (nightly backup window)
+  Frequency: Every night
+
+ROOT CAUSE:
+  SQLBACKUP$ performs SQL enumeration using SQL auth during backups.
+  This creates 15-20 failed logins per server (Event ID 4625) because
+  SQL auth does not use Windows integrated security.
+
+TUNING ACTION:
+  Added SQLBACKUP$ to account exclusion list in rule WIN-AUTH-004.
+
+VERIFICATION:
+  ⎕ Rule change applied (date: 2026-03-16)
+  ⎕ Monitoring for 7 days (complete: 2026-03-23)
+  ⎕ No true positives missed (confirmed)
+  ⎕ FP reduction: ~250/day eliminated
+
+TUNING STATUS: COMPLETED — Rule updated in SIEM
+─────────────────
+```
+
+## Common Alert Analysis Patterns
+
+### Malware Detection Analysis
+
+```
+Alert: EDR detected Trojan:Win32/Emotet on workstation SALES-12
+
+Analysis Chain:
+  1. File Details:
+     └─ Hash: Check VT → 12/65 detections (likely TP)
+     └─ File name: "invoice_2026_03_15.pdf.exe" (double extension — suspicious)
+     └─ Path: C:\Users\jsmith\AppData\Local\Temp\ (temp folder — suspicious)
+     └─ Size: 245KB (typical for Emotet loader)
+  
+  2. Process Lineage:
+     └─ Parent: outlook.exe → launched wermgr.exe (process hollowing)
+     └─ Note: wermgr.exe (Windows Error Reporting) is a known LOLBIN target
+     └─ Child: powershell.exe -enc <base64> (encoded download)
+  
+  3. Network Connections:
+     └─ Connection to: 198.51.100.45:443 (unknown, no reputation)
+     └─ Connection pattern: 60-second interval (C2 beaconing)
+     └─ DNS query: update-check[.]top (registered 3 days ago — suspicious)
+  
+  4. Escalate: TRUE POSITIVE — Emotet loader with C2 beaconing
+```
+
+### Phishing Analysis
+
+```
+Alert: User reported suspicious email re: "Urgent: Invoice Payment Due"
+Sender: "accounts@payable-process[.]com"
+
+Analysis Chain:
+  1. Email Headers:
+     └─ SPF: FAIL (sender IP not authorized)
+     └─ DKIM: NONE (no signature)
+     └─ DMARC: FAIL
+     └─ Reply-To: "urgent-payment@protonmail[.]com" (different domain — suspicious)
+  
+  2. URL Analysis:
+     └─ URL: hxxps://payable-process[.]com/invoice/pay.html
+     └─ URLScan: Redirects to credential harvest page (Microsoft 365 lookalike)
+     └─ Domain age: 4 days (suspicious)
+     └─ VT URL: 3/85 detections (likely malicious)
+  
+  3. Attachment Analysis:
+     └─ Attachment: "invoice_2026_03.html" (not a PDF — suspicious)
+     └─ Content: HTML with embedded credential harvesting form
+     └─ Hash: VT 2/65 detections
+     └─ Hybrid Analysis: Multiple redirects, fake login page
+  
+  4. Campaign Check:
+     └─ Same domain targeting other finance users: YES — 3 additional recipients
+     └─ Campaign: Coordinated BEC attempt targeting finance department
+  
+  5. Escalate: TRUE POSITIVE — Targeted credential phishing campaign
+```
+
+### Brute Force Analysis
+
+```
+Alert: 500 failed logins from IP 203.0.113.42 in 3 minutes
+
+Analysis Chain:
+  1. Source IP:
+     └─ Geolocation: Russia (not expected for any business partner)
+     └─ ASN: Residential ISP (not a cloud provider)
+     └─ GreyNoise: Actively scanning, tagged as "brute-forcer"
+     └─ AbuseIPDB: 15 reports of SSH brute forcing in last 30 days
+     └─ Category: Known malicious
+  
+  2. Target Accounts:
+     └─ Targeted: jdoe@company.com (CEO), jsmith@company.com (CFO), admin
+     └─ All high-privilege targets (targeted, not random)
+  
+  3. Outcome:
+     └─ Successful logins: 0 (all blocked by account lockout policy)
+     └─ Account lockout triggered: CEO account locked (3 failed attempts)
+  
+  4. Current Status:
+     └─ Is the attack still active? YES — still seeing attempts
+     └─ Block at firewall: YES — IP added to blocklist
+  
+  5. Escalate: TRUE POSITIVE — Targeted credential attack on executives
+```
+
+### Data Exfiltration Analysis
+
+```
+Alert: 5GB upload from LEGAL-SRV-01 to cloud storage at 2 AM
+
+Analysis Chain:
+  1. Source System:
+     └─ System: LEGAL-SRV-01 (file server with M&A documents)
+     └─ User: svc_legal_backup (service account — but backup runs at 10 PM, not 2 AM)
+     └─ Recent activity: User logged in via RDP at 1:45 AM (not normal)
+  
+  2. Destination:
+     └─ Destination: mega[.]io (cloud storage — not approved for legal data)
+     └─ Destination IP: 154.xxx.xxx.xxx (Mega data center, Luxembourg)
+     └─ Protocol: HTTPS (encrypted — cannot see contents)
+  
+  3. Volume Analysis:
+     └─ Total uploaded: 5.2GB in 15 minutes (very high throughput)
+     └─ Normal for this host: < 100MB/day outbound
+     └─ Type: Bulk file copy (consistent throughput, not streaming)
+  
+  4. User Analysis:
+     └─ svc_legal_backup: Service account, no interactive logon rights
+     └─ RDP at 1:45 AM: Impossible — service account cannot RDP
+     └─ Password used for RDP: Suggests credential theft
+  
+  5. Scope Check:
+     └─ What files were accessed? Merger due diligence documents, PII
+     └─ Data classification: Confidential, attorney-client privileged
+     └─ Regulatory impact: GDPR breach notification required
+  
+  6. Escalate: TRUE POSITIVE — Critical data exfiltration incident
+     └─ Immediate containment: Disable svc_legal_backup, block mega[.]io
+     └─ Legal notification: GDPR breach, client notification
+```
+
+## Triage Exercises
+
+Apply your triage skills to these realistic scenarios:
+
+### Exercise 1
+
+```
+ALERT: "PowerShell Encoded Command Execution" on HR-ADMIN-01
+Rule: Detects PowerShell with -EncodedCommand flag
+Source: HR-ADMIN-01 (workstation)
+User: jdoe@company.com (HR coordinator)
+Time: Tuesday, 2:15 PM
+
+EDR Data:
+  Parent process: explorer.exe (normal — user-initiated)
+  Command: powershell.exe -EncodedCommand SQBkAG8AbgAnAHQAIAB3AG8AcgByAHkAIABhAGIAbwB1AHQAIAB0AGgAaQBzAA==
+  Child process: none
+  
+Enrichment:
+  jdoe: HR coordinator, no IT/admin role, typically uses Word/email/browser
+  HR-ADMIN-01: Standard workstation, no unique software
+  Past alerts for jdoe: 0 in 6 months
+
+<Aside variant="tip" title="Exercise 1 Answer">
+This is BENIGN. The decoded command is "I don't worry about this" — a harmless string.
+Actually, decode the Base64: "SQBkAG8AbgAnAHQAIAB3AG8AcgByAHkAIABhAGIAbwB1AHQAIAB0AGgAaQBzAA=="
+→ This decodes to UTF-16LE: "I don't worry about this"
+
+However, the CONTEXT is suspicious — why is an HR coordinator running PowerShell?
+This should be classified as BENIGN with monitoring. Advise the user not to run
+PowerShell outside work duties. Document as "User experimentation — no malicious intent."
+</Aside>
+```
+
+### Exercise 2
+
+```
+ALERT: "Outbound Connection to Known Malicious IP" on SALES-03
+Rule: Destination IP on threat intel blocklist
+Source: SALES-03 (sales team laptop)
+User: bsmith@company.com (sales rep)
+Time: Saturday, 3:00 AM
+
+Enrichment:
+  Destination: 192.0.2.100 (known C2 server — APT29 infrastructure)
+  Geolocation: Russia
+  Connection type: HTTPS (encrypted)
+  Connection frequency: Every 60 seconds for 10 minutes
+  Process: svchost.exe (unusual — svchost should not make direct HTTPS connections)
+  
+Asset: 
+  SALES-03 is in airport lounge WiFi (untrusted network)
+  No VPN connected at time of alert
+
+<Aside variant="tip" title="Exercise 2 Answer">
+This is TRUE POSITIVE with HIGH urgency.
+- svchost.exe making direct HTTPS connections is a classic C2 technique (DLL sideloading)
+- Weekend, 3 AM, no VPN, airport WiFi = threat actor taking advantage of remote access
+- APT29 C2 infrastructure is significant
+- IMMEDIATE: Isolate host, disable account, escalate as P1
+- Likely: Spear-phishing via airport WiFi, credential theft + C2 beacon
+- The host is on an untrusted network — consider that the attacker may have local access too
+</Aside>
+```
+
+### Exercise 3
+
+```
+ALERT: "Failed Login Spike — 20 events in 5 minutes"
+Rule: Windows Event ID 4625, threshold 10 in 5 minutes
+Source IP: 10.0.1.50 (internal IP, IT jump box)
+Target: SQL-DB-01 (database server)
+Time: Wednesday, 10:00 AM
+
+Enrichment:
+  10.0.1.50: IT-admin-jumpbox (authorized administrative jump host)
+  User on jumpbox: itadmin@company.com (sysadmin, 15yr tenure)
+  Target SQL-DB-01: Production database
+  Failed logins: sa account (SQL system admin) — all failed
+  Why: "sa account login failed" — typical when typing wrong password
+
+<Aside variant="tip" title="Exercise 3 Answer">
+This is FALSE POSITIVE / BENIGN.
+- Source is authorized IT admin jump box
+- itadmin is a trusted, long-tenured sysadmin
+- Failed logins are all for 'sa' account with wrong password
+- Most likely: Admin mistyped password while trying to connect
+- Time is during business hours (not suspicious)
+- Action: Close as Benign, no escalation needed
+- Note: Could add itadmin to a known-good exception list for this rule
+</Aside>
+```
+
+### Exercise 4
+
+```
+ALERT: "New Service Installed — Service Control Manager Event 7045"
+Rule: Unusual service installation on domain controller
+Source: DC-01 (domain controller)
+Time: Sunday, 4:00 AM
+
+Enrichment:
+  Service Name: "WindowsUpdateSvc"
+  Image Path: C:\ProgramData\Microsoft\Windows\svchost.exe  
+             (NOTE: svchost.exe should be in System32, not ProgramData)
+  User: SYSTEM (LocalSystem)
+  Installer: powershell.exe
+  
+Event Logs:
+  Event 4688 (process creation): powershell.exe -Command 
+      "New-Service -Name WindowsUpdateSvc -BinaryPathName 
+      'C:\ProgramData\Microsoft\Windows\svchost.exe'"
+  Parent of PowerShell: Task Scheduler (task triggered at 3:59 AM)
+  Task Name: "WindowsUpdateTask" (NOT a Microsoft task — fake name)
+
+<Aside variant="tip" title="Exercise 4 Answer">
+This is TRUE POSITIVE — CRITICAL.
+Key indicators:
+  - svchost.exe from C:\ProgramData (not C:\Windows\System32) = FAKE
+  - Service named "WindowsUpdateSvc" — common masquerading name
+  - Installed via PowerShell from Task Scheduler on a SUNDAY at 4 AM
+  - Domain controller compromise — worst case scenario
+  
+ACTIONS:
+  - IMMEDIATE: Isolate DC-01 from network
+  - Disable administrative access to domain
+  - Escalate as P1-Critical IR
+  - Preserve memory and disk for forensics
+  - Assume full domain compromise — reset all admin accounts, rotate KRBTGT
+  - Check other DCs for similar persistence
+  - This is likely a post-exploitation persistence mechanism after DC compromise
+</Aside>
+```
+
+## Triage Metrics
+
+| Metric | Definition | Level 2 | Level 3 | Level 4 |
+|--------|------------|---------|---------|---------|
+| **Triage Accuracy** | % of dispositions confirmed correct in L2/L3 review | 50-70% | 70-85% | 85-95% |
+| **Time to Triage** | Average time per alert | 15-30 min | 5-15 min | 1-5 min |
+| **Escalation Quality** | % of escalations that become incidents | 40-60% | 60-80% | 80-95% |
+| **False Positive Rate** | FPs as % of total alerts | > 60% | 25-40% | < 20% |
+| **Tuning Feedback** | Tuning suggestions per analyst per month | < 3 | 5-10 | 10+ |
+| **Alert Coverage** | % of alert types with documented triage process | < 30% | 50-70% | > 90% |
+
+## Key Takeaways
+
+- Alert triage is the highest-leverage SOC skill — accurate triage of 100 alerts per shift is more valuable than escalating everything
+- The enrichment pipeline is the foundation of efficient triage — automate IoC lookups and context gathering before the analyst sees the alert
+- The triage decision framework follows: Quick Scan → Initial Classification → Deep Triage → Severity Assignment
+- Severity = max(threat_severity, asset_criticality) — a low-severity threat on a critical asset may be High severity overall
+- False positives are the #1 SOC problem: 58% of all alerts — systematic tuning is essential for SOC efficiency
+- FP root causes are identifiable (noise, misconfiguration, outdated rules) and fixable through structured tuning cycles
+- Each alert type (malware, phishing, brute force, exfiltration) has a specific analysis chain to follow
+- Pattern recognition develops with experience — the best T1 analysts maintain a mental "FP database" of known alert behaviors
+- Jumping to conclusions is the #1 triage mistake — always follow the full analysis chain before disposition
+- The triage exercises demonstrate that context is everything — the same alert can be FP or TP based on process tree, timing, and user behavior
+- A mature triage program (Level 3+) reduces analyst fatigue, increases detection accuracy, and saves 40%+ of analyst time

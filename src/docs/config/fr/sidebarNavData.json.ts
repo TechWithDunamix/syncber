@@ -280,8 +280,8 @@ const sidebarNavData: DocsSidebarNavData = {
     },
     {
       id: "cybersecurity",
-      title: "Cybersécurité",
-      description: "Protégez les systèmes et les données",
+      title: "Cyber Sécurité et Analyste SOC",
+      description: "Protégez les systèmes et les données et maîtrisez les opérations SOC",
       icon: "tabler/shield",
       sections: [
         {
@@ -357,6 +357,48 @@ const sidebarNavData: DocsSidebarNavData = {
             {
               id: "cybersecurity-capstone",
               title: "Projet de Fin de Parcours",
+            },
+          ],
+        },
+        {
+          id: "soc-analyst",
+          title: "Analyste SOC",
+          children: [
+            {
+              id: "soc-career-path",
+              title: "Carrière et Rôles SOC",
+            },
+            {
+              id: "tier-1-triage",
+              title: "Niveau 1 : Analyste de Triage",
+            },
+            {
+              id: "tier-2-incident-handler",
+              title: "Niveau 2 : Gestionnaire d'Incidents",
+            },
+            {
+              id: "tier-3-threat-hunter",
+              title: "Niveau 3 : Chasseur de Menaces",
+            },
+            {
+              id: "soc-tooling",
+              title: "Outils et Plateformes SOC",
+            },
+            {
+              id: "alert-analysis-triage",
+              title: "Analyse et Triage dAlertes",
+            },
+            {
+              id: "soc-playbooks-runbooks",
+              title: "Playbooks et Runbooks",
+            },
+            {
+              id: "soc-lab",
+              title: "Laboratoire SOC",
+            },
+            {
+              id: "flashcards",
+              title: "Flashcards",
             },
           ],
         },

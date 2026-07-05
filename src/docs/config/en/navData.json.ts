@@ -26,7 +26,7 @@ const navConfig: navItem[] = [
         link: "/learn/cloud-engineering/",
       },
       {
-        text: "Cybersecurity",
+        text: "Cyber Security and SOC Analyst",
         link: "/learn/cybersecurity/",
       },
       {

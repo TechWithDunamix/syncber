@@ -1,0 +1,612 @@
+---
+title: "SOC Lab — Shift Simulation"
+description: "Hands-on SOC shift simulation — triage 8 realistic alerts across a 90-minute shift. Practice alert triage, escalation decisions, and shift handover documentation."
+sidebar:
+  order: 8
+  label: "SOC Lab"
+tab: "cybersecurity"
+---
+
+## Objective
+
+Simulate a 90-minute SOC shift. You are a **Tier 1 SOC Analyst** at **AcmeCorp** (2,000 employees, hybrid cloud). Tools available: Splunk SIEM, CrowdStrike EDR, ServiceNow ticketing, VirusTotal for enrichment.
+
+Eight alerts arrive over the course of your shift. For each one, you must triage, classify, and decide whether to close or escalate. At the end, write a shift handover document.
+
+## Setup
+
+### Your Environment
+
+```yaml
+Company: AcmeCorp (2,000 employees)
+Industry: E-commerce
+IT Stack:
+  └─ 2,200 endpoints (Windows 11, macOS, Linux)
+  └─ Azure AD + AD hybrid
+  └─ AWS cloud (50 EC2 instances, S3, RDS)
+  └─ Office 365 (Exchange Online, SharePoint, Teams)
+  └─ 50 SaaS applications (Salesforce, GitHub, Jira, etc.)
+
+Security Stack:
+  └─ SIEM: Splunk Enterprise Security (500GB/day ingest)
+  └─ EDR: CrowdStrike Falcon (all endpoints)
+  └─ Email: Microsoft Defender for Office 365
+  └─ Network: Palo Alto firewalls, Zeek for metadata
+  └─ Ticketing: ServiceNow
+
+Your Shift: Monday 8:00 AM - 5:00 PM
+Current Queue: 40 unacknowledged alerts accumulated over the weekend
+```
+
+### Triage Log Template
+
+Use this template to document each alert:
+
+```
+ALERT #[N]
+────────────────────────────────────
+Alert Name: [rule name]
+Severity: [P1-P4]
+Timestamp: [time]
+Source: [host/IP/user]
+Destination: [host/IP/URL]
+Enrichment Results:
+  - Source IP: [VT/AbuseIPDB result]
+  - Destination: [reputation]
+  - User: [role, risk score]
+Disposition: [TP/FP/Benign/Suspicious]
+Escalation: [Yes/No — to whom]
+Action Taken: [what you did]
+Notes: [key findings]
+────────────────────────────────────
+```
+
+## Alert Inject 1 — 8:05 AM
+
+```
+ALERT: "Multiple Failed Logins — 50 events in 2 minutes"
+Rule: Windows Event ID 4625 threshold rule (10+ in 5 min)
+Source IP: 203.0.113.42
+Target: jdoe@company.com (CEO — jdoe)
+Target System: Office 365 (Exchange Online)
+Time: Monday, 8:03 AM - 8:05 AM
+
+Enrichment:
+  Source IP: 203.0.113.42
+    VT: 0/85 detections
+    AbuseIPDB: 3 reports (SSH brute force, 60 days old)
+    GreyNoise: "Internet Scanner" — tagged as background noise
+    Geolocation: US (Kansas City) — residential ISP
+    ASN: Comcast (residential)
+  
+  Target Account: jdoe@company.com
+    Role: CEO
+    Risk Score: 0 (never flagged)
+    MFA: Enabled
+    Past 24h logins: 0 (weekend)
+  
+  Auth Status: All 50 attempts FAILED (no successful login)
+  Is attack active? YES — alerts still firing
+```
+
+<Aside variant="tip" title="Your Triage">
+1. Is this a True Positive or False Positive?
+2. What is the severity?
+3. What action do you take?
+4. Do you escalate? To whom?
+</Aside>
+
+<Aside variant="info" title="Answer — Alert 1">
+**Classification**: Suspicious / Likely targeted attack but no compromise yet
+**Severity**: P2 (High — CEO account under active attack)
+**Action**:
+  1. Block 203.0.113.42 at firewall immediately (attack still active)
+  2. Check if any other accounts targeted from same IP (SIEM search)
+  3. Notify jdoe's assistant about the attack attempt
+  4. Recommend: Enable strict location-based conditional access policy
+**Escalation**: Yes — escalate as P2 to L2 for conditional access policy review
+**Note**: Although GreyNoise shows this IP as background noise, the targeted
+nature (CEO account, Office 365) makes this significant. Better to block
+proactively even if it's a false positive.
+</Aside>
+
+## Alert Inject 2 — 8:20 AM
+
+```
+ALERT: "EDR Detection — Possible C2 Beaconing"
+Rule: Falcon IOA — outbound connections at regular intervals
+Source Host: HR-FILE-03 (HR department file server)
+Destination: 198.51.100.7:443
+Time: 8:00 AM - 8:20 AM (connections every ~60 seconds)
+
+EDR Data:
+  Process: svchost.exe (PID 4521) — making connections
+  Process path: C:\Windows\System32\svchost.exe (legitimate location)
+  Parent process: services.exe (normal)
+  User: SYSTEM
+  Other connections in last 24h: None unusual
+  
+Enrichment:
+  Destination 198.51.100.7:
+    VT: 0/94 detections
+    Geolocation: Netherlands
+    ASN: Hijacked/abused hosting provider
+    WHOIS: Domain registered 3 weeks ago
+    History: First seen in our logs 2 hours ago
+  
+  HR-FILE-03:
+    Role: File server with employee PII (contracts, payroll, HR records)
+    Criticality: High
+    Recent alerts: 0 in 90 days
+```
+
+<Aside variant="tip" title="Your Triage">
+1. Is this a True Positive or False Positive?
+2. What is the severity?
+3. What action do you take?
+4. Do you escalate?
+</Aside>
+
+<Aside variant="info" title="Answer — Alert 2">
+**Classification**: TRUE POSITIVE
+**Severity**: P1 (Critical)
+**Indicators**:
+  - svchost.exe making direct HTTPS connections (svchost should NOT do this)
+  - 60-second beacon interval (classic C2 timing)
+  - Domain registered 3 weeks ago (newly registered — common for C2)
+  - Server hosts sensitive PII data
+  - HR file servers are high-value targets (employee PII)
+
+**Actions**:
+  1. IMMEDIATE: Isolate HR-FILE-03 via EDR (do NOT wait)
+  2. Block 198.51.100.7 at firewall
+  3. Check process: Is svchost.exe DLL-sideloaded? Check loaded DLLs
+  4. Check for file access anomalies (any unusual reads of HR files?)
+  5. Signal L2/IR immediately — this is P1
+
+**Escalation**: YES — P1-Critical escalation to L2/IR
+This has all hallmarks of a C2 beacon on a high-value server.
+SVCHOST making direct HTTPS connections is abnormal and indicates
+DLL sideloading or process injection.
+</Aside>
+
+## Alert Inject 3 — 8:35 AM
+
+```
+ALERT: "Windows Defender detected Trojan:Win32/Emotet"
+Source: WORKSTATION-SALES-22 (sales team laptop)
+User: bsmith@company.com (sales representative)
+Time: 8:30 AM (file created 8:28 AM, detected 8:30 AM)
+
+Detection Details:
+  File: "invoice_2026_03_17.docm" (macro-enabled document)
+  Path: C:\Users\bsmith\AppData\Local\Temp\ 
+  Hash: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  
+  VirusTotal (Hash): 18/65 detections — classified as "Emotet loader"
+  Hybrid Analysis: Drops DLL, connects to 3 IPs, attempts process injection
+  
+  Process Tree:
+    WINWORD.EXE → cmd.exe → powershell.exe -enc <base64>
+    → powershell downloaded: http://198.51.100.15/loader.dll
+  
+  Email: bsmith received email from "invoices@acmecorp-billing.com" at 8:25 AM
+          with attachment "invoice_2026_03_17.docm"
+```
+
+<Aside variant="tip" title="Your Triage">
+1. Is this a True Positive or False Positive?
+2. What is the severity?
+3. What action do you take?
+4. Do you escalate?
+</Aside>
+
+<Aside variant="info" title="Answer — Alert 3">
+**Classification**: TRUE POSITIVE — Active Emotet infection
+**Severity**: P1 (High — active malware, potential lateral movement)
+**Indicators**:
+  - 18/65 VT detections (confirmed malware)
+  - Macro-enabled document from external sender (phishing)
+  - PowerShell executed encoded command (download cradle)
+  - DLL downloaded from C2 server
+  - Emotet is known for lateral movement and ransomware delivery
+
+**Actions**:
+  1. IMMEDIATE: Isolate WORKSTATION-SALES-22 via EDR
+  2. Block 198.51.100.15 at firewall
+  3. Check for lateral movement: Any SMB/WMI/RDP connections from this host?
+  4. Check other sales team workstations for same email/hash
+  5. Block "acmecorp-billing.com" domain in email gateway
+  6. Remove malicious email from all recipients
+  7. Check bsmith's account for credential theft
+
+**Escalation**: YES — P1 escalation to L2/IR
+Emotet infections frequently lead to ransomware deployment.
+Rapid containment and lateral movement check is critical.
+</Aside>
+
+## Alert Inject 4 — 8:50 AM
+
+```
+ALERT: "User Reported Phishing — CEO received suspicious wire request"
+Source: jdoe@company.com (CEO — forwarded to security@)
+Time: 8:45 AM
+
+Email Details:
+  From: "Sarah Chen" <sarah.chen@acmecorp-partner.com>
+  Subject: "URGENT: Wire transfer required for Q1 payment"
+  Body: "Hi John, we need to complete the Q1 vendor payment today.
+         Please approve the attached invoice and wire $247,000 to
+         the account below. This is time-sensitive.
+         — Sarah"
+  
+  Reply-To: sarah.chen@gmail.com (DIFFERENT from From domain)
+  
+  Headers:
+    SPF: FAIL
+    DKIM: NONE  
+    DMARC: FAIL
+  
+  Attachment: "Q1_Payment_Details.pdf" (15KB)
+    VT: 0/65 detections
+    File type: PDF (confirmed — not a renamed executable)
+    
+  Check with actual Sarah Chen (CFO): She did NOT send this email
+```
+
+<Aside variant="tip" title="Your Triage">
+1. Is this a True Positive or False Positive?
+2. What is the severity?
+3. What action do you take?
+4. Do you escalate?
+</Aside>
+
+<Aside variant="info" title="Answer — Alert 4">
+**Classification**: TRUE POSITIVE — Business Email Compromise (BEC) attempt
+**Severity**: P1 (Critical — $247K wire fraud attempt + CEO targeted)
+**Indicators**:
+  - SPF/DKIM/DMARC all fail (spoofed sender)
+  - Reply-To is different from From (phishing indicator)
+  - Impersonation of senior executive (CFO)
+  - Urgency + wire transfer request (BEC signature)
+  - Confirmed not from real Sarah Chen
+
+**Actions**:
+  1. REQUEST CEO's assistant to verbally confirm any wire requests
+  2. Block "sarah.chen@gmail.com" in email gateway
+  3. Block "acmecorp-partner.com" domain
+  4. Scan PDF in sandbox (confirmed clean, but verify)
+  5. Check if similar emails sent to other finance people
+  6. Add BEC warning to finance team bulletin
+  7. Document as BEC IOCs for threat intel feed
+
+**Escalation**: YES — P1 escalation. BEC fraud targeting CEO.
+Finance team needs immediate notification. Check if any wires
+were initiated this morning before the block.
+</Aside>
+
+## Alert Inject 5 — 9:05 AM
+
+```
+ALERT: "Possible Data Exfiltration — Large Outbound Transfer"
+Source: LEGAL-DB-01 (legal department database server)
+Destination: mega.io (cloud storage — 154.xxx.xxx.xxx:443)
+Volume: 5.2GB transferred in 15 minutes (2:00 AM - 2:15 AM Sunday)
+Rule: NetFlow threshold — outbound > 1GB in 10 minutes
+
+Log Details:
+  Source: LEGAL-DB-01 (IP: 10.10.50.100)
+  Destination: 154.xxx.xxx.xxx (mega.io data center, Luxembourg)
+  Protocol: HTTPS (encrypted — no content visibility)
+  Transfer pattern: Consistent 5.7 MB/s for 15 minutes (bulk copy)
+  
+  Normal baseline for LEGAL-DB-01: < 50MB outbound per day
+  
+  User account active at time: svc_legal_sync (service account)
+  Normal usage for svc_legal_sync: No interactive logins, scheduled task only
+
+  Authentication:
+    Event 4624 (successful logon) at 1:45 AM for svc_legal_sync
+    Logon type: 10 (RemoteInteractive — RDP)
+    Source workstation: LEGAL-DB-01 itself (locally initiated)
+    — BUT svc_legal_sync should NOT have interactive logon rights
+```
+
+<Aside variant="tip" title="Your Triage">
+1. Is this a True Positive or False Positive?
+2. What is the severity?
+3. What action do you take?
+4. Do you escalate?
+</Aside>
+
+<Aside variant="info" title="Answer — Alert 5">
+**Classification**: TRUE POSITIVE — Likely data exfiltration
+**Severity**: P1 (Critical)
+**Indicators**:
+  - 5.2GB = 100x normal baseline for this server
+  - Destination is mega.io (consumer cloud storage, not business-approved)
+  - RDP login at 1:45 AM for a service account (extremely abnormal)
+  - svc_legal_sync should have NO interactive logon rights
+  - M&A legal documents on this server (highly sensitive)
+  - Sunday 2 AM timing (evasion of business-hour monitoring)
+
+**Actions**:
+  1. IMMEDIATE: Disable svc_legal_sync account
+  2. IMMEDIATE: Block mega.io domain/IP at firewall
+  3. Isolate LEGAL-DB-01 via EDR (preserve evidence)
+  4. Check: What files were accessed? (file audit logs)
+  5. Check: Are there other connections to mega.io from other hosts?
+  6. Check: Was the service account compromised via credential theft?
+
+**Escalation**: P1-Critical IR escalation. Legal data breach.
+Potential GDPR/DPA notification required. CISO + Legal notified immediately.
+</Aside>
+
+## Alert Inject 6 — 9:20 AM
+
+```
+ALERT: "DNS Query to Known Malicious Domain"
+Source: WORKSTATION-DEV-05 (developer workstation)
+User: tlee@company.com (senior developer)
+Query: cryptominer[.]co (resolved to 192.0.2.200)
+Time: 9:15 AM
+Rule: DNS sinkhole alert — domain on threat intel blocklist
+
+Enrichment:
+  Domain: cryptominer[.]co
+    VT: Domain flagged as "malicious" (cryptomining C2)
+    Domain age: 6 days
+    Registrar: Unknown/Budget registrar
+  
+  Destination IP: 192.0.2.200
+    Geolocation: Eastern Europe
+    
+  Host: WORKSTATION-DEV-05
+    Role: Developer workstation — has access to source code repos
+    OS: Ubuntu Linux
+    Running processes: Chrome, VS Code, Docker, node
+    
+  User: tlee
+    Role: Senior developer
+    Risk score: 0
+    Recent activity: Normal (committing code, browsing documentation)
+    
+  Process: chrome (Chrome browser) — made the DNS query
+  This appears to be a website the user visited, not a background process
+```
+
+<Aside variant="tip" title="Your Triage">
+1. Is this a True Positive or False Positive?
+2. What is the severity?
+3. What action do you take?
+4. Do you escalate?
+</Aside>
+
+<Aside variant="info" title="Answer — Alert 6">
+**Classification**: TRUE POSITIVE — Cryptomining domain access
+**Severity**: P2 (Medium) — but investigate further
+**Analysis**: 
+  - DNS query from Chrome suggests user visited the site intentionally or via redirect
+  - Domain is only 6 days old (malicious indicator)
+  - No process anomaly (Chrome making expected DNS queries)
+  - Cryptomining domains are often visited via compromised websites (drive-by)
+  - However, developer machines often visit unusual sites for research
+
+**Actions**:
+  1. Check if cryptominer[.]co page still open in Chrome on DEV-05
+  2. Check if any cryptocurrency mining process running (system resource check)
+  3. Check proxy logs for the full URL accessed
+  4. Block domain at DNS sinkhole if not already
+  5. Scan DEV-05 for any malware/cryptominer
+
+**Escalation**: Yes — escalate to L2 as P2 for further investigation
+Developer machines with source code access are high-value targets.
+If this is a cryptominer dropping on a dev box, it could be a test
+for broader access. If a drive-by download from a compromised
+crypto site, it could deliver follow-on malware.
+</Aside>
+
+## Alert Inject 7 — 9:35 AM
+
+```
+ALERT: "New Admin Account Created — suspicious"
+Source: DC-01 (domain controller)
+Event: Event ID 4720 (user created) + Event ID 4732 (user added to group)
+User Created: "jadmin"
+Group Added: "Domain Admins"
+Time: 9:30 AM
+Created By: jdoe@company.com (CEO — jdoe)
+
+Enrichment:
+  jdoe: CEO — does NOT have Domain Admin rights normally
+  jdoe's normal IT activities: None (non-technical executive)
+  jdoe's account: MFA enabled, recent login from US
+  Ticket/Change Request: None for admin account creation
+  
+  jadmin account:
+    Created with no password expiry flag set
+    No manager or contact info in AD
+```
+
+<Aside variant="tip" title="Your Triage">
+1. Is this a True Positive or False Positive?
+2. What is the severity?
+3. What action do you take?
+4. Do you escalate?
+</Aside>
+
+<Aside variant="info" title="Answer — Alert 7">
+**Classification**: TRUE POSITIVE — Privilege escalation / Account compromise
+**Severity**: P1 (Critical — Domain Admin compromise)
+**Analysis**:
+  - CEO creating a Domain Admin account is EXTREMELY abnormal
+  - CEO should not have Domain Admin rights (contradiction in logs — CEO may be compromised)
+  - No change management ticket for this action
+  - jadmin has no password expiry (attacker bypasses password change policy)
+  - Account created and immediately added to Domain Admins (no transition period)
+  - Possible scenarios:
+    a) CEO's account was compromised and attacker created a backdoor DA account
+    b) Pass-the-Hash from CEO's session on compromised machine
+    c) CEO's account has excessive privileges (misconfiguration)
+
+**Actions**:
+  1. IMMEDIATE: Disable jadmin account
+  2. IMMEDIATE: Remove jadmin from Domain Admins
+  3. IMMEDIATE: Contact CEO via out-of-band (phone call, walk over)
+     → "Did you just create a Domain Admin account named jadmin?"
+  4. IF CEO did NOT create it → FULL domain compromise IR
+  5. Check: What other actions did the creating account perform?
+  6. Check: Any other new accounts created recently?
+  7. Check: Any Group Policy modifications?
+
+**Escalation**: P1-Critical to L3/IR. Potential full domain compromise.
+Goldern ticket/Kerberos attack may follow. Prepare for KRBTGT reset.
+Also escalate to IT management for CEO account review.
+</Aside>
+
+## Alert Inject 8 — 9:50 AM
+
+```
+ALERT: "Mass File Rename Detection — Possible Ransomware"
+Source: HRSRV-01 (HR file server)
+Rule: EDR behavioral detection — > 100 file rename events in 1 minute
+Time: 9:48 AM - 9:50 AM (ongoing)
+File Extension Added: .encrypted
+
+EDR Data:
+  Process: powershell.exe → launched cmd.exe → launched certutil.exe
+  Files affected: \\HRSRV-01\HR_Shared\*.* (all files in HR share)
+  File count: ~2,500 files being renamed with .encrypted extension
+  
+  Network connections:
+    HRSRV-01 connecting to 198.51.100.200:443 (unknown IP)
+    HRSRV-01 connecting to SQL-DB-01:445 (SMB — potential lateral movement)
+  
+  Other hosts:
+    HRSRV-01 was mounted from WORKSTATION-HR-MGR-03 (HR manager's laptop)
+    WORKSTATION-HR-MGR-03 user: jwilson@company.com (HR manager)
+```
+
+<Aside variant="tip" title="Your Triage">
+1. Is this a True Positive or False Positive?
+2. What is the severity?
+3. What action do you take?
+4. Do you escalate?
+</Aside>
+
+<Aside variant="info" title="Answer — Alert 8">
+**Classification**: TRUE POSITIVE — ACTIVE RANSOMWARE OUTBREAK
+**Severity**: P1-Critical (highest severity possible)
+**Analysis**:
+  - Mass file rename with .encrypted extension = ransomware signature
+  - certutil.exe is a LOLBIN often used by ransomware to download payloads
+  - Lateral movement to SQL-DB-01 (attempting to encrypt database server)
+  - Started from HR manager workstation (patient zero likely phishing)
+  - This is an active, spreading ransomware incident
+
+**ACTIONS — FOLLOW RANSOMWARE PLAYBOOK IMMEDIATELY**:
+  1. IMMEDIATE: Isolate HRSRV-01 from network
+  2. IMMEDIATE: Isolate WORKSTATION-HR-MGR-03
+  3. IMMEDIATE: Block 198.51.100.200 at firewall
+  4. IMMEDIATE: Block SMB at firewall between workstation and server segments
+  5. Disconnect SQL-DB-01 from network (prevent encryption spread)
+  6. Page CISO, IR team, legal — ransomware emergency
+
+**Escalation**: P1-CRITICAL — Full IR team activation
+Call tree activation: L2 → L3 → SOC Manager → CISO → Legal → PR
+Do NOT pass Go, do NOT collect $200. This is a code-red incident.
+Document everything — every action, every timestamp.
+</Aside>
+
+## Shift Handover (10:30 AM)
+
+Your shift is ending. Using the following template, write a handover document for the oncoming team:
+
+```
+SHIFT HANDOVER — Monday, March 17, 2026
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Outgoing Analyst: [Your Name]
+Incoming Analyst: [N/A]
+
+SHIFT SUMMARY:
+  Alerts Received: 8 (simulated)
+  Alerts Closed: [number]
+  Alerts Escalated: [number]
+  Active Incidents: [number]
+
+ACTIVE INCIDENTS:
+
+  1. [Incident Name] | P[1/2/3] | Status: In Progress
+     Summary: [1-2 sentence overview]
+     Current Actions: [what's been done]
+     Next Steps: [what the next team needs to do]
+     Assigned To: [team/individual]
+
+  2. ...
+
+PENDING ESCALATIONS:
+  [Any alerts that need follow-up]
+
+NOTES FOR NEXT SHIFT:
+  [Anything unusual, ongoing issues, or things to watch]
+
+ESCALATION CONTACTS:
+  SOC Manager: [manager name]
+  L2 On-Call: [name/pager]
+  L3/IR On-Call: [name/pager]
+  CISO: [name/contact]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+<Aside variant="tip" title="Expected Handover Summary">
+Your handover should document:
+
+**Active Incidents (P1-Critical):**
+1. Ransomware outbreak on HR file server — isolated, IR team activated, ongoing
+2. Possible data exfiltration from legal server — account disabled, IR investigating
+3. Suspicious Domain Admin account creation — disabled, CEO account possibly compromised
+
+**Active Incidents (P2-High):**
+4. Emotet infection on sales laptop — host isolated, lateral movement check in progress
+5. BEC phishing targeting CEO — email blocked, finance team notified
+6. C2 beaconing on HR file server — host isolated, investigation continuing
+
+**Resolved:**
+7. Brute force attack on CEO account — blocked at firewall, no data loss
+8. Cryptomining DNS query — blocked, analyst investigation found it was compromised website ad
+
+**Note for next shift:** Monitor for recrudescence of ransomware. Ensure backup restoration
+is validated before reconnecting HRSRV-01. Legal and CISO to determine breach notification.
+</Aside>
+
+## Lab Deliverables
+
+By completing this lab, you should have:
+
+1. ✓ Triaged and classified all 8 alerts using the decision framework
+2. ✓ Made escalation decisions with appropriate urgency
+3. ✓ Taken containment actions on active threats
+4. ✓ Documented findings in the triage log template
+5. ✓ Completed a shift handover document for the oncoming team
+6. ✓ Demonstrated the ability to prioritize competing alerts
+
+## Debrief Questions
+
+After completing the shift simulation, consider:
+
+1. Which alerts did you find hardest to classify? Why?
+2. Did you escalate any alerts that, in hindsight, did not need escalation?
+3. Did you miss any escalation? (e.g., should the cryptomining alert have been escalated?)
+4. How did you prioritize when multiple P1 alerts arrived close together?
+5. What would you do differently with the benefit of hindsight?
+6. What additional information would have helped your triage decisions?
+
+## Key Takeaways
+
+- SOC shifts are chaotic — multiple alerts arrive simultaneously, and prioritization is critical
+- The ransomware and data exfiltration alerts (Inject 8 and 5) demand immediate action — containment before investigation
+- The CEO account alerts (Inject 1 and 7) demonstrate that targeting of high-value users requires elevated severity
+- Evidence preservation matters — document all actions and timestamps for post-incident review and legal proceedings
+- Shift handover is the most important process — incomplete handover means the next team starts from zero
+- Pattern recognition develops with practice — the more alerts you triage, the faster you recognize FP vs TP
+- When in doubt, escalate — it is better to escalate a false positive than to miss a true positive

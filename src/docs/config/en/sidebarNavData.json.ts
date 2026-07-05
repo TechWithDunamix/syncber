@@ -287,8 +287,8 @@ const sidebarNavData: DocsSidebarNavData = {
     },
     {
       id: "cybersecurity",
-      title: "Cybersecurity",
-      description: "Protect systems and data from threats",
+      title: "Cyber Security and SOC Analyst",
+      description: "Protect systems and data from threats and master SOC operations",
       icon: "tabler/shield",
       sections: [
         {
@@ -364,6 +364,48 @@ const sidebarNavData: DocsSidebarNavData = {
             {
               id: "cybersecurity-capstone",
               title: "Capstone Project",
+            },
+          ],
+        },
+        {
+          id: "soc-analyst",
+          title: "SOC Analyst",
+          children: [
+            {
+              id: "soc-career-path",
+              title: "SOC Career Path & Job Roles",
+            },
+            {
+              id: "tier-1-triage",
+              title: "Tier 1: Triage Analyst",
+            },
+            {
+              id: "tier-2-incident-handler",
+              title: "Tier 2: Incident Handler",
+            },
+            {
+              id: "tier-3-threat-hunter",
+              title: "Tier 3: Threat Hunter",
+            },
+            {
+              id: "soc-tooling",
+              title: "SOC Tooling & Platforms",
+            },
+            {
+              id: "alert-analysis-triage",
+              title: "Alert Analysis & Triage",
+            },
+            {
+              id: "soc-playbooks-runbooks",
+              title: "Playbooks & Runbooks",
+            },
+            {
+              id: "soc-lab",
+              title: "SOC Lab",
+            },
+            {
+              id: "flashcards",
+              title: "Flashcards",
             },
           ],
         },
