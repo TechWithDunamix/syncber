@@ -41,6 +41,10 @@ const navConfig: navItem[] = [
         text: "Développement Mobile",
         link: "/learn/mobile-app-development/",
       },
+      {
+        text: "Gestion des Dossiers de Santé Électroniques",
+        link: "/learn/electronic-health-records/",
+      },
     ],
   },
 ];

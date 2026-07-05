@@ -476,6 +476,86 @@ const sidebarNavData: DocsSidebarNavData = {
         },
       ],
     },
+    {
+      id: "electronic-health-records",
+      title: "Gestion des Dossiers de Santé Électroniques",
+      description: "Maîtrisez les systèmes DSE de la fondation à la mise en œuvre",
+      icon: "tabler/file-text",
+      sections: [
+        {
+          id: "electronic-health-records",
+          title: "Aperçu du Cours",
+        },
+        {
+          id: "ehr-phase-1-foundations",
+          title: "Phase 1 : Fondamentaux du DSE",
+          children: [
+            {
+              id: "introduction-to-ehr",
+              title: "Introduction au DSE",
+            },
+            {
+              id: "contents-of-ehr",
+              title: "Contenu du DSE",
+            },
+            {
+              id: "documentation-importance",
+              title: "Importance de la Documentation",
+            },
+          ],
+        },
+        {
+          id: "ehr-phase-2-transition",
+          title: "Phase 2 : Transition et Processus",
+          children: [
+            {
+              id: "paper-based-procedures",
+              title: "Procédures Papier",
+            },
+            {
+              id: "transition-to-electronic",
+              title: "Transition vers le DSE",
+            },
+            {
+              id: "ehr-contributors-ownership",
+              title: "Contributeurs et Propriété du DSE",
+            },
+          ],
+        },
+        {
+          id: "ehr-phase-3-software",
+          title: "Phase 3 : Logiciels et Systèmes DSE",
+          children: [
+            {
+              id: "ehr-software-systems",
+              title: "Logiciels DSE et SAD",
+            },
+            {
+              id: "practice-management-software",
+              title: "Logiciel de Gestion de Cabinet",
+            },
+          ],
+        },
+        {
+          id: "ehr-phase-4-impact",
+          title: "Phase 4 : Impact et Résultats",
+          children: [
+            {
+              id: "advantages-impact",
+              title: "Avantages et Impact",
+            },
+            {
+              id: "disaster-response-documentation",
+              title: "Réponse aux Catastrophes et Documentation",
+            },
+          ],
+        },
+        {
+          id: "ehr-flashcards",
+          title: "Flashcards",
+        },
+      ],
+    },
   ],
 };
 

@@ -483,6 +483,86 @@ const sidebarNavData: DocsSidebarNavData = {
         },
       ],
     },
+    {
+      id: "electronic-health-records",
+      title: "Electronic Health Records Management",
+      description: "Master EHR systems from foundations to implementation",
+      icon: "tabler/file-text",
+      sections: [
+        {
+          id: "electronic-health-records",
+          title: "Course Overview",
+        },
+        {
+          id: "ehr-phase-1-foundations",
+          title: "Phase 1: EHR Foundations",
+          children: [
+            {
+              id: "introduction-to-ehr",
+              title: "Introduction to EHR",
+            },
+            {
+              id: "contents-of-ehr",
+              title: "Contents of the EHR",
+            },
+            {
+              id: "documentation-importance",
+              title: "Documentation Importance",
+            },
+          ],
+        },
+        {
+          id: "ehr-phase-2-transition",
+          title: "Phase 2: Transition & Processes",
+          children: [
+            {
+              id: "paper-based-procedures",
+              title: "Paper-Based Procedures",
+            },
+            {
+              id: "transition-to-electronic",
+              title: "Transition to EHR",
+            },
+            {
+              id: "ehr-contributors-ownership",
+              title: "EHR Contributors & Ownership",
+            },
+          ],
+        },
+        {
+          id: "ehr-phase-3-software",
+          title: "Phase 3: EHR Software & Systems",
+          children: [
+            {
+              id: "ehr-software-systems",
+              title: "EHR Software & CDS",
+            },
+            {
+              id: "practice-management-software",
+              title: "Practice Management Software",
+            },
+          ],
+        },
+        {
+          id: "ehr-phase-4-impact",
+          title: "Phase 4: Impact & Outcomes",
+          children: [
+            {
+              id: "advantages-impact",
+              title: "Advantages & Impact",
+            },
+            {
+              id: "disaster-response-documentation",
+              title: "Disaster Response & Documentation",
+            },
+          ],
+        },
+        {
+          id: "ehr-flashcards",
+          title: "Flashcards",
+        },
+      ],
+    },
   ],
 };
 

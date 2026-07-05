@@ -1,0 +1,176 @@
+---
+title: "EHR Contributors & Ownership"
+description: "Identify who documents healthcare-related activities in the EHR, who owns the patient record, patient rights under HIPAA, and the doctrine of professional discretion."
+sidebar:
+  order: 6
+  label: "EHR Contributors & Ownership"
+tab: "electronic-health-records"
+---
+
+The electronic health record is a collaborative document. Understanding who contributes to it, who owns it, and what rights patients have over their health information is fundamental to EHR management and legal compliance.
+
+## Who Documents in the EHR
+
+Healthcare workers across multiple roles contribute data to the patient's health record. Each provider contributes data in different ways based on their role, responsibilities, and scope of practice.
+
+### Documentation by Role
+
+| Role | Documentation Responsibilities | Frequency | Access Level |
+|------|------------------------------|-----------|--------------|
+| **Physician / Provider** | Diagnoses, treatment plans, prescriptions, progress notes, consultation reports, referrals | Every patient encounter | Full clinical access |
+| **Nurse** | Vital signs, nursing assessments, medication administration, patient education, care plans | Every patient interaction | Full clinical access |
+| **Medical Assistant (Clinical)** | Patient history, chief complaint, vitals, preparation for examination, injections, EKGs | Rooming each patient | Structured templates |
+| **Medical Assistant (Administrative)** | Patient demographics, appointment scheduling, insurance verification, billing codes, forms | Front desk tasks | Administrative modules |
+| **Specialist** | Specialty-specific assessments, procedure notes, treatment recommendations, follow-up plans | Specialist consultations | Specialty-specific templates |
+| **Surgeon** | Pre-operative assessments, operative reports, post-operative orders, discharge summaries | Surgical encounters | Surgical modules |
+| **Radiologist** | Imaging interpretations, reports, recommendations for follow-up | Per imaging study | Imaging module |
+| **Laboratory Technician** | Lab results entry, quality control, critical value reporting | Per lab test | Laboratory module |
+| **Pharmacist** | Medication reconciliation, drug interaction review, dosing adjustments | Per medication review | Pharmacy module |
+| **Social Worker** | Psychosocial assessments, care coordination, discharge planning, community resource referrals | Per patient need | Case management |
+| **Medical Biller/Coder** | CPT/ICD-10 coding, charge capture, claim submission, payment posting | Per encounter | Billing module |
+
+### Documentation Workflow Example
+
+A typical patient encounter involves documentation contributions from multiple team members:
+
+```
+PATIENT ARRIVAL
+  └─ Administrative MA: Verifies demographics, insurance, collects copay
+  └─ Documents in: Registration / Check-in module
+
+PATIENT ROOMING
+  └─ Clinical MA: Takes vitals, updates medication list, documents chief complaint
+  └─ Documents in: Vital signs / History module
+
+PROVIDER ENCOUNTER
+  └─ Provider: Examines patient, documents findings, enters orders, prescribes medications
+  └─ Documents in: Progress notes / CPOE module
+
+POST-ENCOUNTER
+  └─ Medical Biller: Reviews diagnoses, assigns codes, creates claim
+  └─ Documents in: Billing / Claims module
+
+FOLLOW-UP
+  └─ Nurse: Provides patient education, coordinates referrals
+  └─ Documents in: Patient education / Care coordination module
+```
+
+<Aside variant="tip" title="Comprehensive Documentation">
+  All aspects of a patient encounter must be recorded in the EHR including patient health history, observations, treatment plans, and other administrative and legal data. Each team member documents their part, creating a complete picture of the patient's care.
+</Aside>
+
+## EHR Ownership: Legal Framework
+
+### Who Owns the Medical Record
+
+Medical records are owned by the facility or individuals who created them. This legal principle has important implications:
+
+| Setting | Record Owner | Implications |
+|---------|-------------|--------------|
+| **Hospital** | The hospital or health system | Records stay with the institution when providers leave |
+| **Private Practice** | The practice or provider(s) | Records are part of the practice's business assets |
+| **Community Health Center** | The health center | Governed by federal regulations and grant requirements |
+| **Urgent Care** | The urgent care organization | Records are maintained at the corporate level |
+| **Telehealth Platform** | The healthcare organization providing services | Subject to the same ownership rules as in-person care |
+
+### Patient Rights to Health Information
+
+While the facility owns the physical or electronic record, **patients have the legal right to access their medical information** anytime through a medical release form. Key patient rights include:
+
+```yaml
+Patient Rights Under HIPAA:
+  Right to Access:
+    └─ Obtain a copy of their health records
+    └─ Request electronic copy (if maintained electronically)
+    └─ Inspect their records in person
+    └─ Receive copies within 30 days (60 days if offsite storage)
+    └─ Facility may charge reasonable fee for copies
+
+  Right to Request Restrictions:
+    └─ Limit how their information is used or disclosed
+    └─ Restrict disclosure to health plans (if paid out-of-pocket)
+    └─ Request confidential communications (email, phone)
+    └─ Facility must document and respond to requests
+
+  Right to Accounting of Disclosures:
+    └─ Know who has requested their health information
+    └─ Includes disclosures for treatment, payment, operations
+    └─ Covers up to 6 years of disclosure history
+    └─ First request per 12-month period is free
+
+  Right to Amend:
+    └─ Request corrections to inaccurate information
+    └─ Request additions to incomplete information
+    └─ Facility must respond within 60 days
+    └─ Denial may be appealed by the patient
+
+  Right to File a Complaint:
+    └─ File with the facility's privacy officer
+    └─ File with the Office for Civil Rights (OCR)
+    └─ No retaliation for filing complaints
+```
+
+### The Doctrine of Professional Discretion
+
+The **doctrine of professional discretion** allows the provider to use their best judgment in sharing developmental notes or clinical observations with patients who have unstable conditions. This is particularly relevant for:
+
+| Scenario | Application of Professional Discretion |
+|----------|---------------------------------------|
+| **Mental Health Treatment** | Provider may limit sharing of detailed therapy notes |
+| **Suicidal Patients** | Information that may cause harm may be withheld |
+| **Emotional Disturbance** | Clinical observations shared carefully |
+| **Cognitive Impairment** | Information shared with guardian instead of patient |
+| **Terminal Diagnosis** | Information shared at patient's readiness level |
+
+The doctrine is meant to protect patients from harm when health information is shared. For example, a provider might choose not to directly share an evaluation with a suicidal patient who may become upset upon learning their condition, instead sharing the information with a family member or guardian.
+
+<Aside variant="danger" title="Limitations of Professional Discretion">
+  The doctrine of professional discretion does not override HIPAA. Patients still have the right to access their records. The doctrine applies specifically to the provider's judgment about HOW and WHEN to share certain clinical observations, not WHETHER to share them. Providers should document their rationale when exercising professional discretion.
+</Aside>
+
+## HIPAA Privacy and Security Rules
+
+The **Health Insurance Portability and Accountability Act (HIPAA)** establishes national standards for protecting health information:
+
+```yaml
+HIPAA Privacy Rule:
+  └─ Protects individually identifiable health information (PHI)
+  └─ Establishes patient rights over their health information
+  └─ Sets limits on uses and disclosures of PHI
+  └─ Requires patient authorization for most non-treatment disclosures
+  └─ Applies to covered entities (providers, plans, clearinghouses)
+
+HIPAA Security Rule:
+  └─ Specifically addresses electronic PHI (ePHI)
+  └─ Requires administrative, physical, and technical safeguards
+  └─ Mandates risk analysis and risk management
+  └─ Requires breach notification procedures
+  └─ Requires workforce training on security policies
+
+Permitted Disclosures (Without Authorization):
+  └─ Treatment: Sharing information for patient care
+  └─ Payment: Billing and claims processing
+  └─ Healthcare Operations: Quality improvement, training
+  └─ Public Health: Reporting diseases, vital statistics
+  └─ Law Enforcement: As required by law or court order
+  └─ Emergency: To prevent serious threat to health or safety
+```
+
+### Notice of Privacy Practices (NPP)
+
+Healthcare providers must provide patients with a **Notice of Privacy Practices** that describes:
+
+- How the provider may use and disclose health information
+- Patient rights regarding their health information
+- The provider's duties to protect health information
+- How to file a complaint about privacy practices
+
+## Key Takeaways
+
+- Multiple healthcare professionals contribute to the EHR — each role documents different aspects of the patient encounter based on their scope of practice
+- The medical record is owned by the facility or provider that created it, but patients have extensive legal rights to access, amend, and control their health information
+- HIPAA guarantees patients the right to access their records, request restrictions, receive an accounting of disclosures, and file complaints
+- The doctrine of professional discretion allows providers to use judgment in how they share sensitive information, particularly for patients with unstable mental or emotional conditions
+- HIPAA's Privacy Rule governs use and disclosure of PHI; the Security Rule specifically protects electronic PHI
+- Healthcare providers must provide patients with a Notice of Privacy Practices explaining their rights
+- Understanding ownership and access rights is essential for compliance, risk management, and patient trust
