@@ -502,12 +502,32 @@ const sidebarNavData: DocsSidebarNavData = {
               title: "Introduction to EHR",
             },
             {
+              id: "ehr-vs-emr-comparison",
+              title: "EHR vs EMR Comparison",
+            },
+            {
               id: "contents-of-ehr",
               title: "Contents of the EHR",
             },
             {
               id: "documentation-importance",
               title: "Documentation Importance",
+            },
+            {
+              id: "ehr-history-evolution",
+              title: "History & Evolution of EHR",
+            },
+            {
+              id: "healthcare-data-standards",
+              title: "Healthcare Data Standards",
+            },
+            {
+              id: "ehr-regulations-compliance",
+              title: "EHR Regulations & Compliance",
+            },
+            {
+              id: "ehr-patient-engagement",
+              title: "Patient Engagement & EHR",
             },
           ],
         },
@@ -527,6 +547,26 @@ const sidebarNavData: DocsSidebarNavData = {
               id: "ehr-contributors-ownership",
               title: "EHR Contributors & Ownership",
             },
+            {
+              id: "ehr-workflow-redesign",
+              title: "Clinical Workflow Redesign",
+            },
+            {
+              id: "ehr-implementation-process",
+              title: "EHR Implementation Process",
+            },
+            {
+              id: "ehr-training-change-management",
+              title: "Training & Change Management",
+            },
+            {
+              id: "ehr-data-migration",
+              title: "Data Migration Strategies",
+            },
+            {
+              id: "ehr-quality-measures",
+              title: "Quality Measures & Reporting",
+            },
           ],
         },
         {
@@ -541,6 +581,30 @@ const sidebarNavData: DocsSidebarNavData = {
               id: "practice-management-software",
               title: "Practice Management Software",
             },
+            {
+              id: "ehr-interoperability",
+              title: "Interoperability & HIE",
+            },
+            {
+              id: "ehr-e-prescribing",
+              title: "E-Prescribing Systems",
+            },
+            {
+              id: "ehr-telehealth-integration",
+              title: "Telehealth & Remote Care",
+            },
+            {
+              id: "ehr-population-health",
+              title: "Population Health Tools",
+            },
+            {
+              id: "ehr-coding-billing",
+              title: "Medical Coding & Billing",
+            },
+            {
+              id: "ehr-analytics-reporting",
+              title: "Analytics & Reporting",
+            },
           ],
         },
         {
@@ -554,6 +618,30 @@ const sidebarNavData: DocsSidebarNavData = {
             {
               id: "disaster-response-documentation",
               title: "Disaster Response & Documentation",
+            },
+            {
+              id: "ehr-patient-safety",
+              title: "Patient Safety & Error Reduction",
+            },
+            {
+              id: "ehr-provider-burnout",
+              title: "Provider Burnout & EHR Usability",
+            },
+            {
+              id: "ehr-future-trends",
+              title: "Future Trends in Health IT",
+            },
+            {
+              id: "ehr-cost-benefit",
+              title: "Cost-Benefit Analysis",
+            },
+            {
+              id: "ehr-data-analytics",
+              title: "Clinical Data Analytics",
+            },
+            {
+              id: "ehr-roi",
+              title: "EHR Return on Investment",
             },
           ],
         },

@@ -495,12 +495,32 @@ const sidebarNavData: DocsSidebarNavData = {
               title: "Introduction au DSE",
             },
             {
+              id: "ehr-vs-emr-comparison",
+              title: "Comparaison DSE vs DME",
+            },
+            {
               id: "contents-of-ehr",
               title: "Contenu du DSE",
             },
             {
               id: "documentation-importance",
               title: "Importance de la Documentation",
+            },
+            {
+              id: "ehr-history-evolution",
+              title: "Histoire et Évolution du DSE",
+            },
+            {
+              id: "healthcare-data-standards",
+              title: "Normes de Données de Santé",
+            },
+            {
+              id: "ehr-regulations-compliance",
+              title: "Réglementation et Conformité du DSE",
+            },
+            {
+              id: "ehr-patient-engagement",
+              title: "Engagement des Patients et DSE",
             },
           ],
         },
@@ -520,6 +540,26 @@ const sidebarNavData: DocsSidebarNavData = {
               id: "ehr-contributors-ownership",
               title: "Contributeurs et Propriété du DSE",
             },
+            {
+              id: "ehr-workflow-redesign",
+              title: "Refonte des Flux de Travail Cliniques",
+            },
+            {
+              id: "ehr-implementation-process",
+              title: "Processus de Mise en Œuvre du DSE",
+            },
+            {
+              id: "ehr-training-change-management",
+              title: "Formation et Gestion du Changement",
+            },
+            {
+              id: "ehr-data-migration",
+              title: "Stratégies de Migration des Données",
+            },
+            {
+              id: "ehr-quality-measures",
+              title: "Mesures de Qualité et Rapports",
+            },
           ],
         },
         {
@@ -534,6 +574,30 @@ const sidebarNavData: DocsSidebarNavData = {
               id: "practice-management-software",
               title: "Logiciel de Gestion de Cabinet",
             },
+            {
+              id: "ehr-interoperability",
+              title: "Interopérabilité et Échange de Données",
+            },
+            {
+              id: "ehr-e-prescribing",
+              title: "Prescription Électronique",
+            },
+            {
+              id: "ehr-telehealth-integration",
+              title: "Télésanté et Soins à Distance",
+            },
+            {
+              id: "ehr-population-health",
+              title: "Outils de Santé des Populations",
+            },
+            {
+              id: "ehr-coding-billing",
+              title: "Codage Médical et Facturation",
+            },
+            {
+              id: "ehr-analytics-reporting",
+              title: "Analytique et Rapports",
+            },
           ],
         },
         {
@@ -547,6 +611,30 @@ const sidebarNavData: DocsSidebarNavData = {
             {
               id: "disaster-response-documentation",
               title: "Réponse aux Catastrophes et Documentation",
+            },
+            {
+              id: "ehr-patient-safety",
+              title: "Sécurité des Patients et Réduction des Erreurs",
+            },
+            {
+              id: "ehr-provider-burnout",
+              title: "Épuisement Professionnel et Utilisabilité du DSE",
+            },
+            {
+              id: "ehr-future-trends",
+              title: "Tendances Futures en Santé Numérique",
+            },
+            {
+              id: "ehr-cost-benefit",
+              title: "Analyse Coûts-Avantages",
+            },
+            {
+              id: "ehr-data-analytics",
+              title: "Analytique des Données Cliniques",
+            },
+            {
+              id: "ehr-roi",
+              title: "Retour sur Investissement du DSE",
             },
           ],
         },
