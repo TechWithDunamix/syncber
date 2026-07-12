@@ -130,6 +130,24 @@ export async function forgotPassword(email: string): Promise<ApiResponse<null>> 
   return { success: true, data: null };
 }
 
+/**
+ * Wait for Supabase to finish processing a recovery token from the URL hash.
+ * When the user clicks the reset link in their email, Supabase redirects to
+ * /reset-password#access_token=xxx&type=recovery. The client needs to exchange
+ * that token for a session before we can call updateUser().
+ */
+export function onRecoveryReady(callback: () => void): () => void {
+  const sb = requireSupabase();
+  const {
+    data: { subscription },
+  } = sb.auth.onAuthStateChange((event) => {
+    if (event === "SIGNED_IN" || event === "PASSWORD_RECOVERY") {
+      callback();
+    }
+  });
+  return () => subscription?.unsubscribe();
+}
+
 export async function resetPassword(
   newPassword: string
 ): Promise<ApiResponse<null>> {
