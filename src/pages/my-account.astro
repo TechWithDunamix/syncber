@@ -71,6 +71,61 @@ const siteData = getTranslatedData("siteData", currLocale);
             </svg>
           </a>
 
+          <!-- Change Password (expandable) -->
+          <div>
+            <button id="change-pwd-toggle" class="flex w-full items-center justify-between rounded-lg p-3 transition-colors hover:bg-accent/5 cursor-pointer">
+              <div class="flex items-center gap-3">
+                <svg class="h-5 w-5 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 15v2m-6 4h12a2 2 0 0 0 2 -2v-6a2 2 0 0 0 -2 -2h-12a2 2 0 0 0 -2 2v6a2 2 0 0 0 2 2z" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M8 11v-4a4 4 0 0 1 8 0v4" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <div class="text-left">
+                  <p class="text-foreground text-sm font-medium">Change Password</p>
+                  <p class="text-muted-foreground text-xs">Update your account password</p>
+                </div>
+              </div>
+              <svg id="change-pwd-chevron" class="h-4 w-4 text-muted-foreground transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <div id="change-pwd-form" class="hidden overflow-hidden transition-all">
+              <div class="border-t border-border/50 mt-2 pt-4 px-3 pb-2 space-y-4">
+                <div>
+                  <label for="new-password" class="text-foreground mb-1.5 block text-sm font-medium">New Password</label>
+                  <input
+                    type="password"
+                    id="new-password"
+                    name="new-password"
+                    required
+                    minlength={6}
+                    placeholder="At least 6 characters"
+                    class="border-input bg-background text-foreground placeholder:text-muted-foreground focus:border-accent focus:ring-accent/20 w-full rounded-lg border px-4 py-2 text-sm transition-colors focus:ring-4 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label for="confirm-new-password" class="text-foreground mb-1.5 block text-sm font-medium">Confirm Password</label>
+                  <input
+                    type="password"
+                    id="confirm-new-password"
+                    required
+                    minlength={6}
+                    placeholder="Repeat your password"
+                    class="border-input bg-background text-foreground placeholder:text-muted-foreground focus:border-accent focus:ring-accent/20 w-full rounded-lg border px-4 py-2 text-sm transition-colors focus:ring-4 focus:outline-none"
+                  />
+                </div>
+                <p id="change-pwd-error" class="hidden rounded-lg bg-error/10 p-3 text-sm font-medium text-error"></p>
+                <p id="change-pwd-success" class="hidden rounded-lg bg-emerald-500/10 p-3 text-sm font-medium text-emerald-500"></p>
+                <button
+                  type="button"
+                  id="change-pwd-btn"
+                  class="bg-accent text-accent-foreground hover:bg-accent/90 inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
+                >
+                  Update Password
+                </button>
+              </div>
+            </div>
+          </div>
+
           <button id="logout-btn" class="flex w-full items-center justify-between rounded-lg p-3 transition-colors hover:bg-error/5 cursor-pointer">
             <div class="flex items-center gap-3">
               <svg class="h-5 w-5 text-error" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -183,6 +238,63 @@ const siteData = getTranslatedData("siteData", currLocale);
     document.getElementById("logout-btn")?.addEventListener("click", async () => {
       await logout();
       window.location.href = "/";
+    });
+
+    // Change password toggle
+    const pwdToggle = document.getElementById("change-pwd-toggle");
+    const pwdForm = document.getElementById("change-pwd-form");
+    const pwdChevron = document.getElementById("change-pwd-chevron");
+    if (pwdToggle && pwdForm && pwdChevron) {
+      pwdToggle.addEventListener("click", () => {
+        const isHidden = pwdForm.classList.toggle("hidden");
+        pwdChevron.style.transform = isHidden ? "rotate(0deg)" : "rotate(180deg)";
+      });
+    }
+
+    // Change password submit
+    document.getElementById("change-pwd-btn")?.addEventListener("click", async () => {
+      const pwd = (document.getElementById("new-password") as HTMLInputElement).value;
+      const confirm = (document.getElementById("confirm-new-password") as HTMLInputElement).value;
+      const errorEl = document.getElementById("change-pwd-error") as HTMLParagraphElement;
+      const successEl = document.getElementById("change-pwd-success") as HTMLParagraphElement;
+      const btn = document.getElementById("change-pwd-btn") as HTMLButtonElement;
+
+      errorEl.classList.add("hidden");
+      successEl.classList.add("hidden");
+
+      if (pwd !== confirm) {
+        errorEl.textContent = "Passwords do not match.";
+        errorEl.classList.remove("hidden");
+        return;
+      }
+      if (pwd.length < 6) {
+        errorEl.textContent = "Password must be at least 6 characters.";
+        errorEl.classList.remove("hidden");
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = "Updating...";
+
+      const sb = requireSupabase();
+      const { error } = await sb.auth.updateUser({ password: pwd });
+
+      if (error) {
+        errorEl.textContent = error.message;
+        errorEl.classList.remove("hidden");
+        btn.disabled = false;
+        btn.textContent = "Update Password";
+      } else {
+        successEl.textContent = "Password updated successfully!";
+        successEl.classList.remove("hidden");
+        btn.textContent = "Updated!";
+        (document.getElementById("new-password") as HTMLInputElement).value = "";
+        (document.getElementById("confirm-new-password") as HTMLInputElement).value = "";
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.textContent = "Update Password";
+        }, 2000);
+      }
     });
   }
 
