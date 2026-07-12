@@ -1,0 +1,190 @@
+---
+import { getLocaleFromUrl } from "@/docs/js/localeUtils";
+import { getTranslatedData } from "@/docs/js/translationUtils";
+import DocsLandingLayout from "@/docs/layouts/DocsLandingLayout.astro";
+
+const currLocale = getLocaleFromUrl(Astro.url);
+const siteData = getTranslatedData("siteData", currLocale);
+---
+
+<DocsLandingLayout title="My Account — Skillber" description="Manage your Skillber account settings and profile.">
+  <main id="main-content" class="docs-home-container flex-1 py-20">
+    <div class="mb-12 text-center">
+      <h1 class="font-heading text-foreground mb-2 text-3xl font-medium tracking-wide md:text-4xl">My Account</h1>
+      <p class="text-muted-foreground text-sm">Manage your profile and account settings</p>
+    </div>
+
+    <!-- Loading state -->
+    <div id="loading-state" class="py-20 text-center">
+      <div class="border-accent mx-auto h-8 w-8 animate-spin rounded-full border-2 border-t-transparent"></div>
+      <p class="text-muted-foreground mt-4 text-sm">Loading your account...</p>
+    </div>
+
+    <!-- Account content (shown by JS) -->
+    <div id="account-content" class="mx-auto hidden max-w-2xl space-y-8">
+      <!-- Profile Card -->
+      <div class="rounded-xl border bg-card p-8">
+        <div class="flex items-center gap-6">
+          <div class="flex h-16 w-16 items-center justify-center rounded-full bg-accent/10 text-2xl font-bold text-accent" id="avatar-initial">
+            ?
+          </div>
+          <div>
+            <h2 class="text-foreground text-xl font-medium" id="account-name">—</h2>
+            <p class="text-muted-foreground text-sm" id="account-email">—</p>
+            <p class="text-muted-foreground mt-1 text-xs" id="account-member-since">Member since —</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats Card -->
+      <div class="grid gap-4 sm:grid-cols-3">
+        <div class="rounded-xl border bg-card p-6 text-center">
+          <p class="text-foreground text-3xl font-bold" id="stat-courses">—</p>
+          <p class="text-muted-foreground mt-1 text-sm">Enrolled Courses</p>
+        </div>
+        <div class="rounded-xl border bg-card p-6 text-center">
+          <p class="text-foreground text-3xl font-bold" id="stat-devices">1</p>
+          <p class="text-muted-foreground mt-1 text-sm">Account Status</p>
+        </div>
+        <div class="rounded-xl border bg-card p-6 text-center">
+          <p class="text-foreground text-3xl font-bold" id="stat-verified">—</p>
+          <p class="text-muted-foreground mt-1 text-sm">Email Verified</p>
+        </div>
+      </div>
+
+      <!-- Actions Card -->
+      <div class="rounded-xl border bg-card p-6">
+        <h3 class="text-foreground mb-4 text-lg font-medium">Account Actions</h3>
+        <div class="space-y-3">
+          <a href="/my-courses" class="flex items-center justify-between rounded-lg p-3 transition-colors hover:bg-accent/5">
+            <div class="flex items-center gap-3">
+              <svg class="h-5 w-5 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M10 14l2 -2m0 0l2 -2m-2 2l-2 -2m2 2l2 2m4 -12v16a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-16a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2z" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <div>
+                <p class="text-foreground text-sm font-medium">My Courses</p>
+                <p class="text-muted-foreground text-xs">View your enrolled courses</p>
+              </div>
+            </div>
+            <svg class="h-4 w-4 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </a>
+
+          <button id="logout-btn" class="flex w-full items-center justify-between rounded-lg p-3 transition-colors hover:bg-error/5 cursor-pointer">
+            <div class="flex items-center gap-3">
+              <svg class="h-5 w-5 text-error" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 8v-2a2 2 0 0 0 -2 -2h-7a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h7a2 2 0 0 0 2 -2v-2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M7 12h14l-3 -3m0 6l3 -3" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <div class="text-left">
+                <p class="text-foreground text-sm font-medium">Log Out</p>
+                <p class="text-muted-foreground text-xs">Sign out of your account</p>
+              </div>
+            </div>
+            <svg class="h-4 w-4 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Not logged in state -->
+    <div id="unauth-state" class="hidden py-20 text-center">
+      <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-accent/10">
+        <svg class="h-8 w-8 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 15v2m-6 4h12a2 2 0 0 0 2 -2v-6a2 2 0 0 0 -2 -2h-12a2 2 0 0 0 -2 2v6a2 2 0 0 0 2 2z" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M8 11v-4a4 4 0 0 1 8 0v4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <h2 class="text-foreground mt-4 text-xl font-medium">Not logged in</h2>
+      <p class="text-muted-foreground mt-2 text-sm">Log in to view and manage your account.</p>
+      <a href="/login?redirect=/my-account" class="bg-accent text-accent-foreground hover:bg-accent/90 mt-6 inline-flex items-center gap-2 rounded-full px-6 py-2.5 text-sm font-medium transition-colors">
+        Log In
+      </a>
+    </div>
+  </main>
+</DocsLandingLayout>
+
+<script>
+  import { getCurrentSession, logout } from "@/docs/services/auth";
+  import { requireSupabase } from "@/docs/services/supabase";
+  import { getEnrolledCourses } from "@/docs/services/enrollment";
+
+  function initAccount() {
+    const loadingEl = document.getElementById("loading-state");
+    const contentEl = document.getElementById("account-content");
+    const unauthEl = document.getElementById("unauth-state");
+
+    if (!loadingEl || !contentEl || !unauthEl) return;
+
+    loadingEl.classList.remove("hidden");
+    contentEl.classList.add("hidden");
+    unauthEl.classList.add("hidden");
+
+    const session = getCurrentSession();
+
+    if (!session) {
+      loadingEl.classList.add("hidden");
+      unauthEl.classList.remove("hidden");
+      return;
+    }
+
+    (async () => {
+      // Set profile info
+      const nameEl = document.getElementById("account-name");
+      const emailEl = document.getElementById("account-email");
+      const memberSinceEl = document.getElementById("account-member-since");
+      const avatarEl = document.getElementById("avatar-initial");
+
+      if (nameEl) nameEl.textContent = session.name;
+      if (emailEl) emailEl.textContent = session.email;
+
+      if (avatarEl) {
+        avatarEl.textContent = session.name.charAt(0).toUpperCase();
+      }
+
+      // Get account creation date from Supabase
+      try {
+        const sb = requireSupabase();
+        const { data: { user } } = await sb.auth.getUser();
+        if (user?.created_at && memberSinceEl) {
+          memberSinceEl.textContent = `Member since ${new Date(user.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long" })}`;
+        }
+      } catch {}
+
+      // Get enrolled courses count
+      try {
+        const enrollments = await getEnrolledCourses(session.userId);
+        const statCourses = document.getElementById("stat-courses");
+        if (statCourses) statCourses.textContent = String(enrollments.length);
+      } catch {}
+
+      // Check email verification status
+      try {
+        const sb = requireSupabase();
+        const { data: { user } } = await sb.auth.getUser();
+        const statVerified = document.getElementById("stat-verified");
+        if (statVerified) {
+          statVerified.textContent = user?.email_confirmed_at ? "Verified" : "Pending";
+        }
+        
+        if (memberSinceEl && user?.created_at) {
+          memberSinceEl.textContent = `Member since ${new Date(user.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long" })}`;
+        }
+      } catch {}
+
+      loadingEl.classList.add("hidden");
+      contentEl.classList.remove("hidden");
+    })();
+
+    // Logout handler
+    document.getElementById("logout-btn")?.addEventListener("click", async () => {
+      await logout();
+      window.location.href = "/";
+    });
+  }
+
+  document.addEventListener("astro:page-load", initAccount);
+</script>

@@ -1,0 +1,125 @@
+---
+import DocsLandingLayout from "@/docs/layouts/DocsLandingLayout.astro";
+---
+
+<DocsLandingLayout
+  title="Cookie Policy — Skillber"
+  description="Skillber Cookie Policy — how we use cookies and similar technologies on our platform."
+>
+  <main class="docs-home-container mx-auto max-w-3xl py-20">
+    <h1 class="font-heading text-foreground mb-2 text-3xl font-medium tracking-wide md:text-4xl">Cookie Policy</h1>
+    <p class="text-muted-foreground mb-8 text-sm">Last updated: January 2026</p>
+
+    <div class="docs-markdown-content space-y-6">
+      <section>
+        <h2>What Are Cookies</h2>
+        <p>
+          Cookies are small text files stored on your device when you visit a website. They are widely used to make websites work more efficiently and provide information to the website owners. Cookies can be "persistent" (remaining on your device) or "session" (deleted when you close your browser).
+        </p>
+      </section>
+
+      <section>
+        <h2>How We Use Cookies</h2>
+        <p>Skillber uses cookies for the following purposes:</p>
+
+        <h3>Essential Cookies</h3>
+        <p>These cookies are necessary for the platform to function properly:</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Cookie Name</th>
+              <th>Purpose</th>
+              <th>Duration</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>cookie-consent</code></td>
+              <td>Remembers your cookie consent preference</td>
+              <td>Session</td>
+            </tr>
+            <tr>
+              <td><code>sb-*-auth-token</code></td>
+              <td>Supabase authentication session token</td>
+              <td>Session</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Authentication Cookies</h3>
+        <p>
+          When you log into your Skillber account, we use cookies to maintain your authenticated session. These cookies are essential for accessing protected features such as course content and your account dashboard.
+        </p>
+
+        <h3>Preference Cookies</h3>
+        <p>
+          We use local storage to remember your theme preference (dark/light mode) and language preference (EN/FR). These are stored locally in your browser and are not used for tracking.
+        </p>
+      </section>
+
+      <section>
+        <h2>Third-Party Cookies</h2>
+        <p>We use the following third-party services that may set cookies:</p>
+        <ul>
+          <li><strong>Supabase:</strong> Sets authentication cookies to manage user sessions. <a href="https://supabase.com/privacy" class="text-accent hover:underline" target="_blank" rel="noopener">Privacy Policy</a></li>
+          <li><strong>Stripe:</strong> Sets cookies when processing payments to prevent fraud and ensure secure transactions. <a href="https://stripe.com/privacy" class="text-accent hover:underline" target="_blank" rel="noopener">Privacy Policy</a></li>
+          <li><strong>Vercel:</strong> Sets analytics cookies for performance monitoring. <a href="https://vercel.com/privacy" class="text-accent hover:underline" target="_blank" rel="noopener">Privacy Policy</a></li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Managing Cookies</h2>
+        <p>You can control and manage cookies in several ways:</p>
+        <ul>
+          <li><strong>Cookie Consent Banner:</strong> When you first visit Skillber, you can accept or decline non-essential cookies via our cookie consent banner.</li>
+          <li><strong>Browser Settings:</strong> Most browsers allow you to view, block, or delete cookies. The method varies by browser:</li>
+        </ul>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Browser</th>
+              <th>Manage Cookies</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Google Chrome</td>
+              <td>Settings → Privacy and Security → Cookies and other site data</td>
+            </tr>
+            <tr>
+              <td>Mozilla Firefox</td>
+              <td>Options → Privacy & Security → Cookies and Site Data</td>
+            </tr>
+            <tr>
+              <td>Safari</td>
+              <td>Preferences → Privacy → Manage Website Data</td>
+            </tr>
+            <tr>
+              <td>Microsoft Edge</td>
+              <td>Settings → Cookies and site permissions → Manage cookies</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p>
+          Blocking essential cookies may prevent certain features of Skillber from functioning properly, such as logging in or accessing purchased courses.
+        </p>
+      </section>
+
+      <section>
+        <h2>Changes to This Policy</h2>
+        <p>
+          We may update this Cookie Policy to reflect changes in technology, legislation, or our data practices. We will notify you of material changes by updating the "Last updated" date. We encourage you to review this policy periodically.
+        </p>
+      </section>
+
+      <section>
+        <h2>Contact</h2>
+        <p>
+          If you have questions about our use of cookies, please contact us through GitHub at <a href="https://github.com/Boston343" class="text-accent hover:underline" target="_blank" rel="noopener">github.com/Boston343</a>.
+        </p>
+      </section>
+    </div>
+  </main>
+</DocsLandingLayout>

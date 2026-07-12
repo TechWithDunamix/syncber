@@ -96,6 +96,13 @@ const siteData = getTranslatedData("siteData", currLocale);
           >
             My Courses
           </a>
+          <a
+            href="/my-account"
+            id="my-account-btn-desktop"
+            class="docs-primary-focus text-foreground hover:text-accent hidden rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
+          >
+            My Account
+          </a>
           <button
             id="logout-btn-desktop"
             class="text-muted-foreground hover:text-foreground hidden cursor-pointer rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
@@ -139,6 +146,13 @@ const siteData = getTranslatedData("siteData", currLocale);
             >
               My Courses
             </a>
+            <a
+              href="/my-account"
+              id="my-account-btn-mobile"
+              class="docs-nav__link--base hidden rounded-lg px-3 py-2 text-sm font-medium"
+            >
+              My Account
+            </a>
             <button
               id="logout-btn-mobile"
               class="text-muted-foreground hover:text-foreground hidden cursor-pointer rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors"
@@ -164,12 +178,14 @@ const siteData = getTranslatedData("siteData", currLocale);
     document.querySelectorAll("#auth-desktop a[href='/login']").forEach((el) => el.classList.toggle("hidden", isLoggedIn));
     document.getElementById("signup-btn-desktop")?.classList.toggle("hidden", isLoggedIn);
     document.getElementById("my-courses-btn-desktop")?.classList.toggle("hidden", !isLoggedIn);
+    document.getElementById("my-account-btn-desktop")?.classList.toggle("hidden", !isLoggedIn);
     document.getElementById("logout-btn-desktop")?.classList.toggle("hidden", !isLoggedIn);
 
     // Mobile
     document.querySelectorAll("#auth-mobile a[href='/login']").forEach((el) => el.classList.toggle("hidden", isLoggedIn));
     document.getElementById("signup-btn-mobile")?.classList.toggle("hidden", isLoggedIn);
     document.getElementById("my-courses-btn-mobile")?.classList.toggle("hidden", !isLoggedIn);
+    document.getElementById("my-account-btn-mobile")?.classList.toggle("hidden", !isLoggedIn);
     document.getElementById("logout-btn-mobile")?.classList.toggle("hidden", !isLoggedIn);
   }
 
