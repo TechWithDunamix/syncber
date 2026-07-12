@@ -117,6 +117,32 @@ export async function login(
   return { success: true, data: session };
 }
 
+export async function forgotPassword(email: string): Promise<ApiResponse<null>> {
+  const sb = requireSupabase();
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/reset-password`,
+  });
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  return { success: true, data: null };
+}
+
+export async function resetPassword(
+  newPassword: string
+): Promise<ApiResponse<null>> {
+  const sb = requireSupabase();
+  const { error } = await sb.auth.updateUser({ password: newPassword });
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  return { success: true, data: null };
+}
+
 export async function logout(): Promise<void> {
   clearSessionCache();
   const sb = requireSupabase();

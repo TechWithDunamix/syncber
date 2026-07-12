@@ -35,8 +35,8 @@ const docsSiteData: DocsSiteData = {
   ],
   // default image for meta tags if the page doesn't have an image already
   defaultImage: {
-    src: "/images/skillber.jpg",
-    alt: "Skillber",
+    src: "/images/skillber-og.svg",
+    alt: "Skillber — Build In-Demand Tech Skills",
   },
   // Your information for SEO purposes
   author: {

@@ -34,8 +34,8 @@ const docsSiteData: DocsSiteData = {
     },
   ],
   defaultImage: {
-    src: "/images/skillber.jpg",
-    alt: "Skillber",
+    src: "/images/skillber-og.svg",
+    alt: "Skillber — Maîtrisez les compétences techniques recherchées",
   },
   author: {
     name: "Cosmic Themes",

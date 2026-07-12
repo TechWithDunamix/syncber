@@ -31,7 +31,10 @@ const siteData = getTranslatedData("siteData", currLocale);
         </div>
 
         <div>
-          <label for="password" class="text-foreground mb-1.5 block text-sm font-medium">Password</label>
+          <div class="flex items-center justify-between mb-1.5">
+            <label for="password" class="text-foreground block text-sm font-medium">Password</label>
+            <a href="/forgot-password" class="text-accent hover:text-accent/80 text-xs font-medium transition-colors">Forgot password?</a>
+          </div>
           <input
             type="password"
             id="password"
