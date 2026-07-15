@@ -253,7 +253,10 @@ const title = "Payment Success";
               if (successTitle) successTitle.textContent = "Full Platform Access Granted!";
               if (successDesc) {
                 const count = data.courseCount;
-                successDesc.textContent = `You now have access to all ${count} courses.`;
+                const expiryDate = new Date();
+                expiryDate.setMonth(expiryDate.getMonth() + 6);
+                const expiryStr = expiryDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+                successDesc.innerHTML = `You now have access to all ${count} courses until <strong>${expiryStr}</strong>.`;
               }
               courseLink.textContent = "Go to My Courses";
             }

@@ -63,6 +63,10 @@ export const GET: APIRoute = async ({ url }) => {
       ? session.metadata.courses.split(",").map((s) => s.trim()).filter(Boolean)
       : Object.keys(COURSE_CATALOG);
 
+    // Full platform access expires in 6 months
+    const expiresAt = new Date();
+    expiresAt.setMonth(expiresAt.getMonth() + 6);
+
     // Build enrollment rows from the course list
     const enrollmentRows = courseIds
       .map((cid) => {
@@ -73,6 +77,7 @@ export const GET: APIRoute = async ({ url }) => {
           course_id: cid,
           course_title: info.title,
           amount: info.price,
+          expires_at: expiresAt.toISOString(),
         };
       })
       .filter(Boolean) as {
@@ -80,6 +85,7 @@ export const GET: APIRoute = async ({ url }) => {
       course_id: string;
       course_title: string;
       amount: number;
+      expires_at: string;
     }[];
 
     if (enrollmentRows.length === 0) {

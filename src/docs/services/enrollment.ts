@@ -17,6 +17,7 @@ export interface Enrollment {
   courseTitle: string;
   purchasedAt: string;
   amount: number;
+  expiresAt?: string;
 }
 
 export const COURSES: CourseInfo[] = [
@@ -142,12 +143,14 @@ export async function hasAccess(
     const sb = requireSupabase();
     const controller = new AbortController();
     const t = setTimeout(() => controller.abort(), 8000);
+    const now = new Date().toISOString();
 
     const { data } = await sb
       .from("enrollments")
       .select("id")
       .eq("user_id", userId)
       .eq("course_id", courseId)
+      .or(`expires_at.is.null,expires_at.gt.${now}`)
       .abortSignal(controller.signal)
       .maybeSingle();
 
@@ -163,10 +166,12 @@ export async function getEnrolledCourses(
 ): Promise<Enrollment[]> {
   try {
     const sb = requireSupabase();
+    const now = new Date().toISOString();
     const { data } = await sb
       .from("enrollments")
       .select("*")
       .eq("user_id", userId)
+      .or(`expires_at.is.null,expires_at.gt.${now}`)
       .order("purchased_at", { ascending: false });
 
     if (!data) return [];
@@ -178,6 +183,7 @@ export async function getEnrolledCourses(
       courseTitle: row.course_title,
       purchasedAt: row.purchased_at,
       amount: row.amount,
+      expiresAt: row.expires_at || undefined,
     }));
   } catch {
     return [];

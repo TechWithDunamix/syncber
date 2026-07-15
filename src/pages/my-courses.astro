@@ -101,7 +101,7 @@ const siteData = getTranslatedData("siteData", currLocale);
               <p class="text-muted-foreground mb-4 text-sm leading-relaxed">${info?.description || ""}</p>
               <div class="text-muted-foreground flex items-center justify-between text-xs">
                 <span>${info?.pages || "?"} pages</span>
-                <span>${new Date(enrollment.purchasedAt).toLocaleDateString()}</span>
+                <span>${enrollment.expiresAt ? `Expires ${new Date(enrollment.expiresAt).toLocaleDateString()}` : new Date(enrollment.purchasedAt).toLocaleDateString()}</span>
               </div>
               <div class="mt-4 flex items-center gap-1 text-sm font-medium text-accent">
                 Continue Learning
